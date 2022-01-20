@@ -1,0 +1,15 @@
+[package]
+name = "pi_render"
+version = "0.1.0"
+authors = ["moyy <moyy@gmail.com>"]
+edition = "2021"
+description = "Renderer for PI Engine"
+repository = "https://github.com/GaiaWorld/pi_render"
+license = "MIT OR Apache-2.0"
+keywords = ["pi"]
+
+[features]
+
+[dependencies]
+
+[dev-dependencies]
