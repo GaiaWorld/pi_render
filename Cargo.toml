@@ -11,5 +11,9 @@ keywords = ["pi"]
 [features]
 
 [dependencies]
+wgpu = "0.12"
+raw-window-handle = "0.4"
+pi_ecs = {path = "../pi_ecs"}
 
 [dev-dependencies]
+winit = "0.26"
