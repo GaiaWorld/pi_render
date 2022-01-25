@@ -26,7 +26,7 @@ impl RenderExample {
     
     // 窗口大小改变 时 调用一次
     pub fn resize(&self, w: u32, h: u32) {
-        info!("RenderExample::resize({}, {}", w, h);
+        info!("RenderExample::resize({}, {})", w, h);
     }
     
     // 执行 窗口渲染，每帧调用一次
@@ -66,7 +66,11 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 // 窗口 关闭，退出 循环
                 event: WindowEvent::CloseRequested,
                 ..
-            } => *control_flow = ControlFlow::Exit,
+            } => {
+                example.clean();
+
+                *control_flow = ControlFlow::Exit
+            }
             _ => {}
         }
     });
