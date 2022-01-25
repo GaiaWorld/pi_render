@@ -1,0 +1,26 @@
+[package]
+name = "pi_crevice_derive"
+version = "0.1.0"
+authors = ["moyy <moyy@gmail.com>"]
+edition = "2021"
+description = "Derive crate for the 'crevice' crate"
+repository = "https://github.com/GaiaWorld/pi_render"
+license = "MIT OR Apache-2.0"
+keywords = ["pi"]
+
+[features]
+default = []
+
+# Enable methods that let you introspect into the generated structs.
+debug-methods = []
+
+[lib]
+proc-macro = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+syn = "1.0.40"
+quote = "1.0.7"
+proc-macro2 = "1.0.21"
+pi_macro_utils = { path = "../../pi_macro_utils", version = "0.1.0" }
