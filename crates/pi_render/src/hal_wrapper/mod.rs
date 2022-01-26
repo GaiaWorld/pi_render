@@ -1,8 +1,10 @@
 mod device;
-
-pub use device::*;
+mod shader;
 
 pub use pi_crevice::*;
+
+pub use device::*;
+pub use shader::*;
 
 pub use wgpu::{
     // Util
@@ -11,8 +13,9 @@ pub use wgpu::{
     // Uniform
     BindGroupDescriptor, BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry, 
     BindingType, BindingResource, 
-    
-    /// State
+    BindGroup, BindGroupLayout, 
+
+    // State
     Operations, StencilOperation, 
     CompareFunction, Face, FrontFace, PolygonMode, PrimitiveTopology, 
     ColorWrites, BlendComponent, BlendFactor, BlendOperation, 
@@ -29,6 +32,7 @@ pub use wgpu::{
     VertexBufferLayout as RawVertexBufferLayout,
     
     // Buffer
+    Buffer, BufferSlice,
     MapMode, util::BufferInitDescriptor, 
     BufferAddress, BufferBinding, BufferBindingType, BufferDescriptor, BufferSize, BufferUsages, 
     
