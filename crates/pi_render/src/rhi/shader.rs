@@ -5,7 +5,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-use std::{borrow::Cow, ops::Deref, path::PathBuf, str::FromStr};
+use std::{borrow::Cow, ops::Deref, path::PathBuf};
 use thiserror::Error;
 use wgpu::{util::make_spirv, ShaderModuleDescriptor, ShaderSource};
 
@@ -50,6 +50,7 @@ impl Shader {
     /// 需要指定 stage: vs, fs, cs
     pub fn from_glsl(source: impl Into<Cow<'static, str>>, stage: naga::ShaderStage) -> Shader {
         let source = source.into();
+
         Shader {
             imports: SHADER_IMPORT_PROCESSOR.get_imports_from_str(&source),
             source: Source::Glsl(source, stage),
@@ -246,7 +247,7 @@ pub fn load_shader(
             _ => panic!("unhandled extension: {}", ext),
         };
 
-        shader.import_path = Some(ShaderImport::AssetPath(path.to_string_lossy().to_string()));
+        shader.import_path = Some(ShaderImport::Path(path.to_string_lossy().to_string()));
 
         Ok(shader)
     }
@@ -289,7 +290,7 @@ pub struct ShaderImportProcessor {
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum ShaderImport {
     /// 路径 识别
-    AssetPath(String),
+    Path(String),
     /// 定制，具体语义由 高层解析
     Custom(String),
 }
@@ -323,7 +324,7 @@ impl ShaderImportProcessor {
         for line in shader.lines() {
             if let Some(cap) = self.import_asset_path_regex.captures(line) {
                 let import = cap.get(1).unwrap();
-                imports.push(ShaderImport::AssetPath(import.as_str().to_string()));
+                imports.push(ShaderImport::Path(import.as_str().to_string()));
             } else if let Some(cap) = self.import_custom_path_regex.captures(line) {
                 let import = cap.get(1).unwrap();
                 imports.push(ShaderImport::Custom(import.as_str().to_string()));
@@ -416,7 +417,7 @@ impl ShaderProcessor {
                 .captures(line)
             {
                 // 遇到 #import "..." 语句
-                let import = ShaderImport::AssetPath(cap.get(1).unwrap().as_str().to_string());
+                let import = ShaderImport::Path(cap.get(1).unwrap().as_str().to_string());
 
                 self.apply_import(
                     import_shaders,
@@ -1134,8 +1135,8 @@ fn in_import_present() { }
 #endif
 ";
         #[rustfmt::skip]
-        const INPUT: &str = r"
-#import FOO
+        const INPUT: &str = "
+#import \"libs/foo\"
 #ifdef MAIN_MISSING
 fn in_main_missing() { }
 #endif
@@ -1158,7 +1159,7 @@ fn in_main_present() { }
 
         let mut import_shaders = HashMap::default();
         import_shaders.insert(
-            ShaderImport::Custom("FOO".to_string()),
+            ShaderImport::Path("libs/foo".to_string()),
             Shader::from_wgsl(FOO),
         );
 
