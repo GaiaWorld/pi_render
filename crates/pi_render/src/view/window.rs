@@ -7,9 +7,9 @@ use pi_ecs::prelude::{World, ResMut, Res};
 use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
 use wgpu::TextureFormat;
 
-use crate::{TextureView, RenderInstance, rhi::RenderDevice, PiDefault};
+use crate::rhi::{texture::TextureView, device::RenderDevice, RenderInstance};
 
-type WindowId = u64;
+pub type WindowId = u64;
 
 /// Presentation mode for a window.
 ///

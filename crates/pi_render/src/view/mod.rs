@@ -1,14 +1,21 @@
-mod window;
+pub mod window;
 
-use pi_ecs::prelude::World;
-pub use window::*;
-
-use wgpu::{
-    Color, Extent3d, Operations, RenderPassColorAttachment, TextureDescriptor, TextureDimension,
-    TextureFormat, TextureUsages,
+use self::window::RenderWindows;
+use crate::{
+    Mat4,
+    camera::{RenderCamera, RenderCameraNames},
+    rhi::{
+        device::RenderDevice,
+        texture::{Texture, TextureView},
+        uniform_vec::DynamicUniformVec,
+        RenderQueue,
+    },
+    texture::texture_cache::TextureCache,
+    RenderArchetype, Vec3,
 };
-
-use crate::{TextureView, PiDefault};
+use pi_crevice::std140::AsStd140;
+use pi_ecs::prelude::*;
+use wgpu::{Color, Operations, RenderPassColorAttachment};
 
 pub fn init_view(world: &mut World) {
     let views = ViewUniforms::default();
@@ -17,7 +24,7 @@ pub fn init_view(world: &mut World) {
 
 pub struct RenderView {
     pub projection: Mat4,
-    pub transform: GlobalTransform,
+    pub transform: Mat4,
     pub width: u32,
     pub height: u32,
     pub near: f32,
@@ -75,11 +82,11 @@ pub struct ViewDepthTexture {
 }
 
 pub fn prepare_view_uniforms(
-    mut commands: Commands,
+    mut commands: Commands<ViewUniformOffset>,
     render_device: Res<RenderDevice>,
     render_queue: Res<RenderQueue>,
     mut view_uniforms: ResMut<ViewUniforms>,
-    views: Query<(Entity, &RenderView)>,
+    views: Query<RenderArchetype, (Entity, &RenderView)>,
 ) {
     view_uniforms.uniforms.clear();
     for (entity, camera) in views.iter() {
@@ -100,7 +107,7 @@ pub fn prepare_view_uniforms(
             }),
         };
 
-        commands.entity(entity).insert(view_uniforms);
+        commands.insert(entity, view_uniforms);
     }
 
     view_uniforms
@@ -109,13 +116,12 @@ pub fn prepare_view_uniforms(
 }
 
 pub fn prepare_view_targets(
-    mut commands: Commands,
-    camera_names: Res<ExtractedCameraNames>,
-    windows: Res<ExtractedWindows>,
-    msaa: Res<Msaa>,
+    mut commands: Commands<ViewTarget>,
+    camera_names: Res<RenderCameraNames>,
+    windows: Res<RenderWindows>,
     render_device: Res<RenderDevice>,
     mut texture_cache: ResMut<TextureCache>,
-    cameras: Query<&ExtractedCamera>,
+    cameras: Query<RenderArchetype, &RenderCamera>,
 ) {
     for entity in camera_names.entities.values().copied() {
         let camera = if let Ok(camera) = cameras.get(entity) {
@@ -123,41 +129,27 @@ pub fn prepare_view_targets(
         } else {
             continue;
         };
+
         let window = if let Some(window) = windows.get(&camera.window_id) {
             window
         } else {
             continue;
         };
+
         let swap_chain_texture = if let Some(texture) = &window.swap_chain_texture {
             texture
         } else {
             continue;
         };
-        let sampled_target = if msaa.samples > 1 {
-            let sampled_texture = texture_cache.get(
-                &render_device,
-                TextureDescriptor {
-                    label: Some("sampled_color_attachment_texture"),
-                    size: Extent3d {
-                        width: window.physical_width,
-                        height: window.physical_height,
-                        depth_or_array_layers: 1,
-                    },
-                    mip_level_count: 1,
-                    sample_count: msaa.samples,
-                    dimension: TextureDimension::D2,
-                    format: TextureFormat::pi_default(),
-                    usage: TextureUsages::RENDER_ATTACHMENT,
-                },
-            );
-            Some(sampled_texture.default_view.clone())
-        } else {
-            None
-        };
 
-        commands.entity(entity).insert(ViewTarget {
-            view: swap_chain_texture.clone(),
-            sampled_target,
-        });
+        let sampled_target = None;
+
+        commands.insert(
+            entity,
+            ViewTarget {
+                view: swap_chain_texture.clone(),
+                sampled_target,
+            },
+        );
     }
 }

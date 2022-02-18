@@ -505,7 +505,8 @@ mod tests {
 
     use naga::ShaderStage;
 
-    use crate::{ProcessShaderError, Shader, ShaderImport, ShaderProcessor};
+    use crate::rhi::shader::{ShaderProcessor, Shader, ProcessShaderError, ShaderImport};
+
     #[rustfmt::skip]
 const WGSL: &str = r"
 struct View {

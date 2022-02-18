@@ -1,11 +1,9 @@
-use crate::{
-    BindGroup, BindGroupLayout, Buffer, ComputePipeline,
-    RenderPipeline, Sampler, Texture,
-};
 
 use std::sync::Arc;
 use futures::Future;
 use wgpu::{util::DeviceExt, BufferAsyncError};
+
+use super::{bind_group::{BindGroup, BindGroupLayout}, pipeline::{RenderPipeline, ComputePipeline}, buffer::Buffer, texture::{Texture, Sampler}};
 
 /// This GPU device is responsible for the creation of most rendering and compute resources.
 #[derive(Clone)]

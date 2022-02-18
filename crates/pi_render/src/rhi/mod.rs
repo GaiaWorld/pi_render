@@ -2,27 +2,20 @@
 //! 对 wgpu 的 封装
 //! 封装成 可 Clone 的 API 对象
 
-mod bind_group;
-mod buffer;
-mod device;
-mod options;
-mod pipeline;
-mod shader;
-mod texture;
-
-use std::sync::Arc;
+pub mod bind_group;
+pub mod buffer;
+pub mod device;
+pub mod options;
+pub mod pipeline;
+pub mod shader;
+pub mod texture;
+pub mod uniform_vec;
 
 use log::{debug, info};
-pub use pi_crevice::*;
-
-pub use bind_group::*;
-pub use buffer::*;
-pub use device::*;
-pub use options::*;
-pub use pipeline::*;
 use raw_window_handle::RawWindowHandle;
-pub use shader::*;
-pub use texture::*;
+use std::sync::Arc;
+
+pub use pi_crevice::*;
 
 pub use wgpu::{
     util::BufferInitDescriptor,
@@ -122,6 +115,10 @@ pub use wgpu::{
     VertexStepMode,
 };
 
+use crate::rhi::options::RenderPriority;
+
+use self::{device::RenderDevice, options::RenderOptions};
+
 /// This queue is used to enqueue tasks for the GPU to execute asynchronously.
 pub type RenderQueue = Arc<wgpu::Queue>;
 
@@ -129,16 +126,7 @@ pub type RenderQueue = Arc<wgpu::Queue>;
 /// aswell as to create [`WindowSurfaces`](crate::view::window::WindowSurfaces).
 pub type RenderInstance = wgpu::Instance;
 
-/// The context with all information required to interact with the GPU.
-///
-/// The [`RenderDevice`] is used to create render resources and the
-/// the [`CommandEncoder`] is used to record a series of GPU operations.
-pub struct RenderContext {
-    pub render_device: RenderDevice,
-    pub command_encoder: CommandEncoder,
-}
-
-/// 初始化 渲染 环境
+// 初始化 渲染 环境
 pub async fn create_render_context(
     window: &RawWindowHandle,
     mut options: RenderOptions,

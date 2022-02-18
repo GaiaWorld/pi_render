@@ -1,9 +1,10 @@
-use crate::{BindGroupLayout, Shader};
 use std::{borrow::Cow, ops::Deref, sync::Arc};
 use wgpu::{
     BufferAddress, ColorTargetState, DepthStencilState, MultisampleState, PrimitiveState,
     VertexAttribute, VertexStepMode,
 };
+
+use super::{bind_group::BindGroupLayout, shader::Shader};
 
 #[derive(Clone, Debug)]
 pub struct RenderPipeline(Arc<wgpu::RenderPipeline>);
