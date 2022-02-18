@@ -2,7 +2,7 @@ use crate::{view::window::{RenderWindows, WindowId}, Vec2, Vec3, Mat4};
 
 #[derive(Default, Debug)]
 pub struct Camera {
-    pub projection_matrix: Mat4<f32>,
+    pub projection_matrix: Mat4,
     pub name: Option<String>,
     pub window: WindowId,
     pub depth_calculation: DepthCalculation,
