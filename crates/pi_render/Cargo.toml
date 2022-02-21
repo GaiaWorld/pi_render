@@ -11,9 +11,12 @@ keywords = ["pi"]
 [features]
 
 [dependencies]
+async = { path = "../../../pi_lib/async" }
+async_graph = { path = "../../../pi_lib/async_graph" }
+graph = { path = "../../../pi_lib/graph" }
+hash = { path = "../../../pi_lib/hash" }
 pi_crevice = { path = "../pi_crevice" }
 pi_ecs = { path = "../../../pi_ecs" }
-hash = {path = "../../../pi_lib/hash"}
 
 anyhow = "1.0"
 futures = "0.3"
