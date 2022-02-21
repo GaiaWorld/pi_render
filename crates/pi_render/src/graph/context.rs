@@ -1,3 +1,5 @@
+//! 渲染图的 执行环境
+
 use super::{
     graph::RenderGraph,
     node::NodeState,
@@ -8,34 +10,26 @@ use crate::rhi::{
     texture::{Sampler, TextureView},
 };
 use pi_ecs::entity::Entity;
-use std::borrow::Cow;
 use thiserror::Error;
 
-/// A command that signals the graph runner to run the sub graph corresponding to the `name`
-/// with the specified `inputs` next.
-pub struct RunSubGraph {
-    pub name: Cow<'static, str>,
-    pub inputs: Vec<SlotValue>,
-}
-
-/// The context with all graph information required to run a [`Node`](super::Node).
-/// This context is created for each node by the `RenderGraphRunner`.
+/// 执行 [`Node`](super::Node) 所需要的 所有 graph 信息
 ///
-/// The slot input can be read from here and the outputs must be written back to the context for
-/// passing them onto the next node.
+/// 环境 由 `RenderGraphRunner` 创建
 ///
-/// Sub graphs can be queued for running by adding a [`RunSubGraph`] command to the context.
-/// After the node has finished running the graph runner is responsible for executing the sub graphs.
-pub struct RenderGraphContext<'a> {
+/// `node` 执行时，从 `inputs` 读 对应的 输入，产生 `output`，输出到 下个 [`Node`](super::Node)
+pub struct RenderNodeContext<'a> {
+    // 渲染图
     graph: &'a RenderGraph,
+    // 对应的 RenderNode
     node: &'a NodeState,
+    // 输入
     inputs: &'a [SlotValue],
+    // 输出
     outputs: &'a mut [Option<SlotValue>],
-    run_sub_graphs: Vec<RunSubGraph>,
 }
 
-impl<'a> RenderGraphContext<'a> {
-    /// Creates a new render graph context for the `node`.
+impl<'a> RenderNodeContext<'a> {
+    /// 创建 渲染节点 执行环境
     pub fn new(
         graph: &'a RenderGraph,
         node: &'a NodeState,
@@ -47,27 +41,26 @@ impl<'a> RenderGraphContext<'a> {
             node,
             inputs,
             outputs,
-            run_sub_graphs: Vec::new(),
         }
     }
 
-    /// Returns the input slot values for the node.
+    /// 返回 该环境的 输入
     #[inline]
     pub fn inputs(&self) -> &[SlotValue] {
         self.inputs
     }
 
-    /// Returns the [`SlotInfos`] of the inputs.
+    /// 返回 该环境的 输入 `SlotInfos`
     pub fn input_info(&self) -> &SlotInfos {
         &self.node.input_slots
     }
 
-    /// Returns the [`SlotInfos`] of the outputs.
+    /// 返回 该环境的 输出 `SlotInfos`
     pub fn output_info(&self) -> &SlotInfos {
         &self.node.output_slots
     }
 
-    /// Retrieves the input slot value referenced by the `label`.
+    /// 返回 `label` 对应的 输入 `SlotValue`
     pub fn get_input(&self, label: impl Into<SlotLabel>) -> Result<&SlotValue, InputSlotError> {
         let label = label.into();
         let index = self
@@ -94,7 +87,8 @@ impl<'a> RenderGraphContext<'a> {
         }
     }
 
-    /// Retrieves the input slot value referenced by the `label` as a [`Sampler`].
+    /// 返回 `label` 对应的 输入 [`Sampler`]
+    /// 如其值非[`Sampler`]，返回 Err
     pub fn get_input_sampler(
         &self,
         label: impl Into<SlotLabel>,
@@ -110,7 +104,8 @@ impl<'a> RenderGraphContext<'a> {
         }
     }
 
-    /// Retrieves the input slot value referenced by the `label` as a [`Buffer`].
+    /// 返回 `label` 对应的 输入 [`Buffer`]
+    /// 如其值非[`Buffer`]，返回 Err
     pub fn get_input_buffer(&self, label: impl Into<SlotLabel>) -> Result<&Buffer, InputSlotError> {
         let label = label.into();
         match self.get_input(label.clone())? {
@@ -123,7 +118,8 @@ impl<'a> RenderGraphContext<'a> {
         }
     }
 
-    /// Retrieves the input slot value referenced by the `label` as an [`Entity`].
+    /// 返回 `label` 对应的 输入 [`Entity`]
+    /// 如其值非[`Entity`]，返回 Err
     pub fn get_input_entity(&self, label: impl Into<SlotLabel>) -> Result<Entity, InputSlotError> {
         let label = label.into();
         match self.get_input(label.clone())? {
@@ -136,7 +132,7 @@ impl<'a> RenderGraphContext<'a> {
         }
     }
 
-    /// Sets the output slot value referenced by the `label`.
+    /// 设置 `label` 对应节点的 输出 值
     pub fn set_output(
         &mut self,
         label: impl Into<SlotLabel>,
@@ -162,76 +158,9 @@ impl<'a> RenderGraphContext<'a> {
         self.outputs[slot_index] = Some(value);
         Ok(())
     }
-
-    /// Queues up a sub graph for execution after the node has finished running.
-    pub fn run_sub_graph(
-        &mut self,
-        name: impl Into<Cow<'static, str>>,
-        inputs: Vec<SlotValue>,
-    ) -> Result<(), RunSubGraphError> {
-        let name = name.into();
-        let sub_graph = self
-            .graph
-            .get_sub_graph(&name)
-            .ok_or_else(|| RunSubGraphError::MissingSubGraph(name.clone()))?;
-        if let Some(input_node) = sub_graph.input_node() {
-            for (i, input_slot) in input_node.input_slots.iter().enumerate() {
-                if let Some(input_value) = inputs.get(i) {
-                    if input_slot.slot_type != input_value.slot_type() {
-                        return Err(RunSubGraphError::MismatchedInputSlotType {
-                            graph_name: name,
-                            slot_index: i,
-                            actual: input_value.slot_type(),
-                            expected: input_slot.slot_type,
-                            label: input_slot.name.clone().into(),
-                        });
-                    }
-                } else {
-                    return Err(RunSubGraphError::MissingInput {
-                        slot_index: i,
-                        slot_name: input_slot.name.clone(),
-                        graph_name: name,
-                    });
-                }
-            }
-        } else if !inputs.is_empty() {
-            return Err(RunSubGraphError::SubGraphHasNoInputs(name));
-        }
-
-        self.run_sub_graphs.push(RunSubGraph { name, inputs });
-
-        Ok(())
-    }
-
-    /// Finishes the context for this [`Node`](super::Node) by
-    /// returning the sub graphs to run next.
-    pub fn finish(self) -> Vec<RunSubGraph> {
-        self.run_sub_graphs
-    }
 }
 
-#[derive(Error, Debug, Eq, PartialEq)]
-pub enum RunSubGraphError {
-    #[error("tried to run a non-existent sub-graph")]
-    MissingSubGraph(Cow<'static, str>),
-    #[error("passed in inputs, but this sub-graph doesn't have any")]
-    SubGraphHasNoInputs(Cow<'static, str>),
-    #[error("sub graph (name: '{graph_name:?}') could not be run because slot '{slot_name}' at index {slot_index} has no value")]
-    MissingInput {
-        slot_index: usize,
-        slot_name: Cow<'static, str>,
-        graph_name: Cow<'static, str>,
-    },
-    #[error("attempted to use the wrong type for input slot")]
-    MismatchedInputSlotType {
-        graph_name: Cow<'static, str>,
-        slot_index: usize,
-        label: SlotLabel,
-        expected: SlotType,
-        actual: SlotType,
-    },
-}
-
+/// 输出 Slot 错误
 #[derive(Error, Debug, Eq, PartialEq)]
 pub enum OutputSlotError {
     #[error("slot does not exist")]
@@ -244,6 +173,7 @@ pub enum OutputSlotError {
     },
 }
 
+/// 输入 Slot 错误
 #[derive(Error, Debug, Eq, PartialEq)]
 pub enum InputSlotError {
     #[error("slot does not exist")]

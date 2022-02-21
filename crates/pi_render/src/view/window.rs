@@ -1,13 +1,9 @@
-use std::{
-    collections::{HashMap, HashSet},
-    ops::{Deref, DerefMut},
-};
-
-use pi_ecs::prelude::{World, ResMut, Res};
+use crate::rhi::{device::RenderDevice, texture::TextureView, RenderInstance};
+use hash::{XHashMap, XHashSet};
+use pi_ecs::prelude::{Res, ResMut, World};
 use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
+use std::ops::{Deref, DerefMut};
 use wgpu::TextureFormat;
-
-use crate::rhi::{texture::TextureView, device::RenderDevice, RenderInstance};
 
 pub type WindowId = u64;
 
@@ -92,11 +88,11 @@ pub struct RenderWindow {
 
 #[derive(Default)]
 pub struct RenderWindows {
-    pub windows: HashMap<WindowId, RenderWindow>,
+    pub windows: XHashMap<WindowId, RenderWindow>,
 }
 
 impl Deref for RenderWindows {
-    type Target = HashMap<WindowId, RenderWindow>;
+    type Target = XHashMap<WindowId, RenderWindow>;
 
     fn deref(&self) -> &Self::Target {
         &self.windows
@@ -111,9 +107,9 @@ impl DerefMut for RenderWindows {
 
 #[derive(Default)]
 pub struct WindowSurfaces {
-    surfaces: HashMap<WindowId, wgpu::Surface>,
+    surfaces: XHashMap<WindowId, wgpu::Surface>,
     /// List of windows that we have already called the initial `configure_surface` for
-    configured_windows: HashSet<WindowId>,
+    configured_windows: XHashSet<WindowId>,
 }
 
 pub fn init_window(world: &mut World) {

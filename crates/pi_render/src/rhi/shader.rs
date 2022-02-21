@@ -1,9 +1,9 @@
 use futures::future::{BoxFuture, FutureExt};
+use hash::{XHashMap, XHashSet};
 use naga::back::wgsl::WriterFlags;
 use naga::{valid::ModuleInfo, Module};
 use once_cell::sync::Lazy;
 use regex::Regex;
-use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::{borrow::Cow, ops::Deref, path::PathBuf};
 use thiserror::Error;
@@ -365,8 +365,8 @@ impl ShaderProcessor {
     pub fn process(
         &self,
         shader: &Shader,
-        shader_defs: &HashSet<String>,
-        import_shaders: &HashMap<ShaderImport, Shader>,
+        shader_defs: &XHashSet<String>,
+        import_shaders: &XHashMap<ShaderImport, Shader>,
     ) -> Result<ProcessedShader, ProcessShaderError> {
         // 拿到 源码
         let shader_str = match &shader.source {
@@ -463,10 +463,10 @@ impl ShaderProcessor {
     // 处理 #import
     fn apply_import(
         &self,
-        import_shaders: &HashMap<ShaderImport, Shader>,
+        import_shaders: &XHashMap<ShaderImport, Shader>,
         import: &ShaderImport,
         shader: &Shader,
-        shader_defs: &HashSet<String>,
+        shader_defs: &XHashSet<String>,
         final_string: &mut String,
     ) -> Result<(), ProcessShaderError> {
         let imported_shader = import_shaders
@@ -501,11 +501,11 @@ impl ShaderProcessor {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::{HashMap, HashSet};
+    use hash::{XHashMap, XHashSet};
 
     use naga::ShaderStage;
 
-    use crate::rhi::shader::{ShaderProcessor, Shader, ProcessShaderError, ShaderImport};
+    use crate::rhi::shader::{ProcessShaderError, Shader, ShaderImport, ShaderProcessor};
 
     #[rustfmt::skip]
 const WGSL: &str = r"
@@ -668,12 +668,12 @@ fn vertex(
     return out;
 }
 ";
-        let mut shader_defs = HashSet::new();
+        let mut shader_defs = XHashSet::new();
         shader_defs.insert("TEXTURE".to_string());
 
         let processor = ShaderProcessor::default();
         let result = processor
-            .process(&Shader::from_wgsl(WGSL), &shader_defs, &HashMap::default())
+            .process(&Shader::from_wgsl(WGSL), &shader_defs, &XHashMap::default())
             .unwrap();
         assert_eq!(result.get_wgsl_source().unwrap(), EXPECTED);
     }
@@ -710,8 +710,8 @@ fn vertex(
         let result = processor
             .process(
                 &Shader::from_wgsl(WGSL),
-                &HashSet::default(),
-                &HashMap::default(),
+                &XHashSet::default(),
+                &XHashMap::default(),
             )
             .unwrap();
         assert_eq!(result.get_wgsl_source().unwrap(), EXPECTED);
@@ -751,8 +751,8 @@ fn vertex(
         let result = processor
             .process(
                 &Shader::from_wgsl(WGSL_ELSE),
-                &HashSet::default(),
-                &HashMap::default(),
+                &XHashSet::default(),
+                &XHashMap::default(),
             )
             .unwrap();
         assert_eq!(result.get_wgsl_source().unwrap(), EXPECTED);
@@ -767,8 +767,8 @@ fn vertex(
         let processor = ShaderProcessor::default();
         let result = processor.process(
             &Shader::from_wgsl(INPUT),
-            &HashSet::default(),
-            &HashMap::default(),
+            &XHashSet::default(),
+            &XHashMap::default(),
         );
         assert_eq!(result, Err(ProcessShaderError::NotEnoughEndIfs));
     }
@@ -782,8 +782,8 @@ fn vertex(
         let processor = ShaderProcessor::default();
         let result = processor.process(
             &Shader::from_wgsl(INPUT),
-            &HashSet::default(),
-            &HashMap::default(),
+            &XHashSet::default(),
+            &XHashMap::default(),
         );
         assert_eq!(result, Err(ProcessShaderError::TooManyEndIfs));
     }
@@ -800,8 +800,8 @@ fn foo() { }
         let result = processor
             .process(
                 &Shader::from_wgsl(INPUT),
-                &HashSet::default(),
-                &HashMap::default(),
+                &XHashSet::default(),
+                &XHashMap::default(),
             )
             .unwrap();
         assert_eq!(result.get_wgsl_source().unwrap(), INPUT);
@@ -826,12 +826,12 @@ fn bar() { }
 ";
 
         let processor = ShaderProcessor::default();
-        let mut import_shaders = HashMap::default();
+        let mut import_shaders = XHashMap::default();
 
         let shader = Shader::from_wgsl(FOO);
         import_shaders.insert(ShaderImport::Custom("FOO".to_string()), shader);
 
-        let shader_defs = HashSet::default();
+        let shader_defs = XHashSet::default();
         let result = processor
             .process(&Shader::from_wgsl(INPUT), &shader_defs, &import_shaders)
             .unwrap();
@@ -856,7 +856,7 @@ void foo() { }
 void bar() { }
 ";
         let processor = ShaderProcessor::default();
-        let mut import_shaders = HashMap::default();
+        let mut import_shaders = XHashMap::default();
 
         import_shaders.insert(
             ShaderImport::Custom("FOO".to_string()),
@@ -865,7 +865,7 @@ void bar() { }
         let result = processor
             .process(
                 &Shader::from_glsl(INPUT, ShaderStage::Vertex),
-                &HashSet::default(),
+                &XHashSet::default(),
                 &import_shaders,
             )
             .unwrap();
@@ -901,7 +901,7 @@ fn vertex(
 }
 ";
 
-        let mut shader_defs = HashSet::default();
+        let mut shader_defs = XHashSet::default();
         shader_defs.insert("TEXTURE".to_string());
 
         let processor = ShaderProcessor::default();
@@ -909,7 +909,7 @@ fn vertex(
             .process(
                 &Shader::from_wgsl(WGSL_NESTED_IFDEF),
                 &shader_defs,
-                &HashMap::default(),
+                &XHashMap::default(),
             )
             .unwrap();
         assert_eq!(result.get_wgsl_source().unwrap(), EXPECTED);
@@ -945,7 +945,7 @@ fn vertex(
     return out;
 }
 ";
-        let mut shader_defs = HashSet::default();
+        let mut shader_defs = XHashSet::default();
         shader_defs.insert("TEXTURE".to_string());
 
         let processor = ShaderProcessor::default();
@@ -953,7 +953,7 @@ fn vertex(
             .process(
                 &Shader::from_wgsl(WGSL_NESTED_IFDEF_ELSE),
                 &shader_defs,
-                &HashMap::default(),
+                &XHashMap::default(),
             )
             .unwrap();
         assert_eq!(result.get_wgsl_source().unwrap(), EXPECTED);
@@ -991,8 +991,8 @@ fn vertex(
         let result = processor
             .process(
                 &Shader::from_wgsl(WGSL_NESTED_IFDEF),
-                &HashSet::default(),
-                &HashMap::default(),
+                &XHashSet::default(),
+                &XHashMap::default(),
             )
             .unwrap();
         assert_eq!(result.get_wgsl_source().unwrap(), EXPECTED);
@@ -1030,8 +1030,8 @@ fn vertex(
         let result = processor
             .process(
                 &Shader::from_wgsl(WGSL_NESTED_IFDEF_ELSE),
-                &HashSet::default(),
-                &HashMap::default(),
+                &XHashSet::default(),
+                &XHashMap::default(),
             )
             .unwrap();
         assert_eq!(result.get_wgsl_source().unwrap(), EXPECTED);
@@ -1065,7 +1065,7 @@ fn vertex(
     return out;
 }
 ";
-        let mut shader_defs = HashSet::default();
+        let mut shader_defs = XHashSet::default();
         shader_defs.insert("ATTRIBUTE".to_string());
 
         let processor = ShaderProcessor::default();
@@ -1073,7 +1073,7 @@ fn vertex(
             .process(
                 &Shader::from_wgsl(WGSL_NESTED_IFDEF),
                 &shader_defs,
-                &HashMap::default(),
+                &XHashMap::default(),
             )
             .unwrap();
         assert_eq!(result.get_wgsl_source().unwrap(), EXPECTED);
@@ -1109,7 +1109,7 @@ fn vertex(
     return out;
 }
 ";
-        let mut shader_defs = HashSet::default();
+        let mut shader_defs = XHashSet::default();
         shader_defs.insert("TEXTURE".to_string());
         shader_defs.insert("ATTRIBUTE".to_string());
 
@@ -1118,7 +1118,7 @@ fn vertex(
             .process(
                 &Shader::from_wgsl(WGSL_NESTED_IFDEF),
                 &shader_defs,
-                &HashMap::default(),
+                &XHashMap::default(),
             )
             .unwrap();
         assert_eq!(result.get_wgsl_source().unwrap(), EXPECTED);
@@ -1154,11 +1154,11 @@ fn in_main_present() { }
 
         let processor = ShaderProcessor::default();
 
-        let mut shader_defs = HashSet::default();
+        let mut shader_defs = XHashSet::default();
         shader_defs.insert("MAIN_PRESENT".to_string());
         shader_defs.insert("IMPORT_PRESENT".to_string());
 
-        let mut import_shaders = HashMap::default();
+        let mut import_shaders = XHashMap::default();
         import_shaders.insert(
             ShaderImport::Path("libs/foo".to_string()),
             Shader::from_wgsl(FOO),
@@ -1196,7 +1196,7 @@ fn import() { }
 fn in_main() { }
 ";
         let processor = ShaderProcessor::default();
-        let mut import_shaders = HashMap::default();
+        let mut import_shaders = XHashMap::default();
 
         import_shaders.insert(
             ShaderImport::Custom("BAR".to_string()),
@@ -1208,7 +1208,7 @@ fn in_main() { }
             Shader::from_wgsl(FOO),
         );
 
-        let mut shader_defs = HashSet::default();
+        let mut shader_defs = XHashSet::default();
         shader_defs.insert("DEEP".to_string());
 
         let result = processor

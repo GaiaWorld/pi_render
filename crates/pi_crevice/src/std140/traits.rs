@@ -1,11 +1,11 @@
-use core::mem::{size_of, MaybeUninit};
-#[cfg(feature = "std")]
-use std::io::{self, Write};
-
-use bytemuck::{bytes_of, Pod, Zeroable};
-
 #[cfg(feature = "std")]
 use crate::std140::Writer;
+
+use bytemuck::{bytes_of, Pod, Zeroable};
+use core::mem::{size_of, MaybeUninit};
+
+#[cfg(feature = "std")]
+use std::io::{self, Write};
 
 /// Trait implemented for all `std140` primitives. Generally should not be
 /// implemented outside this crate.

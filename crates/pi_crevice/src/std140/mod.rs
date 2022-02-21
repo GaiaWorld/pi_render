@@ -1,5 +1,4 @@
-//! Defines traits and types for working with data adhering to GLSL's `std140`
-//! layout specification.
+//! 定义 和 glsl 的 `std140` 布局 相匹配 的 类型 和 Trait
 
 mod dynamic_uniform;
 mod primitives;

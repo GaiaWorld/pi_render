@@ -12,15 +12,13 @@ pub mod view;
 
 use camera::init_camera;
 use futures::{future::BoxFuture, FutureExt};
-use graph::graph::RenderGraph;
+use graph::{graph::RenderGraph, runner::RenderGraphRunner};
 use nalgebra::{Matrix4, Vector2, Vector3, Vector4};
 use pi_ecs::prelude::{Entity, ResMut, With, World};
 use raw_window_handle::RawWindowHandle;
 use rhi::{create_render_context, device::RenderDevice, options::RenderOptions, RenderQueue};
 use thiserror::Error;
 use view::{init_view, window::RenderWindows, ViewTarget};
-
-pub(crate) struct RenderGraphRunner;
 
 #[derive(Error, Debug)]
 pub enum RenderContextError {

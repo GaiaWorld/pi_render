@@ -1,29 +1,40 @@
+//! 节点 对应的 槽位 Slot
+//!
+//! 主要概念
+//!
+//! 渲染节点 槽(Slot) 有四种： [`Buffer`], [`TextureView`], [`Sampler`], [`Entity`]
+//!
+//! + [`SlotValue`]
+//! + [`SlotType`]
+//! + [`SlotLabel`]
+//! + [`SlotInfo`]
+//! + [`SlotInfos`], 这个 用于 [`NodeLabel`]
+
+use crate::rhi::{
+    buffer::Buffer,
+    texture::{Sampler, TextureView},
+};
 use pi_ecs::entity::Entity;
 use std::borrow::Cow;
 
-use crate::rhi::{texture::{Sampler, TextureView}, buffer::Buffer};
-
-/// A value passed between render [`Nodes`](super::Node).
-/// Corresponds to the [`SlotType`] specified in the [`RenderGraph`](super::RenderGraph).
+/// 用于 在 [`Nodes`](super::Node) 传递的 值
+/// 对应 [`RenderGraph`](super::RenderGraph) 的 [`SlotType`]
 ///
-/// Slots can have four different types of values:
-/// [`Buffer`], [`TextureView`], [`Sampler`] and [`Entity`].
-///
-/// These values do not contain the actual render data, but only the ids to retrieve them.
+/// Slots 由 4种不同的值 [`Buffer`], [`TextureView`], [`Sampler`], [`Entity`]
 #[derive(Debug, Clone)]
 pub enum SlotValue {
-    /// A GPU-accessible [`Buffer`].
+    /// GPU [`Buffer`].
     Buffer(Buffer),
-    /// A [`TextureView`] describes a texture used in a pipeline.
+    /// [`TextureView`] 描述 在 Pipeline 使用 的 Texture
     TextureView(TextureView),
-    /// A texture [`Sampler`] defines how a pipeline will sample from a [`TextureView`].
+    /// 纹理 [`Sampler`] 定义 管线 如何 采样 [`TextureView`].
     Sampler(Sampler),
-    /// An entity from the ECS.
+    /// ECS 的 Entity
     Entity(Entity),
 }
 
 impl SlotValue {
-    /// Returns the [`SlotType`] of this value.
+    /// 返回 对应的 类型
     pub fn slot_type(&self) -> SlotType {
         match self {
             SlotValue::Buffer(_) => SlotType::Buffer,
@@ -58,27 +69,27 @@ impl From<Entity> for SlotValue {
     }
 }
 
-/// Describes the render resources created (output) or used (input) by
-/// the render [`Nodes`](super::Node).
+/// Slot 类型
 ///
-/// This should not be confused with [`SlotValue`], which actually contains the passed data.
+/// 被 渲染 [`Nodes`](super::Node) 写(output) 或 读(input) 的 渲染资源 类型
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum SlotType {
-    /// A GPU-accessible [`Buffer`].
+    /// GPU [`Buffer`].
     Buffer,
-    /// A [`TextureView`] describes a texture used in a pipeline.
+    /// [`TextureView`] 描述 在 Pipeline 使用 的 Texture
     TextureView,
-    /// A texture [`Sampler`] defines how a pipeline will sample from a [`TextureView`].
+    /// 纹理 [`Sampler`] 定义 管线 如何 采样 [`TextureView`]
     Sampler,
-    /// An entity from the ECS.
+    /// ECS 的 Entity
     Entity,
 }
 
-/// A [`SlotLabel`] is used to reference a slot by either its name or index
-/// inside the [`RenderGraph`](super::RenderGraph).
+/// [`SlotLabel`] 用于 从 名字 或 位置 来 引用
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum SlotLabel {
+    /// 位置索引
     Index(usize),
+    /// 名字
     Name(Cow<'static, str>),
 }
 
@@ -112,14 +123,17 @@ impl From<usize> for SlotLabel {
     }
 }
 
-/// The internal representation of a slot, which specifies its [`SlotType`] and name.
+/// Slot 的 内部表示，描述 [`SlotType`] 和 名字
 #[derive(Clone, Debug)]
 pub struct SlotInfo {
+    /// Slot 名
     pub name: Cow<'static, str>,
+    /// Slot 类型
     pub slot_type: SlotType,
 }
 
 impl SlotInfo {
+    /// 用 名字 和 类型 创建 SlotInfo
     pub fn new(name: impl Into<Cow<'static, str>>, slot_type: SlotType) -> Self {
         SlotInfo {
             name: name.into(),
@@ -128,8 +142,7 @@ impl SlotInfo {
     }
 }
 
-/// A collection of input or output [`SlotInfos`](SlotInfo) for
-/// a [`NodeState`](super::NodeState).
+/// SlotInfo 的 集合，供 [`NodeSlot`] 使用
 #[derive(Default, Debug)]
 pub struct SlotInfos {
     slots: Vec<SlotInfo>,
@@ -144,33 +157,33 @@ impl<T: IntoIterator<Item = SlotInfo>> From<T> for SlotInfos {
 }
 
 impl SlotInfos {
-    /// Returns the count of slots.
+    /// 返回 有多少个 槽位
     #[inline]
     pub fn len(&self) -> usize {
         self.slots.len()
     }
 
-    /// Returns true if there are no slots.
+    /// 如果 没有 槽位，返回 true
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.slots.is_empty()
     }
 
-    /// Retrieves the [`SlotInfo`] for the provided label.
+    /// 返回 label 对应的 [`SlotInfo`]
     pub fn get_slot(&self, label: impl Into<SlotLabel>) -> Option<&SlotInfo> {
         let label = label.into();
         let index = self.get_slot_index(&label)?;
         self.slots.get(index)
     }
 
-    /// Retrieves the [`SlotInfo`] for the provided label mutably.
+    /// 返回 label 对应的 [`SlotInfo`]
     pub fn get_slot_mut(&mut self, label: impl Into<SlotLabel>) -> Option<&mut SlotInfo> {
         let label = label.into();
         let index = self.get_slot_index(&label)?;
         self.slots.get_mut(index)
     }
 
-    /// Retrieves the index (inside input or output slots) of the slot for the provided label.
+    /// 返回 label 对应的 索引值
     pub fn get_slot_index(&self, label: impl Into<SlotLabel>) -> Option<usize> {
         let label = label.into();
         match label {
@@ -184,7 +197,7 @@ impl SlotInfos {
         }
     }
 
-    /// Returns an iterator over the slot infos.
+    /// 返回 迭代器
     pub fn iter(&self) -> impl Iterator<Item = &SlotInfo> {
         self.slots.iter()
     }
