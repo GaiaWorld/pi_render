@@ -1,4 +1,3 @@
-pub mod context;
 pub mod edge;
 pub mod graph;
 pub mod node;
@@ -10,13 +9,22 @@ use self::node::{NodeId, NodeLabel};
 use self::node_slot::{SlotLabel, SlotValue};
 use crate::rhi::device::RenderDevice;
 use hash::XHashMap;
+use pi_ecs::prelude::World;
+use std::borrow::Cow;
+use std::sync::{Arc, RwLock};
 use thiserror::Error;
 use wgpu::CommandEncoder;
 
 pub struct RenderContext {
-    pub device: RenderDevice,
-    pub commands: CommandEncoder,
-    pub res_mgr: XHashMap<SlotLabel, SlotValue>,
+    // ECS 的 World，用于 查询 渲染数据
+    world: World,
+    // 渲染 设备，用于 创建资源
+    device: RenderDevice,
+    // GPU 渲染 指令队列
+    commands: CommandEncoder,
+    // 存放资源的地方
+    // 资源可以来自 渲染图 之外，也可以来自 渲染节点
+    res_mgr: Arc<RwLock<XHashMap<Cow<'static, str>, SlotValue>>>,
 }
 
 #[derive(Error, Debug, Eq, PartialEq)]

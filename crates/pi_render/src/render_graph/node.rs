@@ -8,20 +8,28 @@
 //! + [`NodeId`]
 //! + [`NodeLabel`] name 或 id
 
+use crate::rhi::device::RenderDevice;
+
 use super::{
-    context::{InputSlotError, OutputSlotError, RenderNodeContext},
     edge::Edge,
-    node_slot::{SlotInfo, SlotInfos},
+    node_slot::{SlotInfo, SlotInfos, SlotValue},
     RenderContext, RenderGraphError,
 };
 use futures::future::BoxFuture;
+use hash::XHashMap;
 use pi_ecs::prelude::World;
+use wgpu::CommandEncoder;
 use std::{borrow::Cow, fmt::Debug};
 use thiserror::Error;
 
 /// 渲染图的节点
 /// 可以 异步 执行
 pub trait Node: Send + Sync + 'static {
+
+    /// 返回 是否 渲染 的 终点，一般是 渲染到屏幕的节点
+    /// 注：如果某个节点 改变了 这个属性，需要 重新构建 渲染图
+    fn is_finish(&self) -> bool;
+
     /// 返回 输入 槽位 信息
     fn input(&self) -> Vec<SlotInfo> {
         vec![]
@@ -32,22 +40,14 @@ pub trait Node: Send + Sync + 'static {
         vec![]
     }
 
-    /// 更新，所有更新在 run 之前
-    fn update(
-        &mut self,
-        _world: World,
-    ) -> Option<BoxFuture<'static, Result<(), NodeRunError>>> {
-        None
-    }
-
     /// 异步执行 渲染方法
     /// 一个渲染节点，通常是 开始 RenderPass
     /// 将 渲染指令 录制在 wgpu 中
     fn run(
         &self,
-        graph: RenderNodeContext,
-        render_context: RenderContext,
-        world: World,
+        context: RenderContext,
+        inputs: Vec<SlotInfo>,
+        outputs: Vec<Option<SlotInfo>>,
     ) -> BoxFuture<'static, Result<(), NodeRunError>>;
 }
 
@@ -55,9 +55,9 @@ pub trait Node: Send + Sync + 'static {
 #[derive(Error, Debug, Eq, PartialEq)]
 pub enum NodeRunError {
     #[error("encountered an input slot error")]
-    InputSlotError(#[from] InputSlotError),
+    InputSlotError,
     #[error("encountered an output slot error")]
-    OutputSlotError(#[from] OutputSlotError),
+    OutputSlotError,
 }
 
 /// 渲染节点 对应的 边集合

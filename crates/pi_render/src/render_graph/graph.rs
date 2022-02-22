@@ -300,7 +300,6 @@ impl Debug for RenderGraph {
 #[cfg(test)]
 mod tests {
     use crate::render_graph::{
-        context::RenderNodeContext,
         edge::Edge,
         graph::RenderGraph,
         node::{Node, NodeId, NodeRunError},
