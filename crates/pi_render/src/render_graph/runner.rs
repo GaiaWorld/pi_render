@@ -5,7 +5,7 @@ use super::{
     RenderContext,
 };
 use crate::{
-    graph::{context::RenderNodeContext, edge::Edge},
+    render_graph::{context::RenderNodeContext, edge::Edge},
     rhi::{device::RenderDevice, RenderQueue},
 };
 use async_graph::async_graph;
@@ -13,7 +13,7 @@ use graph::{NGraph, NGraphBuilder};
 use hash::XHashMap;
 use pi_ecs::prelude::World;
 use r#async::rt::{AsyncRuntime, AsyncTaskPool, AsyncTaskPoolExt};
-use std::{borrow::Cow, cell::RefCell, collections::VecDeque, sync::Arc};
+use std::{borrow::Cow, cell::RefCell, sync::Arc};
 use thiserror::Error;
 
 #[derive(Error, Debug)]

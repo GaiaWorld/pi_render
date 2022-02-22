@@ -3,7 +3,7 @@
 
 pub mod camera;
 pub mod color;
-pub mod graph;
+pub mod render_graph;
 pub mod mesh;
 pub mod primitives;
 pub mod rhi;
@@ -12,7 +12,7 @@ pub mod view;
 
 use camera::init_camera;
 use futures::{future::BoxFuture, FutureExt};
-use graph::{graph::RenderGraph, runner::RenderGraphRunner};
+use render_graph::{graph::RenderGraph, runner::RenderGraphRunner};
 use nalgebra::{Matrix4, Vector2, Vector3, Vector4};
 use pi_ecs::prelude::{Entity, ResMut, With, World};
 use raw_window_handle::RawWindowHandle;
