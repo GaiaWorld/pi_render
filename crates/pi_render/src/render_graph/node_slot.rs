@@ -2,25 +2,24 @@
 //!
 //! 主要概念
 //!
-//! 渲染节点 槽(Slot) 有四种： [`Buffer`], [`TextureView`], [`Sampler`], [`Entity`]
+//! 渲染节点 槽(Slot) 有 3种： [`Buffer`], [`TextureView`], [`Sampler`]
 //!
 //! + [`SlotValue`]
 //! + [`SlotType`]
 //! + [`SlotLabel`]
 //! + [`SlotInfo`]
-//! + [`SlotInfos`], 这个 用于 [`NodeLabel`]
+//! + [`SlotInfos`]
 
 use crate::rhi::{
     buffer::Buffer,
     texture::{Sampler, TextureView},
 };
-use pi_ecs::entity::Entity;
 use std::borrow::Cow;
 
 /// 用于 在 [`Nodes`](super::Node) 传递的 值
 /// 对应 [`RenderGraph`](super::RenderGraph) 的 [`SlotType`]
 ///
-/// Slots 由 4种不同的值 [`Buffer`], [`TextureView`], [`Sampler`], [`Entity`]
+/// Slots 由 3种不同的值 [`Buffer`], [`TextureView`], [`Sampler`]
 #[derive(Debug, Clone)]
 pub enum SlotValue {
     /// GPU [`Buffer`].
@@ -29,8 +28,6 @@ pub enum SlotValue {
     TextureView(TextureView),
     /// 纹理 [`Sampler`] 定义 管线 如何 采样 [`TextureView`].
     Sampler(Sampler),
-    /// ECS 的 Entity
-    Entity(Entity),
 }
 
 impl SlotValue {
@@ -40,7 +37,6 @@ impl SlotValue {
             SlotValue::Buffer(_) => SlotType::Buffer,
             SlotValue::TextureView(_) => SlotType::TextureView,
             SlotValue::Sampler(_) => SlotType::Sampler,
-            SlotValue::Entity(_) => SlotType::Entity,
         }
     }
 }
@@ -63,12 +59,6 @@ impl From<Sampler> for SlotValue {
     }
 }
 
-impl From<Entity> for SlotValue {
-    fn from(value: Entity) -> Self {
-        SlotValue::Entity(value)
-    }
-}
-
 /// Slot 类型
 ///
 /// 被 渲染 [`Nodes`](super::Node) 写(output) 或 读(input) 的 渲染资源 类型
@@ -80,15 +70,15 @@ pub enum SlotType {
     TextureView,
     /// 纹理 [`Sampler`] 定义 管线 如何 采样 [`TextureView`]
     Sampler,
-    /// ECS 的 Entity
-    Entity,
 }
+
+pub type SlotId = usize;
 
 /// [`SlotLabel`] 用于 从 名字 或 位置 来 引用
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum SlotLabel {
     /// 位置索引
-    Index(usize),
+    Index(SlotId),
     /// 名字
     Name(Cow<'static, str>),
 }

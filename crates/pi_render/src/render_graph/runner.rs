@@ -1,10 +1,11 @@
+use crate::rhi::{device::RenderDevice, RenderQueue};
+
 use super::{
     graph::RenderGraph,
     node::{NodeId, NodeRunError, NodeState},
     node_slot::{SlotLabel, SlotType, SlotValue},
     RenderContext,
 };
-use crate::rhi::{device::RenderDevice, RenderQueue};
 use async_graph::{async_graph, ExecNode, RunFactory, Runner};
 use futures::future::BoxFuture;
 use graph::{NGraph, NGraphBuilder};
@@ -89,20 +90,19 @@ where
             }
         }
         
-        for node in finish_nodes {
-            let id = node.id;
-            
-            // TODO
-            builder = builder.node(id, asyn(...));
-
-            for output in node.node.output() {
-                builder = builder.node(id, ExecNode::None);
-            }
-        }
-
         let agraph = builder.build()?;
         self.agraph = Arc::new(agraph);
     }
+
+    /// 准备
+    pub fn prepare(
+        &mut self,
+        device: RenderDevice,
+        queue: RenderQueue,
+        world: World,
+        ) -> std::io::Result<()> {
+            Ok(())
+        }
 
     /// 执行
     pub async fn run(&mut self) {
@@ -141,16 +141,6 @@ fn asyn(
         let commands = device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
 
         async move {
-            let mut render_context = RenderContext {
-                device,
-                commands,
-                res_mgr,
-            };
-            
-            runner(world, render_context);
-
-            queue.submit(vec![render_context.commands.finish()]);
-
             Ok(())
         }
         .boxed()

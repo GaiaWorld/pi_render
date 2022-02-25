@@ -8,27 +8,24 @@
 //! + [`NodeId`]
 //! + [`NodeLabel`] name 或 id
 
-use crate::rhi::device::RenderDevice;
-
 use super::{
-    edge::Edge,
     node_slot::{SlotInfo, SlotInfos, SlotValue},
     RenderContext, RenderGraphError,
 };
 use futures::future::BoxFuture;
 use hash::XHashMap;
 use pi_ecs::prelude::World;
-use wgpu::CommandEncoder;
-use std::{borrow::Cow, fmt::Debug};
+use std::{borrow::Cow, cell::RefCell, fmt::Debug, sync::Arc};
 use thiserror::Error;
 
 /// 渲染图的节点
 /// 可以 异步 执行
 pub trait Node: Send + Sync + 'static {
-
     /// 返回 是否 渲染 的 终点，一般是 渲染到屏幕的节点
     /// 注：如果某个节点 改变了 这个属性，需要 重新构建 渲染图
-    fn is_finish(&self) -> bool;
+    fn is_finish(&self) -> bool {
+        false
+    }
 
     /// 返回 输入 槽位 信息
     fn input(&self) -> Vec<SlotInfo> {
@@ -40,15 +37,23 @@ pub trait Node: Send + Sync + 'static {
         vec![]
     }
 
+    /// 异步 创建 gpu 资源
+    /// 该函数 在 所有节点的 run方法 之前
+    /// 存放资源的地方
+    /// 资源可以来自 渲染图 之外，也可以来自 渲染节点
+    fn prepare(
+        &self,
+        world: World,
+        inputs: Vec<Option<SlotInfo>>,
+        outputs: Vec<Option<SlotInfo>>,
+        context: RenderContext,
+        res_mgr: XHashMap<Cow<'static, str>, Arc<Option<RefCell<SlotValue>>>>,
+    ) -> BoxFuture<'static, Result<(), NodeRunError>>;
+
     /// 异步执行 渲染方法
     /// 一个渲染节点，通常是 开始 RenderPass
     /// 将 渲染指令 录制在 wgpu 中
-    fn run(
-        &self,
-        context: RenderContext,
-        inputs: Vec<SlotInfo>,
-        outputs: Vec<Option<SlotInfo>>,
-    ) -> BoxFuture<'static, Result<(), NodeRunError>>;
+    fn run(&self, context: RenderContext) -> BoxFuture<'static, Result<(), NodeRunError>>;
 }
 
 /// 渲染图 运行过程 遇到的 错误
@@ -58,81 +63,6 @@ pub enum NodeRunError {
     InputSlotError,
     #[error("encountered an output slot error")]
     OutputSlotError,
-}
-
-/// 渲染节点 对应的 边集合
-/// 包括 入边 和 出边
-#[derive(Debug)]
-pub struct Edges {
-    pub id: NodeId,
-    /// 入边
-    pub input_edges: Vec<Edge>,
-    /// 出边
-    pub output_edges: Vec<Edge>,
-}
-
-impl Edges {
-    /// 如果对应边 不存在，添加 入边
-    pub(crate) fn add_input_edge(&mut self, edge: Edge) -> Result<(), RenderGraphError> {
-        if self.has_input_edge(&edge) {
-            return Err(RenderGraphError::EdgeAlreadyExists(edge));
-        }
-        self.input_edges.push(edge);
-        Ok(())
-    }
-
-    /// 如果对应边 不存在，添加 出边
-    pub(crate) fn add_output_edge(&mut self, edge: Edge) -> Result<(), RenderGraphError> {
-        if self.has_output_edge(&edge) {
-            return Err(RenderGraphError::EdgeAlreadyExists(edge));
-        }
-        self.output_edges.push(edge);
-        Ok(())
-    }
-
-    /// 检查有没有对应的 入边
-    pub fn has_input_edge(&self, edge: &Edge) -> bool {
-        self.input_edges.contains(edge)
-    }
-
-    /// 检查有没有对应的 出边
-    pub fn has_output_edge(&self, edge: &Edge) -> bool {
-        self.output_edges.contains(edge)
-    }
-
-    /// 查找 `input_index` 是 index值 的 input_edge
-    pub fn get_input_slot_edge(&self, index: usize) -> Result<&Edge, RenderGraphError> {
-        self.input_edges
-            .iter()
-            .find(|e| {
-                if let Edge::SlotEdge { input_index, .. } = e {
-                    *input_index == index
-                } else {
-                    false
-                }
-            })
-            .ok_or(RenderGraphError::UnconnectedNodeInputSlot {
-                input_slot: index,
-                node: self.id,
-            })
-    }
-
-    /// 查找 `output_index` 是 index值 的 output_edge
-    pub fn get_output_slot_edge(&self, index: usize) -> Result<&Edge, RenderGraphError> {
-        self.output_edges
-            .iter()
-            .find(|e| {
-                if let Edge::SlotEdge { output_index, .. } = e {
-                    *output_index == index
-                } else {
-                    false
-                }
-            })
-            .ok_or(RenderGraphError::UnconnectedNodeOutputSlot {
-                output_slot: index,
-                node: self.id,
-            })
-    }
 }
 
 /// 节点状态: [`Node`] 内部 表示
@@ -152,8 +82,6 @@ pub struct NodeState {
     pub input_slots: SlotInfos,
     /// 输出槽位
     pub output_slots: SlotInfos,
-    /// 边
-    pub edges: Edges,
 }
 
 impl Debug for NodeState {
@@ -175,11 +103,6 @@ impl NodeState {
             output_slots: node.output().into(),
             node: Box::new(node),
             type_name: std::any::type_name::<T>(),
-            edges: Edges {
-                id,
-                input_edges: Vec::new(),
-                output_edges: Vec::new(),
-            },
         }
     }
 
@@ -225,8 +148,7 @@ impl NodeState {
 }
 
 /// 渲染节点 ID
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct NodeId(pub u32);
+pub type NodeId = usize;
 
 /// [`NodeLabel`] 用 名字 或者 [`NodeId`] 来 引用 [`NodeState`]
 #[derive(Debug, Clone, Eq, PartialEq)]
