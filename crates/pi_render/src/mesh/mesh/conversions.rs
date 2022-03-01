@@ -35,16 +35,6 @@ pub struct FromVertexAttributeError {
     into: &'static str,
 }
 
-impl FromVertexAttributeError {
-    fn new<T: 'static>(from: VertexAttributeValues) -> Self {
-        Self {
-            variant: from.enum_variant_name(),
-            into: std::any::type_name::<T>(),
-            from,
-        }
-    }
-}
-
 impl From<Vec<f32>> for VertexAttributeValues {
     fn from(vec: Vec<f32>) -> Self {
         VertexAttributeValues::Float32(vec)

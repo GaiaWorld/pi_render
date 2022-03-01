@@ -9,18 +9,34 @@
 //! + [`NodeLabel`] name 或 id
 
 use super::{
-    node_slot::{SlotInfo, SlotInfos, SlotValue},
+    node_slot::{SlotId, SlotInfo, SlotInfos, SlotLabel, SlotValue},
     RenderContext, RenderGraphError,
 };
+use downcast_rs::{impl_downcast, Downcast};
 use futures::future::BoxFuture;
 use hash::XHashMap;
 use pi_ecs::prelude::World;
 use std::{borrow::Cow, cell::RefCell, fmt::Debug, sync::Arc};
 use thiserror::Error;
 
+/// 实参
+#[derive(Clone, Debug)]
+pub struct RealValue(Arc<RefCell<Option<SlotValue>>>);
+
+impl Default for RealValue {
+
+    fn default() -> Self {
+        RealValue(Arc::new(RefCell::new(None)))
+    }
+}
+
+unsafe impl Sync for RealValue {}
+
+unsafe impl Send for RealValue {}
+
 /// 渲染图的节点
 /// 可以 异步 执行
-pub trait Node: Send + Sync + 'static {
+pub trait Node: Downcast + Send + Sync + 'static {
     /// 返回 是否 渲染 的 终点，一般是 渲染到屏幕的节点
     /// 注：如果某个节点 改变了 这个属性，需要 重新构建 渲染图
     fn is_finish(&self) -> bool {
@@ -43,18 +59,23 @@ pub trait Node: Send + Sync + 'static {
     /// 资源可以来自 渲染图 之外，也可以来自 渲染节点
     fn prepare(
         &self,
-        world: World,
-        inputs: Vec<Option<SlotInfo>>,
-        outputs: Vec<Option<SlotInfo>>,
         context: RenderContext,
-        res_mgr: XHashMap<Cow<'static, str>, Arc<Option<RefCell<SlotValue>>>>,
-    ) -> BoxFuture<'static, Result<(), NodeRunError>>;
+        inputs: &[Option<RealValue>],
+        outputs: &[Option<RealValue>],
+    ) -> Option<BoxFuture<'static, Result<(), NodeRunError>>>;
 
     /// 异步执行 渲染方法
     /// 一个渲染节点，通常是 开始 RenderPass
     /// 将 渲染指令 录制在 wgpu 中
-    fn run(&self, context: RenderContext) -> BoxFuture<'static, Result<(), NodeRunError>>;
+    fn run(
+        &self,
+        context: RenderContext,
+        inputs: &[Option<RealValue>],
+        outputs: &[Option<RealValue>],
+    ) -> BoxFuture<'static, Result<(), NodeRunError>>;
 }
+
+impl_downcast!(Node);
 
 /// 渲染图 运行过程 遇到的 错误
 #[derive(Error, Debug, Eq, PartialEq)]
@@ -77,7 +98,7 @@ pub struct NodeState {
     /// 实现 node 的 类型名
     pub type_name: &'static str,
     /// 节点 本身
-    pub node: Box<dyn Node>,
+    pub node: Arc<dyn Node>,
     /// 输入槽位
     pub input_slots: SlotInfos,
     /// 输出槽位
@@ -101,7 +122,7 @@ impl NodeState {
             name: None,
             input_slots: node.input().into(),
             output_slots: node.output().into(),
-            node: Box::new(node),
+            node: Arc::new(node),
             type_name: std::any::type_name::<T>(),
         }
     }
@@ -126,24 +147,14 @@ impl NodeState {
             .ok_or(RenderGraphError::WrongNodeType)
     }
 
-    /// 检查 输入槽的 合法性
-    /// 主要是 检查 self 的 输入槽，有没有 对应的 入边
-    pub fn validate_input_slots(&self) -> Result<(), RenderGraphError> {
-        for i in 0..self.input_slots.len() {
-            self.edges.get_input_slot_edge(i)?;
-        }
-
-        Ok(())
+    /// 取 Slot ID
+    pub fn input_slot_id(&self, label: impl Into<SlotLabel>) -> Option<usize> {
+        self.input_slots.get_slot_index(label)
     }
 
-    /// 检查 输出槽的 合法性
-    /// 主要是 检查 self 的 输出槽，有没有 对应的 出边
-    pub fn validate_output_slots(&self) -> Result<(), RenderGraphError> {
-        for i in 0..self.output_slots.len() {
-            self.edges.get_output_slot_edge(i)?;
-        }
-
-        Ok(())
+    /// 取 Slot ID
+    pub fn output_slot_id(&self, label: impl Into<SlotLabel>) -> Option<usize> {
+        self.output_slots.get_slot_index(label)
     }
 }
 

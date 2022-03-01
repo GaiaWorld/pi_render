@@ -1,19 +1,21 @@
-use crate::rhi::{device::RenderDevice, RenderQueue};
-
 use super::{
-    graph::RenderGraph,
-    node::{NodeId, NodeRunError, NodeState},
-    node_slot::{SlotLabel, SlotType, SlotValue},
+    graph::{NGNodeValue, RenderGraph},
+    node::{NodeId, NodeLabel, NodeRunError, RealValue},
+    node_slot::{SlotLabel, SlotType},
     RenderContext,
 };
+use crate::{
+    render_graph::{node::NodeState, node_slot::SlotId},
+    rhi::{device::RenderDevice, RenderQueue},
+};
 use async_graph::{async_graph, ExecNode, RunFactory, Runner};
-use futures::future::BoxFuture;
-use graph::{NGraph, NGraphBuilder};
+use futures::{future::BoxFuture, FutureExt};
+use graph::{DirectedGraph, DirectedGraphNode, NGraph, NGraphBuilder};
 use hash::XHashMap;
+use log::error;
 use pi_ecs::prelude::World;
 use r#async::rt::{AsyncRuntime, AsyncTaskPool, AsyncTaskPoolExt};
-use smallvec::SmallVec;
-use std::{borrow::Cow, cell::RefCell, sync::Arc};
+use std::{borrow::Cow, io::Read, sync::Arc};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -42,30 +44,33 @@ pub enum RenderGraphRunnerError {
 }
 
 // 渲染图 执行器
-pub(crate) struct RenderGraphRunner<O, P>
+pub(crate) struct RenderGraphRunner<P>
 where
-    O: Default + 'static,
-    P: AsyncTaskPoolExt<O> + AsyncTaskPool<O>,
+    P: AsyncTaskPoolExt<()> + AsyncTaskPool<(), Pool = P>,
 {
     // 异步运行时
-    rt: AsyncRuntime<O, P>,
-    // 渲染图, RefCell 是为了 外部 可以 根据情况 修改
-    render_graph: Arc<RefCell<RenderGraph>>,
-    // 异步图, build 实现
-    agraph: Option<Arc<NGraph<NodeId, ExecNode<DumpNode, DumpNode>>>>,
+    rt: AsyncRuntime<(), P>,
+    // 渲染图
+    render_graph: RenderGraph,
+
+    // prepare 异步图，build 阶段 用一次
+    prepare_graph: Option<Arc<NGraph<NGNodeValue, ExecNode<DumpNode, DumpNode>>>>,
+
+    // run 异步图，一直用，直到 render_graph 改变为止
+    run_graph: Option<Arc<NGraph<NGNodeValue, ExecNode<DumpNode, DumpNode>>>>,
 }
 
-impl<O, P> RenderGraphRunner<O, P>
+impl<P> RenderGraphRunner<P>
 where
-    O: Default + 'static,
-    P: AsyncTaskPoolExt<O> + AsyncTaskPool<O>,
+    P: AsyncTaskPoolExt<()> + AsyncTaskPool<(), Pool = P>,
 {
     /// 创建
-    pub fn new(rt: AsyncRuntime<O, P>, render_graph: Arc<RefCell<RenderGraph>>) -> Self {
+    pub fn new(rt: AsyncRuntime<(), P>, render_graph: RenderGraph) -> Self {
         Self {
             rt,
             render_graph,
-            agraph: None,
+            prepare_graph: None,
+            run_graph: None,
         }
     }
 
@@ -75,42 +80,180 @@ where
         device: RenderDevice,
         queue: RenderQueue,
         world: World,
-    ) -> std::io::Result<()> {
-        let mut builder = NGraphBuilder::new();
+    ) -> Result<(), String> {
+        let ng_builder = self.render_graph.ng_builder.take().unwrap();
+        let ng = match ng_builder.build() {
+            Ok(ng) => ng,
+            Err(e) => return Err(format!("render build error: {:?}", e)),
+        };
 
-        let res_mgr = XHashMap::<NodeId, SmallVec<SlotValue>>::new();
-
-        // 最终的 渲染节点
-        let mut finish_nodes: Vec<&NodeState> = vec![];
-
-        // 扫描出 最终的 渲染节点
-        for node in self.render_graph.borrow().iter_nodes() {
-            if node.node.is_finish() {
-                finish_nodes.push(node);
+        // 遍历，找 终点
+        let mut finishes = Vec::<NodeId>::new();
+        for node in ng.iter() {
+            match node {
+                NGNodeValue::Node(n) => {
+                    let node = self.render_graph.get_node(NodeLabel::Id(*n)).unwrap();
+                    if node.node.is_finish() {
+                        finishes.push(*n);
+                    }
+                }
+                _ => {}
             }
         }
-        
-        let agraph = builder.build()?;
-        self.agraph = Arc::new(agraph);
+
+        // 以终为起，构建需要的 节点
+        let sub_ng = ng.gen_graph_from_keys(&finishes);
+
+        // 构造异步图
+        let mut run_builder = NGraphBuilder::new();
+        let mut prepare_builder = NGraphBuilder::new();
+
+        fn create_slots_vec(n: &NodeState) -> (Vec<Option<RealValue>>, Vec<Option<RealValue>>) {
+            let len = n.input_slots.len();
+            let mut inputs = Vec::<Option<RealValue>>::with_capacity(len);
+            for i in 0.. {
+                inputs.push(None);
+            }
+
+            let len = n.output_slots.len();
+            let mut outputs = Vec::<Option<RealValue>>::with_capacity(len);
+            for i in 0..len {
+                outputs.push(None);
+            }
+
+            (inputs, outputs)
+        }
+
+        // 从 sub_ng 直接分析 资源依赖
+        let mut map = XHashMap::default();
+        for id in sub_ng.topological_sort() {
+            let ng_node = sub_ng.get(id).unwrap();
+            if let NGNodeValue::OutputSlot(nid, sid) = ng_node.value() {
+                let slots = map.entry(nid).or_insert_with(|| {
+                    let n = self.render_graph.get_node(*nid).unwrap();
+                    create_slots_vec(n)
+                });
+
+                slots.1[*sid] = Some(RealValue::default());
+            }
+        }
+
+        for id in sub_ng.topological_sort() {
+            let ng_node = sub_ng.get(id).unwrap();
+            if let NGNodeValue::InputSlot(nid, sid) = ng_node.value() {
+                let slots = map.entry(nid).or_insert_with(|| {
+                    let n = self.render_graph.get_node(*nid).unwrap();
+                    create_slots_vec(n)
+                });
+
+                for to in ng_node.to() {
+                    let to = sub_ng.get(to).unwrap();
+                    if let NGNodeValue::OutputSlot(next_node, next_slot) = to.value() {
+                        let v = map.get(next_node).unwrap().1[*next_slot].unwrap().clone();
+                        slots.0[*sid] = Some(v);
+                    }
+                }
+            }
+        }
+
+        // 异步图 节点
+        for id in sub_ng.topological_sort() {
+            let ng_node = sub_ng.get(id).unwrap();
+            let ng_node_clone = ng_node.value().clone();
+            match ng_node.value() {
+                NGNodeValue::Node(n) => {
+                    prepare_builder = prepare_builder.node(
+                        ng_node_clone.clone(),
+                        crate_prepare_node(&map, &self.render_graph, *n, device, queue, world),
+                    );
+
+                    run_builder = run_builder.node(
+                        ng_node_clone,
+                        crate_run_node(&map, &self.render_graph, *n, device, queue, world),
+                    );
+                }
+                NGNodeValue::InputSlot(nid, sid) => {
+                    prepare_builder = prepare_builder.node(ng_node_clone.clone(), ExecNode::None);
+                    run_builder = run_builder.node(ng_node_clone, ExecNode::None);
+                }
+                NGNodeValue::OutputSlot(nid, sid) => {
+                    prepare_builder = prepare_builder.node(ng_node_clone.clone(), ExecNode::None);
+                    run_builder = run_builder.node(ng_node_clone, ExecNode::None);
+                }
+            }
+        }
+
+        // 异步图 边
+        for id in sub_ng.topological_sort() {
+            let ng_node = sub_ng.get(id).unwrap();
+            for to in ng_node.to() {
+                let next_node = sub_ng.get(id).unwrap();
+
+                prepare_builder =
+                    prepare_builder.edge(ng_node.value().clone(), next_node.value().clone());
+
+                run_builder = run_builder.edge(ng_node.value().clone(), next_node.value().clone());
+            }
+        }
+
+        let value_map = XHashMap::<NGNodeValue, RealValue>::default();
+
+        match prepare_builder.build() {
+            Ok(g) => {
+                self.prepare_graph = Some(Arc::new(g));
+            }
+            Err(e) => {
+                error!(
+                    "render_graph::build prepare_builder graph failed, reason = {:?}",
+                    e
+                );
+            }
+        };
+
+        match run_builder.build() {
+            Ok(g) => {
+                self.run_graph = Some(Arc::new(g));
+            }
+            Err(e) => {
+                error!(
+                    "render_graph::build run_builder graph failed, reason = {:?}",
+                    e
+                );
+            }
+        };
+
+        Ok(())
     }
 
-    /// 准备
-    pub fn prepare(
-        &mut self,
-        device: RenderDevice,
-        queue: RenderQueue,
-        world: World,
-        ) -> std::io::Result<()> {
-            Ok(())
+    /// 每个节点 调用 prepare 方法
+    /// 目的：创建资源
+    pub async fn prepare(&mut self) {
+        match self.prepare_graph {
+            None => {
+                error!("render_graph::prepare failed, prepare_graph is none");
+            }
+            Some(ref g) => {
+                let _ = async_graph(self.rt.clone(), g.clone()).await;
+            }
         }
+
+        // 移除 prepare，因为它只能执行一次
+        let _ = self.prepare_graph.take();
+    }
 
     /// 执行
     pub async fn run(&mut self) {
-        let agraph = self.agraph;
-        
-        let _ = async_graph(AsyncRuntime::Multi(self.rt.clone()), agraph).await;
+        match self.run_graph {
+            None => {
+                error!("render_graph::run failed, run_graph is none");
+            }
+            Some(ref g) => {
+                let _ = async_graph(self.rt.clone(), g.clone()).await;
+            }
+        }
 
         // TODO 执行 present
+        
     }
 }
 
@@ -126,25 +269,95 @@ impl RunFactory for DumpNode {
     }
 }
 
-// 异步调用
-fn asyn(
-    world: World,
-    node: &NodeState,
+// 创建异步 节点
+fn crate_run_node(
+    map: &XHashMap<&usize, (Vec<Option<RealValue>>, Vec<Option<RealValue>>)>,
+    render_graph: &RenderGraph,
+    n: usize,
     device: RenderDevice,
     queue: RenderQueue,
-    res_mgr: XHashMap<NodeId, SmallVec<SlotValue>>,
+    world: World,
 ) -> ExecNode<DumpNode, DumpNode> {
+    let node = render_graph.get_node(NodeLabel::Id(n)).unwrap();
+    let node = node.node.clone();
 
-    let runner = node.node.run;
+    let (inputs, outputs) = map.get(&n).unwrap();
+    let inputs = inputs.as_slice().to_vec();
+    let outputs = outputs.as_slice().to_vec();
 
-    let f = move || -> BoxFuture<'static, Result<()>> {
+    let f = move || -> BoxFuture<'static, std::io::Result<()>> {
+        let device = device.clone();
+        let queue = queue.clone();
+        let world = world.clone();
+        let node = node.clone();
+        let inputs = inputs.clone();
+        let outputs = outputs.clone();
+
         let commands = device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
 
+        let context = RenderContext {
+            world,
+            device,
+            queue,
+            commands: Some(commands),
+        };
+
         async move {
+            let runner = node.run(context, inputs.as_slice(), outputs.as_slice());
+
+            runner.await;
+
             Ok(())
         }
         .boxed()
     };
 
     ExecNode::Async(Box::new(f))
+}
+
+// 创建异步 节点
+fn crate_prepare_node(
+    map: &XHashMap<&usize, (Vec<Option<RealValue>>, Vec<Option<RealValue>>)>,
+    render_graph: &RenderGraph,
+    n: usize,
+    device: RenderDevice,
+    queue: RenderQueue,
+    world: World,
+) -> ExecNode<DumpNode, DumpNode> {
+    let node = render_graph.get_node(NodeLabel::Id(n)).unwrap();
+    let node = node.node.clone();
+
+    let (inputs, outputs) = map.get(&n).unwrap();
+    let inputs = inputs.as_slice().to_vec();
+    let outputs = outputs.as_slice().to_vec();
+
+    let f = move || -> BoxFuture<'static, std::io::Result<()>> {
+        let device = device.clone();
+        let queue = queue.clone();
+        let world = world.clone();
+        let node = node.clone();
+        let inputs = inputs.clone();
+        let outputs = outputs.clone();
+
+        async move {
+            let context = RenderContext {
+                world,
+                device,
+                queue,
+                commands: None,
+            };
+
+            match node.prepare(context, inputs.as_slice(), outputs.as_slice()) {
+                None => {}
+                Some(r) => {
+                    r.await;
+                }
+            }
+
+            Ok(())
+        }
+        .boxed()
+    };
+
+    return ExecNode::Async(Box::new(f));
 }

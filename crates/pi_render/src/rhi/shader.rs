@@ -668,7 +668,7 @@ fn vertex(
     return out;
 }
 ";
-        let mut shader_defs = XHashSet::new();
+        let mut shader_defs = XHashSet::default();
         shader_defs.insert("TEXTURE".to_string());
 
         let processor = ShaderProcessor::default();

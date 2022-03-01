@@ -2,19 +2,18 @@
 
 use super::{
     node::{Node, NodeId, NodeLabel, NodeState},
-    node_slot::{SlotId, SlotInfo, SlotLabel},
+    node_slot::{SlotId, SlotLabel},
     RenderGraphError,
 };
 use graph::{NGraph, NGraphBuilder};
 use hash::XHashMap;
-use nalgebra::SimdValue;
 use std::{borrow::Cow, fmt::Debug};
 
 pub type NGNodeKey = usize;
 
-#[derive(Debug, Clone, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum NGNodeValue {
-    Node(NodeState),
+    Node(NodeId),
 
     InputSlot(NodeId, SlotId),
 
@@ -23,8 +22,8 @@ pub enum NGNodeValue {
 
 impl NGNodeValue {
     /// 创建 节点
-    pub fn new_with_node(state: NodeState) -> Self {
-        NGNodeValue::Node(state)
+    pub fn new_with_node(id: NodeId) -> Self {
+        NGNodeValue::Node(id)
     }
 
     /// 创建 输入
@@ -45,10 +44,11 @@ pub struct RenderGraph {
     nid_curr: NGNodeKey,
     // 实际上 是 render-graph 的 反向图
     ng: Option<NGraph<NGNodeKey, NGNodeValue>>,
-    ng_builder: Option<NGraphBuilder<NGNodeKey, NGNodeValue>>,
+    pub(crate) ng_builder: Option<NGraphBuilder<NGNodeKey, NGNodeValue>>,
 
-    slot_map: XHashMap<NGNodeValue, NGNodeKey>,
+    nodes: XHashMap<NodeId, NodeState>,
     node_names: XHashMap<Cow<'static, str>, NodeId>,
+    slots: XHashMap<NGNodeValue, NGNodeKey>,
 }
 
 impl RenderGraph {
@@ -58,8 +58,9 @@ impl RenderGraph {
             nid_curr: 0,
             ng: None,
             ng_builder: Some(NGraphBuilder::new()),
-            slot_map: XHashMap::new(),
-            node_names: XHashMap::new(),
+            nodes: XHashMap::default(),
+            slots: XHashMap::default(),
+            node_names: XHashMap::default(),
         }
     }
 
@@ -77,26 +78,27 @@ impl RenderGraph {
         self.node_names.insert(name, node_id);
 
         let mut builder = self.ng_builder.take().unwrap();
-        builder = builder.node(node_id, NGNodeValue::new_Node(node_state));
+        self.nodes.insert(node_id, node_state);
+        builder = builder.node(node_id, NGNodeValue::new_with_node(node_id));
 
-        for (index, _) in node.input().iter().enumarate() {
+        for (index, _) in node.input().iter().enumerate() {
             self.nid_curr += 1;
             let input_id = self.nid_curr;
 
             let node_value = NGNodeValue::InputSlot(node_id, index);
-            self.slot_map.insert(node_value.clone(), input_id);
+            self.slots.insert(node_value, input_id);
             builder = builder.node(input_id, node_value);
 
             // 这里要注意，NGraph 和  RenderGraph 的依赖 是相反的
             builder = builder.edge(node_id, input_id);
         }
 
-        for (index, _) in node.output().iter().enumarate() {
+        for (index, _) in node.output().iter().enumerate() {
             self.nid_curr += 1;
             let output_id = self.nid_curr;
 
             let node_value = NGNodeValue::OutputSlot(node_id, index);
-            self.slot_map.insert(node_value.clone(), output_id);
+            self.slots.insert(node_value, output_id);
             builder = builder.node(output_id, node_value);
 
             // 这里要注意，NGraph 和  RenderGraph 的依赖 是相反的
@@ -119,23 +121,57 @@ impl RenderGraph {
         input_node: impl Into<NodeLabel>,
         input_slot: impl Into<SlotLabel>,
     ) -> Result<(), RenderGraphError> {
+        let input_node = input_node.into();
         let input_slot = input_slot.into();
+
         let input_node_id = self.get_node_id(input_node)?;
-
-        let ng_input = NGNodeValue::new_with_input(input_node_id, input_slot);
-        let ng_input =
-            self.slot_map
-                .get(&ng_input)
-                .ok_or(RenderGraphError::InvalidInputNodeSlot(
+        let input_slot_id = match self.get_node(input_node) {
+            None => {
+                return Err(RenderGraphError::InvalidInputNodeSlot(
                     input_node, input_slot,
-                ))?;
+                ));
+            }
+            Some(n) => match n.input_slot_id(input_slot) {
+                None => {
+                    return Err(RenderGraphError::InvalidInputNodeSlot(
+                        input_node, input_slot,
+                    ));
+                }
+                Some(id) => id,
+            },
+        };
 
+        let ng_input = NGNodeValue::new_with_input(input_node_id, input_slot_id);
+        let ng_input = self
+            .slots
+            .get(&ng_input)
+            .ok_or(RenderGraphError::InvalidInputNodeSlot(
+                input_node, input_slot,
+            ))?;
+
+        let output_node = output_node.into();
         let output_slot = output_slot.into();
         let output_node_id = self.get_node_id(output_node)?;
-
-        let ng_output = NGNodeValue::new_with_output(output_node_id, output_slot);
+        let output_slot_id = match self.get_node(output_node) {
+            None => {
+                return Err(RenderGraphError::InvalidOutputNodeSlot(
+                    output_node,
+                    output_slot,
+                ));
+            }
+            Some(n) => match n.output_slot_id(output_slot) {
+                None => {
+                    return Err(RenderGraphError::InvalidOutputNodeSlot(
+                        output_node,
+                        output_slot,
+                    ));
+                }
+                Some(id) => id,
+            },
+        };
+        let ng_output = NGNodeValue::new_with_output(output_node_id, output_slot_id);
         let ng_output =
-            self.slot_map
+            self.slots
                 .get(&ng_output)
                 .ok_or(RenderGraphError::InvalidOutputNodeSlot(
                     output_node,
@@ -145,7 +181,7 @@ impl RenderGraph {
         let mut builder = self.ng_builder.take().unwrap();
 
         // 和 渲染圖 依賴 相反
-        builder = builder.edge(ng_input, ng_output);
+        builder = builder.edge(*ng_input, *ng_output);
 
         self.ng_builder.replace(builder);
 
@@ -181,6 +217,30 @@ impl RenderGraph {
                 .get(name)
                 .cloned()
                 .ok_or(RenderGraphError::InvalidNode(label)),
+        }
+    }
+
+    pub fn get_node(&self, label: impl Into<NodeLabel>) -> Option<&NodeState> {
+        let id = self.get_node_id(label);
+        match id {
+            Ok(id) => {
+                return self.nodes.get(&id);
+            }
+            Err(_) => {
+                return None;
+            }
+        }
+    }
+
+    pub fn get_node_mut(&mut self, label: impl Into<NodeLabel>) -> Option<&mut NodeState> {
+        let id = self.get_node_id(label);
+        match id {
+            Ok(id) => {
+                return self.nodes.get_mut(&id);
+            }
+            Err(_) => {
+                return None;
+            }
         }
     }
 }

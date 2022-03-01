@@ -75,7 +75,7 @@ pub enum SlotType {
 pub type SlotId = usize;
 
 /// [`SlotLabel`] 用于 从 名字 或 位置 来 引用
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum SlotLabel {
     /// 位置索引
     Index(SlotId),

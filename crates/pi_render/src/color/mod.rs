@@ -1,6 +1,6 @@
 pub mod colorspace;
 
-use self::colorspace::HslRepresentation;
+use self::colorspace::{HslRepresentation, SrgbColorSpace};
 use crate::{Vec3, Vec4};
 use std::ops::{Add, AddAssign, Mul, MulAssign};
 

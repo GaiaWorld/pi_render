@@ -286,8 +286,8 @@ impl Mesh {
             let mut minimum = VEC3_MAX;
             let mut maximum = VEC3_MIN;
             for p in values {
-                minimum = minimum.min(Vec3::from_slice(p));
-                maximum = maximum.max(Vec3::from_slice(p));
+                minimum = minimum.min(p);
+                maximum = maximum.max(p);
             }
             if minimum.x != std::f32::MAX
                 && minimum.y != std::f32::MAX

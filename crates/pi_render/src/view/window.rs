@@ -1,4 +1,4 @@
-use crate::rhi::{device::RenderDevice, texture::TextureView, RenderInstance};
+use crate::rhi::{device::RenderDevice, texture::{TextureView, PiDefault}, RenderInstance};
 use hash::{XHashMap, XHashSet};
 use pi_ecs::prelude::{Res, ResMut, World};
 use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};

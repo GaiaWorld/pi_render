@@ -12,7 +12,7 @@ pub mod texture;
 pub mod uniform_vec;
 
 use log::{debug, info};
-use raw_window_handle::RawWindowHandle;
+use raw_window_handle::HasRawWindowHandle;
 use std::sync::Arc;
 
 pub use pi_crevice::*;
@@ -126,9 +126,10 @@ pub type RenderQueue = Arc<wgpu::Queue>;
 /// aswell as to create [`WindowSurfaces`](crate::view::window::WindowSurfaces).
 pub type RenderInstance = wgpu::Instance;
 
+// TODO
 // 初始化 渲染 环境
 pub async fn create_render_context(
-    window: &RawWindowHandle,
+    window: &impl HasRawWindowHandle,
     mut options: RenderOptions,
 ) -> (RenderDevice, RenderQueue, RenderOptions) {
     let instance = wgpu::Instance::new(options.backends);

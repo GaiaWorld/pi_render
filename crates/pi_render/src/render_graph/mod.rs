@@ -4,19 +4,21 @@ pub mod node_slot;
 pub mod runner;
 
 use self::node::{NodeId, NodeLabel};
-use self::node_slot::{SlotLabel, SlotValue};
-use crate::rhi::device::RenderDevice;
+use self::node_slot::SlotLabel;
+use crate::rhi::{device::RenderDevice, RenderQueue};
 use pi_ecs::prelude::World;
 use thiserror::Error;
 use wgpu::CommandEncoder;
 
 pub struct RenderContext {
     // ECS 的 World，用于 查询 渲染数据
-    world: World,
+    pub(crate) world: World,
+    // Queue
+    pub(crate) queue: RenderQueue,
     // 渲染 设备，用于 创建资源
-    device: RenderDevice,
+    pub(crate) device: RenderDevice,
     // GPU 渲染 指令队列
-    commands: CommandEncoder,
+    pub(crate) commands: Option<CommandEncoder>,
 }
 
 #[derive(Error, Debug, Eq, PartialEq)]

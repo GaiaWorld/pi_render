@@ -54,7 +54,7 @@ pub fn active_cameras_system(
     for (name, active_camera) in active_cameras.cameras.iter_mut() {
         if active_camera
             .entity
-            .map_or(false, |entity| query.get(entity).is_err())
+            .map_or(false, |entity| query.get(entity).is_none())
         {
             active_camera.entity = None;
         }
