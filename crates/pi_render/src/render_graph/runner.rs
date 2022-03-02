@@ -15,8 +15,9 @@ use hash::XHashMap;
 use log::error;
 use pi_ecs::prelude::World;
 use r#async::rt::{AsyncRuntime, AsyncTaskPool, AsyncTaskPoolExt};
-use std::{borrow::Cow, io::Read, sync::Arc};
+use std::{borrow::Cow, cell::RefCell, io::Read, sync::Arc};
 use thiserror::Error;
+use wgpu::CommandEncoder;
 
 #[derive(Error, Debug)]
 pub enum RenderGraphRunnerError {
@@ -251,9 +252,6 @@ where
                 let _ = async_graph(self.rt.clone(), g.clone()).await;
             }
         }
-
-        // TODO 执行 present
-        
     }
 }
 
@@ -268,6 +266,11 @@ impl RunFactory for DumpNode {
         DumpNode
     }
 }
+
+#[derive(Clone, Debug)]
+pub struct CommandEncoderWrap(pub Arc<RefCell<Option<CommandEncoder>>>);
+unsafe impl Sync for CommandEncoderWrap {}
+unsafe impl Send for CommandEncoderWrap {}
 
 // 创建异步 节点
 fn crate_run_node(
@@ -293,20 +296,29 @@ fn crate_run_node(
         let inputs = inputs.clone();
         let outputs = outputs.clone();
 
-        let commands = device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
-
         let context = RenderContext {
             world,
             device,
             queue,
-            commands: Some(commands),
         };
 
         async move {
-            let runner = node.run(context, inputs.as_slice(), outputs.as_slice());
+            let commands =
+                device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+            let commands = CommandEncoderWrap(Arc::new(RefCell::new(Some(commands))));
+
+            let runner = node.run(
+                context,
+                commands.clone(),
+                inputs.as_slice(),
+                outputs.as_slice(),
+            );
 
             runner.await;
 
+            let mut lck = commands.0.get_mut();
+            let commands = std::mem::take(lck).unwrap();
+            context.queue.submit(vec![commands.finish()]);
             Ok(())
         }
         .boxed()
@@ -344,7 +356,6 @@ fn crate_prepare_node(
                 world,
                 device,
                 queue,
-                commands: None,
             };
 
             match node.prepare(context, inputs.as_slice(), outputs.as_slice()) {

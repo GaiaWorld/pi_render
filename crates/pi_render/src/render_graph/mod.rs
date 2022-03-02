@@ -17,8 +17,6 @@ pub struct RenderContext {
     pub(crate) queue: RenderQueue,
     // 渲染 设备，用于 创建资源
     pub(crate) device: RenderDevice,
-    // GPU 渲染 指令队列
-    pub(crate) commands: Option<CommandEncoder>,
 }
 
 #[derive(Error, Debug, Eq, PartialEq)]

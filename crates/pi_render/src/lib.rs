@@ -69,7 +69,6 @@ where
     async move {
         graph_runner.run().await;
 
-        // present
         {
             // Remove ViewTarget components to ensure swap chain TextureViews are dropped.
             // If all TextureViews aren't dropped before present, acquiring the next swap chain texture will fail.
@@ -77,8 +76,9 @@ where
                 .query_filtered::<Entity, With<ViewTarget>>()
                 .iter(world)
                 .collect::<Vec<_>>();
+
             for view_entity in view_entities {
-                world.RenderArchetypeentity_mut(view_entity).remove::<ViewTarget>();
+                world.entity_mut(view_entity).remove::<ViewTarget>();
             }
 
             let mut windows = world.get_resource_mut::<RenderWindows>().unwrap();

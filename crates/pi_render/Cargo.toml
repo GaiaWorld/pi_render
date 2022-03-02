@@ -34,6 +34,5 @@ nalgebra = "0.30"
 once_cell = "1.4" # TODO: replace once_cell with std equivalent if/when this lands: https://github.com/rust-lang/rfcs/pull/2788
 regex = "1.5"
 raw-window-handle = "0.4"
-smallvec = { version = "1.6", features = ["union", "const_generics"] }
 thiserror = "1.0"
 wgpu = { version = "0.12", features = ["spirv"] }

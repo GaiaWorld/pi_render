@@ -10,7 +10,7 @@
 
 use super::{
     node_slot::{SlotId, SlotInfo, SlotInfos, SlotLabel, SlotValue},
-    RenderContext, RenderGraphError,
+    RenderContext, RenderGraphError, runner::CommandEncoderWrap,
 };
 use downcast_rs::{impl_downcast, Downcast};
 use futures::future::BoxFuture;
@@ -70,6 +70,7 @@ pub trait Node: Downcast + Send + Sync + 'static {
     fn run(
         &self,
         context: RenderContext,
+        commands: CommandEncoderWrap,
         inputs: &[Option<RealValue>],
         outputs: &[Option<RealValue>],
     ) -> BoxFuture<'static, Result<(), NodeRunError>>;
