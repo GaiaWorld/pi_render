@@ -25,6 +25,7 @@
 //! ```
 
 use super::VertexAttributeValues;
+use pi_render_utils::EnumVariantMeta;
 use thiserror::Error;
 
 #[derive(Debug, Clone, Error)]
@@ -33,6 +34,16 @@ pub struct FromVertexAttributeError {
     from: VertexAttributeValues,
     variant: &'static str,
     into: &'static str,
+}
+
+impl FromVertexAttributeError {
+    fn new<T: 'static>(from: VertexAttributeValues) -> Self {
+        Self {
+            variant: from.enum_variant_name(),
+            into: std::any::type_name::<T>(),
+            from,
+        }
+    }
 }
 
 impl From<Vec<f32>> for VertexAttributeValues {

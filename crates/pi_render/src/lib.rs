@@ -3,7 +3,7 @@
 
 // pub mod camera;
 pub mod color;
-// pub mod mesh;
+pub mod mesh;
 pub mod primitives;
 // pub mod view;
 pub mod render_graph;

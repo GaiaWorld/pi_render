@@ -11,5 +11,6 @@ keywords = ["pi"]
 [features]
 
 [dependencies]
+pi_derive = { path = "../pi_derive" }
 
 [dev-dependencies]

@@ -2,6 +2,7 @@ pub mod conversions;
 
 use crate::{primitives::Aabb, rhi::buffer::Buffer, Vec3};
 use pi_crevice::internal::bytemuck::cast_slice;
+use pi_render_utils::EnumVariantMeta;
 use std::{borrow::Cow, collections::BTreeMap};
 use wgpu::{IndexFormat, PrimitiveTopology, VertexFormat};
 
@@ -278,6 +279,20 @@ impl Mesh {
         self.set_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
     }
 
+    fn min(a: Vec3, b: &[f32; 3]) -> Vec3 {
+        let x = if a.x < b[0] { a.x } else { b[0] };
+        let y = if a.y < b[1] { a.y } else { b[1] };
+        let z = if a.z < b[2] { a.z } else { b[2] };
+        Vec3::new(x, y, z)
+    }
+
+    fn max(a: Vec3, b: &[f32; 3]) -> Vec3 {
+        let x = if a.x > b[0] { a.x } else { b[0] };
+        let y = if a.y > b[1] { a.y } else { b[1] };
+        let z = if a.z > b[2] { a.z } else { b[2] };
+        Vec3::new(x, y, z)
+    }
+
     /// Compute the Axis-Aligned Bounding Box of the mesh vertices in model space
     pub fn compute_aabb(&self) -> Option<Aabb> {
         if let Some(VertexAttributeValues::Float32x3(values)) =
@@ -286,8 +301,8 @@ impl Mesh {
             let mut minimum = VEC3_MAX;
             let mut maximum = VEC3_MIN;
             for p in values {
-                minimum = minimum.min(p);
-                maximum = maximum.max(p);
+                minimum = Self::min(minimum, p);
+                maximum = Self::max(maximum, p);
             }
             if minimum.x != std::f32::MAX
                 && minimum.y != std::f32::MAX
@@ -309,7 +324,14 @@ const VEC3_MAX: Vec3 = Vec3::new(std::f32::MAX, std::f32::MAX, std::f32::MAX);
 
 fn face_normal(a: [f32; 3], b: [f32; 3], c: [f32; 3]) -> [f32; 3] {
     let (a, b, c) = (Vec3::from(a), Vec3::from(b), Vec3::from(c));
-    (b - a).cross(c - a).normalize().into()
+
+    let ab = b - a;
+    let ac = c - a;
+    let k1 = ab.cross(&ac);
+    
+    let k1 = k1.normalize();
+    
+    k1.into()
 }
 
 pub trait VertexFormatSize {
@@ -359,7 +381,7 @@ impl VertexFormatSize for wgpu::VertexFormat {
 
 /// Contains an array where each entry describes a property of a single vertex.
 /// Matches the [`VertexFormats`](VertexFormat).
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, EnumVariantMeta)]
 pub enum VertexAttributeValues {
     Float32(Vec<f32>),
     Sint32(Vec<i32>),

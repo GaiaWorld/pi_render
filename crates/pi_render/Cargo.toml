@@ -17,6 +17,7 @@ graph = { path = "../../../pi_lib/graph" }
 hash = { path = "../../../pi_lib/hash" }
 pi_crevice = { path = "../pi_crevice" }
 pi_ecs = { path = "../../../pi_ecs" }
+pi_render_utils = { path = "../pi_render_utils" }
 
 anyhow = "1.0"
 downcast-rs = "1.2"
