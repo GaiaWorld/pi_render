@@ -78,27 +78,26 @@ impl RenderGraph {
         self.node_names.insert(name, node_id);
 
         let mut builder = self.ng_builder.take().unwrap();
-        self.nodes.insert(node_id, node_state);
         builder = builder.node(node_id, NGNodeValue::new_with_node(node_id));
 
-        for (index, _) in node.input().iter().enumerate() {
+        for (index, _) in node_state.node.input().iter().enumerate() {
             self.nid_curr += 1;
             let input_id = self.nid_curr;
 
             let node_value = NGNodeValue::InputSlot(node_id, index);
-            self.slots.insert(node_value, input_id);
+            self.slots.insert(node_value.clone(), input_id);
             builder = builder.node(input_id, node_value);
 
             // 这里要注意，NGraph 和  RenderGraph 的依赖 是相反的
             builder = builder.edge(node_id, input_id);
         }
 
-        for (index, _) in node.output().iter().enumerate() {
+        for (index, _) in node_state.node.output().iter().enumerate() {
             self.nid_curr += 1;
             let output_id = self.nid_curr;
 
             let node_value = NGNodeValue::OutputSlot(node_id, index);
-            self.slots.insert(node_value, output_id);
+            self.slots.insert(node_value.clone(), output_id);
             builder = builder.node(output_id, node_value);
 
             // 这里要注意，NGraph 和  RenderGraph 的依赖 是相反的
@@ -106,6 +105,7 @@ impl RenderGraph {
         }
 
         self.ng_builder.replace(builder);
+        self.nodes.insert(node_id, node_state);
 
         node_id
     }
@@ -124,14 +124,14 @@ impl RenderGraph {
         let input_node = input_node.into();
         let input_slot = input_slot.into();
 
-        let input_node_id = self.get_node_id(input_node)?;
-        let input_slot_id = match self.get_node(input_node) {
+        let input_node_id = self.get_node_id(input_node.clone())?;
+        let input_slot_id = match self.get_node(input_node.clone()) {
             None => {
                 return Err(RenderGraphError::InvalidInputNodeSlot(
                     input_node, input_slot,
                 ));
             }
-            Some(n) => match n.input_slot_id(input_slot) {
+            Some(n) => match n.input_slot_id(input_slot.clone()) {
                 None => {
                     return Err(RenderGraphError::InvalidInputNodeSlot(
                         input_node, input_slot,
@@ -151,15 +151,15 @@ impl RenderGraph {
 
         let output_node = output_node.into();
         let output_slot = output_slot.into();
-        let output_node_id = self.get_node_id(output_node)?;
-        let output_slot_id = match self.get_node(output_node) {
+        let output_node_id = self.get_node_id(output_node.clone())?;
+        let output_slot_id = match self.get_node(output_node.clone()) {
             None => {
                 return Err(RenderGraphError::InvalidOutputNodeSlot(
                     output_node,
                     output_slot,
                 ));
             }
-            Some(n) => match n.output_slot_id(output_slot) {
+            Some(n) => match n.output_slot_id(output_slot.clone()) {
                 None => {
                     return Err(RenderGraphError::InvalidOutputNodeSlot(
                         output_node,

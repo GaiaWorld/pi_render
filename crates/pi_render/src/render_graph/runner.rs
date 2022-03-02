@@ -15,7 +15,12 @@ use hash::XHashMap;
 use log::error;
 use pi_ecs::prelude::World;
 use r#async::rt::{AsyncRuntime, AsyncTaskPool, AsyncTaskPoolExt};
-use std::{borrow::Cow, cell::RefCell, io::Read, sync::Arc};
+use std::{
+    borrow::{BorrowMut, Cow},
+    cell::RefCell,
+    io::Read,
+    sync::Arc,
+};
 use thiserror::Error;
 use wgpu::CommandEncoder;
 
@@ -45,7 +50,7 @@ pub enum RenderGraphRunnerError {
 }
 
 // 渲染图 执行器
-pub(crate) struct RenderGraphRunner<P>
+pub struct RenderGraphRunner<P>
 where
     P: AsyncTaskPoolExt<()> + AsyncTaskPool<(), Pool = P>,
 {
@@ -142,18 +147,25 @@ where
         for id in sub_ng.topological_sort() {
             let ng_node = sub_ng.get(id).unwrap();
             if let NGNodeValue::InputSlot(nid, sid) = ng_node.value() {
+                if ng_node.to().len() != 1 {
+                    panic!("InputSlot's len != 1");
+                }
+
+                let mut value = None;
+                let to = ng_node.to()[0];
+                let to = sub_ng.get(&to).unwrap();
+                if let NGNodeValue::OutputSlot(next_node, next_slot) = to.value() {
+                    let v = map.get(next_node).unwrap();
+                    let v = &v.1[*next_slot];
+                    let v = v.as_ref().unwrap().clone();
+                    value = Some(v);
+                }
+
                 let slots = map.entry(nid).or_insert_with(|| {
                     let n = self.render_graph.get_node(*nid).unwrap();
                     create_slots_vec(n)
                 });
-
-                for to in ng_node.to() {
-                    let to = sub_ng.get(to).unwrap();
-                    if let NGNodeValue::OutputSlot(next_node, next_slot) = to.value() {
-                        let v = map.get(next_node).unwrap().1[*next_slot].unwrap().clone();
-                        slots.0[*sid] = Some(v);
-                    }
-                }
+                slots.0[*sid] = value;
             }
         }
 
@@ -165,12 +177,26 @@ where
                 NGNodeValue::Node(n) => {
                     prepare_builder = prepare_builder.node(
                         ng_node_clone.clone(),
-                        crate_prepare_node(&map, &self.render_graph, *n, device, queue, world),
+                        crate_prepare_node(
+                            &map,
+                            &self.render_graph,
+                            *n,
+                            device.clone(),
+                            queue.clone(),
+                            world.clone(),
+                        ),
                     );
 
                     run_builder = run_builder.node(
                         ng_node_clone,
-                        crate_run_node(&map, &self.render_graph, *n, device, queue, world),
+                        crate_run_node(
+                            &map,
+                            &self.render_graph,
+                            *n,
+                            device.clone(),
+                            queue.clone(),
+                            world.clone(),
+                        ),
                     );
                 }
                 NGNodeValue::InputSlot(nid, sid) => {
@@ -298,13 +324,14 @@ fn crate_run_node(
 
         let context = RenderContext {
             world,
-            device,
-            queue,
+            device: device.clone(),
+            queue: queue.clone(),
         };
 
         async move {
             let commands =
                 device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+
             let commands = CommandEncoderWrap(Arc::new(RefCell::new(Some(commands))));
 
             let runner = node.run(
@@ -314,11 +341,10 @@ fn crate_run_node(
                 outputs.as_slice(),
             );
 
-            runner.await;
+            runner.await.unwrap();
 
-            let mut lck = commands.0.get_mut();
-            let commands = std::mem::take(lck).unwrap();
-            context.queue.submit(vec![commands.finish()]);
+            let commands = commands.0.as_ref().borrow_mut().take().unwrap();
+            queue.submit(vec![commands.finish()]);
             Ok(())
         }
         .boxed()

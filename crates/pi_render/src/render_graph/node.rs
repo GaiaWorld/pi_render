@@ -10,7 +10,8 @@
 
 use super::{
     node_slot::{SlotId, SlotInfo, SlotInfos, SlotLabel, SlotValue},
-    RenderContext, RenderGraphError, runner::CommandEncoderWrap,
+    runner::CommandEncoderWrap,
+    RenderContext, RenderGraphError,
 };
 use downcast_rs::{impl_downcast, Downcast};
 use futures::future::BoxFuture;
@@ -24,7 +25,6 @@ use thiserror::Error;
 pub struct RealValue(Arc<RefCell<Option<SlotValue>>>);
 
 impl Default for RealValue {
-
     fn default() -> Self {
         RealValue(Arc::new(RefCell::new(None)))
     }
@@ -144,6 +144,7 @@ impl NodeState {
         T: Node,
     {
         self.node
+            .as_any_mut()
             .downcast_mut::<T>()
             .ok_or(RenderGraphError::WrongNodeType)
     }
