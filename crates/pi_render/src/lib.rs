@@ -1,14 +1,12 @@
 //! 基于 ECS 框架的 渲染库
 //! 提供 rhi封装 和 渲染图
 
-// pub mod camera;
+pub mod camera;
 pub mod color;
-pub mod mesh;
-pub mod primitives;
-// pub mod view;
 pub mod render_graph;
 pub mod rhi;
 pub mod texture;
+pub mod view;
 
 use futures::{future::BoxFuture, FutureExt};
 use nalgebra::{Matrix4, Vector2, Vector3, Vector4};
@@ -21,6 +19,7 @@ use raw_window_handle::HasRawWindowHandle;
 use render_graph::{graph::RenderGraph, runner::RenderGraphRunner};
 use rhi::{create_render_context, device::RenderDevice, options::RenderOptions, RenderQueue};
 use thiserror::Error;
+use view::{window::RenderWindows, ViewTarget};
 // use view::{init_view, window::RenderWindows, ViewTarget};
 
 #[derive(Error, Debug)]
@@ -63,7 +62,7 @@ pub async fn init_render<T: HasRawWindowHandle>(
 
 /// 每帧 调用一次，用于 驱动 渲染图
 pub fn render_system<P>(
-    _world: World,
+    mut world: World,
     mut graph_runner: ResMut<RenderGraphRunner<P>>,
 ) -> BoxFuture<'static, std::io::Result<()>>
 where
@@ -72,28 +71,27 @@ where
     async move {
         graph_runner.run().await;
 
-        // {
-        //     // Remove ViewTarget components to ensure swap chain TextureViews are dropped.
-        //     // If all TextureViews aren't dropped before present, acquiring the next swap chain texture will fail.
-        //     let view_entities = world
-        //         .query_filtered::<RenderArchetype, Entity, With<ViewTarget>>()
-        //         .iter(world)
-        //         .collect::<Vec<_>>();
+        {
+            // Remove ViewTarget components to ensure swap chain TextureViews are dropped.
+            // If all TextureViews aren't dropped before present, acquiring the next swap chain texture will fail.
+            let view_entities = world
+                .query_filtered::<RenderArchetype, Entity, With<ViewTarget>>()
+                .iter(&world)
+                .collect::<Vec<_>>();
 
-        //     for e in view_entities {
-        //         world.remove_component::<ViewTarget>(e);
-        //     }
+            for e in view_entities {
+                world.remove_component::<ViewTarget>(e);
+            }
 
-        //     let mut windows = world.get_resource_mut::<RenderWindows>().unwrap();
-
-        //     for window in windows.values_mut() {
-        //         if let Some(texture_view) = window.swap_chain_texture.take() {
-        //             if let Some(surface_texture) = texture_view.take_surface_texture() {
-        //                 surface_texture.present();
-        //             }
-        //         }
-        //     }
-        // }
+            let windows = world.get_resource_mut::<RenderWindows>().unwrap();
+            for window in windows.values_mut() {
+                if let Some(texture_view) = window.swap_chain_texture.take() {
+                    if let Some(surface_texture) = texture_view.take_surface_texture() {
+                        surface_texture.present();
+                    }
+                }
+            }
+        }
 
         Ok(())
     }

@@ -1,10 +1,6 @@
 pub mod active_cameras;
-pub mod bundle;
-#[allow(clippy::module_inception)]
-pub mod camera;
-pub mod projection;
 
-use self::{active_cameras::ActiveCameras, camera::Camera};
+use self::active_cameras::ActiveCameras;
 use crate::{
     view::{
         window::{RenderWindows, WindowId},
@@ -26,10 +22,8 @@ impl CameraPlugin {
     pub const CAMERA_3D: &'static str = "camera_3d";
 }
 
-pub fn init_camera(world: &World) {
-    world.insert(RenderCameraNames::default());
-
-    world.init_resource::<RenderCameraNames>();
+pub fn init_camera(world: &mut World) {
+    world.insert_resource::<RenderCameraNames>(RenderCameraNames::default());
 }
 
 #[derive(Default)]
@@ -43,47 +37,3 @@ pub struct RenderCamera {
     pub name: Option<String>,
 }
 
-fn extract_cameras(
-    mut cmd_camera: Commands<RenderCamera>,
-    mut cmd_view: Commands<RenderView>,
-    mut camera_names: ResMut<RenderCameraNames>,
-    active_cameras: Res<ActiveCameras>,
-    windows: Res<RenderWindows>,
-    query: Query<RenderArchetype, (Entity, &Camera, &Mat4)>,
-) {
-    let mut entities = XHashMap::default();
-    for camera in active_cameras.iter() {
-        let name = &camera.name;
-        if let Some((entity, camera, transform, visible_entities)) =
-            camera.entity.and_then(|e| query.get(e).ok())
-        {
-            if let Some(window) = windows.get(camera.window) {
-                entities.insert(name.clone(), entity);
-
-                cmd_camera.insert(
-                    entity,
-                    RenderCamera {
-                        window_id: camera.window,
-                        name: camera.name.clone(),
-                    },
-                );
-
-                cmd_view.insert(
-                    entity,
-                    RenderView {
-                        projection: camera.projection_matrix,
-                        transform: *transform,
-                        width: window.physical_width().max(1),
-                        height: window.physical_height().max(1),
-                        near: camera.near,
-                        far: camera.far,
-                    },
-                );
-            }
-        }
-    }
-
-    for (n, e) in entities {
-        camera_names.insert(n, e);
-    }
-}
