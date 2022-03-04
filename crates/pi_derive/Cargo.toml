@@ -1,6 +1,7 @@
 [package]
 name = "pi_derive"
 version = "0.1.0"
+authors = ["moyy <myy412001799@gmail.com>"]
 edition = "2021"
 description = "Provides derive implementations for Pi Engine"
 repository = "https://github.com/GaiaWorld/pi_render"

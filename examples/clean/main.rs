@@ -12,8 +12,6 @@ struct RenderExample {
 
 impl RenderExample {
     pub fn new(window: Window) -> Self {
-
-        
         Self { window }
     }
 
@@ -29,7 +27,6 @@ impl RenderExample {
 
     // 执行 窗口渲染，每帧调用一次
     pub fn render(&self) {
-
         debug!("RenderExample::render");
     }
 
@@ -77,7 +74,7 @@ fn main() {
     let event_loop = EventLoop::new();
     let window = winit::window::Window::new(&event_loop).unwrap();
 
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("debug")).init();
 
     pollster::block_on(run(event_loop, window));
 }

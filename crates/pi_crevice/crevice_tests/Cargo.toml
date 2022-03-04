@@ -1,7 +1,12 @@
 [package]
 name = "crevice_tests"
 version = "0.1.0"
+authors = ["moyy <myy412001799@gmail.com>"]
 edition = "2021"
+description = "Tests for Derive crate"
+repository = "https://github.com/GaiaWorld/pi_render"
+license = "MIT OR Apache-2.0"
+keywords = ["pi"]
 
 [features]
 wgpu-validation = ["wgpu", "naga", "futures"]

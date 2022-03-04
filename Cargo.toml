@@ -1,10 +1,19 @@
 [package]
 name = "pi"
 version = "0.1.0"
+authors = ["moyy <myy412001799@gmail.com>"]
 edition = "2021"
+description = "Render for PI Engine"
+repository = "https://github.com/GaiaWorld/pi_render"
+license = "MIT OR Apache-2.0"
+keywords = ["pi"]
 
 [workspace]
 members = ["crates/*"]
+
+[dependencies]
+pi_2d = { path = "crates/pi_2d" }
+pi_render = { path = "crates/pi_render" }
 
 [dev-dependencies]
 winit = "0.26"
@@ -15,3 +24,7 @@ env_logger = "0.9"
 [[example]]
 name = "hello_winit"
 path = "examples/hello_winit/main.rs"
+
+[[example]]
+name = "clean"
+path = "examples/clean/main.rs"

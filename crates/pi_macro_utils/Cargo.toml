@@ -1,7 +1,7 @@
 [package]
 name = "pi_macro_utils"
 version = "0.1.0"
-authors = ["moyy <moyy@gmail.com>"]
+authors = ["moyy <myy412001799@gmail.com>"]
 edition = "2021"
 description = "A collection of utils for PI Engine"
 repository = "https://github.com/GaiaWorld/pi_render"
