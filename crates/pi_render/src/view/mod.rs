@@ -24,6 +24,8 @@ pub fn init_view(world: &mut World) {
 pub struct RenderView {
     pub projection: Mat4,
     pub transform: Mat4,
+    // TODO 之后会用 Transform3 直接换掉
+    pub translation: Vec3,
     pub width: u32,
     pub height: u32,
     pub near: f32,
@@ -87,31 +89,31 @@ pub fn prepare_view_uniforms(
     mut view_uniforms: ResMut<ViewUniforms>,
     views: Query<RenderArchetype, (Entity, &RenderView)>,
 ) {
-    // view_uniforms.uniforms.clear();
-    // for (entity, camera) in views.iter() {
-    //     let projection = camera.projection;
-    //     let view = camera.transform.compute_matrix();
-    //     let inverse_view = view.inverse();
-    //     let view_uniforms = ViewUniformOffset {
-    //         offset: view_uniforms.uniforms.push(ViewUniform {
-    //             view_proj: projection * inverse_view,
-    //             view,
-    //             inverse_view,
-    //             projection,
-    //             world_position: camera.transform.translation,
-    //             near: camera.near,
-    //             far: camera.far,
-    //             width: camera.width as f32,
-    //             height: camera.height as f32,
-    //         }),
-    //     };
+    view_uniforms.uniforms.clear();
+    for (entity, camera) in views.iter() {
+        let projection = camera.projection;
+        let view = camera.transform;
+        let inverse_view = view.try_inverse().unwrap();
+        let view_uniforms = ViewUniformOffset {
+            offset: view_uniforms.uniforms.push(ViewUniform {
+                view_proj: projection * inverse_view,
+                view,
+                inverse_view,
+                projection,
+                world_position: camera.translation,
+                near: camera.near,
+                far: camera.far,
+                width: camera.width as f32,
+                height: camera.height as f32,
+            }),
+        };
 
-    //     commands.insert(entity, view_uniforms);
-    // }
+        commands.insert(entity, view_uniforms);
+    }
 
-    // view_uniforms
-    //     .uniforms
-    //     .write_buffer(&render_device, &render_queue);
+    view_uniforms
+        .uniforms
+        .write_buffer(&render_device, &render_queue);
 }
 
 pub fn prepare_view_targets(
@@ -122,33 +124,33 @@ pub fn prepare_view_targets(
     mut texture_cache: ResMut<TextureCache>,
     cameras: Query<RenderArchetype, &RenderCamera>,
 ) {
-    //     for entity in camera_names.entities.values().copied() {
-    //         let camera = if let Ok(camera) = cameras.get(entity) {
-    //             camera
-    //         } else {
-    //             continue;
-    //         };
+    for entity in camera_names.entities.values().copied() {
+        let camera = if let Some(camera) = cameras.get(entity) {
+            camera
+        } else {
+            continue;
+        };
 
-    //         let window = if let Some(window) = windows.get(&camera.window_id) {
-    //             window
-    //         } else {
-    //             continue;
-    //         };
+        let window = if let Some(window) = windows.get(&camera.window_id) {
+            window
+        } else {
+            continue;
+        };
 
-    //         let swap_chain_texture = if let Some(texture) = &window.swap_chain_texture {
-    //             texture
-    //         } else {
-    //             continue;
-    //         };
+        let swap_chain_texture = if let Some(texture) = &window.swap_chain_texture {
+            texture
+        } else {
+            continue;
+        };
 
-    //         let sampled_target = None;
+        let sampled_target = None;
 
-    //         commands.insert(
-    //             entity,
-    //             ViewTarget {
-    //                 view: swap_chain_texture.clone(),
-    //                 sampled_target,
-    //             },
-    //         );
-    //     }
+        commands.insert(
+            entity,
+            ViewTarget {
+                view: swap_chain_texture.clone(),
+                sampled_target,
+            },
+        );
+    }
 }

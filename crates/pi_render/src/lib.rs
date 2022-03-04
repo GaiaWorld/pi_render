@@ -9,7 +9,7 @@ pub mod texture;
 pub mod view;
 
 use futures::{future::BoxFuture, FutureExt};
-use nalgebra::{Matrix4, Vector2, Vector3, Vector4};
+use nalgebra::{Matrix4, Vector2, Vector3, Vector4, Transform3 as NalTransform3};
 use pi_ecs::{
     entity::Entity,
     prelude::{ResMut, With, World},
@@ -38,6 +38,7 @@ pub type Vec2 = Vector2<f32>;
 pub type Vec3 = Vector3<f32>;
 pub type Vec4 = Vector4<f32>;
 pub type Mat4 = Matrix4<f32>;
+pub type Transform3 = NalTransform3<f32>;
 
 /// 初始化
 pub async fn init_render<T: HasRawWindowHandle>(
