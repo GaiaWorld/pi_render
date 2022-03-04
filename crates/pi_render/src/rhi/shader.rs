@@ -128,7 +128,6 @@ impl ProcessedShader {
     /// 反射
     pub fn reflect(&self) -> Result<ShaderReflection, ShaderReflectError> {
         let module = match &self {
-            // TODO: process macros here
             ProcessedShader::Wgsl(source) => naga::front::wgsl::parse_str(source)?,
             ProcessedShader::Glsl(source, shader_stage) => {
                 let mut parser = naga::front::glsl::Parser::default();
@@ -173,7 +172,6 @@ impl ProcessedShader {
                 }
                 ProcessedShader::Glsl(_source, _stage) => {
                     let reflection = self.reflect()?;
-                    // TODO: it probably makes more sense to convert this to spirv, but as of writing
 
                     // 通过 反射信息 转换成 wgsl
                     let wgsl = reflection.get_wgsl()?;

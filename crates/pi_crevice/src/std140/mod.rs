@@ -14,4 +14,5 @@ pub use self::traits::*;
 #[cfg(feature = "std")]
 pub use self::writer::*;
 
+use mint::Vector3;
 pub use pi_crevice_derive::AsStd140;

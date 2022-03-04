@@ -126,7 +126,6 @@ pub type RenderQueue = Arc<wgpu::Queue>;
 /// aswell as to create [`WindowSurfaces`](crate::view::window::WindowSurfaces).
 pub type RenderInstance = wgpu::Instance;
 
-// TODO
 // 初始化 渲染 环境
 pub async fn create_render_context(
     window: &impl HasRawWindowHandle,

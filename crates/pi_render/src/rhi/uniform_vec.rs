@@ -12,15 +12,12 @@ pub struct UniformVec<T: AsStd140> {
 }
 
 impl<T: AsStd140> Default for UniformVec<T> {
-    // TODO
     fn default() -> Self {
         Self {
             values: Vec::new(),
             scratch: Vec::new(),
             uniform_buffer: None,
             capacity: 0,
-            // item_size: (T::std140_size_static() + <T as AsStd140>::Output::ALIGNMENT - 1)
-            //     & !(<T as AsStd140>::Output::ALIGNMENT - 1),
             item_size: 16,
         }
     }

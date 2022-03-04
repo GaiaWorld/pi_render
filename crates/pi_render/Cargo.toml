@@ -15,7 +15,7 @@ async = { path = "../../../pi_lib/async" }
 async_graph = { path = "../../../pi_lib/async_graph" }
 graph = { path = "../../../pi_lib/graph" }
 hash = { path = "../../../pi_lib/hash" }
-pi_crevice = { path = "../pi_crevice" }
+pi_crevice = { path = "../pi_crevice", features = ["nalgebra"] }
 pi_ecs = { path = "../../../pi_ecs" }
 pi_render_utils = { path = "../pi_render_utils" }
 
