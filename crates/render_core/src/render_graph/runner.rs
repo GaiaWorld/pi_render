@@ -8,20 +8,15 @@ use crate::{
     render_graph::node::NodeState,
     rhi::{device::RenderDevice, RenderQueue},
 };
-use pi_async_graph::{async_graph, ExecNode, RunFactory, Runner};
 use futures::{future::BoxFuture, FutureExt};
+use log::error;
+use pi_async::rt::{AsyncRuntime, AsyncTaskPool, AsyncTaskPoolExt};
+use pi_async_graph::{async_graph, ExecNode, RunFactory, Runner};
+use pi_ecs::prelude::World;
 use pi_graph::{DirectedGraph, DirectedGraphNode, NGraph, NGraphBuilder};
 use pi_hash::XHashMap;
-use log::error;
-use pi_ecs::prelude::World;
-use pi_async::rt::{AsyncRuntime, AsyncTaskPool, AsyncTaskPoolExt};
-use pi_share::{SharePtr, Share, cell::TrustCell};
-use std::{
-    borrow::Cow,
-    cell::{RefCell, UnsafeCell},
-    ops::{Deref, DerefMut},
-    sync::Arc,
-};
+use pi_share::{cell::TrustCell, Share};
+use std::{borrow::Cow, sync::Arc};
 use thiserror::Error;
 use wgpu::CommandEncoder;
 
@@ -200,11 +195,11 @@ where
                         ),
                     );
                 }
-                NGNodeValue::InputSlot(nid, sid) => {
+                NGNodeValue::InputSlot(_nid, _sid) => {
                     prepare_builder = prepare_builder.node(ng_node_clone.clone(), ExecNode::None);
                     run_builder = run_builder.node(ng_node_clone, ExecNode::None);
                 }
-                NGNodeValue::OutputSlot(nid, sid) => {
+                NGNodeValue::OutputSlot(_nid, _sid) => {
                     prepare_builder = prepare_builder.node(ng_node_clone.clone(), ExecNode::None);
                     run_builder = run_builder.node(ng_node_clone, ExecNode::None);
                 }
@@ -223,8 +218,6 @@ where
                 run_builder = run_builder.edge(ng_node.value().clone(), next_node.value().clone());
             }
         }
-
-        let value_map = XHashMap::<NGNodeValue, RealValue>::default();
 
         match prepare_builder.build() {
             Ok(g) => {
@@ -388,7 +381,7 @@ fn crate_prepare_node(
             match node.prepare(context, inputs.as_slice(), outputs.as_slice()) {
                 None => {}
                 Some(r) => {
-                    r.await;
+                    let _ = r.await;
                 }
             }
 

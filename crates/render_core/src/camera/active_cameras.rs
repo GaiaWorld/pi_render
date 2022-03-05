@@ -9,5 +9,5 @@ pub struct ActiveCamera {
 
 #[derive(Debug, Default)]
 pub struct ActiveCameras {
-    cameras: XHashMap<String, ActiveCamera>,
+    pub cameras: XHashMap<String, ActiveCamera>,
 }

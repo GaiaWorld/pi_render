@@ -5,7 +5,7 @@ use super::{
     node_slot::{SlotId, SlotLabel},
     RenderGraphError,
 };
-use pi_graph::{NGraph, NGraphBuilder};
+use pi_graph::NGraphBuilder;
 use pi_hash::XHashMap;
 use std::{borrow::Cow, fmt::Debug};
 
@@ -42,8 +42,6 @@ impl NGNodeValue {
 pub struct RenderGraph {
     // 当前 已经分配到的 id 数字
     nid_curr: NGNodeKey,
-    // 实际上 是 render-graph 的 反向图
-    ng: Option<NGraph<NGNodeKey, NGNodeValue>>,
     pub(crate) ng_builder: Option<NGraphBuilder<NGNodeKey, NGNodeValue>>,
 
     nodes: XHashMap<NodeId, NodeState>,
@@ -56,7 +54,6 @@ impl RenderGraph {
     pub fn new() -> Self {
         Self {
             nid_curr: 0,
-            ng: None,
             ng_builder: Some(NGraphBuilder::new()),
             nodes: XHashMap::default(),
             slots: XHashMap::default(),

@@ -13,6 +13,4 @@ pub use self::sizer::*;
 pub use self::traits::*;
 #[cfg(feature = "std")]
 pub use self::writer::*;
-
-use mint::Vector3;
 pub use render_crevice_derive::AsStd140;

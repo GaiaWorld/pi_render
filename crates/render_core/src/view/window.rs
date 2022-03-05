@@ -46,10 +46,6 @@ pub enum PresentMode {
 pub struct RawWindowHandleWrapper(RawWindowHandle);
 
 impl RawWindowHandleWrapper {
-    pub(crate) fn new(handle: RawWindowHandle) -> Self {
-        Self(handle)
-    }
-
     /// # Safety
     /// This returns a [`HasRawWindowHandle`] impl, which exposes [`RawWindowHandle`]. Some platforms
     /// have constraints on where/how this handle can be used. For example, some platforms don't support doing window

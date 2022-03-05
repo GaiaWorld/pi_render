@@ -20,7 +20,7 @@ use futures::{future::BoxFuture, FutureExt};
 use pi_ecs::prelude::{QueryState, With, World};
 use pi_hash::XHashSet;
 use pi_share::{cell::TrustCell, Share};
-use std::{ops::DerefMut, sync::Arc};
+use std::{ops::DerefMut};
 
 pub struct ClearPassNode {
     query: Share<

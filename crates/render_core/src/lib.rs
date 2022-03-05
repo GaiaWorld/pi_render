@@ -9,18 +9,19 @@ pub mod rhi;
 pub mod texture;
 pub mod view;
 
+use camera::init_camera;
 use futures::{future::BoxFuture, FutureExt};
-use nalgebra::{Matrix4, Vector2, Vector3, Vector4, Transform3 as NalTransform3};
+use nalgebra::{Matrix4, Transform3 as NalTransform3, Vector2, Vector3, Vector4};
+use pi_async::rt::{AsyncTaskPool, AsyncTaskPoolExt};
 use pi_ecs::{
     entity::Entity,
     prelude::{ResMut, With, World},
 };
-use pi_async::rt::{AsyncTaskPool, AsyncTaskPoolExt};
 use raw_window_handle::HasRawWindowHandle;
-use render_graph::{runner::RenderGraphRunner};
+use render_graph::runner::RenderGraphRunner;
 use rhi::{create_render_context, options::RenderOptions};
 use thiserror::Error;
-use view::{window::RenderWindows, ViewTarget};
+use view::{init_view, window::RenderWindows, ViewTarget};
 
 #[derive(Error, Debug)]
 pub enum RenderContextError {
@@ -48,12 +49,12 @@ pub async fn init_render<T: HasRawWindowHandle>(
 ) {
     world.new_archetype::<RenderArchetype>().create();
 
-    // init_view(world);
-    // init_camera(world);
+    init_view(world);
+    init_camera(world);
 
     let (device, queue, options) = create_render_context(&window, options).await;
 
-    let window = RawWindowHandleWrapper(window);
+    // let window = RawWindowHandleWrapper(window);
 
     world.insert_resource(options);
 

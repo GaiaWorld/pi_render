@@ -1,19 +1,10 @@
 pub mod active_cameras;
 pub mod render_target;
 
-use self::{active_cameras::ActiveCameras, render_target::RenderTarget};
-use crate::{
-    view::{
-        window::{RenderWindows, WindowId},
-        RenderView,
-    },
-    Mat4, RenderArchetype, Vec2,
-};
+use self::render_target::RenderTarget;
+use crate::Vec2;
+use pi_ecs::{entity::Entity, prelude::World};
 use pi_hash::XHashMap;
-use pi_ecs::{
-    entity::Entity,
-    prelude::{Commands, Query, Res, ResMut, World},
-};
 
 #[derive(Default)]
 pub struct CameraPlugin;
@@ -38,4 +29,3 @@ pub struct RenderCamera {
     pub name: Option<String>,
     pub size: Option<Vec2>,
 }
-

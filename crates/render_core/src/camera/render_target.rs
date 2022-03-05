@@ -33,11 +33,4 @@ impl RenderTarget {
                 .map(|window| Vec2::new(window.width as f32, window.height as f32)),
         }
     }
-
-    // Check if this render target is contained in the given changed windows or images.
-    fn is_changed(&self, changed_window_ids: &[WindowId]) -> bool {
-        match self {
-            RenderTarget::Window(window_id) => changed_window_ids.contains(window_id),
-        }
-    }
 }
