@@ -1,0 +1,14 @@
+[package]
+name = "render_macro_utils"
+version = "0.1.0"
+authors = ["moyy <myy412001799@gmail.com>"]
+edition = "2021"
+description = "A collection of utils for PI Engine"
+repository = "https://github.com/GaiaWorld/pi_render"
+license = "MIT OR Apache-2.0"
+keywords = ["pi"]
+
+[dependencies]
+cargo-manifest = "0.2.6"
+syn = "1.0"
+quote = "1.0"

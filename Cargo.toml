@@ -1,5 +1,5 @@
 [package]
-name = "pi"
+name = "pi_render"
 version = "0.1.0"
 authors = ["moyy <myy412001799@gmail.com>"]
 edition = "2021"
@@ -12,8 +12,7 @@ keywords = ["pi"]
 members = ["crates/*"]
 
 [dependencies]
-pi_2d = { path = "crates/pi_2d" }
-pi_render = { path = "crates/pi_render" }
+render_core = { path = "crates/render_core" }
 
 [dev-dependencies]
 winit = "0.26"

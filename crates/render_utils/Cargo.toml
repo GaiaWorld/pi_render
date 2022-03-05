@@ -1,0 +1,16 @@
+[package]
+name = "render_utils"
+version = "0.1.0"
+authors = ["moyy <myy412001799@gmail.com>"]
+edition = "2021"
+description = "Render Utils for PI Engine"
+repository = "https://github.com/GaiaWorld/pi_render"
+license = "MIT OR Apache-2.0"
+keywords = ["pi"]
+
+[features]
+
+[dependencies]
+render_derive = { path = "../render_derive" }
+
+[dev-dependencies]

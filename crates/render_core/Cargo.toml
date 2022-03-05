@@ -1,0 +1,40 @@
+[package]
+name = "render_core"
+version = "0.1.0"
+authors = ["moyy <myy412001799@gmail.com>"]
+edition = "2021"
+description = "Renderer for PI Engine"
+repository = "https://github.com/GaiaWorld/pi_render"
+license = "MIT OR Apache-2.0"
+keywords = ["pi"]
+
+[features]
+
+[dependencies]
+pi_async = "0.1"
+pi_async_graph  = "0.1"
+pi_graph  = "0.1"
+pi_hash  = "0.1"
+pi_ecs  = "0.1"
+pi_share = {version = "0.1"}
+render_utils = { path = "../render_utils" }
+render_crevice = { path = "../render_crevice", features = ["nalgebra"] }
+
+anyhow = "1.0"
+downcast-rs = "1.2"
+futures = "0.3"
+hex = "0.4"
+log = "0.4"
+naga = { version = "0.8", features = [
+    "glsl-in",
+    "spv-in",
+    "spv-out",
+    "wgsl-in",
+    "wgsl-out",
+] }
+nalgebra = "0.30"
+once_cell = "1.4" # TODO: replace once_cell with std equivalent if/when this lands: https://github.com/rust-lang/rfcs/pull/2788
+regex = "1.5"
+raw-window-handle = "0.4"
+thiserror = "1.0"
+wgpu = { version = "0.12", features = ["spirv"] }
