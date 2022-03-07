@@ -35,11 +35,6 @@ unsafe impl Send for RealValue {}
 /// 渲染图的节点
 /// 可以 异步 执行
 pub trait Node: Downcast + Send + Sync + 'static {
-    /// 返回 是否 渲染 的 终点，一般是 渲染到屏幕的节点
-    /// 注：如果某个节点 改变了 这个属性，需要 重新构建 渲染图
-    fn is_finish(&self) -> bool {
-        false
-    }
 
     /// 返回 输入 槽位 信息
     fn input(&self) -> Vec<SlotInfo> {

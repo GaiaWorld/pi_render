@@ -6,7 +6,7 @@ use super::{
     RenderGraphError,
 };
 use pi_graph::NGraphBuilder;
-use pi_hash::XHashMap;
+use pi_hash::{XHashMap, XHashSet};
 use std::{borrow::Cow, fmt::Debug};
 
 pub type NGNodeKey = usize;
@@ -44,6 +44,8 @@ pub struct RenderGraph {
     nid_curr: NGNodeKey,
     pub(crate) ng_builder: Option<NGraphBuilder<NGNodeKey, NGNodeValue>>,
 
+    pub(crate) finish_nodes: XHashSet<NodeId>,
+
     nodes: XHashMap<NodeId, NodeState>,
     node_names: XHashMap<Cow<'static, str>, NodeId>,
     slots: XHashMap<NGNodeValue, NGNodeKey>,
@@ -54,11 +56,30 @@ impl RenderGraph {
     pub fn new() -> Self {
         Self {
             nid_curr: 0,
+            finish_nodes: XHashSet::default(),
             ng_builder: Some(NGraphBuilder::new()),
             nodes: XHashMap::default(),
             slots: XHashMap::default(),
             node_names: XHashMap::default(),
         }
+    }
+
+    /// 设置 是否 是 最终节点
+    pub fn set_node_finish(
+        &mut self,
+        node: impl Into<NodeLabel>,
+        is_finish: bool,
+    ) -> Result<(), RenderGraphError> {
+        let node = node.into();
+        let node_id = self.get_node_id(node.clone())?;
+
+        if is_finish {
+            self.finish_nodes.insert(node_id);
+        } else {
+            self.finish_nodes.remove(&node_id);
+        }
+
+        Ok(())
     }
 
     /// 添加 节点

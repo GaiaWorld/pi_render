@@ -10,7 +10,7 @@ use crate::{
 };
 use futures::{future::BoxFuture, FutureExt};
 use log::error;
-use pi_async::rt::{AsyncRuntime, AsyncTaskPool, AsyncTaskPoolExt};
+use pi_async::rt::{multi_thread::StealableTaskPool, AsyncRuntime, AsyncTaskPool};
 use pi_async_graph::{async_graph, ExecNode, RunFactory, Runner};
 use pi_ecs::prelude::World;
 use pi_graph::{DirectedGraph, DirectedGraphNode, NGraph, NGraphBuilder};
@@ -46,12 +46,9 @@ pub enum RenderGraphRunnerError {
 }
 
 // 渲染图 执行器
-pub struct RenderGraphRunner<P>
-where
-    P: AsyncTaskPoolExt<()> + AsyncTaskPool<(), Pool = P>,
-{
+pub struct RenderGraphRunner {
     // 异步运行时
-    rt: AsyncRuntime<(), P>,
+    rt: AsyncRuntime<(), StealableTaskPool<()>>,
     // 渲染图
     render_graph: RenderGraph,
 
@@ -62,12 +59,9 @@ where
     run_graph: Option<Arc<NGraph<NGNodeValue, ExecNode<DumpNode, DumpNode>>>>,
 }
 
-impl<P> RenderGraphRunner<P>
-where
-    P: AsyncTaskPoolExt<()> + AsyncTaskPool<(), Pool = P>,
-{
+impl RenderGraphRunner {
     /// 创建
-    pub fn new(rt: AsyncRuntime<(), P>, render_graph: RenderGraph) -> Self {
+    pub fn new(rt: AsyncRuntime<(), StealableTaskPool<()>>, render_graph: RenderGraph) -> Self {
         Self {
             rt,
             render_graph,
@@ -90,18 +84,7 @@ where
         };
 
         // 遍历，找 终点
-        let mut finishes = Vec::<NodeId>::new();
-        for node in ng.iter() {
-            match node {
-                NGNodeValue::Node(n) => {
-                    let node = self.render_graph.get_node(NodeLabel::Id(*n)).unwrap();
-                    if node.node.is_finish() {
-                        finishes.push(*n);
-                    }
-                }
-                _ => {}
-            }
-        }
+        let mut finishes: Vec<NodeId> = self.render_graph.finish_nodes.iter().copied().collect();
 
         // 以终为起，构建需要的 节点
         let sub_ng = ng.gen_graph_from_keys(&finishes);

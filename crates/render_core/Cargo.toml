@@ -12,11 +12,11 @@ keywords = ["pi"]
 
 [dependencies]
 pi_async = "0.1"
-pi_async_graph  = "0.1"
-pi_graph  = "0.1"
-pi_hash  = "0.1"
-pi_ecs  = "0.1"
-pi_share = {version = "0.1"}
+pi_async_graph = "0.1"
+pi_graph = "0.1"
+pi_hash = "0.1"
+pi_ecs = "0.1"
+pi_share = "0.1"
 render_utils = { path = "../render_utils" }
 render_crevice = { path = "../render_crevice", features = ["nalgebra"] }
 

@@ -20,7 +20,7 @@ use futures::{future::BoxFuture, FutureExt};
 use pi_ecs::prelude::{QueryState, With, World};
 use pi_hash::XHashSet;
 use pi_share::{cell::TrustCell, Share};
-use std::{ops::DerefMut};
+use std::{ops::{DerefMut, Deref}};
 
 pub struct ClearPassNode {
     query: Share<
@@ -68,7 +68,8 @@ impl Node for ClearPassNode {
             let render_target_clear_colors =
                 world.get_resource::<RenderTargetClearColors>().unwrap();
 
-            let c = &mut commands.0.borrow_mut();
+            let c = commands.0.deref();
+            let mut c = c.borrow_mut();
             let c = c.deref_mut();
             let c = c.as_mut().unwrap();
 
@@ -140,10 +141,6 @@ impl Node for ClearPassNode {
             Ok(())
         }
         .boxed()
-    }
-
-    fn is_finish(&self) -> bool {
-        false
     }
 
     fn output(&self) -> Vec<SlotInfo> {

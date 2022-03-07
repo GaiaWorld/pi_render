@@ -13,6 +13,7 @@ pub mod uniform_vec;
 
 use log::{debug, info};
 use raw_window_handle::HasRawWindowHandle;
+use wgpu::{Instance, Surface};
 use std::sync::Arc;
 
 pub use render_crevice::*;
@@ -126,15 +127,20 @@ pub type RenderQueue = Arc<wgpu::Queue>;
 /// aswell as to create [`WindowSurfaces`](crate::view::window::WindowSurfaces).
 pub type RenderInstance = wgpu::Instance;
 
+pub fn create_instance(options: &RenderOptions,) -> Instance {
+    wgpu::Instance::new(options.backends)
+}
+
+pub fn create_surface(instance: &Instance, window: &impl HasRawWindowHandle) -> wgpu::Surface {
+    unsafe { instance.create_surface(window) }
+}
+
 // 初始化 渲染 环境
 pub async fn create_render_context(
-    window: &impl HasRawWindowHandle,
+    instance: Instance,
+    surface: Surface,
     mut options: RenderOptions,
 ) -> (RenderDevice, RenderQueue, RenderOptions) {
-    let instance = wgpu::Instance::new(options.backends);
-
-    let surface = unsafe { instance.create_surface(window) };
-
     let request_adapter_options = wgpu::RequestAdapterOptions {
         power_preference: options.power_preference,
         compatible_surface: Some(&surface),

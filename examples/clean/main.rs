@@ -1,4 +1,15 @@
 use log::{debug, info};
+use pi_async::rt::{
+    single_thread::{SingleTaskPool, SingleTaskRunner},
+    AsyncRuntime,
+};
+use pi_ecs::prelude::{Dispatcher, SingleDispatcher, World};
+use pi_render::{
+    create_instance_surface, init_render, render_graph::graph::RenderGraph,
+    render_nodes::clear_pass::ClearPassNode, rhi::options::RenderOptions,
+};
+use pi_share::cell::TrustCell;
+use std::{ops::DerefMut, sync::Arc};
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
@@ -7,12 +18,44 @@ use winit::{
 
 // 渲染 环境
 struct RenderExample {
+    world: World,
     window: Window,
+    rt: AsyncRuntime<(), SingleTaskPool<()>>,
+    dispatcher: Option<SingleDispatcher<SingleTaskPool<()>>>,
 }
 
 impl RenderExample {
-    pub fn new(window: Window) -> Self {
-        Self { window }
+    pub fn new(window: Window, rt: AsyncRuntime<(), SingleTaskPool<()>>) -> Self {
+        let world = World::new();
+
+        let rg = world.get_resource_mut::<RenderGraph>().unwrap();
+        let clear_node = rg.add_node("clean", ClearPassNode::new(&mut world.clone()));
+        rg.set_node_finish(clear_node, true).unwrap();
+
+        Self {
+            window,
+            world,
+            rt,
+            dispatcher: None,
+        }
+    }
+
+    pub async fn init_render(
+        &mut self,
+        instance: wgpu::Instance,
+        surface: wgpu::Surface,
+        options: RenderOptions,
+    ) {
+        let render_stage = init_render(&mut self.world, instance, surface, options).await;
+
+        let mut stages = vec![];
+        stages.push(Arc::new(render_stage.build()));
+
+        let rt = self.rt.clone();
+
+        let dispatcher = SingleDispatcher::new(stages, &self.world, rt);
+
+        self.dispatcher = Some(dispatcher);
     }
 
     // 初始化渲染调用
@@ -28,6 +71,11 @@ impl RenderExample {
     // 执行 窗口渲染，每帧调用一次
     pub fn render(&self) {
         debug!("RenderExample::render");
+
+        match &self.dispatcher {
+            Some(d) => d.run(),
+            None => {}
+        }
     }
 
     pub fn clean(&self) {
@@ -35,10 +83,27 @@ impl RenderExample {
     }
 }
 
-async fn run(event_loop: EventLoop<()>, window: Window) {
-    let example = RenderExample::new(window);
+fn run(event_loop: EventLoop<()>, window: Window) {
+    let runner = SingleTaskRunner::<()>::default();
+    let runtime = runner.startup().unwrap();
+    let single = AsyncRuntime::Local(runtime.clone());
 
-    example.init();
+    let single_clone = single.clone();
+
+    let options = RenderOptions::default();
+
+    let (instance, surface) = create_instance_surface(&window, &options);
+
+    let example = Arc::new(TrustCell::new(RenderExample::new(window, single_clone)));
+
+    let e = example.clone();
+    let _ = single.spawn(single.alloc(), async move {
+        e.get().init();
+
+        let mut e = e.borrow_mut();
+        let e = e.deref_mut();
+        e.init_render(instance, surface, options).await;
+    });
 
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
@@ -48,20 +113,36 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 event: WindowEvent::Resized(size),
                 ..
             } => {
-                example.resize(size.width, size.height);
+                let w = size.width;
+                let h = size.height;
+                let e = example.clone();
+                let _ = single.spawn(single.alloc(), async move {
+                    e.get().resize(w, h);
+                });
             }
             Event::MainEventsCleared => {
-                example.window.request_redraw();
+                let e = example.clone();
+                let _ = single.spawn(single.alloc(), async move {
+                    e.get().window.request_redraw();
+                });
             }
             Event::RedrawRequested(_) => {
-                example.render();
+                let e = example.clone();
+                let _ = single.spawn(single.alloc(), async move {
+                    e.get().render();
+                });
+
+                let _ = runner.run();
             }
             Event::WindowEvent {
                 // 窗口 关闭，退出 循环
                 event: WindowEvent::CloseRequested,
                 ..
             } => {
-                example.clean();
+                let e = example.clone();
+                let _ = single.spawn(single.alloc(), async move {
+                    e.get().clean();
+                });
 
                 *control_flow = ControlFlow::Exit
             }
@@ -71,10 +152,10 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 }
 
 fn main() {
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("debug")).init();
+
     let event_loop = EventLoop::new();
     let window = winit::window::Window::new(&event_loop).unwrap();
 
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("debug")).init();
-
-    pollster::block_on(run(event_loop, window));
+    run(event_loop, window);
 }

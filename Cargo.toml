@@ -6,7 +6,7 @@ edition = "2021"
 description = "Render for PI Engine"
 repository = "https://github.com/GaiaWorld/pi_render"
 license = "MIT OR Apache-2.0"
-keywords = ["pi"]
+keywords = ["pi", "render"]
 
 [workspace]
 members = ["crates/*"]
@@ -15,10 +15,15 @@ members = ["crates/*"]
 render_core = { path = "crates/render_core" }
 
 [dev-dependencies]
+futures = "0.3"
 winit = "0.26"
-pollster = "0.2"
 log = "0.4"
+wgpu = "0.12"
+raw-window-handle = "0.4"
 env_logger = "0.9"
+pi_ecs = "0.1"
+pi_async = "0.1"
+pi_share = "0.1"
 
 [[example]]
 name = "hello_winit"
