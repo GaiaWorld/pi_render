@@ -10,7 +10,9 @@ use crate::{
 };
 use futures::{future::BoxFuture, FutureExt};
 use log::error;
-use pi_async::rt::{multi_thread::StealableTaskPool, AsyncRuntime, AsyncTaskPool};
+use pi_async::rt::{
+    multi_thread::StealableTaskPool, AsyncRuntime, AsyncTaskPool, AsyncTaskPoolExt,
+};
 use pi_async_graph::{async_graph, ExecNode, RunFactory, Runner};
 use pi_ecs::prelude::World;
 use pi_graph::{DirectedGraph, DirectedGraphNode, NGraph, NGraphBuilder};
@@ -46,11 +48,12 @@ pub enum RenderGraphRunnerError {
 }
 
 // 渲染图 执行器
-pub struct RenderGraphRunner {
+pub struct RenderGraphRunner<P>
+where
+    P: AsyncTaskPoolExt<()> + AsyncTaskPool<(), Pool = P>,
+{
     // 异步运行时
-    rt: AsyncRuntime<(), StealableTaskPool<()>>,
-    // 渲染图
-    render_graph: RenderGraph,
+    rt: AsyncRuntime<(), P>,
 
     // prepare 异步图，build 阶段 用一次
     prepare_graph: Option<Arc<NGraph<NGNodeValue, ExecNode<DumpNode, DumpNode>>>>,
@@ -59,12 +62,14 @@ pub struct RenderGraphRunner {
     run_graph: Option<Arc<NGraph<NGNodeValue, ExecNode<DumpNode, DumpNode>>>>,
 }
 
-impl RenderGraphRunner {
+impl<P> RenderGraphRunner<P>
+where
+    P: AsyncTaskPoolExt<()> + AsyncTaskPool<(), Pool = P>,
+{
     /// 创建
-    pub fn new(rt: AsyncRuntime<(), StealableTaskPool<()>>, render_graph: RenderGraph) -> Self {
+    pub fn new(rt: AsyncRuntime<(), P>) -> Self {
         Self {
             rt,
-            render_graph,
             prepare_graph: None,
             run_graph: None,
         }
@@ -73,18 +78,19 @@ impl RenderGraphRunner {
     /// 构建
     pub fn build(
         &mut self,
+        world: World,
         device: RenderDevice,
         queue: RenderQueue,
-        world: World,
+        rg: &mut RenderGraph,
     ) -> Result<(), String> {
-        let ng_builder = self.render_graph.ng_builder.take().unwrap();
+        let ng_builder = rg.ng_builder.take().unwrap();
         let ng = match ng_builder.build() {
             Ok(ng) => ng,
             Err(e) => return Err(format!("render build error: {:?}", e)),
         };
 
         // 遍历，找 终点
-        let mut finishes: Vec<NodeId> = self.render_graph.finish_nodes.iter().copied().collect();
+        let finishes: Vec<NodeId> = rg.finish_nodes.iter().copied().collect();
 
         // 以终为起，构建需要的 节点
         let sub_ng = ng.gen_graph_from_keys(&finishes);
@@ -115,7 +121,7 @@ impl RenderGraphRunner {
             let ng_node = sub_ng.get(id).unwrap();
             if let NGNodeValue::OutputSlot(nid, sid) = ng_node.value() {
                 let slots = map.entry(nid).or_insert_with(|| {
-                    let n = self.render_graph.get_node(*nid).unwrap();
+                    let n = rg.get_node(*nid).unwrap();
                     create_slots_vec(n)
                 });
 
@@ -141,7 +147,7 @@ impl RenderGraphRunner {
                 }
 
                 let slots = map.entry(nid).or_insert_with(|| {
-                    let n = self.render_graph.get_node(*nid).unwrap();
+                    let n = rg.get_node(*nid).unwrap();
                     create_slots_vec(n)
                 });
                 slots.0[*sid] = value;
@@ -158,7 +164,7 @@ impl RenderGraphRunner {
                         ng_node_clone.clone(),
                         crate_prepare_node(
                             &map,
-                            &self.render_graph,
+                            &rg,
                             *n,
                             device.clone(),
                             queue.clone(),
@@ -168,14 +174,7 @@ impl RenderGraphRunner {
 
                     run_builder = run_builder.node(
                         ng_node_clone,
-                        crate_run_node(
-                            &map,
-                            &self.render_graph,
-                            *n,
-                            device.clone(),
-                            queue.clone(),
-                            world.clone(),
-                        ),
+                        crate_run_node(&map, &rg, *n, device.clone(), queue.clone(), world.clone()),
                     );
                 }
                 NGNodeValue::InputSlot(_nid, _sid) => {

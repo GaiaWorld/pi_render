@@ -1,7 +1,7 @@
 use log::{debug, info};
 use pi_async::rt::{
     single_thread::{SingleTaskPool, SingleTaskRunner},
-    AsyncRuntime,
+    AsyncRuntime, AsyncTaskPool, AsyncTaskPoolExt,
 };
 use pi_ecs::prelude::{Dispatcher, SingleDispatcher, World};
 use pi_render::{
@@ -28,10 +28,6 @@ impl RenderExample {
     pub fn new(window: Window, rt: AsyncRuntime<(), SingleTaskPool<()>>) -> Self {
         let world = World::new();
 
-        let rg = world.get_resource_mut::<RenderGraph>().unwrap();
-        let clear_node = rg.add_node("clean", ClearPassNode::new(&mut world.clone()));
-        rg.set_node_finish(clear_node, true).unwrap();
-
         Self {
             window,
             world,
@@ -40,13 +36,20 @@ impl RenderExample {
         }
     }
 
-    pub async fn init_render(
+    pub async fn init_render<P>(
         &mut self,
         instance: wgpu::Instance,
         surface: wgpu::Surface,
         options: RenderOptions,
-    ) {
-        let render_stage = init_render(&mut self.world, instance, surface, options).await;
+        rt: AsyncRuntime<(), P>,
+    ) where
+        P: AsyncTaskPoolExt<()> + AsyncTaskPool<(), Pool = P>,
+    {
+        let render_stage = init_render(&mut self.world, instance, surface, options, rt).await;
+
+        let rg = self.world.get_resource_mut::<RenderGraph>().unwrap();
+        let clear_node = rg.add_node("clean", ClearPassNode::new(&mut self.world.clone()));
+        rg.set_node_finish(clear_node, true).unwrap();
 
         let mut stages = vec![];
         stages.push(Arc::new(render_stage.build()));
@@ -97,12 +100,14 @@ fn run(event_loop: EventLoop<()>, window: Window) {
     let example = Arc::new(TrustCell::new(RenderExample::new(window, single_clone)));
 
     let e = example.clone();
+    let s = single.clone();
+
     let _ = single.spawn(single.alloc(), async move {
         e.get().init();
 
         let mut e = e.borrow_mut();
         let e = e.deref_mut();
-        e.init_render(instance, surface, options).await;
+        e.init_render(instance, surface, options, s.clone()).await;
     });
 
     event_loop.run(move |event, _, control_flow| {

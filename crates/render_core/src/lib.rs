@@ -12,6 +12,7 @@ pub mod view;
 use camera::init_camera;
 use futures::{future::BoxFuture, FutureExt};
 use nalgebra::{Matrix4, Transform3 as NalTransform3, Vector2, Vector3, Vector4};
+use pi_async::rt::{AsyncRuntime, AsyncTaskPool, AsyncTaskPoolExt};
 use pi_ecs::{
     entity::Entity,
     prelude::{world::WorldMut, ResMut, StageBuilder, With, World},
@@ -19,7 +20,7 @@ use pi_ecs::{
 };
 use raw_window_handle::HasRawWindowHandle;
 use render_graph::{graph::RenderGraph, runner::RenderGraphRunner};
-use rhi::{create_render_context, options::RenderOptions, create_instance, create_surface};
+use rhi::{create_instance, create_render_context, create_surface, options::RenderOptions};
 use thiserror::Error;
 use view::{init_view, window::RenderWindows, ViewTarget};
 use wgpu::{Instance, Surface};
@@ -42,8 +43,10 @@ pub type Vec4 = Vector4<f32>;
 pub type Mat4 = Matrix4<f32>;
 pub type Transform3 = NalTransform3<f32>;
 
-
-pub fn create_instance_surface(window: &impl HasRawWindowHandle, options: &RenderOptions) -> (wgpu::Instance, wgpu::Surface) {
+pub fn create_instance_surface(
+    window: &impl HasRawWindowHandle,
+    options: &RenderOptions,
+) -> (wgpu::Instance, wgpu::Surface) {
     let instance = create_instance(&options);
     let surface = create_surface(&instance, &window);
 
@@ -51,12 +54,15 @@ pub fn create_instance_surface(window: &impl HasRawWindowHandle, options: &Rende
 }
 
 /// 初始化
-pub async fn init_render(
+pub async fn init_render<P>(
     world: &mut World,
     instance: Instance,
     surface: Surface,
     options: RenderOptions,
+    rt: AsyncRuntime<(), P>,
 ) -> StageBuilder
+where
+    P: AsyncTaskPoolExt<()> + AsyncTaskPool<(), Pool = P>,
 {
     world.new_archetype::<RenderArchetype>().create();
 
@@ -70,18 +76,24 @@ pub async fn init_render(
     world.insert_resource(device);
     world.insert_resource(queue);
 
+    let rg_runner = RenderGraphRunner::new(rt);
+    world.insert_resource(rg_runner);
+
     let mut stage = StageBuilder::new();
-    let rg = render_system.system(world);
+    let rg = render_system::<P>.system(world);
     stage.add_node(rg);
 
     return stage;
 }
 
 /// 每帧 调用一次，用于 驱动 渲染图
-fn render_system(
+fn render_system<P>(
     mut world: WorldMut,
-    mut graph_runner: ResMut<RenderGraphRunner>,
-) -> BoxFuture<'static, std::io::Result<()>> {
+    mut graph_runner: ResMut<RenderGraphRunner<P>>,
+) -> BoxFuture<'static, std::io::Result<()>>
+where
+    P: AsyncTaskPoolExt<()> + AsyncTaskPool<(), Pool = P>,
+{
     async move {
         graph_runner.run().await;
 
