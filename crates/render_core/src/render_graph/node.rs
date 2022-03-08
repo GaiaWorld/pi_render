@@ -10,11 +10,12 @@
 
 use super::{
     node_slot::{SlotInfo, SlotInfos, SlotLabel, SlotValue},
-    runner::CommandEncoderWrap,
     RenderContext, RenderGraphError,
 };
 use downcast_rs::{impl_downcast, Downcast};
 use futures::future::BoxFuture;
+use pi_share::ShareRefCell;
+use wgpu::CommandEncoder;
 use std::{borrow::Cow, cell::RefCell, fmt::Debug, sync::Arc};
 use thiserror::Error;
 
@@ -65,7 +66,7 @@ pub trait Node: Downcast + Send + Sync + 'static {
     fn run(
         &self,
         context: RenderContext,
-        commands: CommandEncoderWrap,
+        commands: ShareRefCell<Option<CommandEncoder>>,
         inputs: &[Option<RealValue>],
         outputs: &[Option<RealValue>],
     ) -> BoxFuture<'static, Result<(), NodeRunError>>;

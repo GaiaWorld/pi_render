@@ -1,12 +1,13 @@
 //! 清屏
 
+use std::ops::{DerefMut, Deref};
+
 use super::clear_color::{ClearColor, RenderTargetClearColors};
 use crate::{
     camera::{render_target::RenderTarget, RenderCamera},
     render_graph::{
         node::{Node, NodeRunError, RealValue},
         node_slot::SlotInfo,
-        runner::CommandEncoderWrap,
         RenderContext,
     },
     rhi::{
@@ -19,21 +20,19 @@ use crate::{
 use futures::{future::BoxFuture, FutureExt};
 use pi_ecs::prelude::{QueryState, With, World};
 use pi_hash::XHashSet;
-use pi_share::{cell::TrustCell, Share};
-use std::{ops::{DerefMut, Deref}};
+use pi_share::ShareRefCell;
+use wgpu::CommandEncoder;
 
 pub struct ClearPassNode {
-    query: Share<
-        TrustCell<
-            QueryState<
-                RenderArchetype,
-                (
-                    &'static ViewTarget,
-                    Option<&'static ViewDepthTexture>,
-                    Option<&'static RenderCamera>,
-                ),
-                With<RenderView>,
-            >,
+    query: ShareRefCell<
+        QueryState<
+            RenderArchetype,
+            (
+                &'static ViewTarget,
+                Option<&'static ViewDepthTexture>,
+                Option<&'static RenderCamera>,
+            ),
+            With<RenderView>,
         >,
     >,
 }
@@ -41,7 +40,7 @@ pub struct ClearPassNode {
 impl ClearPassNode {
     pub fn new(world: &mut World) -> Self {
         Self {
-            query: Share::new(TrustCell::new(QueryState::new(world))),
+            query: ShareRefCell::new(QueryState::new(world)),
         }
     }
 }
@@ -54,13 +53,13 @@ impl Node for ClearPassNode {
     fn run(
         &self,
         context: RenderContext,
-        commands: CommandEncoderWrap,
+        mut commands: ShareRefCell<Option<CommandEncoder>>,
         _inputs: &[Option<RealValue>],
         _outputs: &[Option<RealValue>],
     ) -> BoxFuture<'static, Result<(), NodeRunError>> {
         let RenderContext { world, .. } = context;
 
-        let query = self.query.clone();
+        let mut query = self.query.clone();
 
         async move {
             let mut cleared_targets = XHashSet::default();
@@ -68,16 +67,11 @@ impl Node for ClearPassNode {
             let render_target_clear_colors =
                 world.get_resource::<RenderTargetClearColors>().unwrap();
 
-            let c = commands.0.deref();
-            let mut c = c.borrow_mut();
-            let c = c.deref_mut();
-            let c = c.as_mut().unwrap();
-
             // This gets all ViewTargets and ViewDepthTextures and clears its attachments
             // TODO: This has the potential to clear the same target multiple times, if there
             // are multiple views drawing to the same target. This should be fixed when we make
             // clearing happen on "render targets" instead of "views" (see the TODO below for more context).
-            for (target, depth, camera) in query.borrow_mut().iter(&world) {
+            for (target, depth, camera) in query.iter(&world) {
                 let mut color = &clear_color.0;
 
                 if let Some(camera) = camera {
@@ -102,7 +96,7 @@ impl Node for ClearPassNode {
                     }),
                 };
 
-                c.begin_render_pass(&pass_descriptor);
+                commands.as_mut().unwrap().begin_render_pass(&pass_descriptor);
             }
 
             // TODO: This is a hack to ensure we don't call present() on frames without any work,
@@ -135,7 +129,7 @@ impl Node for ClearPassNode {
                     }],
                     depth_stencil_attachment: None,
                 };
-                c.begin_render_pass(&pass_descriptor);
+                commands.as_mut().unwrap().begin_render_pass(&pass_descriptor);
             }
 
             Ok(())

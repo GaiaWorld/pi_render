@@ -9,7 +9,7 @@ use pi_render::{
     render_nodes::clear_pass::ClearPassNode, rhi::options::RenderOptions,
 };
 use pi_share::cell::TrustCell;
-use std::{ops::DerefMut, sync::Arc};
+use std::{ops::DerefMut, os::windows::thread, sync::Arc};
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
@@ -19,17 +19,15 @@ use winit::{
 // 渲染 环境
 struct RenderExample {
     world: World,
-    window: Window,
     rt: AsyncRuntime<(), SingleTaskPool<()>>,
     dispatcher: Option<SingleDispatcher<SingleTaskPool<()>>>,
 }
 
 impl RenderExample {
-    pub fn new(window: Window, rt: AsyncRuntime<(), SingleTaskPool<()>>) -> Self {
+    pub fn new(rt: AsyncRuntime<(), SingleTaskPool<()>>) -> Self {
         let world = World::new();
 
         Self {
-            window,
             world,
             rt,
             dispatcher: None,
@@ -86,30 +84,12 @@ impl RenderExample {
     }
 }
 
-fn run(event_loop: EventLoop<()>, window: Window) {
-    let runner = SingleTaskRunner::<()>::default();
-    let runtime = runner.startup().unwrap();
-    let single = AsyncRuntime::Local(runtime.clone());
-
-    let single_clone = single.clone();
-
-    let options = RenderOptions::default();
-
-    let (instance, surface) = create_instance_surface(&window, &options);
-
-    let example = Arc::new(TrustCell::new(RenderExample::new(window, single_clone)));
-
-    let e = example.clone();
-    let s = single.clone();
-
-    let _ = single.spawn(single.alloc(), async move {
-        e.get().init();
-
-        let mut e = e.borrow_mut();
-        let e = e.deref_mut();
-        e.init_render(instance, surface, options, s.clone()).await;
-    });
-
+fn run_window_loop(
+    window: Window,
+    event_loop: EventLoop<()>,
+    runtime: AsyncRuntime<(), SingleTaskPool<()>>,
+    runner: SingleTaskRunner<()>
+) {
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
 
@@ -118,25 +98,13 @@ fn run(event_loop: EventLoop<()>, window: Window) {
                 event: WindowEvent::Resized(size),
                 ..
             } => {
-                let w = size.width;
-                let h = size.height;
-                let e = example.clone();
-                let _ = single.spawn(single.alloc(), async move {
-                    e.get().resize(w, h);
-                });
+                info!("RenderExample::resize, size = {:?}", size);
             }
             Event::MainEventsCleared => {
-                let e = example.clone();
-                let _ = single.spawn(single.alloc(), async move {
-                    e.get().window.request_redraw();
-                });
+                window.request_redraw();
             }
             Event::RedrawRequested(_) => {
-                let e = example.clone();
-                let _ = single.spawn(single.alloc(), async move {
-                    e.get().render();
-                });
-
+                debug!("RenderExample::run");
                 let _ = runner.run();
             }
             Event::WindowEvent {
@@ -144,11 +112,7 @@ fn run(event_loop: EventLoop<()>, window: Window) {
                 event: WindowEvent::CloseRequested,
                 ..
             } => {
-                let e = example.clone();
-                let _ = single.spawn(single.alloc(), async move {
-                    e.get().clean();
-                });
-
+                info!("RenderExample::clean");
                 *control_flow = ControlFlow::Exit
             }
             _ => {}
@@ -157,10 +121,36 @@ fn run(event_loop: EventLoop<()>, window: Window) {
 }
 
 fn main() {
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("debug")).init();
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
     let event_loop = EventLoop::new();
     let window = winit::window::Window::new(&event_loop).unwrap();
 
-    run(event_loop, window);
+    let options = RenderOptions::default();
+    let (instance, surface) = create_instance_surface(&window, &options);
+
+    let runner = SingleTaskRunner::<()>::default();
+    let runtime = AsyncRuntime::Local(runner.startup().unwrap());
+
+    let rt = runtime.clone();
+    std::thread::spawn(move || {
+        let mut example = RenderExample::new(rt.clone());
+
+        let runtime = rt.clone();
+
+        let _ = rt.spawn(rt.alloc(), async move {
+            example.init();
+            example
+                .init_render(instance, surface, options, runtime)
+                .await;
+
+            loop {
+                example.render();
+                
+                std::thread::sleep(std::time::Duration::from_millis(16));
+            }
+        });
+    });
+
+    run_window_loop(window, event_loop, runtime, runner);
 }

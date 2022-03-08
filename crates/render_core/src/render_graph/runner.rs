@@ -10,14 +10,12 @@ use crate::{
 };
 use futures::{future::BoxFuture, FutureExt};
 use log::error;
-use pi_async::rt::{
-    multi_thread::StealableTaskPool, AsyncRuntime, AsyncTaskPool, AsyncTaskPoolExt,
-};
+use pi_async::rt::{AsyncRuntime, AsyncTaskPool, AsyncTaskPoolExt};
 use pi_async_graph::{async_graph, ExecNode, RunFactory, Runner};
 use pi_ecs::prelude::World;
 use pi_graph::{DirectedGraph, DirectedGraphNode, NGraph, NGraphBuilder};
 use pi_hash::XHashMap;
-use pi_share::{cell::TrustCell, Share};
+use pi_share::ShareRefCell;
 use std::{borrow::Cow, sync::Arc};
 use thiserror::Error;
 use wgpu::CommandEncoder;
@@ -269,11 +267,6 @@ impl RunFactory for DumpNode {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct CommandEncoderWrap(pub Share<TrustCell<Option<CommandEncoder>>>);
-unsafe impl Send for CommandEncoderWrap {}
-unsafe impl Sync for CommandEncoderWrap {}
-
 // 创建异步 节点
 fn crate_run_node(
     map: &XHashMap<&usize, (Vec<Option<RealValue>>, Vec<Option<RealValue>>)>,
@@ -308,7 +301,7 @@ fn crate_run_node(
             let commands =
                 device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
 
-            let commands = CommandEncoderWrap(Share::new(TrustCell::new(Some(commands))));
+            let mut commands = ShareRefCell::new(Some(commands));
 
             let runner = node.run(
                 context,
@@ -319,7 +312,7 @@ fn crate_run_node(
 
             runner.await.unwrap();
 
-            let commands = commands.0.as_ref().borrow_mut().take().unwrap();
+            let commands = commands.take().unwrap();
             queue.submit(vec![commands.finish()]);
             Ok(())
         }

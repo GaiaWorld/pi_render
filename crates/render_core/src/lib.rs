@@ -9,13 +9,16 @@ pub mod rhi;
 pub mod texture;
 pub mod view;
 
+use std::borrow::BorrowMut;
+
 use camera::init_camera;
 use futures::{future::BoxFuture, FutureExt};
+use log::info;
 use nalgebra::{Matrix4, Transform3 as NalTransform3, Vector2, Vector3, Vector4};
 use pi_async::rt::{AsyncRuntime, AsyncTaskPool, AsyncTaskPoolExt};
 use pi_ecs::{
     entity::Entity,
-    prelude::{world::WorldMut, ResMut, StageBuilder, With, World},
+    prelude::{world::WorldMut, QueryState, StageBuilder, With, World, ResMut},
     sys::system::IntoSystem,
 };
 use raw_window_handle::HasRawWindowHandle;
@@ -86,34 +89,57 @@ where
     return stage;
 }
 
+pub fn build_and_prepare(_wolrd: &World) {}
+
 /// 每帧 调用一次，用于 驱动 渲染图
-fn render_system<P>(
-    mut world: WorldMut,
-    mut graph_runner: ResMut<RenderGraphRunner<P>>,
-) -> BoxFuture<'static, std::io::Result<()>>
+fn render_system<P>(mut world: WorldMut) -> BoxFuture<'static, std::io::Result<()>>
 where
     P: AsyncTaskPoolExt<()> + AsyncTaskPool<(), Pool = P>,
 {
+    info!("begin render_system");
+
     async move {
-        graph_runner.run().await;
+        info!("begin async render_system");
 
-        {
-            // Remove ViewTarget components to ensure swap chain TextureViews are dropped.
-            // If all TextureViews aren't dropped before present, acquiring the next swap chain texture will fail.
-            let view_entities = world
-                .query_filtered::<RenderArchetype, Entity, With<ViewTarget>>()
-                .iter(&world)
-                .collect::<Vec<_>>();
+        let mut w = world.clone();
+        let mut query =
+            QueryState::<RenderArchetype, &mut RenderGraphRunner<P>>::new(&mut w);
 
-            for e in view_entities {
-                world.remove_component::<ViewTarget>(e);
-            }
+        let mut w = world.clone();
+        for mut graph_runner in query.iter_mut(&mut w) {
+            let graph_runner = graph_runner.borrow_mut();
+            graph_runner.run().await;
 
-            let windows = world.get_resource_mut::<RenderWindows>().unwrap();
-            for window in windows.values_mut() {
-                if let Some(texture_view) = window.swap_chain_texture.take() {
-                    if let Some(surface_texture) = texture_view.take_surface_texture() {
-                        surface_texture.present();
+            info!("render_system: after graph_runner.run");
+
+            {
+                // Remove ViewTarget components to ensure swap chain TextureViews are dropped.
+                // If all TextureViews aren't dropped before present, acquiring the next swap chain texture will fail.
+                let view_entities = world
+                    .query_filtered::<RenderArchetype, Entity, With<ViewTarget>>()
+                    .iter(&world)
+                    .collect::<Vec<_>>();
+
+                info!(
+                    "render_system: before iter view_entities, len = {:?}",
+                    view_entities.len()
+                );
+                for e in view_entities {
+                    world.remove_component::<ViewTarget>(e);
+                }
+
+                let windows = world.get_resource_mut::<RenderWindows>().unwrap();
+
+                info!(
+                    "render_system: before iter windows, len = {:?}",
+                    windows.len()
+                );
+                for window in windows.values_mut() {
+                    if let Some(texture_view) = window.swap_chain_texture.take() {
+                        if let Some(surface_texture) = texture_view.take_surface_texture() {
+                            surface_texture.present();
+                            info!("render_system: after surface_texture.present");
+                        }
                     }
                 }
             }
