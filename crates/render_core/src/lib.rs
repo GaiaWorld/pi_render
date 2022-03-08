@@ -18,15 +18,14 @@ use nalgebra::{Matrix4, Transform3 as NalTransform3, Vector2, Vector3, Vector4};
 use pi_async::rt::{AsyncRuntime, AsyncTaskPool, AsyncTaskPoolExt};
 use pi_ecs::{
     entity::Entity,
-    prelude::{world::WorldMut, QueryState, StageBuilder, With, World, ResMut},
+    prelude::{world::WorldMut, QueryState, StageBuilder, With, World},
     sys::system::IntoSystem,
 };
 use raw_window_handle::HasRawWindowHandle;
 use render_graph::{graph::RenderGraph, runner::RenderGraphRunner};
-use rhi::{create_instance, create_render_context, create_surface, options::RenderOptions};
+use rhi::{create_instance, create_render_context, create_surface, options::RenderOptions, RenderInstance, RenderSurface};
 use thiserror::Error;
 use view::{init_view, window::RenderWindows, ViewTarget};
-use wgpu::{Instance, Surface};
 
 #[derive(Error, Debug)]
 pub enum RenderContextError {
@@ -49,7 +48,7 @@ pub type Transform3 = NalTransform3<f32>;
 pub fn create_instance_surface(
     window: &impl HasRawWindowHandle,
     options: &RenderOptions,
-) -> (wgpu::Instance, wgpu::Surface) {
+) -> (RenderInstance, RenderSurface) {
     let instance = create_instance(&options);
     let surface = create_surface(&instance, &window);
 
@@ -59,8 +58,8 @@ pub fn create_instance_surface(
 /// 初始化
 pub async fn init_render<P>(
     world: &mut World,
-    instance: Instance,
-    surface: Surface,
+    instance: RenderInstance,
+    surface: RenderSurface,
     options: RenderOptions,
     rt: AsyncRuntime<(), P>,
 ) -> StageBuilder

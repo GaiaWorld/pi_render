@@ -5,11 +5,13 @@ use pi_async::rt::{
 };
 use pi_ecs::prelude::{Dispatcher, SingleDispatcher, World};
 use pi_render::{
-    create_instance_surface, init_render, render_graph::graph::RenderGraph,
-    render_nodes::clear_pass::ClearPassNode, rhi::options::RenderOptions,
+    create_instance_surface, init_render,
+    render_graph::graph::RenderGraph,
+    render_nodes::clear_pass::ClearPassNode,
+    rhi::{options::RenderOptions, RenderInstance, RenderSurface},
 };
-use pi_share::cell::TrustCell;
-use std::{ops::DerefMut, os::windows::thread, sync::Arc};
+use pi_share::ShareRefCell;
+use std::sync::Arc;
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
@@ -36,8 +38,8 @@ impl RenderExample {
 
     pub async fn init_render<P>(
         &mut self,
-        instance: wgpu::Instance,
-        surface: wgpu::Surface,
+        instance: RenderInstance,
+        surface: RenderSurface,
         options: RenderOptions,
         rt: AsyncRuntime<(), P>,
     ) where
@@ -87,8 +89,8 @@ impl RenderExample {
 fn run_window_loop(
     window: Window,
     event_loop: EventLoop<()>,
-    runtime: AsyncRuntime<(), SingleTaskPool<()>>,
-    runner: SingleTaskRunner<()>
+    example: ShareRefCell<RenderExample>,
+    rt: AsyncRuntime<(), SingleTaskPool<()>>,
 ) {
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
@@ -99,13 +101,23 @@ fn run_window_loop(
                 ..
             } => {
                 info!("RenderExample::resize, size = {:?}", size);
+                let w = size.width;
+                let h = size.height;
+                let e = example.clone();
+                let _ = rt.spawn(rt.alloc(), async move {
+                    e.resize(w, h);
+                });
             }
             Event::MainEventsCleared => {
                 window.request_redraw();
             }
             Event::RedrawRequested(_) => {
                 debug!("RenderExample::run");
-                let _ = runner.run();
+
+                let e = example.clone();
+                let _ = rt.spawn(rt.alloc(), async move {
+                    e.render();
+                });
             }
             Event::WindowEvent {
                 // 窗口 关闭，退出 循环
@@ -113,6 +125,11 @@ fn run_window_loop(
                 ..
             } => {
                 info!("RenderExample::clean");
+                let e = example.clone();
+                let _ = rt.spawn(rt.alloc(), async move {
+                    e.clean();
+                });
+
                 *control_flow = ControlFlow::Exit
             }
             _ => {}
@@ -133,24 +150,22 @@ fn main() {
     let runtime = AsyncRuntime::Local(runner.startup().unwrap());
 
     let rt = runtime.clone();
+    let example = ShareRefCell::new(RenderExample::new(rt.clone()));
+    let mut e = example.clone();
     std::thread::spawn(move || {
-        let mut example = RenderExample::new(rt.clone());
+        let runtime = runtime.clone();
 
-        let runtime = rt.clone();
-
-        let _ = rt.spawn(rt.alloc(), async move {
-            example.init();
-            example
-                .init_render(instance, surface, options, runtime)
-                .await;
-
-            loop {
-                example.render();
-                
-                std::thread::sleep(std::time::Duration::from_millis(16));
-            }
+        let rt = runtime.clone();
+        let _ = runtime.spawn(runtime.alloc(), async move {
+            e.init();
+            e.init_render(instance, surface, options, rt).await;
         });
+
+        loop {
+            let _ = runner.run();
+            std::thread::sleep(std::time::Duration::from_millis(16));
+        }
     });
 
-    run_window_loop(window, event_loop, runtime, runner);
+    run_window_loop(window, event_loop, example, rt);
 }

@@ -1,7 +1,5 @@
 //! 清屏
 
-use std::ops::{DerefMut, Deref};
-
 use super::clear_color::{ClearColor, RenderTargetClearColors};
 use crate::{
     camera::{render_target::RenderTarget, RenderCamera},
@@ -96,7 +94,10 @@ impl Node for ClearPassNode {
                     }),
                 };
 
-                commands.as_mut().unwrap().begin_render_pass(&pass_descriptor);
+                commands
+                    .as_mut()
+                    .unwrap()
+                    .begin_render_pass(&pass_descriptor);
             }
 
             // TODO: This is a hack to ensure we don't call present() on frames without any work,
@@ -129,7 +130,10 @@ impl Node for ClearPassNode {
                     }],
                     depth_stencil_attachment: None,
                 };
-                commands.as_mut().unwrap().begin_render_pass(&pass_descriptor);
+                commands
+                    .as_mut()
+                    .unwrap()
+                    .begin_render_pass(&pass_descriptor);
             }
 
             Ok(())
