@@ -6,7 +6,7 @@ use pi_async::rt::{
 use pi_ecs::prelude::{Dispatcher, SingleDispatcher, World};
 use pi_render::{
     init_render, render_graph::graph::RenderGraph, render_nodes::clear_pass::ClearPassNode,
-    rhi::options::RenderOptions, window::windows::Windows, RenderStage,
+    rhi::options::RenderOptions, window::{windows::Windows, window::PiWindow}, RenderStage,
 };
 use pi_share::ShareRefCell;
 use std::sync::Arc;
@@ -82,7 +82,7 @@ impl RenderExample {
 }
 
 fn run_window_loop(
-    window: winit::window::Window,
+    window: ShareRefCell<winit::window::Window>,
     event_loop: EventLoop<()>,
     example: ShareRefCell<RenderExample>,
     rt: AsyncRuntime<(), SingleTaskPool<()>>,
@@ -142,7 +142,7 @@ fn main() {
     let world = World::new();    
     // Res Windows
     let windows = Windows::default();
-    windows.add(window.clone());
+    windows.add(PiWindow::new(window.clone()));
     world.insert_resource(windows);
 
     let runner = SingleTaskRunner::<()>::default();

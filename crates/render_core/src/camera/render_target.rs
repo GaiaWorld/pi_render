@@ -1,6 +1,6 @@
 use crate::{
     rhi::texture::TextureView,
-    window::window::WindowId,
+    window::window::PiWindowId,
     view::render_window::RenderWindows,
     Vec2,
 };
@@ -9,7 +9,7 @@ use crate::{
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum RenderTarget {
     /// Window to which the camera's view is rendered.
-    Window(WindowId),
+    Window(PiWindowId),
 }
 
 impl RenderTarget {

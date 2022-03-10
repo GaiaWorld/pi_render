@@ -1,6 +1,5 @@
 use super::window::{PiWindow, PiWindowId};
 use pi_hash::XHashMap;
-use std::ops::{Deref, DerefMut};
 
 #[derive(Debug, Default)]
 pub struct Windows {
@@ -18,11 +17,11 @@ impl Windows {
     }
 
     pub fn get(&self, id: PiWindowId) -> Option<&PiWindow> {
-        self.windows.get(&id).and_then(|r| Some(r.deref()))
+        self.windows.get(&id).and_then(|r| Some(r))
     }
 
     pub fn get_mut(&mut self, id: PiWindowId) -> Option<&mut PiWindow> {
-        self.windows.get_mut(&id).and_then(|r| Some(r.deref_mut()))
+        self.windows.get_mut(&id).and_then(|r| Some(r))
     }
 
     pub fn get_primary(&self) -> Option<&PiWindow> {
@@ -34,10 +33,10 @@ impl Windows {
     }
 
     pub fn iter(&self) -> impl Iterator<Item = &PiWindow> {
-        self.windows.values().map(|v| v.deref())
+        self.windows.values()
     }
 
     pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut PiWindow> {
-        self.windows.values_mut().map(|v| v.deref_mut())
+        self.windows.values_mut()
     }
 }
