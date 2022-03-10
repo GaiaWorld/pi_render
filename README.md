@@ -8,7 +8,6 @@ Renderer for PI Engine
 + extract_cameras
 + extract_clear_color
 + extract_core_pipeline_camera_phases
-+ extract_shaders
 
 ## prepare_***
 
@@ -17,6 +16,22 @@ Renderer for PI Engine
 + prepare_view_uniforms
 + prepare_core_views_system
 
+## Res
+
++ RenderGraph
++ RenderGraphRunner
++ RenderInstance
++ RenderDevice
++ RenderQueue
+
+
++ RenderWindows
++ WindowSurfaces
+
+
+`下面的是还没准备好的`
+
+
 ## Component
 
 + RenderView
@@ -24,17 +39,8 @@ Renderer for PI Engine
 + RenderCamera
 + ViewUniformOffset
 
-## Res
-
-+ RenderGraph
-+ RenderGraphRunner
-+ WindowSurfaces
-+ RenderInstance
-+ RenderDevice
-+ RenderQueue
 + ViewUniforms
 + RenderCameraNames
-+ RenderWindows
 + ClearColor
 + RenderTargetClearColors
 + TextureCache

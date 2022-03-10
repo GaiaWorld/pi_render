@@ -18,7 +18,6 @@ use pi_hash::XHashMap;
 use pi_share::ShareRefCell;
 use std::{borrow::Cow, sync::Arc};
 use thiserror::Error;
-use wgpu::CommandEncoder;
 
 #[derive(Error, Debug)]
 pub enum RenderGraphRunnerError {
@@ -54,10 +53,10 @@ where
     rt: AsyncRuntime<(), P>,
 
     // prepare 异步图，build 阶段 用一次
-    prepare_graph: Option<Arc<NGraph<NGNodeValue, ExecNode<DumpNode, DumpNode>>>>,
+    pub(crate) prepare_graph: Option<Arc<NGraph<NGNodeValue, ExecNode<DumpNode, DumpNode>>>>,
 
     // run 异步图，一直用，直到 render_graph 改变为止
-    run_graph: Option<Arc<NGraph<NGNodeValue, ExecNode<DumpNode, DumpNode>>>>,
+    pub(crate) run_graph: Option<Arc<NGraph<NGNodeValue, ExecNode<DumpNode, DumpNode>>>>,
 }
 
 impl<P> RenderGraphRunner<P>
@@ -256,7 +255,7 @@ where
 }
 
 // 异步图: 哑节点，异步函数不需要的类型
-struct DumpNode;
+pub struct DumpNode;
 impl Runner for DumpNode {
     fn run(self) {}
 }

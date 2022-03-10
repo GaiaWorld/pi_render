@@ -1,6 +1,6 @@
-pub mod window;
+pub mod render_window;
 
-use self::window::RenderWindows;
+use self::render_window::RenderWindows;
 use crate::{
     camera::{RenderCamera, RenderCameraNames},
     rhi::{

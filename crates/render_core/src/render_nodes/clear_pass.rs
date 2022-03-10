@@ -12,7 +12,7 @@ use crate::{
         LoadOp, Operations, RenderPassColorAttachment, RenderPassDepthStencilAttachment,
         RenderPassDescriptor,
     },
-    view::{window::RenderWindows, RenderView, ViewDepthTexture, ViewTarget},
+    view::{RenderView, ViewDepthTexture, ViewTarget, render_window::RenderWindows},
     RenderArchetype,
 };
 use futures::{future::BoxFuture, FutureExt};

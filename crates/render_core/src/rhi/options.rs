@@ -13,8 +13,15 @@ pub struct RenderOptions {
     pub backends: wgpu::Backends,
     pub power_preference: wgpu::PowerPreference,
     pub priority: RenderPriority,
+    /// The features to ensure are enabled regardless of what the adapter/backend supports.
+    /// Setting these explicitly may cause renderer initialization to fail.
     pub features: wgpu::Features,
+    /// The features to ensure are disabled regardless of what the adapter/backend supports
+    pub disabled_features: Option<wgpu::Features>,
+    /// The imposed limits.
     pub limits: wgpu::Limits,
+    /// The constraints on limits allowed regardless of what the adapter/backend supports
+    pub constrained_limits: Option<wgpu::Limits>,
 }
 
 impl Default for RenderOptions {
@@ -48,7 +55,9 @@ impl Default for RenderOptions {
             power_preference: wgpu::PowerPreference::HighPerformance,
             priority,
             features: wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES,
+            disabled_features: None,
             limits,
+            constrained_limits: None,
         }
     }
 }
@@ -68,4 +77,3 @@ pub fn options_priority_from_env() -> Option<RenderPriority> {
         },
     )
 }
-

@@ -8,8 +8,7 @@ pub mod render_nodes;
 pub mod rhi;
 pub mod texture;
 pub mod view;
-
-use std::borrow::BorrowMut;
+pub mod window;
 
 use camera::init_camera;
 use futures::{future::BoxFuture, FutureExt};
@@ -21,11 +20,15 @@ use pi_ecs::{
     prelude::{world::WorldMut, QueryState, StageBuilder, With, World},
     sys::system::IntoSystem,
 };
-use raw_window_handle::HasRawWindowHandle;
 use render_graph::{graph::RenderGraph, runner::RenderGraphRunner};
-use rhi::{create_instance, create_render_context, create_surface, options::RenderOptions, RenderInstance, RenderSurface};
+use rhi::{device::RenderDevice, options::RenderOptions, setup_render_context, RenderQueue};
+use std::borrow::BorrowMut;
 use thiserror::Error;
-use view::{init_view, window::RenderWindows, ViewTarget};
+use view::{
+    init_view, prepare_view_targets, prepare_view_uniforms,
+    render_window::{extract_windows, init_window, prepare_windows, RenderWindows},
+    ViewTarget,
+};
 
 #[derive(Error, Debug)]
 pub enum RenderContextError {
@@ -35,60 +38,97 @@ pub enum RenderContextError {
 
 pub struct RenderArchetype;
 
-pub struct RawWindowHandleWrapper<T: HasRawWindowHandle>(pub T);
-unsafe impl<T: HasRawWindowHandle> Send for RawWindowHandleWrapper<T> {}
-unsafe impl<T: HasRawWindowHandle> Sync for RawWindowHandleWrapper<T> {}
-
 pub type Vec2 = Vector2<f32>;
 pub type Vec3 = Vector3<f32>;
 pub type Vec4 = Vector4<f32>;
 pub type Mat4 = Matrix4<f32>;
 pub type Transform3 = NalTransform3<f32>;
 
-pub fn create_instance_surface(
-    window: &impl HasRawWindowHandle,
-    options: &RenderOptions,
-) -> (RenderInstance, RenderSurface) {
-    let instance = create_instance(&options);
-    let surface = create_surface(&instance, &window);
-
-    (instance, surface)
+pub struct RenderStage {
+    pub extract_stage: StageBuilder,
+    pub prepare_stage: StageBuilder,
+    pub render_stage: StageBuilder,
 }
 
 /// 初始化
 pub async fn init_render<P>(
     world: &mut World,
-    instance: RenderInstance,
-    surface: RenderSurface,
     options: RenderOptions,
     rt: AsyncRuntime<(), P>,
-) -> StageBuilder
+) -> RenderStage
 where
     P: AsyncTaskPoolExt<()> + AsyncTaskPool<(), Pool = P>,
 {
     world.new_archetype::<RenderArchetype>().create();
 
+    // world 加入 Res: RenderInstance, RenderQueue, RenderDevice, RenderOptions, AdapterInfo
+    setup_render_context(world, options).await;
+
+    init_window(world);
     init_view(world);
     init_camera(world);
 
-    let (device, queue, options) = create_render_context(instance, surface, options).await;
-
     world.insert_resource(RenderGraph::new());
-    world.insert_resource(options);
-    world.insert_resource(device);
-    world.insert_resource(queue);
 
     let rg_runner = RenderGraphRunner::new(rt);
     world.insert_resource(rg_runner);
 
-    let mut stage = StageBuilder::new();
-    let rg = render_system::<P>.system(world);
-    stage.add_node(rg);
+    let mut extract_stage = StageBuilder::new();
+    extract_stage.add_node(extract_windows.system(world));
 
-    return stage;
+    let mut prepare_stage = StageBuilder::new();
+    prepare_stage.add_node(prepare_windows.system(world));
+    prepare_stage.add_node(prepare_view_targets.system(world));
+    prepare_stage.add_node(prepare_view_uniforms.system(world));
+    prepare_stage.add_node(prepare_rg::<P>.system(world));
+
+    let mut render_stage = StageBuilder::new();
+    render_stage.add_node(render_system::<P>.system(world));
+
+    return RenderStage {
+        extract_stage,
+        prepare_stage,
+        render_stage,
+    };
 }
 
-pub fn build_and_prepare(_wolrd: &World) {}
+// RenderGraph Build & Prepare
+pub fn prepare_rg<P>(world: WorldMut) -> BoxFuture<'static, std::io::Result<()>>
+where
+    P: AsyncTaskPoolExt<()> + AsyncTaskPool<(), Pool = P>,
+{
+    let mut world = world.clone();
+
+    async move {
+        let mut query = QueryState::<RenderArchetype, &mut RenderGraphRunner<P>>::new(&mut world);
+        for mut runner in query.iter_mut(&mut world.clone()) {
+            if runner.run_graph.is_some() {
+                // TODO: 要加上 渲染图 改变 的 代码
+                return Ok(());
+            }
+
+            let mut query = QueryState::<
+                RenderArchetype,
+                (&mut RenderGraph, &RenderDevice, &RenderQueue),
+            >::new(&mut world);
+            for (mut rg, device, queue) in query.iter_mut(&mut world.clone()) {
+                runner
+                    .build(
+                        world.clone(),
+                        device.clone(),
+                        queue.clone(),
+                        rg.borrow_mut(),
+                    )
+                    .unwrap();
+
+                runner.prepare().await;
+            }
+        }
+
+        Ok(())
+    }
+    .boxed()
+}
 
 /// 每帧 调用一次，用于 驱动 渲染图
 fn render_system<P>(mut world: WorldMut) -> BoxFuture<'static, std::io::Result<()>>
@@ -101,8 +141,7 @@ where
         info!("begin async render_system");
 
         let mut w = world.clone();
-        let mut query =
-            QueryState::<RenderArchetype, &mut RenderGraphRunner<P>>::new(&mut w);
+        let mut query = QueryState::<RenderArchetype, &mut RenderGraphRunner<P>>::new(&mut w);
 
         let mut w = world.clone();
         for mut graph_runner in query.iter_mut(&mut w) {
