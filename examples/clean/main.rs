@@ -139,9 +139,9 @@ fn main() {
     let event_loop = EventLoop::new();
     let window = ShareRefCell::new(winit::window::Window::new(&event_loop).unwrap());
     
-    let world = World::new();    
+    let mut world = World::new();    
     // Res Windows
-    let windows = Windows::default();
+    let mut windows = Windows::default();
     windows.add(PiWindow::new(window.clone()));
     world.insert_resource(windows);
 
