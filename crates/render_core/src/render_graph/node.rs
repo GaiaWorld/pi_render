@@ -66,7 +66,7 @@ pub trait Node: Downcast + Send + Sync + 'static {
     fn run(
         &self,
         context: RenderContext,
-        commands: ShareRefCell<Option<CommandEncoder>>,
+        commands: ShareRefCell<CommandEncoder>,
         inputs: &[Option<RealValue>],
         outputs: &[Option<RealValue>],
     ) -> BoxFuture<'static, Result<(), NodeRunError>>;

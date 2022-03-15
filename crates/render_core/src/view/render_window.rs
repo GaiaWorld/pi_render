@@ -2,113 +2,67 @@ use crate::{
     rhi::{
         device::RenderDevice,
         texture::{PiRenderDefault, TextureView},
-        RenderInstance, RenderSurface,
+        PresentMode, RenderInstance, RenderSurface,
     },
-    window::{
-        window::{PiWindowId, PresentMode},
-        window_wrapper::RawWindowHandleWrapper,
-        windows::Windows,
-    },
+    RenderArchetype,
 };
-use log::debug;
-use pi_ecs::prelude::{Res, ResMut, World};
-use pi_hash::{XHashMap, XHashSet};
-use std::ops::{Deref, DerefMut};
+use pi_ecs::{
+    prelude::{Query, Res, World},
+    world::ArchetypeInfo,
+};
+use pi_share::ShareRefCell;
+use std::ops::Deref;
 use wgpu::TextureFormat;
+use winit::{dpi::PhysicalSize, window::Window};
 
 pub struct RenderWindow {
-    pub id: PiWindowId,
-    pub handle: RawWindowHandleWrapper,
-    pub width: u32,
-    pub height: u32,
     pub present_mode: PresentMode,
-    pub swap_chain_texture: Option<TextureView>,
-    pub size_changed: bool,
+    pub last_size: PhysicalSize<u32>,
+    pub handle: ShareRefCell<Window>,
+
+    pub rt: Option<TextureView>,
+    pub surface: Option<RenderSurface>,
 }
 
-#[derive(Default)]
-pub struct RenderWindows {
-    pub windows: XHashMap<PiWindowId, RenderWindow>,
-}
-
-impl Deref for RenderWindows {
-    type Target = XHashMap<PiWindowId, RenderWindow>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.windows
-    }
-}
-
-impl DerefMut for RenderWindows {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.windows
-    }
-}
-
-#[derive(Default)]
-pub struct WindowSurfaces {
-    surfaces: XHashMap<PiWindowId, RenderSurface>,
-    configured_windows: XHashSet<PiWindowId>,
-}
-
-pub fn init_window(world: &mut World) {
-    world.insert_resource(RenderWindows::default());
-    world.insert_resource(WindowSurfaces::default());
-}
-
-pub fn extract_windows(windows: Res<Windows>, mut render_windows: ResMut<RenderWindows>) {
-    for window in windows.iter() {
-        let new_width = window.width().max(1);
-        let new_height = window.height().max(1);
-
-        let render_windows = render_windows.deref_mut();
-
-        let mut render_window = render_windows.entry(window.id()).or_insert(RenderWindow {
-            id: window.id(),
-            handle: window.raw_window_handle(),
-            width: new_width,
-            height: new_height,
-            present_mode: window.present_mode(),
-            swap_chain_texture: None,
-            size_changed: false,
-        });
-
-        // NOTE: Drop the swap chain frame here
-        render_window.swap_chain_texture = None;
-        render_window.size_changed =
-            new_width != render_window.width || new_height != render_window.height;
-
-        if render_window.size_changed {
-            debug!(
-                "Window size changed from {}x{} to {}x{}",
-                render_window.width, render_window.height, new_width, new_height
-            );
-            render_window.width = new_width;
-            render_window.height = new_height;
+impl RenderWindow {
+    pub fn new(handle: ShareRefCell<Window>, present_mode: PresentMode) -> Self {
+        Self {
+            present_mode,
+            last_size: PhysicalSize::default(),
+            handle,
+            surface: None,
+            rt: None,
         }
     }
 }
 
+#[inline]
+pub fn register_components(archetype: ArchetypeInfo) -> ArchetypeInfo {
+    archetype.register::<RenderWindow>()
+}
+
+#[inline]
+pub fn insert_resources(_world: &mut World) {}
+
 pub fn prepare_windows(
-    mut windows: ResMut<RenderWindows>,
-    mut window_surfaces: ResMut<WindowSurfaces>,
     render_device: Res<RenderDevice>,
     render_instance: Res<RenderInstance>,
+    mut query: Query<RenderArchetype, &mut RenderWindow>,
 ) {
-    let window_surfaces = window_surfaces.deref_mut();
-    for window in windows.windows.values_mut() {
-        let surface = window_surfaces
-            .surfaces
-            .entry(window.id)
-            .or_insert_with(|| unsafe {
-                // NOTE: On some OSes this MUST be called from the main thread.
-                render_instance.create_surface(&window.handle.get_handle())
-            });
+    for mut window in query.iter_mut() {
+        let is_surface_none = window.surface.is_none();
+        if is_surface_none {
+            let handle = window.handle.deref();
+            window.surface = Some(unsafe { render_instance.create_surface(handle) });
+        };
 
-        let swap_chain_descriptor = wgpu::SurfaceConfiguration {
+        let surface = window.surface.as_ref().unwrap();
+        let PhysicalSize { width, height } = window.handle.inner_size();
+
+        let config = wgpu::SurfaceConfiguration {
             format: TextureFormat::pi_render_default(),
-            width: window.width,
-            height: window.height,
+            width,
+            height,
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             present_mode: match window.present_mode {
                 PresentMode::Fifo => wgpu::PresentMode::Fifo,
@@ -117,15 +71,18 @@ pub fn prepare_windows(
             },
         };
 
-        // Do the initial surface configuration if it hasn't been configured yet
-        if window_surfaces.configured_windows.insert(window.id) || window.size_changed {
-            render_device.configure_surface(surface, &swap_chain_descriptor);
+        // 记得 第一次 需要 Config
+        let is_size_changed = width != window.last_size.width || height != window.last_size.height;
+        let has_config = is_surface_none || is_size_changed;
+        if has_config {
+            render_device.configure_surface(surface, &config);
         }
 
+        // 每帧 都要 设置 新的 SuraceTexture
         let frame = match surface.get_current_texture() {
-            Ok(swap_chain_frame) => swap_chain_frame,
+            Ok(swap_chain) => swap_chain,
             Err(wgpu::SurfaceError::Outdated) => {
-                render_device.configure_surface(surface, &swap_chain_descriptor);
+                render_device.configure_surface(surface, &config);
                 surface
                     .get_current_texture()
                     .expect("Error reconfiguring surface")
@@ -133,6 +90,6 @@ pub fn prepare_windows(
             err => err.expect("Failed to acquire next swap chain texture!"),
         };
 
-        window.swap_chain_texture = Some(TextureView::from(frame));
+        window.rt = Some(TextureView::from(frame));
     }
 }

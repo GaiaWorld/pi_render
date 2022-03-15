@@ -1,12 +1,16 @@
 use log::{debug, info};
 use pi_async::rt::{
     single_thread::{SingleTaskPool, SingleTaskRunner},
-    AsyncRuntime, AsyncTaskPool, AsyncTaskPoolExt,
+    AsyncRuntime,
 };
 use pi_ecs::prelude::{Dispatcher, SingleDispatcher, World};
 use pi_render::{
-    init_render, render_graph::graph::RenderGraph, render_nodes::clear_pass::ClearPassNode,
-    rhi::options::RenderOptions, window::{windows::Windows, window::PiWindow}, RenderStage,
+    init_render,
+    render_graph::graph::RenderGraph,
+    render_nodes::clear_pass::ClearPassNode,
+    rhi::{options::RenderOptions, PresentMode},
+    view::render_window::RenderWindow,
+    RenderArchetype, RenderStage,
 };
 use pi_share::ShareRefCell;
 use std::sync::Arc;
@@ -17,48 +21,41 @@ use winit::{
 
 // 渲染 环境
 struct RenderExample {
-    rt: AsyncRuntime<(), SingleTaskPool<()>>,
     dispatcher: Option<SingleDispatcher<SingleTaskPool<()>>>,
 }
 
 impl RenderExample {
-    pub fn new(rt: AsyncRuntime<(), SingleTaskPool<()>>) -> Self {
-        Self {
-            rt,
-            dispatcher: None,
-        }
+    pub fn new() -> Self {
+        Self { dispatcher: None }
     }
 
-    pub async fn init<P>(
+    pub async fn init(
         &mut self,
         mut world: World,
         options: RenderOptions,
-        rt: AsyncRuntime<(), P>,
-    ) where
-        P: AsyncTaskPoolExt<()> + AsyncTaskPool<(), Pool = P>,
-    {
+        window: ShareRefCell<winit::window::Window>,
+        rt: AsyncRuntime<(), SingleTaskPool<()>>,
+    ) {
         info!("RenderExample::init");
 
+        // Render: stage && system
         let RenderStage {
             extract_stage,
             prepare_stage,
             render_stage,
-        } = init_render(&mut world, options, rt).await;
-
-        let rg = world.get_resource_mut::<RenderGraph>().unwrap();
-        let clear_node = rg.add_node("clean", ClearPassNode::new(&mut world.clone()));
-        rg.set_node_finish(clear_node, true).unwrap();
+        } = init_render(&mut world, options, window, rt.clone()).await;
 
         let mut stages = vec![];
         stages.push(Arc::new(extract_stage.build()));
         stages.push(Arc::new(prepare_stage.build()));
         stages.push(Arc::new(render_stage.build()));
 
-        let rt = self.rt.clone();
+        self.dispatcher = Some(SingleDispatcher::new(stages, &world, rt));
 
-        let dispatcher = SingleDispatcher::new(stages, &world, rt);
-
-        self.dispatcher = Some(dispatcher);
+        // Render Graph
+        let rg = world.get_resource_mut::<RenderGraph>().unwrap();
+        let clear_node = rg.add_node("clean", ClearPassNode::new(&mut world.clone()));
+        rg.set_node_finish(clear_node, true).unwrap();
     }
 
     // 窗口大小改变 时 调用一次
@@ -107,8 +104,6 @@ fn run_window_loop(
                 window.request_redraw();
             }
             Event::RedrawRequested(_) => {
-                debug!("RenderExample::run");
-
                 let e = example.clone();
                 let _ = rt.spawn(rt.alloc(), async move {
                     e.render();
@@ -133,32 +128,35 @@ fn run_window_loop(
 }
 
 fn main() {
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
-
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("debug")).init();
 
     let event_loop = EventLoop::new();
     let window = ShareRefCell::new(winit::window::Window::new(&event_loop).unwrap());
+
+    let mut world = World::new();
     
-    let mut world = World::new();    
-    // Res Windows
-    let mut windows = Windows::default();
-    windows.add(PiWindow::new(window.clone()));
-    world.insert_resource(windows);
+    world
+        .spawn::<RenderArchetype>()
+        .insert(RenderWindow::new(window.clone(), PresentMode::Mailbox));
+        
+    // TODO 准备 Entity: ClearOption, RenderTarget, Option<Viewport>, Option<Scissor>,
+    000000000000000
 
     let runner = SingleTaskRunner::<()>::default();
     let runtime = AsyncRuntime::Local(runner.startup().unwrap());
 
     let rt = runtime.clone();
-    let example = ShareRefCell::new(RenderExample::new(rt.clone()));
+    let example = ShareRefCell::new(RenderExample::new());
     let mut e = example.clone();
+
+    let win = window.clone();
     std::thread::spawn(move || {
         let runtime = runtime.clone();
 
         let rt = runtime.clone();
         let _ = runtime.spawn(runtime.alloc(), async move {
-            
             let options = RenderOptions::default();
-            e.init(world, options, rt).await;
+            e.init(world, options, win, rt).await;
         });
 
         loop {

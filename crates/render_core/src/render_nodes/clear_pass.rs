@@ -1,36 +1,43 @@
-//! 清屏
+use std::ops::Deref;
 
-use super::clear_color::{ClearColor, RenderTargetClearColors};
 use crate::{
-    camera::{render_target::RenderTarget, RenderCamera},
+    camera::{ClearOption, Scissor, Viewport},
     render_graph::{
         node::{Node, NodeRunError, RealValue},
         node_slot::SlotInfo,
         RenderContext,
     },
-    rhi::{
-        LoadOp, Operations, RenderPassColorAttachment, RenderPassDepthStencilAttachment,
-        RenderPassDescriptor,
-    },
-    view::{RenderView, ViewDepthTexture, ViewTarget, render_window::RenderWindows},
-    RenderArchetype,
+    view::{render_target::RenderTarget, render_window::RenderWindow},
+    Active, RenderArchetype,
 };
 use futures::{future::BoxFuture, FutureExt};
-use pi_ecs::prelude::{QueryState, With, World};
-use pi_hash::XHashSet;
+use pi_ecs::{
+    prelude::{QueryState, With, World},
+    world::ArchetypeInfo,
+};
 use pi_share::ShareRefCell;
 use wgpu::CommandEncoder;
 
+#[inline]
+pub fn register_components(archetype: ArchetypeInfo) -> ArchetypeInfo {
+    archetype
+}
+
+#[inline]
+pub fn insert_resources(_world: &mut World) {}
+
 pub struct ClearPassNode {
-    query: ShareRefCell<
+    window_query: ShareRefCell<QueryState<RenderArchetype, &'static RenderWindow>>,
+    clear_query: ShareRefCell<
         QueryState<
             RenderArchetype,
             (
-                &'static ViewTarget,
-                Option<&'static ViewDepthTexture>,
-                Option<&'static RenderCamera>,
+                &'static ClearOption,
+                &'static RenderTarget,
+                &'static Option<Viewport>,
+                &'static Option<Scissor>,
             ),
-            With<RenderView>,
+            With<Active>,
         >,
     >,
 }
@@ -38,7 +45,8 @@ pub struct ClearPassNode {
 impl ClearPassNode {
     pub fn new(world: &mut World) -> Self {
         Self {
-            query: ShareRefCell::new(QueryState::new(world)),
+            window_query: ShareRefCell::new(QueryState::new(world)),
+            clear_query: ShareRefCell::new(QueryState::new(world)),
         }
     }
 }
@@ -51,89 +59,93 @@ impl Node for ClearPassNode {
     fn run(
         &self,
         context: RenderContext,
-        mut commands: ShareRefCell<Option<CommandEncoder>>,
+        mut commands: ShareRefCell<CommandEncoder>,
         _inputs: &[Option<RealValue>],
         _outputs: &[Option<RealValue>],
     ) -> BoxFuture<'static, Result<(), NodeRunError>> {
         let RenderContext { world, .. } = context;
 
-        let mut query = self.query.clone();
+        let mut clear_query = self.clear_query.clone();
+        let window_query = self.window_query.clone();
 
         async move {
-            let mut cleared_targets = XHashSet::default();
-            let clear_color = world.get_resource::<ClearColor>().unwrap();
-            let render_target_clear_colors =
-                world.get_resource::<RenderTargetClearColors>().unwrap();
-
-            // This gets all ViewTargets and ViewDepthTextures and clears its attachments
-            // TODO: This has the potential to clear the same target multiple times, if there
-            // are multiple views drawing to the same target. This should be fixed when we make
-            // clearing happen on "render targets" instead of "views" (see the TODO below for more context).
-            for (target, depth, camera) in query.iter(&world) {
-                let mut color = &clear_color.0;
-
-                if let Some(camera) = camera {
-                    cleared_targets.insert(&camera.target);
-                    if let Some(target_color) = render_target_clear_colors.get(&camera.target) {
-                        color = target_color;
+            for (clear, rt, viewport, scissor) in clear_query.iter(&world) {
+                let view = match rt {
+                    RenderTarget::Window(w) => {
+                        let window = window_query.get(&world, w.clone()).unwrap();
+                        window.rt.as_ref().unwrap()
                     }
-                }
-                let pass_descriptor = RenderPassDescriptor {
-                    label: Some("clear_pass"),
-                    color_attachments: &[target.get_color_attachment(Operations {
-                        load: LoadOp::Clear((*color).into()),
-                        store: true,
-                    })],
-                    depth_stencil_attachment: depth.map(|depth| RenderPassDepthStencilAttachment {
-                        view: &depth.view,
-                        depth_ops: Some(Operations {
-                            load: LoadOp::Clear(0.0),
-                            store: true,
-                        }),
-                        stencil_ops: None,
-                    }),
+                    RenderTarget::Texture(v) => v.deref(),
                 };
 
-                commands
-                    .as_mut()
-                    .unwrap()
-                    .begin_render_pass(&pass_descriptor);
-            }
-
-            // TODO: This is a hack to ensure we don't call present() on frames without any work,
-            // which will cause panics. The real fix here is to clear "render targets" directly
-            // instead of "views". This should be removed once full RenderTargets are implemented.
-            let windows = world.get_resource::<RenderWindows>().unwrap();
-            for target in render_target_clear_colors.colors.keys().cloned().chain(
-                windows
-                    .values()
-                    .map(|window| RenderTarget::Window(window.id)),
-            ) {
-                // skip windows that have already been cleared
-                if cleared_targets.contains(&target) {
-                    continue;
-                }
-                let pass_descriptor = RenderPassDescriptor {
-                    label: Some("clear_pass"),
-                    color_attachments: &[RenderPassColorAttachment {
-                        view: target.get_texture_view(windows).unwrap(),
+                let color_attachments = match &clear.color {
+                    None => vec![],
+                    Some(color) => vec![wgpu::RenderPassColorAttachment {
                         resolve_target: None,
-                        ops: Operations {
-                            load: LoadOp::Clear(
-                                (*render_target_clear_colors
-                                    .get(&target)
-                                    .unwrap_or(&clear_color.0))
-                                .into(),
-                            ),
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(color.into()),
                             store: true,
                         },
+                        view,
                     }],
-                    depth_stencil_attachment: None,
                 };
-                commands
-                    .as_mut()
-                    .unwrap()
-                    .begin_render_pass(&pass_descriptor);
+
+                let depth_ops = clear.depth.map(|depth| wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(depth),
+                    store: true,
+                });
+
+                let stencil_ops = clear.stencil.map(|stencil| wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(stencil),
+                    store: true,
+                });
+
+                let depth_stencil_attachment = if depth_ops.is_none() && stencil_ops.is_none() {
+                    None
+                } else {
+                    todo!();
+                    
+                    // Some(wgpu::RenderPassDepthStencilAttachment {
+                    //     view: view,
+                    //     depth_ops,
+                    //     stencil_ops,
+                    // })
+                };
+
+                let mut render_pass = commands.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: None,
+                    color_attachments: &color_attachments,
+                    depth_stencil_attachment,
+                });
+
+                if let Some(Viewport {
+                    x,
+                    y,
+                    width,
+                    height,
+                    min_depth,
+                    max_depth,
+                }) = viewport
+                {
+                    render_pass.set_viewport(
+                        *x as f32,
+                        *y as f32,
+                        *width as f32,
+                        *height as f32,
+                        *min_depth,
+                        *max_depth,
+                    );
+                }
+
+                if let Some(Scissor {
+                    x,
+                    y,
+                    width,
+                    height,
+                }) = scissor
+                {
+                    render_pass.set_scissor_rect(*x, *y, *width, *height);
+                }
             }
 
             Ok(())

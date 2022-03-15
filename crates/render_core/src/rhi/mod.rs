@@ -12,10 +12,11 @@ pub mod texture;
 pub mod uniform_vec;
 
 use self::{device::RenderDevice, options::RenderOptions};
-use crate::{window::windows::Windows, rhi::options::RenderPriority};
+use crate::rhi::options::RenderPriority;
 use log::{debug, info};
 use pi_ecs::prelude::World;
-use std::sync::Arc;
+use pi_share::ShareRefCell;
+use std::{ops::Deref, sync::Arc};
 
 pub use render_crevice::*;
 pub use wgpu::{
@@ -82,6 +83,8 @@ pub use wgpu::{
     PipelineLayoutDescriptor,
 
     PolygonMode,
+    PresentMode,
+
     PrimitiveState,
     PrimitiveTopology,
     RenderPassColorAttachment,
@@ -123,31 +126,25 @@ pub type RenderSurface = wgpu::Surface;
 /// 初始化 渲染 环境
 /// world 加入 Res: RenderInstance, RenderQueue, RenderDevice, RenderOptions, AdapterInfo
 pub async fn setup_render_context(
-    world: &mut World,
+    mut world: World,
     options: RenderOptions,
+    window: ShareRefCell<winit::window::Window>,
 ) {
     let backends = options.backends;
 
     let instance = wgpu::Instance::new(backends);
-    let surface = {
-        let windows = world.get_resource_mut::<Windows>().unwrap();
-        // 只有 主窗口 创建了 窗口表面, 队列，Device
-        let raw_handle = windows.get_primary().map(|window| unsafe {
-            let handle = window.raw_window_handle().get_handle();
-            instance.create_surface(&handle)
-        });
-        raw_handle
-    };
+    let surface = unsafe { instance.create_surface(window.deref()) };
     let request_adapter_options = wgpu::RequestAdapterOptions {
         power_preference: options.power_preference,
-        compatible_surface: surface.as_ref(),
+        compatible_surface: Some(&surface),
         ..Default::default()
     };
-    let (device, queue, adapter_info) = initialize_renderer(&instance, &options, &request_adapter_options).await;
-    
+    let (device, queue, adapter_info) =
+        initialize_renderer(&instance, &options, &request_adapter_options).await;
+
     debug!("Configured wgpu adapter Limits: {:#?}", device.limits());
     debug!("Configured wgpu adapter Features: {:#?}", device.features());
-    
+
     world.insert_resource(instance);
     world.insert_resource(options);
     world.insert_resource(device);

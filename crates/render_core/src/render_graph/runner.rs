@@ -300,7 +300,7 @@ fn crate_run_node(
             let commands =
                 device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
 
-            let mut commands = ShareRefCell::new(Some(commands));
+            let commands = ShareRefCell::new(commands);
 
             let runner = node.run(
                 context,
@@ -311,7 +311,8 @@ fn crate_run_node(
 
             runner.await.unwrap();
 
-            let commands = commands.take().unwrap();
+            let commands = Arc::try_unwrap(commands.0).unwrap();
+            let commands = commands.into_inner();
             queue.submit(vec![commands.finish()]);
             Ok(())
         }

@@ -8,27 +8,27 @@ pub mod render_nodes;
 pub mod rhi;
 pub mod texture;
 pub mod view;
-pub mod window;
 
-use camera::init_camera;
 use futures::{future::BoxFuture, FutureExt};
 use log::info;
 use nalgebra::{Matrix4, Transform3 as NalTransform3, Vector2, Vector3, Vector4};
 use pi_async::rt::{AsyncRuntime, AsyncTaskPool, AsyncTaskPoolExt};
 use pi_ecs::{
-    entity::Entity,
-    prelude::{world::WorldMut, QueryState, StageBuilder, With, World},
+    prelude::{world::WorldMut, QueryState, StageBuilder, World},
     sys::system::IntoSystem,
 };
+use pi_share::ShareRefCell;
 use render_graph::{graph::RenderGraph, runner::RenderGraphRunner};
 use rhi::{device::RenderDevice, options::RenderOptions, setup_render_context, RenderQueue};
 use std::borrow::BorrowMut;
 use thiserror::Error;
-use view::{
-    init_view, prepare_view_targets, prepare_view_uniforms,
-    render_window::{extract_windows, init_window, prepare_windows, RenderWindows},
-    ViewTarget,
-};
+use view::render_window::prepare_windows;
+use winit::window::Window;
+
+use crate::view::render_window::RenderWindow;
+
+// 组件：激活的
+pub struct Active;
 
 #[derive(Error, Debug)]
 pub enum RenderContextError {
@@ -54,32 +54,35 @@ pub struct RenderStage {
 pub async fn init_render<P>(
     world: &mut World,
     options: RenderOptions,
+    window: ShareRefCell<Window>,
     rt: AsyncRuntime<(), P>,
 ) -> RenderStage
 where
     P: AsyncTaskPoolExt<()> + AsyncTaskPool<(), Pool = P>,
 {
-    world.new_archetype::<RenderArchetype>().create();
+    // 一次性 注册 所有的 组件
+    let archetype = world.new_archetype::<RenderArchetype>();
+    let archetype = view::register_components(archetype);
+    let archetype = camera::register_components(archetype);
+    let archetype = render_nodes::register_components(archetype);
+    archetype.register::<Active>().create();
 
     // world 加入 Res: RenderInstance, RenderQueue, RenderDevice, RenderOptions, AdapterInfo
-    setup_render_context(world, options).await;
+    setup_render_context(world.clone(), options, window).await;
 
-    init_window(world);
-    init_view(world);
-    init_camera(world);
+    view::insert_resources(world);
+    camera::insert_resources(world);
+    render_nodes::insert_resources(world);
 
     world.insert_resource(RenderGraph::new());
 
     let rg_runner = RenderGraphRunner::new(rt);
     world.insert_resource(rg_runner);
 
-    let mut extract_stage = StageBuilder::new();
-    extract_stage.add_node(extract_windows.system(world));
+    let extract_stage = StageBuilder::new();
 
     let mut prepare_stage = StageBuilder::new();
     prepare_stage.add_node(prepare_windows.system(world));
-    prepare_stage.add_node(prepare_view_targets.system(world));
-    prepare_stage.add_node(prepare_view_uniforms.system(world));
     prepare_stage.add_node(prepare_rg::<P>.system(world));
 
     let mut render_stage = StageBuilder::new();
@@ -107,22 +110,19 @@ where
                 return Ok(());
             }
 
-            let mut query = QueryState::<
-                RenderArchetype,
-                (&mut RenderGraph, &RenderDevice, &RenderQueue),
-            >::new(&mut world);
-            for (mut rg, device, queue) in query.iter_mut(&mut world.clone()) {
-                runner
-                    .build(
-                        world.clone(),
-                        device.clone(),
-                        queue.clone(),
-                        rg.borrow_mut(),
-                    )
-                    .unwrap();
+            let rg = world.get_resource_mut::<RenderGraph>().unwrap();
+            let device = world.get_resource::<RenderDevice>().unwrap();
+            let queue = world.get_resource::<RenderQueue>().unwrap();
+            runner
+                .build(
+                    world.clone(),
+                    device.clone(),
+                    queue.clone(),
+                    rg.borrow_mut(),
+                )
+                .unwrap();
 
-                runner.prepare().await;
-            }
+            runner.prepare().await;
         }
 
         Ok(())
@@ -131,58 +131,32 @@ where
 }
 
 /// 每帧 调用一次，用于 驱动 渲染图
-fn render_system<P>(mut world: WorldMut) -> BoxFuture<'static, std::io::Result<()>>
+fn render_system<P>(world: WorldMut) -> BoxFuture<'static, std::io::Result<()>>
 where
     P: AsyncTaskPoolExt<()> + AsyncTaskPool<(), Pool = P>,
 {
     info!("begin render_system");
 
+    let mut query: ShareRefCell<QueryState<RenderArchetype, &'static mut RenderWindow>> =
+        ShareRefCell::new(QueryState::new(&mut world.clone()));
+
     async move {
         info!("begin async render_system");
 
-        let mut w = world.clone();
-        let mut query = QueryState::<RenderArchetype, &mut RenderGraphRunner<P>>::new(&mut w);
+        let graph_runner = world.get_resource_mut::<RenderGraphRunner<P>>().unwrap();
+        graph_runner.run().await;
 
-        let mut w = world.clone();
-        for mut graph_runner in query.iter_mut(&mut w) {
-            let graph_runner = graph_runner.borrow_mut();
-            graph_runner.run().await;
+        info!("render_system: after graph_runner.run");
 
-            info!("render_system: after graph_runner.run");
-
-            {
-                // Remove ViewTarget components to ensure swap chain TextureViews are dropped.
-                // If all TextureViews aren't dropped before present, acquiring the next swap chain texture will fail.
-                let view_entities = world
-                    .query_filtered::<RenderArchetype, Entity, With<ViewTarget>>()
-                    .iter(&world)
-                    .collect::<Vec<_>>();
-
-                info!(
-                    "render_system: before iter view_entities, len = {:?}",
-                    view_entities.len()
-                );
-                for e in view_entities {
-                    world.remove_component::<ViewTarget>(e);
-                }
-
-                let windows = world.get_resource_mut::<RenderWindows>().unwrap();
-
-                info!(
-                    "render_system: before iter windows, len = {:?}",
-                    windows.len()
-                );
-                for window in windows.values_mut() {
-                    if let Some(texture_view) = window.swap_chain_texture.take() {
-                        if let Some(surface_texture) = texture_view.take_surface_texture() {
-                            surface_texture.present();
-                            info!("render_system: after surface_texture.present");
-                        }
-                    }
+        let mut world = world.clone();
+        for mut window in query.iter_mut(&mut world) {
+            if let Some(texture_view) = window.rt.take() {
+                if let Some(surface_texture) = texture_view.take_surface_texture() {
+                    surface_texture.present();
+                    info!("render_system: after surface_texture.present");
                 }
             }
         }
-
         Ok(())
     }
     .boxed()

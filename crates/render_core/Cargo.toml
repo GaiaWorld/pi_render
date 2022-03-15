@@ -25,7 +25,6 @@ downcast-rs = "1.2"
 futures = "0.3"
 hex = "0.4"
 log = "0.4"
-raw-window-handle = "0.4"
 naga = { version = "0.8", features = [
     "glsl-in",
     "spv-in",
@@ -38,3 +37,6 @@ once_cell = "1.4" # TODO: replace once_cell with std equivalent if/when this lan
 regex = "1.5"
 thiserror = "1.0"
 wgpu = { version = "0.12", features = ["spirv"] }
+
+[patch.crates-io]
+pi_ecs = { path = "../pi_ecs" }
