@@ -19,6 +19,8 @@ use pi_share::ShareRefCell;
 use std::{borrow::Cow, sync::Arc};
 use thiserror::Error;
 
+type NodeSlot = (Vec<Option<RealValue>>, Vec<Option<RealValue>>);
+
 #[derive(Error, Debug)]
 pub enum RenderGraphRunnerError {
     #[error(transparent)]
@@ -96,7 +98,7 @@ where
         let mut run_builder = NGraphBuilder::new();
         let mut prepare_builder = NGraphBuilder::new();
 
-        fn create_slots_vec(n: &NodeState) -> (Vec<Option<RealValue>>, Vec<Option<RealValue>>) {
+        fn create_slots_vec(n: &NodeState) -> NodeSlot {
             let len = n.input_slots.len();
             let mut inputs = Vec::<Option<RealValue>>::with_capacity(len);
             for _ in 0.. {
@@ -161,7 +163,7 @@ where
                         ng_node_clone.clone(),
                         crate_prepare_node(
                             &map,
-                            &rg,
+                            rg,
                             *n,
                             device.clone(),
                             queue.clone(),
@@ -171,7 +173,7 @@ where
 
                     run_builder = run_builder.node(
                         ng_node_clone,
-                        crate_run_node(&map, &rg, *n, device.clone(), queue.clone(), world.clone()),
+                        crate_run_node(&map, rg, *n, device.clone(), queue.clone(), world.clone()),
                     );
                 }
                 NGNodeValue::InputSlot(_nid, _sid) => {
@@ -268,7 +270,7 @@ impl RunFactory for DumpNode {
 
 // 创建异步 节点
 fn crate_run_node(
-    map: &XHashMap<&usize, (Vec<Option<RealValue>>, Vec<Option<RealValue>>)>,
+    map: &XHashMap<&usize, NodeSlot>,
     render_graph: &RenderGraph,
     n: usize,
     device: RenderDevice,
@@ -324,7 +326,7 @@ fn crate_run_node(
 
 // 创建异步 节点
 fn crate_prepare_node(
-    map: &XHashMap<&usize, (Vec<Option<RealValue>>, Vec<Option<RealValue>>)>,
+    map: &XHashMap<&usize, NodeSlot>,
     render_graph: &RenderGraph,
     n: usize,
     device: RenderDevice,
@@ -365,5 +367,5 @@ fn crate_prepare_node(
         .boxed()
     };
 
-    return ExecNode::Async(Box::new(f));
+    ExecNode::Async(Box::new(f))
 }

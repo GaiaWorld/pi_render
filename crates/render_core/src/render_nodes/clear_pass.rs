@@ -1,59 +1,91 @@
-use std::ops::Deref;
-
 use crate::{
-    camera::{ClearOption, Scissor, Viewport},
+    components::camera::{Scissor, Viewport},
+    components::{
+        camera::{
+            render_target::{RenderTarget, RenderTargetKey, RenderTargets, TextureViews},
+            ClearColor,
+        },
+        option_slotmap::OptionSlotMap,
+    },
     render_graph::{
         node::{Node, NodeRunError, RealValue},
         node_slot::SlotInfo,
         RenderContext,
     },
-    view::{render_target::RenderTarget, render_window::RenderWindow},
-    Active, RenderArchetype,
 };
 use futures::{future::BoxFuture, FutureExt};
-use pi_ecs::{
-    prelude::{QueryState, With, World},
-    world::ArchetypeInfo,
-};
+use pi_ecs::prelude::World;
 use pi_share::ShareRefCell;
+use pi_slotmap::new_key_type;
 use wgpu::CommandEncoder;
 
-#[inline]
-pub fn register_components(archetype: ArchetypeInfo) -> ArchetypeInfo {
-    archetype
+new_key_type! {
+    pub struct ClearOptionKey;
+}
+
+pub type ClearOptions = OptionSlotMap<ClearOptionKey, ClearOption>;
+
+#[derive(Default)]
+pub struct ClearOption {
+    target: RenderTargetKey,
+
+    pub viewport: Option<Viewport>,
+    pub scissor: Option<Scissor>,
+    pub color: Option<ClearColor>,
+    pub depth: Option<f32>,
+    pub stencil: Option<u32>,
+}
+
+impl ClearOption {
+    pub fn set_color(&mut self, r: f32, g: f32, b: f32, a: f32) {
+        self.color = Some(ClearColor { r, g, b, a });
+    }
+
+    pub fn set_depth(&mut self, depth: Option<f32>) {
+        self.depth = depth;
+    }
+
+    pub fn set_stencil(&mut self, stencil: Option<u32>) {
+        self.stencil = stencil;
+    }
+
+    pub fn set_target(&mut self, target: RenderTargetKey) {
+        self.target = target;
+    }
+
+    pub fn set_viewport(&mut self, viewport: Option<Viewport>) {
+        self.viewport = viewport;
+    }
+
+    pub fn set_scissor(&mut self, scissor: Option<Scissor>) {
+        self.scissor = scissor;
+    }
 }
 
 #[inline]
 pub fn insert_resources(_world: &mut World) {}
 
-pub struct ClearPassNode {
-    window_query: ShareRefCell<QueryState<RenderArchetype, &'static RenderWindow>>,
-    clear_query: ShareRefCell<
-        QueryState<
-            RenderArchetype,
-            (
-                &'static ClearOption,
-                &'static RenderTarget,
-                &'static Option<Viewport>,
-                &'static Option<Scissor>,
-            ),
-            With<Active>,
-        >,
-    >,
-}
+#[derive(Default)]
+pub struct ClearPassNode;
 
-impl ClearPassNode {
-    pub fn new(world: &mut World) -> Self {
-        Self {
-            window_query: ShareRefCell::new(QueryState::new(world)),
-            clear_query: ShareRefCell::new(QueryState::new(world)),
-        }
-    }
-}
+impl ClearPassNode {}
 
 impl Node for ClearPassNode {
     fn input(&self) -> Vec<SlotInfo> {
         vec![]
+    }
+
+    fn output(&self) -> Vec<SlotInfo> {
+        vec![]
+    }
+
+    fn prepare(
+        &self,
+        _context: RenderContext,
+        _inputs: &[Option<RealValue>],
+        _outputs: &[Option<RealValue>],
+    ) -> Option<BoxFuture<'static, Result<(), NodeRunError>>> {
+        None
     }
 
     fn run(
@@ -65,52 +97,45 @@ impl Node for ClearPassNode {
     ) -> BoxFuture<'static, Result<(), NodeRunError>> {
         let RenderContext { world, .. } = context;
 
-        let mut clear_query = self.clear_query.clone();
-        let window_query = self.window_query.clone();
-
         async move {
-            for (clear, rt, viewport, scissor) in clear_query.iter(&world) {
-                let view = match rt {
-                    RenderTarget::Window(w) => {
-                        let window = window_query.get(&world, w.clone()).unwrap();
-                        window.rt.as_ref().unwrap()
-                    }
-                    RenderTarget::Texture(v) => v.deref(),
-                };
+            let clears = world.get_resource::<ClearOptions>().unwrap();
+            let rts = world.get_resource::<RenderTargets>().unwrap();
+            let views = world.get_resource::<TextureViews>().unwrap();
 
-                let color_attachments = match &clear.color {
-                    None => vec![],
-                    Some(color) => vec![wgpu::RenderPassColorAttachment {
-                        resolve_target: None,
-                        ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Clear(color.into()),
-                            store: true,
-                        },
-                        view,
-                    }],
-                };
+            for (
+                _,
+                ClearOption {
+                    target,
+                    viewport,
+                    scissor,
+                    color,
+                    ..
+                },
+            ) in clears.iter()
+            {
+                if color.is_none() {
+                    continue;
+                }
 
-                let depth_ops = clear.depth.map(|depth| wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(depth),
-                    store: true,
-                });
+                let color = color.as_ref().unwrap();
+                let RenderTarget { colors, .. } = rts.get(*target).unwrap();
+                let color_attachments = colors
+                    .iter()
+                    .map(|view| {
+                        let view = views.get(*view).unwrap();
+                        wgpu::RenderPassColorAttachment {
+                            resolve_target: None,
+                            ops: wgpu::Operations {
+                                load: wgpu::LoadOp::Clear(color.into()),
+                                store: true,
+                            },
+                            view,
+                        }
+                    })
+                    .collect::<Vec<wgpu::RenderPassColorAttachment>>();
 
-                let stencil_ops = clear.stencil.map(|stencil| wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(stencil),
-                    store: true,
-                });
-
-                let depth_stencil_attachment = if depth_ops.is_none() && stencil_ops.is_none() {
-                    None
-                } else {
-                    todo!();
-                    
-                    // Some(wgpu::RenderPassDepthStencilAttachment {
-                    //     view: view,
-                    //     depth_ops,
-                    //     stencil_ops,
-                    // })
-                };
+                // TODO Detph-Stencil
+                let depth_stencil_attachment = None;
 
                 let mut render_pass = commands.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: None,
@@ -151,18 +176,5 @@ impl Node for ClearPassNode {
             Ok(())
         }
         .boxed()
-    }
-
-    fn output(&self) -> Vec<SlotInfo> {
-        vec![]
-    }
-
-    fn prepare(
-        &self,
-        _context: RenderContext,
-        _inputs: &[Option<RealValue>],
-        _outputs: &[Option<RealValue>],
-    ) -> Option<BoxFuture<'static, Result<(), NodeRunError>>> {
-        None
     }
 }

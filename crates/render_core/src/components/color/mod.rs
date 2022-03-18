@@ -1,8 +1,9 @@
 pub mod colorspace;
 
-use self::colorspace::{HslRepresentation, SrgbColorSpace};
 use crate::{Vec3, Vec4};
 use std::ops::{Add, AddAssign, Mul, MulAssign};
+
+use self::colorspace::{HslRepresentation, SrgbColorSpace};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Color {

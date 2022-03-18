@@ -121,7 +121,6 @@ pub use wgpu::{
 
 pub type RenderQueue = Arc<wgpu::Queue>;
 pub type RenderInstance = wgpu::Instance;
-pub type RenderSurface = wgpu::Surface;
 
 /// 初始化 渲染 环境
 /// world 加入 Res: RenderInstance, RenderQueue, RenderDevice, RenderOptions, AdapterInfo

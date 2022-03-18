@@ -1,9 +1,13 @@
-
-use std::sync::Arc;
 use futures::Future;
+use std::sync::Arc;
 use wgpu::{util::DeviceExt, BufferAsyncError};
 
-use super::{bind_group::{BindGroup, BindGroupLayout}, pipeline::{RenderPipeline, ComputePipeline}, buffer::Buffer, texture::{Texture, Sampler}};
+use super::{
+    bind_group::{BindGroup, BindGroupLayout},
+    buffer::Buffer,
+    pipeline::{ComputePipeline, RenderPipeline},
+    texture::{Sampler, Texture},
+};
 
 /// This GPU device is responsible for the creation of most rendering and compute resources.
 #[derive(Clone)]
@@ -150,9 +154,9 @@ impl RenderDevice {
     }
 
     pub async fn map_buffer(
-        &self, 
-        buffer: &wgpu::BufferSlice<'_>, 
-        map_mode: wgpu::MapMode
+        &self,
+        buffer: &wgpu::BufferSlice<'_>,
+        map_mode: wgpu::MapMode,
     ) -> impl Future<Output = Result<(), BufferAsyncError>> + Send {
         buffer.map_async(map_mode)
     }

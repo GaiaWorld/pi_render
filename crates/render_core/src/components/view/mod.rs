@@ -1,8 +1,8 @@
 use pi_ecs::prelude::World;
 
-pub mod clear_pass;
+pub mod render_window;
 
 #[inline]
 pub fn insert_resources(world: &mut World) {
-    clear_pass::insert_resources(world)
+    render_window::insert_resources(world)
 }

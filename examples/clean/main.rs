@@ -5,11 +5,11 @@ use pi_async::rt::{
 };
 use pi_ecs::prelude::{Dispatcher, SingleDispatcher, World};
 use pi_render::{
+    components::camera::{ClearOption, Scissor, Viewport},
     init_render,
     render_graph::graph::RenderGraph,
     render_nodes::clear_pass::ClearPassNode,
     rhi::{options::RenderOptions, PresentMode},
-    view::render_window::RenderWindow,
     RenderArchetype, RenderStage,
 };
 use pi_share::ShareRefCell;
@@ -128,19 +128,10 @@ fn run_window_loop(
 }
 
 fn main() {
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("debug")).init();
-
     let event_loop = EventLoop::new();
     let window = ShareRefCell::new(winit::window::Window::new(&event_loop).unwrap());
 
     let mut world = World::new();
-    
-    world
-        .spawn::<RenderArchetype>()
-        .insert(RenderWindow::new(window.clone(), PresentMode::Mailbox));
-        
-    // TODO 准备 Entity: ClearOption, RenderTarget, Option<Viewport>, Option<Scissor>,
-    000000000000000
 
     let runner = SingleTaskRunner::<()>::default();
     let runtime = AsyncRuntime::Local(runner.startup().unwrap());
@@ -156,7 +147,25 @@ fn main() {
         let rt = runtime.clone();
         let _ = runtime.spawn(runtime.alloc(), async move {
             let options = RenderOptions::default();
-            e.init(world, options, win, rt).await;
+
+            let window_id = win.id();
+
+            e.init(world.clone(), options, win.clone(), rt).await;
+
+            // Entity: RenderWindow
+            world
+                .spawn::<RenderArchetype>()
+                .insert(RenderWindow::new(win, PresentMode::Mailbox));
+
+            // Entity: ClearOption, Viewport, Scissor
+            let mut clear = ClearOption::new();
+            clear.set_color(1.0, 0.0, 0.0, 1.0);
+            world
+                .spawn::<RenderArchetype>()
+                .insert(window_id)
+                .insert(clear)
+                .insert(Viewport::new_with_rect(0, 0, 1024, 1024))
+                .insert(Scissor::new(0, 0, 1024, 1024));
         });
 
         loop {

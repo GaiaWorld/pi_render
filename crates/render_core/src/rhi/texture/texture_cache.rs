@@ -1,9 +1,7 @@
-use crate::rhi::{
-    device::RenderDevice,
-    texture::{Texture, TextureView},
-};
-use pi_hash::XHashMap;
+use super::{Texture, TextureView};
+use crate::rhi::device::RenderDevice;
 use pi_ecs::prelude::*;
+use pi_hash::XHashMap;
 use wgpu::{TextureDescriptor, TextureViewDescriptor};
 
 /// The internal representation of a [`CachedTexture`] used to track whether it was recently used

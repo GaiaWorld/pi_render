@@ -52,18 +52,6 @@ pub struct RenderGraph {
 }
 
 impl RenderGraph {
-    /// 创建
-    pub fn new() -> Self {
-        Self {
-            nid_curr: 0,
-            finish_nodes: XHashSet::default(),
-            ng_builder: Some(NGraphBuilder::new()),
-            nodes: XHashMap::default(),
-            slots: XHashMap::default(),
-            node_names: XHashMap::default(),
-        }
-    }
-
     /// 设置 是否 是 最终节点
     pub fn set_node_finish(
         &mut self,
@@ -71,7 +59,7 @@ impl RenderGraph {
         is_finish: bool,
     ) -> Result<(), RenderGraphError> {
         let node = node.into();
-        let node_id = self.get_node_id(node.clone())?;
+        let node_id = self.get_node_id(node)?;
 
         if is_finish {
             self.finish_nodes.insert(node_id);
@@ -241,24 +229,16 @@ impl RenderGraph {
     pub fn get_node(&self, label: impl Into<NodeLabel>) -> Option<&NodeState> {
         let id = self.get_node_id(label);
         match id {
-            Ok(id) => {
-                return self.nodes.get(&id);
-            }
-            Err(_) => {
-                return None;
-            }
+            Ok(id) => self.nodes.get(&id),
+            Err(_) => None,
         }
     }
 
     pub fn get_node_mut(&mut self, label: impl Into<NodeLabel>) -> Option<&mut NodeState> {
         let id = self.get_node_id(label);
         match id {
-            Ok(id) => {
-                return self.nodes.get_mut(&id);
-            }
-            Err(_) => {
-                return None;
-            }
+            Ok(id) => self.nodes.get_mut(&id),
+            Err(_) => None,
         }
     }
 }

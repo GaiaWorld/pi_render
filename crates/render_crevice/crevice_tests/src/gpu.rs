@@ -2,10 +2,10 @@ use std::borrow::Cow;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
+use futures::executor::block_on;
 use render_crevice::glsl::{Glsl, GlslStruct};
 use render_crevice::std140::{AsStd140, Std140};
 use render_crevice::std430::{AsStd430, Std430};
-use futures::executor::block_on;
 use wgpu::util::DeviceExt;
 
 const BASE_SHADER: &str = "#version 450

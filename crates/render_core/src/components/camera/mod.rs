@@ -1,4 +1,6 @@
-use pi_ecs::{prelude::World, world::ArchetypeInfo};
+pub mod render_target;
+
+use pi_ecs::prelude::World;
 
 pub struct Viewport {
     pub x: u32,
@@ -59,6 +61,7 @@ impl Scissor {
     }
 }
 
+#[derive(Debug, Default)]
 pub struct ClearColor {
     pub r: f32,
     pub g: f32,
@@ -83,41 +86,6 @@ impl From<&ClearColor> for wgpu::Color {
     }
 }
 
-pub struct ClearOption {
-    pub color: Option<ClearColor>,
-    pub depth: Option<f32>,
-    pub stencil: Option<u32>,
-}
-
-impl ClearOption {
-    pub fn new() -> Self {
-        Self {
-            color: None,
-            depth: None,
-            stencil: None,
-        }
-    }
-
-    pub fn set_color(&mut self, r: f32, g: f32, b: f32, a: f32) {
-        self.color = Some(ClearColor::new(r, g, b, a));
-    }
-
-    pub fn set_detph(&mut self, d: f32) {
-        self.depth = Some(d);
-    }
-
-    pub fn set_stencil(&mut self, stencil: u32) {
-        self.stencil = Some(stencil);
-    }
-}
-
-#[inline]
-pub fn register_components(archetype: ArchetypeInfo) -> ArchetypeInfo {
-    archetype
-        .register::<Viewport>()
-        .register::<Scissor>()
-        .register::<ClearOption>()
-}
 
 #[inline]
 pub fn insert_resources(_world: &mut World) {}
