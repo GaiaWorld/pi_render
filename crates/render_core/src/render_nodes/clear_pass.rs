@@ -5,7 +5,6 @@ use crate::{
             render_target::{RenderTarget, RenderTargetKey, RenderTargets, TextureViews},
             ClearColor,
         },
-        option_slotmap::OptionSlotMap,
     },
     render_graph::{
         node::{Node, NodeRunError, RealValue},
@@ -16,19 +15,18 @@ use crate::{
 use futures::{future::BoxFuture, FutureExt};
 use pi_ecs::prelude::World;
 use pi_share::ShareRefCell;
-use pi_slotmap::new_key_type;
+use pi_slotmap::{new_key_type, SlotMap};
 use wgpu::CommandEncoder;
 
 new_key_type! {
     pub struct ClearOptionKey;
 }
 
-pub type ClearOptions = OptionSlotMap<ClearOptionKey, ClearOption>;
+pub type ClearOptions = SlotMap<ClearOptionKey, ClearOption>;
 
 #[derive(Default)]
 pub struct ClearOption {
     target: RenderTargetKey,
-
     pub viewport: Option<Viewport>,
     pub scissor: Option<Scissor>,
     pub color: Option<ClearColor>,
@@ -129,7 +127,7 @@ impl Node for ClearPassNode {
                                 load: wgpu::LoadOp::Clear(color.into()),
                                 store: true,
                             },
-                            view,
+                            view: view.as_ref().unwrap(),
                         }
                     })
                     .collect::<Vec<wgpu::RenderPassColorAttachment>>();

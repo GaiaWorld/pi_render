@@ -1,10 +1,14 @@
 use crate::{
-    components::{camera::render_target::{TextureViewKey, TextureViews}, option_slotmap::OptionSlotMap},
-    rhi::{device::RenderDevice, texture::{PiRenderDefault, TextureView}, PresentMode, RenderInstance},
+    components::camera::render_target::{TextureViewKey, TextureViews},
+    rhi::{
+        device::RenderDevice,
+        texture::{PiRenderDefault, TextureView},
+        PresentMode, RenderInstance,
+    },
 };
 use pi_ecs::prelude::{Res, ResMut, World};
 use pi_share::ShareRefCell;
-use pi_slotmap::new_key_type;
+use pi_slotmap::{new_key_type, SlotMap};
 use std::{ops::Deref, sync::Arc};
 use wgpu::TextureFormat;
 use winit::{dpi::PhysicalSize, window::Window};
@@ -13,13 +17,32 @@ new_key_type! {
     pub struct RenderWindowKey;
 }
 
-pub type RenderWindows = OptionSlotMap<RenderWindowKey, RenderWindow>;
+pub type RenderWindows = SlotMap<RenderWindowKey, RenderWindow>;
 
 pub struct RenderWindow {
-    pub present_mode: PresentMode,
-    pub last_size: PhysicalSize<u32>,
-    pub handle: ShareRefCell<Window>,
-    pub view: TextureViewKey,
+    present_mode: PresentMode,
+    last_size: PhysicalSize<u32>,
+    handle: ShareRefCell<Window>,
+    view: TextureViewKey,
+}
+
+impl RenderWindow {
+    pub fn new(
+        handle: ShareRefCell<Window>,
+        present_mode: PresentMode,
+        view: TextureViewKey,
+    ) -> Self {
+        Self {
+            handle,
+            present_mode,
+            last_size: PhysicalSize::default(),
+            view,
+        }
+    }
+
+    pub fn get_view(&self) -> TextureViewKey {
+        self.view
+    }
 }
 
 #[inline]
@@ -34,17 +57,18 @@ pub fn prepare_windows(
     mut views: ResMut<TextureViews>,
 ) {
     for (_, window) in windows.iter_mut() {
-        let (view, is_first) = match views.get_mut(window.view) {
-            Some(view) => (view, true),
-            None => {
-                let surface = unsafe { instance.create_surface(window.handle.deref()) };
-                let surface = Arc::new(surface);
-                window.view = views.insert(Some(TextureView::with_surface(surface)));
-                
-                let view = views.get_mut(window.view);
-                (view.unwrap(), false)
-            }
-        };
+        let view = views.get_mut(window.view);
+
+        assert!(view.is_some());
+        let view = view.unwrap();
+
+        let is_first = view.is_none();
+        if is_first {
+            let surface = unsafe { instance.create_surface(window.handle.deref()) };
+            let surface = Arc::new(surface);
+            *view = Some(TextureView::with_surface(surface));
+        }
+        let view = view.as_mut().unwrap();
 
         let PhysicalSize { width, height } = window.handle.inner_size();
         let config = wgpu::SurfaceConfiguration {

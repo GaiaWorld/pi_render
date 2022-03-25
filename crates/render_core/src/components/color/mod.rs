@@ -1,9 +1,14 @@
 pub mod colorspace;
 
+use pi_ecs::prelude::World;
+
 use crate::{Vec3, Vec4};
 use std::ops::{Add, AddAssign, Mul, MulAssign};
-
 use self::colorspace::{HslRepresentation, SrgbColorSpace};
+
+#[inline]
+pub fn insert_resources(_world: &mut World) {
+}
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Color {

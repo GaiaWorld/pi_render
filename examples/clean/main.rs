@@ -5,12 +5,15 @@ use pi_async::rt::{
 };
 use pi_ecs::prelude::{Dispatcher, SingleDispatcher, World};
 use pi_render::{
-    components::camera::{ClearOption, Scissor, Viewport},
+    components::{
+        camera::render_target::{RenderTarget, RenderTargets, TextureViews},
+        view::render_window::{RenderWindow, RenderWindows},
+    },
     init_render,
     render_graph::graph::RenderGraph,
-    render_nodes::clear_pass::ClearPassNode,
+    render_nodes::clear_pass::{ClearOption, ClearOptions, ClearPassNode},
     rhi::{options::RenderOptions, PresentMode},
-    RenderArchetype, RenderStage,
+    RenderStage,
 };
 use pi_share::ShareRefCell;
 use std::sync::Arc;
@@ -45,16 +48,17 @@ impl RenderExample {
             render_stage,
         } = init_render(&mut world, options, window, rt.clone()).await;
 
-        let mut stages = vec![];
-        stages.push(Arc::new(extract_stage.build()));
-        stages.push(Arc::new(prepare_stage.build()));
-        stages.push(Arc::new(render_stage.build()));
+        let stages = vec![
+            Arc::new(extract_stage.build()),
+            Arc::new(prepare_stage.build()),
+            Arc::new(render_stage.build()),
+        ];
 
         self.dispatcher = Some(SingleDispatcher::new(stages, &world, rt));
 
         // Render Graph
         let rg = world.get_resource_mut::<RenderGraph>().unwrap();
-        let clear_node = rg.add_node("clean", ClearPassNode::new(&mut world.clone()));
+        let clear_node = rg.add_node("clean", ClearPassNode);
         rg.set_node_finish(clear_node, true).unwrap();
     }
 
@@ -131,7 +135,7 @@ fn main() {
     let event_loop = EventLoop::new();
     let window = ShareRefCell::new(winit::window::Window::new(&event_loop).unwrap());
 
-    let mut world = World::new();
+    let world = World::new();
 
     let runner = SingleTaskRunner::<()>::default();
     let runtime = AsyncRuntime::Local(runner.startup().unwrap());
@@ -148,24 +152,29 @@ fn main() {
         let _ = runtime.spawn(runtime.alloc(), async move {
             let options = RenderOptions::default();
 
-            let window_id = win.id();
-
             e.init(world.clone(), options, win.clone(), rt).await;
 
-            // Entity: RenderWindow
-            world
-                .spawn::<RenderArchetype>()
-                .insert(RenderWindow::new(win, PresentMode::Mailbox));
+            // 取 TextureView
+            let texture_views = world.get_resource_mut::<TextureViews>().unwrap();
+            let view = texture_views.insert(None);
 
-            // Entity: ClearOption, Viewport, Scissor
-            let mut clear = ClearOption::new();
-            clear.set_color(1.0, 0.0, 0.0, 1.0);
-            world
-                .spawn::<RenderArchetype>()
-                .insert(window_id)
-                .insert(clear)
-                .insert(Viewport::new_with_rect(0, 0, 1024, 1024))
-                .insert(Scissor::new(0, 0, 1024, 1024));
+            // 创建 RenderWindow
+            let render_window = RenderWindow::new(win, PresentMode::Mailbox, view);
+            let render_windows = world.get_resource_mut::<RenderWindows>().unwrap();
+            render_windows.insert(render_window);
+
+            // 创建 RenderTarget
+            let mut rt = RenderTarget::default();
+            rt.add_color(view);
+            let render_targets = world.get_resource_mut::<RenderTargets>().unwrap();
+            let rt_key = render_targets.insert(rt);
+
+            // 装配 清屏
+            let mut clear_option = ClearOption::default();
+            clear_option.set_color(1.0, 0.0, 0.0, 1.0);
+            clear_option.set_target(rt_key);
+            let clear_options = world.get_resource_mut::<ClearOptions>().unwrap();
+            clear_options.insert(clear_option);
         });
 
         loop {

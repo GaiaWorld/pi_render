@@ -86,6 +86,7 @@ impl From<&ClearColor> for wgpu::Color {
     }
 }
 
-
 #[inline]
-pub fn insert_resources(_world: &mut World) {}
+pub fn insert_resources(world: &mut World) {
+    render_target::insert_resources(world)
+}

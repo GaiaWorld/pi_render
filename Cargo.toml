@@ -21,8 +21,8 @@ log = "0.4"
 wgpu = "0.12"
 env_logger = "0.9"
 pi_ecs = "0.1"
-pi_async = "0.1"
 pi_share = "0.1"
+pi_async = "0.1"
 
 [[example]]
 name = "hello_winit"

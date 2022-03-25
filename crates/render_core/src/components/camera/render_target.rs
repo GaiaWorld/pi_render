@@ -1,17 +1,17 @@
 use crate::{
-    components::option_slotmap::OptionSlotMap,
     rhi::texture::{TextureView},
 };
 use pi_ecs::prelude::World;
-use pi_slotmap::new_key_type;
+use pi_slotmap::{new_key_type, SlotMap};
 
 new_key_type! {
     pub struct TextureViewKey;
     pub struct RenderTargetKey;
 }
 
-pub type TextureViews = OptionSlotMap<TextureViewKey, TextureView>;
-pub type RenderTargets = OptionSlotMap<RenderTargetKey, RenderTarget>;
+pub type TextureViews = SlotMap<TextureViewKey, Option<TextureView>>;
+
+pub type RenderTargets = SlotMap<RenderTargetKey, RenderTarget>;
 
 #[inline]
 pub fn insert_resources(world: &mut World) {

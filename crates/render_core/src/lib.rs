@@ -127,7 +127,7 @@ where
         let views = world.get_resource_mut::<TextureViews>().unwrap();
         let windows = world.get_resource::<RenderWindows>().unwrap();
         for (_, window) in windows.iter() {
-            let view = views.get_mut(window.view).unwrap();
+            let view = views.get_mut(window.get_view()).unwrap().as_mut().unwrap();
             if let Some(view) = view.take_surface_texture() {
                 view.present();
                 info!("render_system: after surface_texture.present");
@@ -150,8 +150,7 @@ where
 
 // 添加 其他 Res
 fn insert_resources(world: &mut World) {
-    components::view::insert_resources(world);
-    components::camera::insert_resources(world);
+    components::insert_resources(world);
     render_nodes::insert_resources(world);
 }
 
