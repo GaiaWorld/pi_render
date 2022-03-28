@@ -164,7 +164,7 @@ async fn initialize_renderer(
         .expect("Unable to find a GPU! Make sure you have installed required drivers!");
 
     let adapter_info = adapter.get_info();
-    info!("{:?}", adapter_info);
+    info!("initialize_renderer {:?}", adapter_info);
 
     let trace_path = None;
 

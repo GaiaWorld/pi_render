@@ -21,6 +21,8 @@ pub struct RenderContext {
 
 #[derive(Error, Debug, Eq, PartialEq)]
 pub enum RenderGraphError {
+    #[error("NGGraph is null")]
+    NoneNGraph,
     #[error("node does not exist")]
     InvalidNode(NodeLabel),
     #[error("output node slot does not exist")]

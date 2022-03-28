@@ -5,9 +5,11 @@ use super::{
     node_slot::{SlotId, SlotLabel},
     RenderGraphError,
 };
-use pi_graph::NGraphBuilder;
+use log::error;
+use pi_graph::{NGraph, NGraphBuilder};
 use pi_hash::{XHashMap, XHashSet};
 use std::{borrow::Cow, fmt::Debug};
+use thiserror::Error;
 
 pub type NGNodeKey = usize;
 
@@ -38,11 +40,13 @@ impl NGNodeValue {
 }
 
 /// 渲染图
-#[derive(Default)]
 pub struct RenderGraph {
     // 当前 已经分配到的 id 数字
     nid_curr: NGNodeKey,
+    // 一旦构建成 ng后，ng_builder 就删掉
     pub(crate) ng_builder: Option<NGraphBuilder<NGNodeKey, NGNodeValue>>,
+    // 只要 高层不改 链接关系，ng就一直用这个；
+    pub(crate) ng: Option<NGraph<NGNodeKey, NGNodeValue>>,
 
     pub(crate) finish_nodes: XHashSet<NodeId>,
 
@@ -51,7 +55,25 @@ pub struct RenderGraph {
     slots: XHashMap<NGNodeValue, NGNodeKey>,
 }
 
+impl Default for RenderGraph {
+    fn default() -> Self {
+        Self {
+            ng_builder: Some(NGraphBuilder::new()),
+            nid_curr: NGNodeKey::default(),
+            ng: None,
+            finish_nodes: XHashSet::default(),
+            nodes: XHashMap::default(),
+            node_names: XHashMap::default(),
+            slots: XHashMap::default(),
+        }
+    }
+}
+
 impl RenderGraph {
+    pub fn clone_finish_nodes(&self) -> Vec<NodeId> {
+        self.finish_nodes.iter().copied().collect()
+    }
+
     /// 设置 是否 是 最终节点
     pub fn set_node_finish(
         &mut self,
@@ -239,6 +261,31 @@ impl RenderGraph {
         match id {
             Ok(id) => self.nodes.get_mut(&id),
             Err(_) => None,
+        }
+    }
+
+    pub fn get_graph_impl(&mut self) -> Option<&mut NGraph<NGNodeKey, NGNodeValue>> {
+        if self.ng.is_none() {
+            let ng_builder = self.ng_builder.take().unwrap();
+            let ng = match ng_builder.build() {
+                Ok(ng) => ng,
+                Err(e) => {
+                    error!("get_graph_impl, ng_builder.build error, e = {:?}", e);
+                    return None;
+                }
+            };
+            self.ng = Some(ng);
+        }
+        self.ng.as_mut()
+    }
+
+    pub fn reset(&mut self) -> Result<(), RenderGraphError> {
+        if self.ng.is_some() && self.ng_builder.is_none() {
+            let ng = self.ng.take().unwrap();
+            self.ng_builder = Some(NGraphBuilder::new_with_graph(ng));
+            Ok(())
+        } else {
+            Err(RenderGraphError::NoneNGraph)
         }
     }
 }

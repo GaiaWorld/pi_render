@@ -16,22 +16,19 @@ use pi_render::{
     RenderStage,
 };
 use pi_share::ShareRefCell;
-use std::sync::Arc;
+use std::{sync::Arc, thread};
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
 };
 
 // 渲染 环境
+#[derive(Default)]
 struct RenderExample {
     dispatcher: Option<SingleDispatcher<SingleTaskPool<()>>>,
 }
 
 impl RenderExample {
-    pub fn new() -> Self {
-        Self { dispatcher: None }
-    }
-
     pub async fn init(
         &mut self,
         mut world: World,
@@ -68,14 +65,7 @@ impl RenderExample {
     }
 
     // 执行 窗口渲染，每帧调用一次
-    pub fn render(&self) {
-        debug!("RenderExample::render");
-
-        match &self.dispatcher {
-            Some(d) => d.run(),
-            None => {}
-        }
-    }
+    pub fn render(&self) {}
 
     pub fn clean(&self) {
         info!("RenderExample::clean");
@@ -96,11 +86,11 @@ fn run_window_loop(
                 event: WindowEvent::Resized(size),
                 ..
             } => {
-                info!("RenderExample::resize, size = {:?}", size);
                 let w = size.width;
                 let h = size.height;
                 let e = example.clone();
                 let _ = rt.spawn(rt.alloc(), async move {
+                    info!("RenderExample::resize, size = {:?}", size);
                     e.resize(w, h);
                 });
             }
@@ -132,6 +122,8 @@ fn run_window_loop(
 }
 
 fn main() {
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+
     let event_loop = EventLoop::new();
     let window = ShareRefCell::new(winit::window::Window::new(&event_loop).unwrap());
 
@@ -141,11 +133,13 @@ fn main() {
     let runtime = AsyncRuntime::Local(runner.startup().unwrap());
 
     let rt = runtime.clone();
-    let example = ShareRefCell::new(RenderExample::new());
+    let example = ShareRefCell::new(RenderExample::default());
     let mut e = example.clone();
 
     let win = window.clone();
     std::thread::spawn(move || {
+        let example = e.clone();
+
         let runtime = runtime.clone();
 
         let rt = runtime.clone();
@@ -177,8 +171,24 @@ fn main() {
             clear_options.insert(clear_option);
         });
 
+        let mut frame = 0;
         loop {
-            let _ = runner.run();
+            frame += 1;
+            debug!("=================== frame = {}", frame);
+
+            match &example.dispatcher {
+                Some(d) => {
+                    d.run();
+                }
+                None => {}
+            }
+
+            loop {
+                let count = runner.run().unwrap();
+                if count == 0 {
+                    break;
+                }
+            }
             std::thread::sleep(std::time::Duration::from_millis(16));
         }
     });

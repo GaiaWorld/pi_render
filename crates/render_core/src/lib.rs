@@ -17,7 +17,7 @@ use crate::components::{
     view::render_window::{prepare_windows, RenderWindows},
 };
 use futures::{future::BoxFuture, FutureExt};
-use log::info;
+use log::trace;
 use nalgebra::{Matrix4, Transform3 as NalTransform3, Vector2, Vector3, Vector4};
 use pi_async::rt::{AsyncRuntime, AsyncTaskPool, AsyncTaskPoolExt};
 use pi_ecs::{
@@ -32,6 +32,7 @@ use thiserror::Error;
 use winit::window::Window;
 
 #[derive(Error, Debug)]
+
 pub enum RenderContextError {
     #[error("Create Device Error.")]
     DeviceError,
@@ -83,11 +84,6 @@ where
     async move {
         let runner = world.get_resource_mut::<RenderGraphRunner<P>>().unwrap();
 
-        if runner.run_graph.is_some() {
-            // TODO: 要加上 渲染图 改变 的 代码
-            todo!();
-        }
-
         let rg = world.get_resource_mut::<RenderGraph>().unwrap();
         let device = world.get_resource::<RenderDevice>().unwrap();
         let queue = world.get_resource::<RenderQueue>().unwrap();
@@ -99,9 +95,7 @@ where
                 rg.borrow_mut(),
             )
             .unwrap();
-
         runner.prepare().await;
-
         Ok(())
     }
     .boxed()
@@ -112,25 +106,20 @@ fn render_system<P>(world: WorldMut) -> BoxFuture<'static, std::io::Result<()>>
 where
     P: AsyncTaskPoolExt<()> + AsyncTaskPool<(), Pool = P>,
 {
-    info!("begin render_system");
-
     async move {
-        info!("begin async render_system");
-
         let graph_runner = world.get_resource_mut::<RenderGraphRunner<P>>().unwrap();
         graph_runner.run().await;
-
-        info!("render_system: after graph_runner.run");
 
         let world = world.clone();
 
         let views = world.get_resource_mut::<TextureViews>().unwrap();
         let windows = world.get_resource::<RenderWindows>().unwrap();
+        // 呈现 所有的 窗口 -- 交换链
         for (_, window) in windows.iter() {
             let view = views.get_mut(window.get_view()).unwrap().as_mut().unwrap();
             if let Some(view) = view.take_surface_texture() {
                 view.present();
-                info!("render_system: after surface_texture.present");
+                trace!("render_system: after surface_texture.present");
             }
         }
         Ok(())

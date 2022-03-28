@@ -27,7 +27,7 @@ impl RenderExample {
 
     // 执行 窗口渲染，每帧调用一次
     pub fn render(&self) {
-        debug!("RenderExample::render");
+        // info!("RenderExample::render");
     }
 
     pub fn clean(&self) {

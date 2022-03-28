@@ -9,7 +9,7 @@ use crate::{
     rhi::{device::RenderDevice, RenderQueue},
 };
 use futures::{future::BoxFuture, FutureExt};
-use log::error;
+use log::{error, info};
 use pi_async::rt::{AsyncRuntime, AsyncTaskPool, AsyncTaskPoolExt};
 use pi_async_graph::{async_graph, ExecNode, RunFactory, Runner};
 use pi_ecs::prelude::World;
@@ -82,14 +82,14 @@ where
         queue: RenderQueue,
         rg: &mut RenderGraph,
     ) -> Result<(), String> {
-        let ng_builder = rg.ng_builder.take().unwrap();
-        let ng = match ng_builder.build() {
-            Ok(ng) => ng,
-            Err(e) => return Err(format!("render build error: {:?}", e)),
-        };
+        if self.prepare_graph.is_some() && self.run_graph.is_some() {
+            return Ok(());
+        }
 
         // 遍历，找 终点
-        let finishes: Vec<NodeId> = rg.finish_nodes.iter().copied().collect();
+        let finishes = rg.clone_finish_nodes();
+
+        let ng = rg.get_graph_impl().unwrap();
 
         // 以终为起，构建需要的 节点
         let sub_ng = ng.gen_graph_from_keys(&finishes);
@@ -209,9 +209,9 @@ where
                     "render_graph::build prepare_builder graph failed, reason = {:?}",
                     e
                 );
+                panic!("");
             }
         };
-
         match run_builder.build() {
             Ok(g) => {
                 self.run_graph = Some(Arc::new(g));
@@ -223,7 +223,6 @@ where
                 );
             }
         };
-
         Ok(())
     }
 
@@ -233,14 +232,17 @@ where
         match self.prepare_graph {
             None => {
                 error!("render_graph::prepare failed, prepare_graph is none");
+                panic!("");
             }
             Some(ref g) => {
-                let _ = async_graph(self.rt.clone(), g.clone()).await;
+                let ag = async_graph(self.rt.clone(), g.clone());
+                ag.await.unwrap();
             }
         }
 
         // 移除 prepare，因为它只能执行一次
-        let _ = self.prepare_graph.take();
+        let t = self.prepare_graph.take();
+        t.unwrap();
     }
 
     /// 执行
@@ -248,9 +250,11 @@ where
         match self.run_graph {
             None => {
                 error!("render_graph::run failed, run_graph is none");
+                panic!("");
             }
             Some(ref g) => {
-                let _ = async_graph(self.rt.clone(), g.clone()).await;
+                let r = async_graph(self.rt.clone(), g.clone()).await;
+                r.unwrap();
             }
         }
     }
@@ -280,7 +284,10 @@ fn crate_run_node(
     let node = render_graph.get_node(NodeLabel::Id(n)).unwrap();
     let node = node.node.clone();
 
-    let (inputs, outputs) = map.get(&n).unwrap();
+    let (inputs, outputs) = match map.get(&n) {
+        None => (vec![], vec![]),
+        Some((i, o)) => (i.clone(), o.clone()),
+    };
     let inputs = inputs.as_slice().to_vec();
     let outputs = outputs.as_slice().to_vec();
 
@@ -312,9 +319,10 @@ fn crate_run_node(
             );
 
             runner.await.unwrap();
-
+           
             let commands = Arc::try_unwrap(commands.0).unwrap();
             let commands = commands.into_inner();
+
             queue.submit(vec![commands.finish()]);
             Ok(())
         }
@@ -336,9 +344,10 @@ fn crate_prepare_node(
     let node = render_graph.get_node(NodeLabel::Id(n)).unwrap();
     let node = node.node.clone();
 
-    let (inputs, outputs) = map.get(&n).unwrap();
-    let inputs = inputs.as_slice().to_vec();
-    let outputs = outputs.as_slice().to_vec();
+    let (inputs, outputs) = match map.get(&n) {
+        None => (vec![], vec![]),
+        Some((i, o)) => (i.clone(), o.clone()),
+    };
 
     let f = move || -> BoxFuture<'static, std::io::Result<()>> {
         let device = device.clone();
@@ -358,7 +367,7 @@ fn crate_prepare_node(
             match node.prepare(context, inputs.as_slice(), outputs.as_slice()) {
                 None => {}
                 Some(r) => {
-                    let _ = r.await;
+                    r.await.unwrap();
                 }
             }
 

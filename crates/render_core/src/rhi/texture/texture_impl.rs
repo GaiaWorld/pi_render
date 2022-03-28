@@ -1,6 +1,8 @@
 use pi_share::Share;
 use std::ops::Deref;
-use wgpu::SurfaceTexture;
+use wgpu::{SurfaceConfiguration, SurfaceTexture};
+
+use crate::rhi::device::RenderDevice;
 
 /// 提供 可 Clone的 Texture
 #[derive(Clone, Debug)]
@@ -84,7 +86,7 @@ impl TextureView {
     }
 
     #[inline]
-    pub fn next_frame(&mut self) {
+    pub fn next_frame(&mut self, device: &RenderDevice, config: &SurfaceConfiguration) {
         if let Self::Surface {
             surface,
             texture,
@@ -92,9 +94,16 @@ impl TextureView {
             ..
         } = self
         {
-            let t = surface
-                .get_current_texture()
-                .expect("Error reconfiguring surface");
+            let t = match surface.get_current_texture() {
+                Ok(swap_chain_frame) => swap_chain_frame,
+                Err(wgpu::SurfaceError::Outdated) => {
+                    device.configure_surface(surface, config);
+                    surface
+                        .get_current_texture()
+                        .expect("Error reconfiguring surface")
+                }
+                err => err.expect("Failed to acquire next swap chain texture!"),
+            };
 
             let t = Share::new(t);
             let v = Share::new(t.texture.create_view(&Default::default()));

@@ -1,11 +1,9 @@
 use crate::{
-    components::camera::{Scissor, Viewport},
-    components::{
-        camera::{
-            render_target::{RenderTarget, RenderTargetKey, RenderTargets, TextureViews},
-            ClearColor,
-        },
+    components::camera::{
+        render_target::{RenderTarget, RenderTargetKey, RenderTargets, TextureViews},
+        ClearColor,
     },
+    components::camera::{Scissor, Viewport},
     render_graph::{
         node::{Node, NodeRunError, RealValue},
         node_slot::SlotInfo,
@@ -13,6 +11,7 @@ use crate::{
     },
 };
 use futures::{future::BoxFuture, FutureExt};
+use log::{debug, info};
 use pi_ecs::prelude::World;
 use pi_share::ShareRefCell;
 use pi_slotmap::{new_key_type, SlotMap};
@@ -61,7 +60,9 @@ impl ClearOption {
 }
 
 #[inline]
-pub fn insert_resources(_world: &mut World) {}
+pub fn insert_resources(world: &mut World) {
+    world.insert_resource(ClearOptions::default());
+}
 
 #[derive(Default)]
 pub struct ClearPassNode;
@@ -94,7 +95,6 @@ impl Node for ClearPassNode {
         _outputs: &[Option<RealValue>],
     ) -> BoxFuture<'static, Result<(), NodeRunError>> {
         let RenderContext { world, .. } = context;
-
         async move {
             let clears = world.get_resource::<ClearOptions>().unwrap();
             let rts = world.get_resource::<RenderTargets>().unwrap();
@@ -170,7 +170,6 @@ impl Node for ClearPassNode {
                     render_pass.set_scissor_rect(*x, *y, *width, *height);
                 }
             }
-
             Ok(())
         }
         .boxed()

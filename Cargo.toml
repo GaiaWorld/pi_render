@@ -31,3 +31,6 @@ path = "examples/hello_winit/main.rs"
 [[example]]
 name = "clean"
 path = "examples/clean/main.rs"
+
+[patch.crates-io]
+pi_ecs = { path = "../pi_ecs" }
