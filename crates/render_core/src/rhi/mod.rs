@@ -3,6 +3,7 @@
 //! 封装成 可 Clone 的 API 对象
 
 pub mod bind_group;
+pub mod bind_group_layout;
 pub mod buffer;
 pub mod device;
 pub mod options;
@@ -49,7 +50,6 @@ pub use wgpu::{
     CompareFunction,
     ComputePassDescriptor,
     // Pipeline
-    ComputePipelineDescriptor,
     DepthBiasState,
     DepthStencilState,
     Extent3d,

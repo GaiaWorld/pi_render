@@ -22,7 +22,7 @@ pub fn insert_resources(world: &mut World) {
 #[derive(Clone, Default)]
 pub struct RenderTarget {
     pub depth: TextureViewKey,
-    pub colors: Vec<TextureViewKey>,
+    pub colors: Vec<TextureViewKey>, // TODO smallvec
 }
 
 impl RenderTarget {

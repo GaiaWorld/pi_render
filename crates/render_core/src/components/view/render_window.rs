@@ -51,56 +51,53 @@ pub fn insert_resources(world: &mut World) {
     world.insert_resource(RenderWindows::default());
 }
 
-pub fn prepare_windows(
-    device: Res<RenderDevice>,
-    instance: Res<RenderInstance>,
-    mut windows: ResMut<RenderWindows>,
-    mut views: ResMut<TextureViews>,
-) -> BoxFuture<'static, std::io::Result<()>> {
-    async move {
-        for (_, window) in windows.iter_mut() {
-            let view = views.get_mut(window.view);
+pub async fn prepare_windows<'w>(
+    device: Res<'w, RenderDevice>,
+    instance: Res<'w, RenderInstance>,
+    mut windows: ResMut<'w, RenderWindows>,
+    mut views: ResMut<'w, TextureViews>,
+) -> std::io::Result<()> {
+    for (_, window) in windows.iter_mut() {
+        let view = views.get_mut(window.view);
 
-            assert!(view.is_some());
-            let view = view.unwrap();
+        assert!(view.is_some());
+        let view = view.unwrap();
 
-            let is_first = view.is_none();
-            if is_first {
-                let surface = unsafe { instance.create_surface(window.handle.deref()) };
-                let surface = Arc::new(surface);
-                *view = Some(TextureView::with_surface(surface));
-            }
-            let view = view.as_mut().unwrap();
-
-            let PhysicalSize { width, height } = window.handle.inner_size();
-            let config = wgpu::SurfaceConfiguration {
-                format: TextureFormat::pi_render_default(),
-                width,
-                height,
-                usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-                present_mode: match window.present_mode {
-                    PresentMode::Fifo => wgpu::PresentMode::Fifo,
-                    PresentMode::Mailbox => wgpu::PresentMode::Mailbox,
-                    PresentMode::Immediate => wgpu::PresentMode::Immediate,
-                },
-            };
-
-            let is_size_changed =
-                width != window.last_size.width || height != window.last_size.height;
-            if is_size_changed {
-                window.last_size.width = width;
-                window.last_size.height = height;
-            }
-            // 记得 第一次 需要 Config
-            if is_first || is_size_changed {
-                let surface = view.surface().unwrap();
-                device.configure_surface(surface, &config);
-            }
-
-            // 每帧 都要 设置 新的 SuraceTexture
-            let _ = view.next_frame(&device, &config);
+        let is_first = view.is_none();
+        if is_first {
+            let surface = unsafe { instance.create_surface(window.handle.deref()) };
+            let surface = Arc::new(surface);
+            *view = Some(TextureView::with_surface(surface));
         }
-        Ok(())
+        let view = view.as_mut().unwrap();
+
+        let PhysicalSize { width, height } = window.handle.inner_size();
+        let config = wgpu::SurfaceConfiguration {
+            format: TextureFormat::pi_render_default(),
+            width,
+            height,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            present_mode: match window.present_mode {
+                PresentMode::Fifo => wgpu::PresentMode::Fifo,
+                PresentMode::Mailbox => wgpu::PresentMode::Mailbox,
+                PresentMode::Immediate => wgpu::PresentMode::Immediate,
+            },
+        };
+
+        let is_size_changed =
+            width != window.last_size.width || height != window.last_size.height;
+        if is_size_changed {
+            window.last_size.width = width;
+            window.last_size.height = height;
+        }
+        // 记得 第一次 需要 Config
+        if is_first || is_size_changed {
+            let surface = view.surface().unwrap();
+            device.configure_surface(surface, &config);
+        }
+
+        // 每帧 都要 设置 新的 SuraceTexture
+        let _ = view.next_frame(&device, &config);
     }
-    .boxed()
+    Ok(())
 }

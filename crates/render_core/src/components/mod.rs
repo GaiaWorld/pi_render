@@ -2,6 +2,7 @@ use pi_ecs::prelude::World;
 
 pub mod camera;
 pub mod color;
+pub mod mesh;
 pub mod view;
 
 #[inline]

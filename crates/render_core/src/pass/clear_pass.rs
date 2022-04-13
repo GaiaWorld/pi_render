@@ -4,7 +4,7 @@ use crate::{
         ClearColor,
     },
     components::camera::{Scissor, Viewport},
-    render_graph::{
+    graph::{
         node::{Node, NodeRunError, RealValue},
         node_slot::SlotInfo,
         RenderContext,

@@ -12,5 +12,6 @@ keywords = ["pi"]
 
 [dependencies]
 render_derive = { path = "../render_derive" }
+ahash = "0.7"
 
 [dev-dependencies]

@@ -8,15 +8,16 @@
 //! + components 渲染组件，比如 color, camera ...
 
 pub mod components;
-pub mod render_graph;
-pub mod render_nodes;
+pub mod graph;
+pub mod pass;
+pub mod phase;
 pub mod rhi;
 
 use crate::components::{
     camera::render_target::TextureViews,
     view::render_window::{prepare_windows, RenderWindows},
 };
-use futures::{future::BoxFuture, FutureExt};
+use graph::{graph::RenderGraph, runner::RenderGraphRunner};
 use log::trace;
 use nalgebra::{Matrix4, Transform3 as NalTransform3, Vector2, Vector3, Vector4};
 use pi_async::rt::{AsyncRuntime, AsyncTaskPool, AsyncTaskPoolExt};
@@ -25,7 +26,6 @@ use pi_ecs::{
     sys::system::IntoSystem,
 };
 use pi_share::ShareRefCell;
-use render_graph::{graph::RenderGraph, runner::RenderGraphRunner};
 use rhi::{device::RenderDevice, options::RenderOptions, setup_render_context, RenderQueue};
 use std::borrow::BorrowMut;
 use thiserror::Error;
@@ -75,56 +75,51 @@ where
 }
 
 // RenderGraph Build & Prepare
-pub fn prepare_rg<P>(world: WorldMut) -> BoxFuture<'static, std::io::Result<()>>
+pub async fn prepare_rg<P>(world: WorldMut) -> std::io::Result<()>
 where
     P: AsyncTaskPoolExt<()> + AsyncTaskPool<(), Pool = P>,
 {
     let world = world.clone();
 
-    async move {
-        let runner = world.get_resource_mut::<RenderGraphRunner<P>>().unwrap();
+    let runner = world.get_resource_mut::<RenderGraphRunner<P>>().unwrap();
 
-        let rg = world.get_resource_mut::<RenderGraph>().unwrap();
-        let device = world.get_resource::<RenderDevice>().unwrap();
-        let queue = world.get_resource::<RenderQueue>().unwrap();
-        runner
-            .build(
-                world.clone(),
-                device.clone(),
-                queue.clone(),
-                rg.borrow_mut(),
-            )
-            .unwrap();
-        runner.prepare().await;
-        Ok(())
-    }
-    .boxed()
+    let rg = world.get_resource_mut::<RenderGraph>().unwrap();
+    let device = world.get_resource::<RenderDevice>().unwrap();
+    let queue = world.get_resource::<RenderQueue>().unwrap();
+    runner
+        .build(
+            world.clone(),
+            device.clone(),
+            queue.clone(),
+            rg.borrow_mut(),
+        )
+        .unwrap();
+    runner.prepare().await;
+
+    Ok(())
 }
 
 /// 每帧 调用一次，用于 驱动 渲染图
-fn render_system<P>(world: WorldMut) -> BoxFuture<'static, std::io::Result<()>>
+async fn render_system<P>(world: WorldMut) -> std::io::Result<()>
 where
     P: AsyncTaskPoolExt<()> + AsyncTaskPool<(), Pool = P>,
 {
-    async move {
-        let graph_runner = world.get_resource_mut::<RenderGraphRunner<P>>().unwrap();
-        graph_runner.run().await;
+    let graph_runner = world.get_resource_mut::<RenderGraphRunner<P>>().unwrap();
+    graph_runner.run().await;
 
-        let world = world.clone();
+    let world = world.clone();
 
-        let views = world.get_resource_mut::<TextureViews>().unwrap();
-        let windows = world.get_resource::<RenderWindows>().unwrap();
-        // 呈现 所有的 窗口 -- 交换链
-        for (_, window) in windows.iter() {
-            let view = views.get_mut(window.get_view()).unwrap().as_mut().unwrap();
-            if let Some(view) = view.take_surface_texture() {
-                view.present();
-                trace!("render_system: after surface_texture.present");
-            }
+    let views = world.get_resource_mut::<TextureViews>().unwrap();
+    let windows = world.get_resource::<RenderWindows>().unwrap();
+    // 呈现 所有的 窗口 -- 交换链
+    for (_, window) in windows.iter() {
+        let view = views.get_mut(window.get_view()).unwrap().as_mut().unwrap();
+        if let Some(view) = view.take_surface_texture() {
+            view.present();
+            trace!("render_system: after surface_texture.present");
         }
-        Ok(())
     }
-    .boxed()
+    Ok(())
 }
 
 fn insert_render_graph<P>(world: &mut World, rt: AsyncRuntime<(), P>)
@@ -140,7 +135,7 @@ where
 // 添加 其他 Res
 fn insert_resources(world: &mut World) {
     components::insert_resources(world);
-    render_nodes::insert_resources(world);
+    pass::insert_resources(world);
 }
 
 fn register_system<P>(world: &mut World) -> RenderStage

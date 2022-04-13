@@ -1,13 +1,13 @@
-use futures::Future;
-use std::sync::Arc;
-use wgpu::{util::DeviceExt, BufferAsyncError};
-
 use super::{
-    bind_group::{BindGroup, BindGroupLayout},
+    bind_group::BindGroup,
+    bind_group_layout::BindGroupLayout,
     buffer::Buffer,
     pipeline::{ComputePipeline, RenderPipeline},
     texture::{Sampler, Texture},
 };
+use futures::Future;
+use std::sync::Arc;
+use wgpu::{util::DeviceExt, BufferAsyncError};
 
 /// This GPU device is responsible for the creation of most rendering and compute resources.
 #[derive(Clone)]

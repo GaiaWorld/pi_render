@@ -5,7 +5,7 @@ use super::{
     RenderContext,
 };
 use crate::{
-    render_graph::node::NodeState,
+    graph::node::NodeState,
     rhi::{device::RenderDevice, RenderQueue},
 };
 use futures::{future::BoxFuture, FutureExt};
