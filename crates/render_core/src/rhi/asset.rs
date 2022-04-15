@@ -64,7 +64,11 @@ macro_rules! impl_asset {
 				asset: Share<Self>/* Share<ShareCell<Self>>?*/, 
 				desc: Desc) {
 					// 非安全， TODO
-					unsafe {&mut *(Share::as_ptr(&asset) as usize as *mut Self)}.value = desc.get_device().$create_fn(desc.get_descriptor());
+					let r = unsafe {&mut *(Share::as_ptr(&asset) as usize as *mut Self)};
+					r.value = desc.get_device().$create_fn(desc.get_descriptor());
+					r.state = LoadState::Ok;
+					// unsafe {&mut *(Share::as_ptr(&asset) as usize as *mut Self)}.value = 
+
 			}
 		}
 	}
