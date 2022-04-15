@@ -6,8 +6,7 @@ use pi_async::rt::{
 use pi_ecs::prelude::{Dispatcher, SingleDispatcher, World};
 use pi_render::{
     components::{
-        pass2d::render_target::{RenderTarget, RenderTargets, TextureViews},
-        view::render_window::{RenderWindow, RenderWindows},
+        view::{render_window::{RenderWindow, RenderWindows}, target::{TextureViews, RenderTarget, RenderTargets}},
     },
     graph::graph::RenderGraph,
     init_render,
