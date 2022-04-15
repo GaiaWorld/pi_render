@@ -15,6 +15,32 @@ new_key_type! {
     pub struct ClearOptionKey;
 }
 
+#[derive(Debug, Default)]
+pub struct ClearColor {
+    pub r: f32,
+    pub g: f32,
+    pub b: f32,
+    pub a: f32,
+}
+
+impl ClearColor {
+    pub fn new(r: f32, g: f32, b: f32, a: f32) -> Self {
+        Self { r, g, b, a }
+    }
+}
+
+impl From<&ClearColor> for wgpu::Color {
+    fn from(clear: &ClearColor) -> Self {
+        Self {
+            r: clear.r as f64,
+            g: clear.g as f64,
+            b: clear.b as f64,
+            a: clear.a as f64,
+        }
+    }
+}
+
+
 pub type ClearOptions = SlotMap<ClearOptionKey, ClearOption>;
 
 #[derive(Default)]

@@ -78,7 +78,7 @@ fn draw_2d(
         for e in transparent {
             // 每个 e 的 原型都是 DrawObjectArchetype
             // ? 怎么 从 e 取到 DrawState 组件
-            let state: world .get<>&DrawState = Query::get<DrawObjectArchetype, DrawState>(e);
+            // let state: world .get<>&DrawState = Query::get<DrawObjectArchetype, DrawState>(e);
             state.draw();
         }
     }
