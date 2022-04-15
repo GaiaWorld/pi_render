@@ -8,7 +8,7 @@ use pi_ecs::prelude::World;
 use pi_map::vecmap::VecMap;
 use wgpu::RenderPass;
 
-pub struct DrawOejctArchetype;
+pub struct DrawObjectArchetype;
 
 #[derive(Debug, Default)]
 pub struct DrawState {
@@ -28,13 +28,13 @@ pub struct DrawState {
 /// 初始化 ECS
 pub fn init_ecs(world: &mut World) {
     world
-        .new_archetype::<DrawOejctArchetype>()
+        .new_archetype::<DrawObjectArchetype>()
         .register::<DrawState>()
         .create();
 }
 
 impl DrawState {
-    pub fn draw<'w>(&self, rp: &mut RenderPass<'w>, camera: Camera2D) {
+    pub fn draw<'w>(&self, rp: &mut RenderPass<'w>, camera: &Camera2D) {
         // 在这里 写 wgpu 的 指令
         todo!()
     }

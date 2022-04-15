@@ -30,7 +30,6 @@ impl<'a, 'b, T> AssetDescriptor<T> for WgpuAssetDescriptor<'a, 'b, T> {
     }
 }
 
-/// ������Դ���ͣ� ��Ϊ��Դʵ��Asset
 macro_rules! impl_asset {
     ($struct_name: ident, $create_fn: ident, $struct_descriptor: ident) => {
         #[derive(Debug, Deref)]
@@ -68,7 +67,7 @@ macro_rules! impl_asset {
                 asset: Share<Self>, /* Share<ShareCell<Self>>?*/
                 desc: Desc,
             ) {
-                // �ǰ�ȫ�� TODO
+                // TODO
                 let r = unsafe { &mut *(Share::as_ptr(&asset) as usize as *mut Self) };
                 r.value = desc.get_device().$create_fn(desc.get_descriptor());
                 r.state = LoadState::Ok;

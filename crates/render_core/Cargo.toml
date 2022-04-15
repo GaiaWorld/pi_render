@@ -52,5 +52,3 @@ pi_res_loader = {  git = "https://github.com/GaiaWorld/pi_res_loader.git" }
 
 [patch.crates-io]
 pi_ecs = { path = "../../pi_ecs" }
-
-
