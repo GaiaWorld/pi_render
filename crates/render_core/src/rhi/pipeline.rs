@@ -7,31 +7,18 @@ use wgpu::{
 
 use super::{bind_group_layout::BindGroupLayout, shader::ShaderId};
 
-/// A [`RenderPipeline`] identifier.
-#[derive(Copy, Clone, Hash, Eq, PartialEq, Debug)]
-pub struct RenderPipelineId(Uuid);
-
 /// A [`RenderPipeline`] represents a graphics pipeline and its stages (shaders), bindings and vertex buffers.
 ///
 /// May be converted from and dereferences to a wgpu [`RenderPipeline`](wgpu::RenderPipeline).
 /// Can be created via [`RenderDevice::create_render_pipeline`](crate::renderer::RenderDevice::create_render_pipeline).
 #[derive(Clone, Debug)]
 pub struct RenderPipeline {
-    id: RenderPipelineId,
     value: Arc<wgpu::RenderPipeline>,
-}
-
-impl RenderPipeline {
-    #[inline]
-    pub fn id(&self) -> RenderPipelineId {
-        self.id
-    }
 }
 
 impl From<wgpu::RenderPipeline> for RenderPipeline {
     fn from(value: wgpu::RenderPipeline) -> Self {
         RenderPipeline {
-            id: RenderPipelineId(Uuid::new_v4()),
             value: Arc::new(value),
         }
     }

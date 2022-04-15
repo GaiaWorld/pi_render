@@ -2,12 +2,12 @@ pub mod colorspace;
 
 use pi_ecs::prelude::World;
 
-use crate::{Vec3, Vec4};
+use crate::{Vector3f, Vector4f};
 use std::ops::{Add, AddAssign, Mul, MulAssign};
 use self::colorspace::{HslRepresentation, SrgbColorSpace};
 
 #[inline]
-pub fn insert_resources(_world: &mut World) {
+pub fn init_ecs(_world: &mut World) {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -590,17 +590,17 @@ impl Add<Color> for Color {
     }
 }
 
-impl AddAssign<Vec4> for Color {
-    fn add_assign(&mut self, rhs: Vec4) {
+impl AddAssign<Vector4f> for Color {
+    fn add_assign(&mut self, rhs: Vector4f) {
         let rhs: Color = rhs.into();
         *self += rhs
     }
 }
 
-impl Add<Vec4> for Color {
+impl Add<Vector4f> for Color {
     type Output = Color;
 
-    fn add(self, rhs: Vec4) -> Self::Output {
+    fn add(self, rhs: Vector4f) -> Self::Output {
         let rhs: Color = rhs.into();
         self + rhs
     }
@@ -624,15 +624,15 @@ impl From<[f32; 3]> for Color {
     }
 }
 
-impl From<Color> for Vec4 {
+impl From<Color> for Vector4f {
     fn from(color: Color) -> Self {
         let color: [f32; 4] = color.into();
-        Vec4::new(color[0], color[1], color[2], color[3])
+        Vector4f::new(color[0], color[1], color[2], color[3])
     }
 }
 
-impl From<Vec4> for Color {
-    fn from(vec4: Vec4) -> Self {
+impl From<Vector4f> for Color {
+    fn from(vec4: Vector4f) -> Self {
         Color::rgba(vec4.x, vec4.y, vec4.z, vec4.w)
     }
 }
@@ -731,10 +731,10 @@ impl MulAssign<f32> for Color {
     }
 }
 
-impl Mul<Vec4> for Color {
+impl Mul<Vector4f> for Color {
     type Output = Color;
 
-    fn mul(self, rhs: Vec4) -> Self::Output {
+    fn mul(self, rhs: Vector4f) -> Self::Output {
         match self {
             Color::Rgba {
                 red,
@@ -773,8 +773,8 @@ impl Mul<Vec4> for Color {
     }
 }
 
-impl MulAssign<Vec4> for Color {
-    fn mul_assign(&mut self, rhs: Vec4) {
+impl MulAssign<Vector4f> for Color {
+    fn mul_assign(&mut self, rhs: Vector4f) {
         match self {
             Color::Rgba {
                 red,
@@ -813,10 +813,10 @@ impl MulAssign<Vec4> for Color {
     }
 }
 
-impl Mul<Vec3> for Color {
+impl Mul<Vector3f> for Color {
     type Output = Color;
 
-    fn mul(self, rhs: Vec3) -> Self::Output {
+    fn mul(self, rhs: Vector3f) -> Self::Output {
         match self {
             Color::Rgba {
                 red,
@@ -855,8 +855,8 @@ impl Mul<Vec3> for Color {
     }
 }
 
-impl MulAssign<Vec3> for Color {
-    fn mul_assign(&mut self, rhs: Vec3) {
+impl MulAssign<Vector3f> for Color {
+    fn mul_assign(&mut self, rhs: Vector3f) {
         match self {
             Color::Rgba {
                 red, green, blue, ..
@@ -1107,12 +1107,12 @@ mod tests {
 
     #[test]
     fn conversions_vec4() {
-        let starting_vec4 = Vec4::new(0.4, 0.5, 0.6, 1.0);
+        let starting_vec4 = Vector4f::new(0.4, 0.5, 0.6, 1.0);
         let starting_color = Color::from(starting_vec4);
 
-        assert_eq!(starting_vec4, Vec4::from(starting_color),);
+        assert_eq!(starting_vec4, Vector4f::from(starting_color),);
 
-        let transformation = Vec4::new(0.5, 0.5, 0.5, 1.0);
+        let transformation = Vector4f::new(0.5, 0.5, 0.5, 1.0);
         let c = starting_vec4.component_mul(&transformation);
         assert_eq!(starting_color * transformation, Color::from(c),);
     }
@@ -1167,7 +1167,7 @@ mod tests {
 
     #[test]
     fn mul_and_mulassign_vec3() {
-        let transformation = Vec3::new(0.2, 0.3, 0.4);
+        let transformation = Vector3f::new(0.2, 0.3, 0.4);
         let starting_color = Color::rgba(0.4, 0.5, 0.6, 1.0);
 
         assert_eq!(
@@ -1183,7 +1183,7 @@ mod tests {
 
     #[test]
     fn mul_and_mulassign_vec4() {
-        let transformation = Vec4::new(0.2, 0.3, 0.4, 0.5);
+        let transformation = Vector4f::new(0.2, 0.3, 0.4, 0.5);
         let starting_color = Color::rgba(0.4, 0.5, 0.6, 1.0);
 
         assert_eq!(

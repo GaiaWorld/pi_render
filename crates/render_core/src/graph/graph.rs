@@ -9,7 +9,6 @@ use log::error;
 use pi_graph::{NGraph, NGraphBuilder};
 use pi_hash::{XHashMap, XHashSet};
 use std::{borrow::Cow, fmt::Debug};
-use thiserror::Error;
 
 pub type NGNodeKey = usize;
 

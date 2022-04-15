@@ -1,3 +1,6 @@
+mod quad;
+mod scene_pass;
+
 use log::{debug, info};
 use pi_async::rt::{
     single_thread::{SingleTaskPool, SingleTaskRunner},
@@ -12,11 +15,13 @@ use pi_render::{
     graph::graph::RenderGraph,
     init_render,
     pass::clear_pass::{ClearOption, ClearOptions, ClearPassNode},
+    phase::DrawFunctions,
     rhi::{options::RenderOptions, PresentMode},
     RenderStage,
 };
 use pi_share::ShareRefCell;
-use std::sync::Arc;
+use quad::RenderItem;
+use std::{default::Default, sync::Arc};
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
@@ -194,4 +199,8 @@ fn main() {
     });
 
     run_window_loop(window, event_loop, example, rt);
+}
+
+fn insert_resource(world: World) {
+    world.insert_resource(DrawFunctions::<RenderItem>::default());
 }
