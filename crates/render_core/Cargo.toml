@@ -42,6 +42,13 @@ once_cell = "1.4" # TODO: replace once_cell with std equivalent if/when this lan
 regex = "1.5"
 thiserror = "1.0"
 wgpu = { version = "0.12", features = ["spirv"] }
+derive-deref-rs = "0.1"
+# pi_res_loader = {  git = "https://github.com/GaiaWorld/pi_res_loader.git" }
+pi_res_loader = { path = "../../../pi_res_loader" }
+# pi_res = { path = "../../../pi_res" }
+# pi_res_macros = { path = "../../../pi_res/macros" }
 
 [patch.crates-io]
 pi_ecs = { path = "../../pi_ecs" }
+
+

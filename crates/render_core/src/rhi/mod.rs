@@ -11,6 +11,7 @@ pub mod pipeline;
 pub mod shader;
 pub mod texture;
 pub mod uniform_vec;
+pub mod asset;
 
 use self::{device::RenderDevice, options::RenderOptions};
 use crate::rhi::options::RenderPriority;
