@@ -1,11 +1,15 @@
 mod conversions;
-mod primitives;
 
-use self::primitives::Aabb;
 use crate::{
-    rhi::{buffer::Buffer, pipeline::VertexBufferLayout},
-    Vec3,
+    rhi::{
+        buffer::Buffer,
+        pipeline::{RenderPipeline, VertexBufferLayout},
+    },
+    Point3f, Vector3f,
 };
+use parry3d::bounding_volume::AABB;
+use pi_ecs::prelude::World;
+use pi_slotmap::{new_key_type, SlotMap};
 use render_crevice::internal::bytemuck::cast_slice;
 use render_utils::{hashed::Hashed, EnumVariantMeta};
 use std::collections::BTreeMap;
@@ -14,6 +18,17 @@ use wgpu::{IndexFormat, PrimitiveTopology, VertexAttribute, VertexFormat, Vertex
 
 pub const INDEX_BUFFER_ASSET_INDEX: u64 = 0;
 pub const VERTEX_ATTRIBUTE_BUFFER_ID: u64 = 10;
+
+new_key_type! {
+    pub struct RenderPipelineKey;
+}
+
+pub type RenderPipelines = SlotMap<RenderPipelineKey, RenderPipeline>;
+
+#[inline]
+pub fn init_ecs(world: &mut World) {
+    world.insert_resource(RenderPipelines::default());
+}
 
 // TODO: allow values to be unloaded after been submitting to the GPU to conserve memory
 #[derive(Debug, Clone)]
@@ -319,26 +334,17 @@ impl Mesh {
     }
 
     /// Compute the Axis-Aligned Bounding Box of the mesh vertices in model space
-    pub fn compute_aabb(&self) -> Option<Aabb> {
+    pub fn compute_aabb(&self) -> Option<AABB> {
         if let Some(VertexAttributeValues::Float32x3(values)) =
             self.attribute(Mesh::ATTRIBUTE_POSITION)
         {
-            let mut minimum = Vec3::new(std::f32::MAX, std::f32::MAX, std::f32::MAX);
-            let mut maximum = Vec3::new(std::f32::MIN, std::f32::MIN, std::f32::MIN);
+            let mut aabb = AABB::new_invalid();
+
             for p in values {
-                let p = Vec3::new(p[0], p[1], p[2]);
-                minimum = min_vec3(&minimum, &p);
-                maximum = max_vec3(&maximum, &p);
+                let p = Point3f::new(p[0], p[1], p[2]);
+                aabb.take_point(p);
             }
-            if minimum.x != std::f32::MAX
-                && minimum.y != std::f32::MAX
-                && minimum.z != std::f32::MAX
-                && maximum.x != std::f32::MIN
-                && maximum.y != std::f32::MIN
-                && maximum.z != std::f32::MIN
-            {
-                return Some(Aabb::from_min_max(minimum, maximum));
-            }
+            return Some(aabb);
         }
 
         None
@@ -471,7 +477,7 @@ struct MeshAttributeData {
 }
 
 fn face_normal(a: [f32; 3], b: [f32; 3], c: [f32; 3]) -> [f32; 3] {
-    let (a, b, c) = (Vec3::from(a), Vec3::from(b), Vec3::from(c));
+    let (a, b, c) = (Vector3f::from(a), Vector3f::from(b), Vector3f::from(c));
     let tmp = c - a;
     (b - a).cross(&tmp).normalize().into()
 }
@@ -759,66 +765,4 @@ pub enum GpuBufferInfo {
     NonIndexed {
         vertex_count: u32,
     },
-}
-
-// impl RenderAsset for Mesh {
-//     type ExtractedAsset = Mesh;
-//     type PreparedAsset = GpuMesh;
-//     type Param = Res<RenderDevice>;
-
-//     /// Clones the mesh.
-//     fn extract_asset(&self) -> Self::ExtractedAsset {
-//         self.clone()
-//     }
-
-//     /// Converts the extracted mesh a into [`GpuMesh`].
-//     fn prepare_asset(
-//         mesh: Self::ExtractedAsset,
-//         render_device: &mut SystemParamItem<Self::Param>,
-//     ) -> Result<Self::PreparedAsset, PrepareAssetError<Self::ExtractedAsset>> {
-//         let vertex_buffer_data = mesh.get_vertex_buffer_data();
-//         let vertex_buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
-//             usage: BufferUsages::VERTEX,
-//             label: Some("Mesh Vertex Buffer"),
-//             contents: &vertex_buffer_data,
-//         });
-
-//         let buffer_info = mesh.get_index_buffer_bytes().map_or(
-//             GpuBufferInfo::NonIndexed {
-//                 vertex_count: mesh.count_vertices() as u32,
-//             },
-//             |data| GpuBufferInfo::Indexed {
-//                 buffer: render_device.create_buffer_with_data(&BufferInitDescriptor {
-//                     usage: BufferUsages::INDEX,
-//                     contents: data,
-//                     label: Some("Mesh Index Buffer"),
-//                 }),
-//                 count: mesh.indices().unwrap().len() as u32,
-//                 index_format: mesh.indices().unwrap().into(),
-//             },
-//         );
-
-//         let mesh_vertex_buffer_layout = mesh.get_mesh_vertex_buffer_layout();
-
-//         Ok(GpuMesh {
-//             vertex_buffer,
-//             buffer_info,
-//             primitive_topology: mesh.primitive_topology(),
-//             layout: mesh_vertex_buffer_layout,
-//         })
-//     }
-// }
-
-fn min_vec3(a: &Vec3, b: &Vec3) -> Vec3 {
-    let x = if a.x < b.x { a.x } else { b.x };
-    let y = if a.y < b.y { a.y } else { b.y };
-    let z = if a.z < b.z { a.z } else { b.z };
-    Vec3::new(x, y, z)
-}
-
-fn max_vec3(a: &Vec3, b: &Vec3) -> Vec3 {
-    let x = if a.x > b.x { a.x } else { b.x };
-    let y = if a.y > b.y { a.y } else { b.y };
-    let z = if a.z > b.z { a.z } else { b.z };
-    Vec3::new(x, y, z)
 }

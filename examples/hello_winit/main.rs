@@ -1,4 +1,4 @@
-use log::{debug, info};
+use log::info;
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},

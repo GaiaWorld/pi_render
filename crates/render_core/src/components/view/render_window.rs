@@ -1,18 +1,18 @@
 use crate::{
-    components::camera::render_target::{TextureViewKey, TextureViews},
     rhi::{
         device::RenderDevice,
         texture::{PiRenderDefault, TextureView},
         PresentMode, RenderInstance,
     },
 };
-use futures::{future::BoxFuture, FutureExt};
 use pi_ecs::prelude::{Res, ResMut, World};
 use pi_share::ShareRefCell;
 use pi_slotmap::{new_key_type, SlotMap};
 use std::{ops::Deref, sync::Arc};
 use wgpu::TextureFormat;
 use winit::{dpi::PhysicalSize, window::Window};
+
+use super::target::{TextureViewKey, TextureViews};
 
 new_key_type! {
     pub struct RenderWindowKey;

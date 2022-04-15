@@ -11,16 +11,17 @@
 pub mod components;
 pub mod graph;
 pub mod pass;
-pub mod phase;
 pub mod rhi;
 
+mod math;
+use components::view::target::TextureViews;
+pub use math::*;
+
 use crate::components::{
-    camera::render_target::TextureViews,
     view::render_window::{prepare_windows, RenderWindows},
 };
 use graph::{graph::RenderGraph, runner::RenderGraphRunner};
 use log::trace;
-use nalgebra::{Matrix4, Transform3 as NalTransform3, Vector2, Vector3, Vector4};
 use pi_async::rt::{AsyncRuntime, AsyncTaskPool, AsyncTaskPoolExt};
 use pi_ecs::{
     prelude::{world::WorldMut, StageBuilder, World},
@@ -38,12 +39,6 @@ pub enum RenderContextError {
     #[error("Create Device Error.")]
     DeviceError,
 }
-
-pub type Vec2 = Vector2<f32>;
-pub type Vec3 = Vector3<f32>;
-pub type Vec4 = Vector4<f32>;
-pub type Mat4 = Matrix4<f32>;
-pub type Transform3 = NalTransform3<f32>;
 
 pub struct RenderStage {
     pub extract_stage: StageBuilder,
@@ -135,7 +130,7 @@ where
 
 // 添加 其他 Res
 fn insert_resources(world: &mut World) {
-    components::insert_resources(world);
+    components::init_ecs(world);
     pass::insert_resources(world);
 }
 
@@ -158,3 +153,4 @@ where
         render_stage,
     }
 }
+

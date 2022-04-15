@@ -1,17 +1,11 @@
 use crate::{
-    components::camera::{
-        render_target::{RenderTarget, RenderTargetKey, RenderTargets, TextureViews},
-        ClearColor,
-    },
-    components::camera::{Scissor, Viewport},
     graph::{
         node::{Node, NodeRunError, RealValue},
         node_slot::SlotInfo,
         RenderContext,
-    },
+    }, components::view::target::{RenderTargetKey, RenderTargets, TextureViews, RenderTarget},
 };
 use futures::{future::BoxFuture, FutureExt};
-use log::{debug, info};
 use pi_ecs::prelude::World;
 use pi_share::ShareRefCell;
 use pi_slotmap::{new_key_type, SlotMap};
@@ -21,13 +15,37 @@ new_key_type! {
     pub struct ClearOptionKey;
 }
 
+#[derive(Debug, Default)]
+pub struct ClearColor {
+    pub r: f32,
+    pub g: f32,
+    pub b: f32,
+    pub a: f32,
+}
+
+impl ClearColor {
+    pub fn new(r: f32, g: f32, b: f32, a: f32) -> Self {
+        Self { r, g, b, a }
+    }
+}
+
+impl From<&ClearColor> for wgpu::Color {
+    fn from(clear: &ClearColor) -> Self {
+        Self {
+            r: clear.r as f64,
+            g: clear.g as f64,
+            b: clear.b as f64,
+            a: clear.a as f64,
+        }
+    }
+}
+
+
 pub type ClearOptions = SlotMap<ClearOptionKey, ClearOption>;
 
 #[derive(Default)]
 pub struct ClearOption {
     target: RenderTargetKey,
-    pub viewport: Option<Viewport>,
-    pub scissor: Option<Scissor>,
     pub color: Option<ClearColor>,
     pub depth: Option<f32>,
     pub stencil: Option<u32>,
@@ -48,14 +66,6 @@ impl ClearOption {
 
     pub fn set_target(&mut self, target: RenderTargetKey) {
         self.target = target;
-    }
-
-    pub fn set_viewport(&mut self, viewport: Option<Viewport>) {
-        self.viewport = viewport;
-    }
-
-    pub fn set_scissor(&mut self, scissor: Option<Scissor>) {
-        self.scissor = scissor;
     }
 }
 
@@ -104,8 +114,6 @@ impl Node for ClearPassNode {
                 _,
                 ClearOption {
                     target,
-                    viewport,
-                    scissor,
                     color,
                     ..
                 },
@@ -140,35 +148,6 @@ impl Node for ClearPassNode {
                     color_attachments: &color_attachments,
                     depth_stencil_attachment,
                 });
-
-                if let Some(Viewport {
-                    x,
-                    y,
-                    width,
-                    height,
-                    min_depth,
-                    max_depth,
-                }) = viewport
-                {
-                    render_pass.set_viewport(
-                        *x as f32,
-                        *y as f32,
-                        *width as f32,
-                        *height as f32,
-                        *min_depth,
-                        *max_depth,
-                    );
-                }
-
-                if let Some(Scissor {
-                    x,
-                    y,
-                    width,
-                    height,
-                }) = scissor
-                {
-                    render_pass.set_scissor_rect(*x, *y, *width, *height);
-                }
             }
             Ok(())
         }
