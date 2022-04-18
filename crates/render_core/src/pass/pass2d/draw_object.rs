@@ -8,7 +8,7 @@ use pi_ecs::prelude::World;
 use pi_map::vecmap::VecMap;
 use wgpu::RenderPass;
 
-pub struct DrawObjectArchetype;
+pub struct DrawObject;
 
 #[derive(Debug, Default)]
 pub struct DrawState {
@@ -28,7 +28,7 @@ pub struct DrawState {
 /// 初始化 ECS
 pub fn init_ecs(world: &mut World) {
     world
-        .new_archetype::<DrawObjectArchetype>()
+        .new_archetype::<DrawObject>()
         .register::<DrawState>()
         .create();
 }

@@ -5,7 +5,7 @@ pub mod draw_object;
 
 use self::{
     camera::Camera2D,
-    draw_object::{DrawObjectArchetype, DrawState},
+    draw_object::{DrawObject, DrawState},
 };
 use crate::{
     components::view::target::{RenderTarget, RenderTargetKey, RenderTargets, TextureViews},
@@ -28,7 +28,7 @@ use pi_share::ShareRefCell;
 /// 输出到 RenderTargetKey 指定的 渲染目标
 /// 挨个 渲染 不透明物件 Opaque2D
 /// 挨个 渲染 半透明物件 Transparent2D
-pub struct Pass2DArchetype;
+pub struct Pass2D;
 
 // 渲染 物件 列表
 pub struct Draw2DList {
@@ -55,7 +55,7 @@ impl Default for Draw2DList {
 /// 初始化 ECS
 pub fn init_ecs(world: &mut World) {
     world
-        .new_archetype::<Pass2DArchetype>()
+        .new_archetype::<Pass2D>()
         .register::<Camera2D>()
         .register::<RenderTargetKey>()
         .register::<Draw2DList>()
@@ -92,7 +92,7 @@ impl Node for Pass2DNode {
         let RenderContext { mut world, .. } = context;
 
         let mut pass_query = QueryState::<
-            Pass2DArchetype,
+            Pass2D,
             (
                 &'static Camera2D,
                 &'static RenderTargetKey,
@@ -100,7 +100,7 @@ impl Node for Pass2DNode {
             ),
         >::new(&mut world);
 
-        let draw_query = QueryState::<DrawObjectArchetype, &'static DrawState>::new(&mut world);
+        let draw_query = QueryState::<DrawObject, &'static DrawState>::new(&mut world);
 
         async move {
             let rts = world.get_resource::<RenderTargets>().unwrap();
