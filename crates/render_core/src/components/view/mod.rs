@@ -5,5 +5,6 @@ pub mod render_window;
 
 #[inline]
 pub fn init_ecs(world: &mut World) {
-    render_window::insert_resources(world)
+    render_window::insert_resources(world);
+	target::insert_resources(world);
 }

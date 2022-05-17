@@ -143,7 +143,7 @@ impl Node for ClearPassNode {
                 // TODO Detph-Stencil
                 let depth_stencil_attachment = None;
 
-                let mut render_pass = commands.begin_render_pass(&wgpu::RenderPassDescriptor {
+                let _render_pass = commands.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: None,
                     color_attachments: &color_attachments,
                     depth_stencil_attachment,

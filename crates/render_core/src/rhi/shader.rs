@@ -377,15 +377,14 @@ impl ShaderProcessor {
     /// shader: 文本
     /// shader_defs: 预处理 宏
     /// import_shaders: 提供给 该shader找的 import 的 其他 Shader
-    pub fn process(
+	pub fn process(
         &self,
         id: &ShaderId,
         shader_defs: &XHashSet<String>,
         shaders: &XHashMap<ShaderId, Shader>,
         import_shaders: &XHashMap<ShaderImport, ShaderId>,
     ) -> Result<ProcessedShader, ProcessShaderError> {
-        // 拿到 源码
-        let shader = shaders.get(id).unwrap();
+		let shader = shaders.get(id).unwrap();
         let shader_str = match &shader.source {
             Source::Wgsl(source) => source.deref(),
             Source::Glsl(source, _stage) => source.deref(),
@@ -1281,6 +1280,7 @@ fn in_main() { }
         let result = processor
             .process(&id, &shader_defs, &shaders, &import_shaders)
             .unwrap();
+		let r = result.get_wgsl_source().unwrap();
         assert_eq!(result.get_wgsl_source().unwrap(), EXPECTED);
     }
 }

@@ -1,6 +1,5 @@
 use crate::Matrix4f;
 use nalgebra::Orthographic3;
-use pi_ecs::prelude::*;
 
 // 2D相机，正交投影
 pub struct Camera2D {

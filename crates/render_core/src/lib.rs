@@ -90,7 +90,6 @@ where
         )
         .unwrap();
     runner.prepare().await;
-
     Ok(())
 }
 

@@ -96,6 +96,7 @@ pub async fn prepare_windows<'w>(
             device.configure_surface(surface, &config);
         }
 
+		// log::warn!("next_frame========================");
         // 每帧 都要 设置 新的 SuraceTexture
         let _ = view.next_frame(&device, &config);
     }

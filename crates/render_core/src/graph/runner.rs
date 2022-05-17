@@ -1,6 +1,6 @@
 use super::{
     graph::{NGNodeValue, RenderGraph},
-    node::{NodeId, NodeLabel, NodeRunError, RealValue},
+    node::{NodeLabel, NodeRunError, RealValue},
     node_slot::{SlotLabel, SlotType},
     RenderContext,
 };
@@ -82,7 +82,9 @@ where
         queue: RenderQueue,
         rg: &mut RenderGraph,
     ) -> Result<(), String> {
+
         if self.prepare_graph.is_some() && self.run_graph.is_some() {
+			info!("RenderGraphRunner::build prepare and run graph is ready, prepare is_some = {}, run = {}", self.prepare_graph.is_some(), self.run_graph.is_some());
             return Ok(());
         }
 
@@ -132,7 +134,7 @@ where
             let ng_node = sub_ng.get(id).unwrap();
             if let NGNodeValue::InputSlot(nid, sid) = ng_node.value() {
                 if ng_node.to().len() != 1 {
-                    panic!("InputSlot's len != 1");
+                    panic!("================================= InputSlot's len != 1");
                 }
 
                 let mut value = None;
@@ -209,9 +211,10 @@ where
                     "render_graph::build prepare_builder graph failed, reason = {:?}",
                     e
                 );
-                panic!("");
+                panic!("!!!!!!!!!!!!!!!!!!!!!!!!!!! 3");
             }
         };
+
         match run_builder.build() {
             Ok(g) => {
                 self.run_graph = Some(Arc::new(g));
@@ -221,8 +224,10 @@ where
                     "render_graph::build run_builder graph failed, reason = {:?}",
                     e
                 );
+				panic!("!!!!!!!!!!!!!!!!!!!!!!!!!!! 4");
             }
         };
+
         Ok(())
     }
 
@@ -232,7 +237,7 @@ where
         match self.prepare_graph {
             None => {
                 error!("render_graph::prepare failed, prepare_graph is none");
-                panic!("");
+                panic!("prepare fail");
             }
             Some(ref g) => {
                 let ag = async_graph(self.rt.clone(), g.clone());
@@ -242,7 +247,7 @@ where
 
         // 移除 prepare，因为它只能执行一次
         let t = self.prepare_graph.take();
-        t.unwrap();
+		t.unwrap();
     }
 
     /// 执行

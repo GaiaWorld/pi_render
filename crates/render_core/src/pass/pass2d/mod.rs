@@ -18,7 +18,7 @@ use crate::{
 };
 use futures::{future::BoxFuture, FutureExt};
 use pi_ecs::{
-    entity::Entity,
+    entity::Id,
     prelude::{QueryState, World},
 };
 use pi_share::ShareRefCell;
@@ -35,12 +35,12 @@ pub struct Draw2DList {
     /// 不透明 列表
     /// 注：渲染时，假设 Vec已经 排好序 了
     // Entity 是 DrawObjectArchetype
-    pub opaque: Vec<Entity>,
+    pub opaque: Vec<Id<DrawObject>>,
 
     /// 透明 列表
     /// 注：渲染时，假设 Vec已经 排好序 了
     /// Entity 是 DrawObjectArchetype
-    pub transparent: Vec<Entity>,
+    pub transparent: Vec<Id<DrawObject>>,
 }
 
 impl Default for Draw2DList {
@@ -62,6 +62,7 @@ pub fn init_ecs(world: &mut World) {
         .create();
 }
 
+// `TODO` Entity 是 Pass2D 的
 pub struct Pass2DNode;
 
 impl Node for Pass2DNode {
@@ -153,3 +154,6 @@ impl Node for Pass2DNode {
         .boxed()
     }
 }
+
+
+
