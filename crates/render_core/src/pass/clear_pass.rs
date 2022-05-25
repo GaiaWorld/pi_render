@@ -1,12 +1,11 @@
 use crate::{
     graph::{
-        node::{Node, NodeRunError, RealValue},
-        node_slot::SlotInfo,
+        node::{Node, NodeRunError},
         RenderContext,
     }, components::view::target::{RenderTargetKey, RenderTargets, TextureViews, RenderTarget},
 };
 use futures::{future::BoxFuture, FutureExt};
-use pi_ecs::prelude::World;
+use pi_ecs::{prelude::World, entity::Entity};
 use pi_share::ShareRefCell;
 use pi_slotmap::{new_key_type, SlotMap};
 use wgpu::CommandEncoder;
@@ -80,29 +79,21 @@ pub struct ClearPassNode;
 impl ClearPassNode {}
 
 impl Node for ClearPassNode {
-    fn input(&self) -> Vec<SlotInfo> {
-        vec![]
-    }
-
-    fn output(&self) -> Vec<SlotInfo> {
-        vec![]
-    }
+	type Output = ();
 
     fn prepare(
         &self,
         _context: RenderContext,
-        _inputs: &[Option<RealValue>],
-        _outputs: &[Option<RealValue>],
+        _inputs: &[()],
     ) -> Option<BoxFuture<'static, Result<(), NodeRunError>>> {
         None
     }
 
     fn run(
-        &self,
+        &mut self,
         context: RenderContext,
         mut commands: ShareRefCell<CommandEncoder>,
-        _inputs: &[Option<RealValue>],
-        _outputs: &[Option<RealValue>],
+        _inputs: &[()],
     ) -> BoxFuture<'static, Result<(), NodeRunError>> {
         let RenderContext { world, .. } = context;
         async move {

@@ -5,12 +5,13 @@ use super::{
     pipeline::{ComputePipeline, RenderPipeline},
     texture::{Sampler, Texture},
 };
+use derive_deref_rs::Deref;
 use futures::Future;
 use std::sync::Arc;
 use wgpu::{util::DeviceExt, BufferAsyncError};
 
 /// This GPU device is responsible for the creation of most rendering and compute resources.
-#[derive(Clone)]
+#[derive(Clone, Deref)]
 pub struct RenderDevice(Arc<wgpu::Device>);
 
 impl From<Arc<wgpu::Device>> for RenderDevice {

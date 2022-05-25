@@ -4,48 +4,28 @@
 //!
 //! + [`Node`] 渲染节点，含: input, output, update, run
 //! + [`Edges`] 某个节点的边集，含：入边 和 出边
-//! + [`NodeState`] 节点状态，含：Node, name, id, Edges, input_slots, output_slots
+//! + [`NodeState`] 节点状态，含：Node, name, id, Edges
 //! + [`NodeId`]
 //! + [`NodeLabel`] name 或 id
 
-use super::{
-    node_slot::{SlotInfo, SlotInfos, SlotLabel, SlotValue},
-    RenderContext, RenderGraphError,
-};
+use super::{RenderContext, RenderGraphError};
 use downcast_rs::{impl_downcast, Downcast};
-use futures::future::BoxFuture;
+use futures::{future::BoxFuture, FutureExt};
+use pi_ecs::entity::Entity;
+use pi_null::Null;
 use pi_share::ShareRefCell;
+use pi_slotmap::SlotMap;
 use wgpu::CommandEncoder;
 use std::{borrow::Cow, cell::RefCell, fmt::Debug, sync::Arc};
 use thiserror::Error;
 
-/// 实参
-#[derive(Clone, Debug)]
-pub struct RealValue(Arc<RefCell<Option<SlotValue>>>);
-
-impl Default for RealValue {
-    fn default() -> Self {
-        RealValue(Arc::new(RefCell::new(None)))
-    }
-}
-
-unsafe impl Sync for RealValue {}
-
-unsafe impl Send for RealValue {}
-
 /// 渲染图的节点
 /// 可以 异步 执行
 pub trait Node: Downcast + Send + Sync + 'static {
+	type Output: Clone + Default;
 
-    /// 返回 输入 槽位 信息
-    fn input(&self) -> Vec<SlotInfo> {
-        vec![]
-    }
-
-    /// 返回 输出 槽位 信息
-    fn output(&self) -> Vec<SlotInfo> {
-        vec![]
-    }
+    /// 返回 输出 结果
+    fn output(&self) -> Self::Output {Self::Output::default()}
 
     /// 异步 创建 gpu 资源
     /// 该函数 在 所有节点的 run方法 之前
@@ -54,25 +34,29 @@ pub trait Node: Downcast + Send + Sync + 'static {
     fn prepare(
         &self,
         _context: RenderContext,
-        _inputs: &[Option<RealValue>],
-        _outputs: &[Option<RealValue>],
+        _inputs: &[Self::Output],
     ) -> Option<BoxFuture<'static, Result<(), NodeRunError>>> {
         None
     }
+	
+	fn finish(
+        &mut self,
+        _context: RenderContext,
+        _inputs: &[Self::Output],
+    ) -> BoxFuture<'static, Result<(), NodeRunError>> {async {Ok(())}.boxed()}
 
     /// 异步执行 渲染方法
     /// 一个渲染节点，通常是 开始 RenderPass
     /// 将 渲染指令 录制在 wgpu 中
     fn run(
-        &self,
+        &mut self,
         context: RenderContext,
         commands: ShareRefCell<CommandEncoder>,
-        inputs: &[Option<RealValue>],
-        outputs: &[Option<RealValue>],
+		_inputs: &[Self::Output],
     ) -> BoxFuture<'static, Result<(), NodeRunError>>;
 }
 
-impl_downcast!(Node);
+// impl_downcast!(Node);
 
 /// 渲染图 运行过程 遇到的 错误
 #[derive(Error, Debug, Eq, PartialEq)]
@@ -84,10 +68,8 @@ pub enum NodeRunError {
 }
 
 /// 节点状态: [`Node`] 内部 表示
-///
-/// `input_slots`, `output_slots` 都是 由 [`Node`] 提供
 /// 注: 节点状态不含值
-pub struct NodeState {
+pub struct NodeState<O> {
     /// 节点 ID
     pub id: NodeId,
     /// 名字
@@ -95,65 +77,49 @@ pub struct NodeState {
     /// 实现 node 的 类型名
     pub type_name: &'static str,
     /// 节点 本身
-    pub node: Arc<dyn Node>,
-    /// 输入槽位
-    pub input_slots: SlotInfos,
-    /// 输出槽位
-    pub output_slots: SlotInfos,
+    pub node: Arc<dyn Node<Output = O>>
 }
 
-impl Debug for NodeState {
+impl<O> Debug for NodeState<O> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "{:?} ({:?})", self.id, self.name)
     }
 }
 
-impl NodeState {
+impl<O> NodeState<O> {
     /// 创建 默认 节点状态
     pub fn new<T>(id: NodeId, node: T) -> Self
     where
-        T: Node,
+        T: Node<Output = O>,
     {
         NodeState {
             id,
             name: None,
-            input_slots: node.input().into(),
-            output_slots: node.output().into(),
             node: Arc::new(node),
             type_name: std::any::type_name::<T>(),
         }
     }
 
-    /// 取节点值
-    pub fn node<T>(&self) -> Result<&T, RenderGraphError>
-    where
-        T: Node,
-    {
-        self.node
-            .downcast_ref::<T>()
-            .ok_or(RenderGraphError::WrongNodeType)
-    }
+    // /// 取节点值
+    // pub fn node<T>(&self) -> Result<&T, RenderGraphError>
+    // where
+    //     T: Node<Output = O>,
+    // {
+    //     self.node
+    //         .downcast_ref::<T>()
+    //         .ok_or(RenderGraphError::WrongNodeType)
+    // }
 
-    /// 取节点值
-    pub fn node_mut<T>(&mut self) -> Result<&mut T, RenderGraphError>
-    where
-        T: Node,
-    {
-        self.node
-            .as_any_mut()
-            .downcast_mut::<T>()
-            .ok_or(RenderGraphError::WrongNodeType)
-    }
-
-    /// 取 Slot ID
-    pub fn input_slot_id(&self, label: impl Into<SlotLabel>) -> Option<usize> {
-        self.input_slots.get_slot_index(label)
-    }
-
-    /// 取 Slot ID
-    pub fn output_slot_id(&self, label: impl Into<SlotLabel>) -> Option<usize> {
-        self.output_slots.get_slot_index(label)
-    }
+    // /// 取节点值
+    // pub fn node_mut<T>(&mut self) -> Result<&mut T, RenderGraphError>
+    // where
+    //     T: Node<Output = O>,
+    // {
+    //     self.node
+    //         .as_any_mut()
+    //         .downcast_mut::<T>()
+    //         .ok_or(RenderGraphError::WrongNodeType)
+    // }
 }
 
 /// 渲染节点 ID

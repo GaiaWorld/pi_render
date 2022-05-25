@@ -11,11 +11,13 @@ keywords = ["pi"]
 [features]
 
 [dependencies]
+paste = "1.0"
 pi_async = "0.1"
 pi_async_graph = "0.1"
 pi_graph = "0.1"
 pi_hash = "0.1"
 pi_map = "0.1"
+pi_null = "0.1"
 # pi_ecs = "0.1"
 pi_ecs_macros = "0.1"
 pi_share = "0.1"
@@ -45,10 +47,14 @@ regex = "1.5"
 thiserror = "1.0"
 wgpu = { version = "0.12", features = ["spirv"] }
 derive-deref-rs = "0.1"
+pi_assets = { path = "../../../pi_assets" }
+# pi_assets = "0.1"
 # pi_res_loader = {  git = "https://github.com/GaiaWorld/pi_res_loader.git" }
-pi_res_loader = { path = "../../../pi_res_loader" }
+# pi_res_loader = { path = "../../../pi_res_loader" }
 # pi_res = { path = "../../../pi_res" }
 # pi_res_macros = { path = "../../../pi_res/macros" }
 
 # [patch.crates-io]
 pi_ecs = { path = "../../../pi_ecs" }
+guillotiere = {version="0.6"}
+smallvec="1.8"

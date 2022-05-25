@@ -39,7 +39,7 @@ struct PointLight {
     position: mint::Vector3<f32>,
     color: mint::Vector3<f32>,
     brightness: f32,
-}
+}b   
 
 let lights = vec![
     PointLight {

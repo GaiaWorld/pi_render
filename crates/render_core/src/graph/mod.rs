@@ -1,10 +1,8 @@
 pub mod graph;
 pub mod node;
-pub mod node_slot;
 pub mod runner;
 
 use self::node::{NodeId, NodeLabel};
-use self::node_slot::SlotLabel;
 use crate::rhi::{device::RenderDevice, RenderQueue};
 use pi_ecs::prelude::World;
 use thiserror::Error;
@@ -25,10 +23,6 @@ pub enum RenderGraphError {
     NoneNGraph,
     #[error("node does not exist")]
     InvalidNode(NodeLabel),
-    #[error("output node slot does not exist")]
-    InvalidOutputNodeSlot(NodeLabel, SlotLabel),
-    #[error("input node slot does not exist")]
-    InvalidInputNodeSlot(NodeLabel, SlotLabel),
     #[error("node does not match the given type")]
     WrongNodeType,
     #[error("attempted to connect a node output slot to an incompatible input node slot")]

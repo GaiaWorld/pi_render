@@ -6,6 +6,7 @@
 //! + render_graph 基于 rhi 封装 渲染图
 //! + render_nodes 具体的常用的 渲染节点
 //! + components 渲染组件，比如 color, camera ...
+extern crate paste;
 
 pub mod components;
 pub mod graph;
@@ -78,7 +79,7 @@ where
 
     let runner = world.get_resource_mut::<RenderGraphRunner<P>>().unwrap();
 
-    let rg = world.get_resource_mut::<RenderGraph>().unwrap();
+    let rg = world.get_resource_mut::<RenderGraph<()>>().unwrap();
     let device = world.get_resource::<RenderDevice>().unwrap();
     let queue = world.get_resource::<RenderQueue>().unwrap();
     runner
@@ -120,7 +121,7 @@ fn insert_render_graph<P>(world: &mut World, rt: AsyncRuntime<(), P>)
 where
     P: AsyncTaskPoolExt<()> + AsyncTaskPool<(), Pool = P>,
 {
-    world.insert_resource(RenderGraph::default());
+    world.insert_resource(RenderGraph::<()>::default());
 
     let rg_runner = RenderGraphRunner::new(rt);
     world.insert_resource(rg_runner);

@@ -10,15 +10,14 @@ use self::{
 use crate::{
     components::view::target::{RenderTarget, RenderTargetKey, RenderTargets, TextureViews},
     graph::{
-        node::{Node, NodeRunError, RealValue},
-        node_slot::SlotInfo,
+        node::{Node, NodeRunError},
         RenderContext,
     },
     rhi::CommandEncoder,
 };
 use futures::{future::BoxFuture, FutureExt};
 use pi_ecs::{
-    entity::Id,
+    entity::{Id, Entity},
     prelude::{QueryState, World},
 };
 use pi_share::ShareRefCell;
@@ -66,29 +65,20 @@ pub fn init_ecs(world: &mut World) {
 pub struct Pass2DNode;
 
 impl Node for Pass2DNode {
-    fn input(&self) -> Vec<SlotInfo> {
-        vec![]
-    }
-
-    fn output(&self) -> Vec<SlotInfo> {
-        vec![]
-    }
-
+	type Output = ();
     fn prepare(
         &self,
         _context: RenderContext,
-        _inputs: &[Option<RealValue>],
-        _outputs: &[Option<RealValue>],
+        _inputs: &[()],
     ) -> Option<BoxFuture<'static, Result<(), NodeRunError>>> {
         None
     }
 
     fn run(
-        &self,
+        &mut self,
         context: RenderContext,
         mut commands: ShareRefCell<CommandEncoder>,
-        _inputs: &[Option<RealValue>],
-        _outputs: &[Option<RealValue>],
+        _inputs: &[()],
     ) -> BoxFuture<'static, Result<(), NodeRunError>> {
         let RenderContext { mut world, .. } = context;
 
