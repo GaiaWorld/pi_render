@@ -1,18 +1,18 @@
 use crate::{
     rhi::{
         device::RenderDevice,
-        texture::{PiRenderDefault, TextureView},
+        texture::{PiRenderDefault, TextureView, ScreenTexture},
         PresentMode, RenderInstance,
     },
 };
-use pi_ecs::prelude::{Res, ResMut, World};
+use pi_ecs::prelude::{Res, ResMut, World, res::WriteRes};
 use pi_share::ShareRefCell;
 use pi_slotmap::{new_key_type, SlotMap};
 use std::{ops::Deref, sync::Arc};
 use wgpu::TextureFormat;
 use winit::{dpi::PhysicalSize, window::Window};
 
-use super::target::{TextureViewKey, TextureViews};
+use super::target::TextureViewKey;
 
 new_key_type! {
     pub struct RenderWindowKey;
@@ -55,21 +55,22 @@ pub async fn prepare_windows<'w>(
     device: Res<'w, RenderDevice>,
     instance: Res<'w, RenderInstance>,
     mut windows: ResMut<'w, RenderWindows>,
-    mut views: ResMut<'w, TextureViews>,
+    mut view: WriteRes<'w, ScreenTexture>,
 ) -> std::io::Result<()> {
     for (_, window) in windows.iter_mut() {
-        let view = views.get_mut(window.view);
+        // let view = views.get_mut(window.view);
 
-        assert!(view.is_some());
-        let view = view.unwrap();
+        // assert!(view.is_some());
+        // let view = view.unwrap();
 
-        let is_first = view.is_none();
+        let is_first = view.get().is_none();
         if is_first {
             let surface = unsafe { instance.create_surface(window.handle.deref()) };
             let surface = Arc::new(surface);
-            *view = Some(TextureView::with_surface(surface));
+			view.write(ScreenTexture::with_surface(surface));
         }
-        let view = view.as_mut().unwrap();
+
+		let view = view.get_mut().unwrap();
 
         let PhysicalSize { width, height } = window.handle.inner_size();
         let config = wgpu::SurfaceConfiguration {
@@ -92,8 +93,7 @@ pub async fn prepare_windows<'w>(
         }
         // 记得 第一次 需要 Config
         if is_first || is_size_changed {
-            let surface = view.surface().unwrap();
-            device.configure_surface(surface, &config);
+            device.configure_surface(view.surface(), &config);
         }
 
 		// log::warn!("next_frame========================");

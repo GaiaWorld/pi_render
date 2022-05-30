@@ -7,10 +7,15 @@ use pi_assets::{asset::{Handle, Droper}, mgr::AssetMgr};
 use pi_share::{Share, ShareWeak, ShareRwLock};
 use pi_slotmap::{DefaultKey, SlotMap, SecondaryMap};
 use pi_hash::{DefaultHasher, XHashMap};
+use pi_atom::Atom;
 use smallvec::SmallVec;
 use wgpu::{TextureAspect, TextureDimension, TextureFormat, TextureUsages, TextureViewDimension};
 
 use crate::rhi::{asset::{RenderRes, calc_texture_size}, device::RenderDevice};
+
+lazy_static!{
+	pub static ref DEPTH_TEXTURE: Atom = Atom::from("DEPTH_TEXTURE");
+}
 
 /// 纹理描述
 #[derive(Debug, Hash, Clone, Copy)]

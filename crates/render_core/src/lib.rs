@@ -7,6 +7,8 @@
 //! + render_nodes 具体的常用的 渲染节点
 //! + components 渲染组件，比如 color, camera ...
 extern crate paste;
+#[macro_use]
+extern crate lazy_static;
 
 pub mod components;
 pub mod graph;
@@ -14,7 +16,6 @@ pub mod pass;
 pub mod rhi;
 
 mod math;
-use components::view::target::TextureViews;
 pub use math::*;
 
 use crate::components::{
@@ -28,7 +29,7 @@ use pi_ecs::{
     sys::system::IntoSystem,
 };
 use pi_share::ShareRefCell;
-use rhi::{device::RenderDevice, options::RenderOptions, setup_render_context, RenderQueue};
+use rhi::{device::RenderDevice, options::RenderOptions, setup_render_context, RenderQueue, texture::ScreenTexture};
 use std::borrow::BorrowMut;
 use thiserror::Error;
 use winit::window::Window;
@@ -93,6 +94,7 @@ where
         )
         .unwrap();
     runner.prepare().await;
+	
     Ok(())
 }
 
@@ -107,13 +109,12 @@ where
 
     let world = world.clone();
 
-    let views = world.get_resource_mut::<TextureViews>().unwrap();
+    let screen_texture = world.get_resource_mut::<ScreenTexture>().unwrap();
     let windows = world.get_resource::<RenderWindows>().unwrap();
 
     // 呈现 所有的 窗口 -- 交换链
     for (_, window) in windows.iter() {
-        let view = views.get_mut(window.get_view()).unwrap().as_mut().unwrap();
-        if let Some(view) = view.take_surface_texture() {
+        if let Some(view) = screen_texture.take_surface_texture() {
             view.present();
             trace!("render_system: after surface_texture.present");
         }

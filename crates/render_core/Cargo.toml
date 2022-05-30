@@ -58,3 +58,5 @@ pi_assets = { path = "../../../pi_assets" }
 pi_ecs = { path = "../../../pi_ecs" }
 guillotiere = {version="0.6"}
 smallvec="1.8"
+lazy_static="1.4"
+pi_atom = "0.1"

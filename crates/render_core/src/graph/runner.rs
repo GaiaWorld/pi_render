@@ -167,7 +167,8 @@ where
             }
             Some(ref g) => {
                 let ag = async_graph(self.rt.clone(), g.clone());
-                ag.await.unwrap();
+                println!("@@@@@@@@@@@@@@ ");
+				ag.await.unwrap();
             }
         }
 
@@ -178,6 +179,7 @@ where
 
     /// 执行
     pub async fn run(&mut self) {
+		println!("run===================");
         match self.run_graph {
             None => {
                 error!("render_graph::run failed, run_graph is none");

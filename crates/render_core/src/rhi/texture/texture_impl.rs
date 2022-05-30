@@ -128,6 +128,65 @@ impl TextureView {
     }
 }
 
+pub struct ScreenTexture {
+	surface: Share<wgpu::Surface>,
+	texture: Option<Share<wgpu::SurfaceTexture>>,
+	pub view: Option<Share<wgpu::TextureView>>,
+}
+
+impl ScreenTexture {
+	#[inline]
+    pub fn with_surface(surface: Share<wgpu::Surface>) -> Self {
+        Self {
+            surface,
+            texture: None,
+            view: None,
+        }
+    }
+
+	#[inline]
+    pub fn surface(&self) -> &wgpu::Surface {
+        &self.surface
+    }
+
+	#[inline]
+    pub fn next_frame(&mut self, device: &RenderDevice, config: &SurfaceConfiguration) {
+        if let ScreenTexture {
+            surface,
+            texture,
+            view,
+            ..
+        } = self
+        {
+            let t = match surface.get_current_texture() {
+                Ok(swap_chain_frame) => swap_chain_frame,
+                Err(wgpu::SurfaceError::Outdated) => {
+                    device.configure_surface(surface, config);
+                    surface
+                        .get_current_texture()
+                        .expect("Error reconfiguring surface")
+                }
+                err => err.expect("Failed to acquire next swap chain texture!"),
+            };
+
+            let t = Share::new(t);
+            let v = Share::new(t.texture.create_view(&Default::default()));
+
+            *texture = Some(t);
+            *view = Some(v);
+        }
+    }
+
+	#[inline]
+    pub fn take_surface_texture(&mut self) -> Option<SurfaceTexture> {
+        let v = self.view.take().unwrap();
+		Share::try_unwrap(v).ok();
+
+		let t = self.texture.take().unwrap();
+		Share::try_unwrap(t).ok()
+    }
+}
+
 impl From<wgpu::TextureView> for TextureView {
     fn from(value: wgpu::TextureView) -> Self {
         TextureView::Texture(Share::new(value))
