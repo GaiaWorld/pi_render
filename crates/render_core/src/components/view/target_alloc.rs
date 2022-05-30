@@ -13,7 +13,7 @@ use wgpu::{TextureAspect, TextureDimension, TextureFormat, TextureUsages, Textur
 use crate::rhi::{asset::{RenderRes, calc_texture_size}, device::RenderDevice};
 
 /// 纹理描述
-#[derive(Debug, Hash, Clone)]
+#[derive(Debug, Hash, Clone, Copy)]
 pub struct TextureDescriptor {
 	pub mip_level_count: u32,
 	pub sample_count: u32,
@@ -37,7 +37,7 @@ pub struct TargetDescriptor {
 }
 
 /// 渲染目标
-pub struct RenderTarget {
+pub struct Fbo {
 	pub depth: Option<Handle<RenderRes<wgpu::TextureView>>>,
 	pub colors: SmallVec<[Handle<RenderRes<wgpu::TextureView>>;1]>,
 	pub width: u32,
@@ -49,17 +49,27 @@ pub struct TargetView {
 	ty_index: DefaultKey,
 	index: DefaultKey, // 第几张纹理
 	info: Allocation,
-	target: Share<RenderTarget>,
+	target: Share<Fbo>,
 }
 
 impl TargetView {
 	/// 拿到渲染目标
-	pub fn target(&self) -> &Share<RenderTarget> {
+	pub fn target(&self) -> &Share<Fbo> {
 		&self.target
 	}
 	/// 拿到分配的矩形信息
 	pub fn rect(&self) -> &Rectangle {
 		&self.info.rectangle
+	}
+	/// 拿到分配的uv
+	pub fn uv(&self) -> [f32;8] {
+		let (xmin, xmax, ymin, ymax) = (
+			self.info.rectangle.min.x as f32/self.target.width as f32,
+			self.info.rectangle.max.y as f32/self.target.height as f32,
+			self.info.rectangle.min.x as f32/self.target.width as f32,
+			self.info.rectangle.max.y as f32/self.target.height as f32,
+		);
+		[xmin, xmin, xmax, ymin, xmax, ymax, xmin, ymax]
 	}
 	/// 渲染目标类型id
 	pub fn ty_index(&self) -> DefaultKey {
@@ -92,13 +102,37 @@ impl Drop for ShareTargetView {
 }
 
 impl GetTargetView for ShareTargetView {
-    fn get_target_view(&self) -> &TargetView{
-        &self.0.0
+    fn get_target_view(&self) -> Option<&TargetView>{
+        Some(&self.0.0)
     }
 }
 
+impl GetTargetView for &ShareTargetView {
+    fn get_target_view(&self) -> Option<&TargetView>{
+        Some(&self.0.0)
+    }
+}
+
+impl GetTargetView for Option<ShareTargetView> {
+    fn get_target_view(&self) -> Option<&TargetView>{
+		match self {
+			Some(r) => Some(&r.0.0),
+			None => None
+		}
+	}
+}
+
+impl GetTargetView for &Option<ShareTargetView> {
+    fn get_target_view(&self) -> Option<&TargetView>{
+		match self {
+			Some(r) => Some(&r.0.0),
+			None => None
+		}
+	}
+}
+
 pub trait GetTargetView {
-	fn get_target_view(&self) -> &TargetView;
+	fn get_target_view(&self) -> Option<&TargetView>;
 }
 
 /// 线程安全的纹理分配器
@@ -113,12 +147,18 @@ impl SafeAtlasAllocator {
 					AtlasAllocator::new(device, texture_assets_mgr))))
 	}
 
-	pub fn get_or_create_type(&mut self, descript: TargetDescriptor) -> TargetType {
+	pub fn get_or_create_type(&self, descript: TargetDescriptor) -> TargetType {
 		self.0.write().unwrap().get_or_create_type(descript)
 	}
 
+	/// 创建一个渲染目标类型，并且不共享（get_or_create_type无法通过hash命中该类型）
+	#[inline]
+	pub fn create_type(&mut self, descript: TargetDescriptor) -> TargetType {
+		self.0.write().unwrap().create_type(descript)
+	}
+
 	/// 分配矩形区域
-	pub fn allocate(&mut self, width: u32, height: u32, target_type: TargetType, exclude: &Vec<ShareTargetView>) -> ShareTargetView {
+	pub fn allocate<G: GetTargetView, T: Iterator<Item=G>>(&self, width: u32, height: u32, target_type: TargetType, exclude: T) -> ShareTargetView {
 		ShareTargetView(
 			Share::new(
 				(self.0.write().unwrap().allocate(width, height, target_type, exclude), self.clone())
@@ -177,32 +217,28 @@ impl AtlasAllocator {
 	fn get_or_create_type(&mut self, descript: TargetDescriptor) -> TargetType {
 		match self.type_map.entry(calc_hash(&descript)) {
 			Entry::Vacant(r) => {
-				let mut texture_hashs = SmallVec::with_capacity(descript.texture_descriptor.len());
-				for i in descript.texture_descriptor.iter() {
-					texture_hashs.push(calc_hash(i));
-				}
-				let ty = self.all_allocator.insert(
-					AllocatorGroup { 
-						info: AllocatorGroupInfo { 
-							descript: descript, 
-							texture_hash: texture_hashs, 
-							// hash: 0, // TODO
-						}, 
-						list: SlotMap::new() });
-				TargetType(r.insert(ty).clone())
+				TargetType(r.insert(Self::create_type_inner(&mut self.all_allocator, descript)).clone())
 			},
 			Entry::Occupied(r) => TargetType(r.get().clone())
 		}
 	}
 
+	/// 创建一个渲染目标类型，并且不共享（get_or_create_type无法通过hash命中该类型）
+	#[inline]
+	fn create_type(&mut self, descript: TargetDescriptor) -> TargetType {
+		TargetType(Self::create_type_inner(&mut self.all_allocator, descript))
+	}
+
 	/// 分配TargetView
-	fn allocate<T: GetTargetView>(&mut self, width: u32, height: u32, target_type: TargetType, exclude: &Vec<T>) -> TargetView {
+	fn allocate<G: GetTargetView, T: Iterator<Item=G>>(&mut self, width: u32, height: u32, target_type: TargetType, exclude: T) -> TargetView {
 		let list = self.all_allocator.get_mut(target_type.0).unwrap();
 		// 将需要排除的渲染目标插入到slotmap中，后续可以更快的判断一个纹理是否需要排除
 		for i in exclude {
 			let i = i.get_target_view();
-			if i.ty_index == target_type.0 {
-				self.excludes.insert(i.index, true);
+			if let Some(i) = i {
+				if i.ty_index == target_type.0 {
+					self.excludes.insert(i.index, true);
+				}
 			}
 		}
 		for (index, item) in list.list.iter_mut(){
@@ -286,13 +322,13 @@ impl AtlasAllocator {
 		min_width: u32, 
 		min_height: u32, 
 		target_type: TargetType,
-	)-> RenderTarget {
+	)-> Fbo {
 		let info: &AllocatorGroupInfo = unsafe { transmute(&self.all_allocator[target_type.0].info) };
 		let width = info.descript.default_width.max(min_width);
 		let height = info.descript.default_height.max(min_height);
 		let len = info.descript.texture_descriptor.len();
 
-		let mut target = RenderTarget {
+		let mut target = Fbo {
 			depth: None,
 			colors: SmallVec::new(),
 			width,
@@ -390,11 +426,28 @@ impl AtlasAllocator {
 			key, 
 			RenderRes::new(texture_view, calc_texture_size(desc))).unwrap()
 	}
+
+	
+	fn create_type_inner(all_allocator: &mut SlotMap<DefaultKey, AllocatorGroup>, descript: TargetDescriptor) -> DefaultKey {
+		let mut texture_hashs = SmallVec::with_capacity(descript.texture_descriptor.len());
+		for i in descript.texture_descriptor.iter() {
+			texture_hashs.push(calc_hash(i));
+		}
+		let ty = all_allocator.insert(
+			AllocatorGroup { 
+				info: AllocatorGroupInfo { 
+					descript: descript, 
+					texture_hash: texture_hashs, 
+					// hash: 0, // TODO
+				}, 
+				list: SlotMap::new() });
+		ty
+	}
 }
 
 struct SingleAllocator {
 	allocator: guillotiere::AtlasAllocator,
-	target: Share<RenderTarget>,
+	target: Share<Fbo>,
 	count: usize,
 }
 
