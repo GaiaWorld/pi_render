@@ -5,8 +5,9 @@ use pi_async::rt::{
 };
 use pi_ecs::prelude::{Dispatcher, SingleDispatcher, World};
 use pi_render::{
-    components::{
-        view::{render_window::{RenderWindow, RenderWindows}, target::{TextureViews, RenderTarget, RenderTargets}},
+    components::view::{
+        render_window::{RenderWindow, RenderWindows},
+        target::{RenderTarget, RenderTargets, TextureViews},
     },
     graph::graph::RenderGraph,
     init_render,
@@ -42,20 +43,20 @@ impl RenderExample {
             extract_stage,
             prepare_stage,
             render_stage,
-        } = init_render(&mut world, options, window, rt.clone()).await;
+        } = init_render::<(), SingleTaskPool<()>>(&mut world, options, window, rt.clone()).await;
 
         let stages = vec![
-            Arc::new(extract_stage.build()),
-            Arc::new(prepare_stage.build()),
-            Arc::new(render_stage.build()),
+            Arc::new(extract_stage.build(&world.clone())),
+            Arc::new(prepare_stage.build(&world.clone())),
+            Arc::new(render_stage.build(&world.clone())),
         ];
 
-        self.dispatcher = Some(SingleDispatcher::new(stages, &world, rt));
+        self.dispatcher = Some(SingleDispatcher::new(rt));
 
         // Render Graph
-        let rg = world.get_resource_mut::<RenderGraph>().unwrap();
+        let rg = world.get_resource_mut::<RenderGraph<()>>().unwrap();
         let clear_node = rg.add_node("clean", ClearPassNode);
-        rg.set_node_finish(clear_node, true).unwrap();
+        rg.set_finish(clear_node, true).unwrap();
     }
 
     // 窗口大小改变 时 调用一次

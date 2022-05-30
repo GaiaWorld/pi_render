@@ -20,7 +20,7 @@ pub use math::*;
 use crate::components::{
     view::render_window::{prepare_windows, RenderWindows},
 };
-use graph::{graph::RenderGraph, runner::RenderGraphRunner};
+use graph::{graph::RenderGraph, runner::RenderGraphRunner, node::NodeOutputType};
 use log::trace;
 use pi_async::rt::{AsyncRuntime, AsyncTaskPool, AsyncTaskPoolExt};
 use pi_ecs::{
@@ -47,13 +47,14 @@ pub struct RenderStage {
 }
 
 /// 初始化
-pub async fn init_render<P>(
+pub async fn init_render<O, P>(
     world: &mut World,
     options: RenderOptions,
     window: ShareRefCell<Window>,
     rt: AsyncRuntime<(), P>,
 ) -> RenderStage
 where
+    O: NodeOutputType,
     P: AsyncTaskPoolExt<()> + AsyncTaskPool<(), Pool = P>,
 {
     // 一次性 注册 所有的 组件
@@ -62,24 +63,25 @@ where
     // 初始化渲染，加入如下 Res: RenderInstance, RenderQueue, RenderDevice, RenderOptions, AdapterInfo
     setup_render_context(world.clone(), options, window).await;
     // 添加 渲染图 Res
-    insert_render_graph(world, rt);
+    insert_render_graph::<O, P>(world, rt);
     // 添加 其他 Res
     insert_resources(world);
 
     // 注册 必要的 Stage 和 System
-    register_system::<P>(world)
+    register_system::<O, P>(world)
 }
 
 // RenderGraph Build & Prepare
-pub async fn prepare_rg<P>(world: WorldMut) -> std::io::Result<()>
+pub async fn prepare_rg<O, P>(world: WorldMut) -> std::io::Result<()>
 where
+    O: NodeOutputType,
     P: AsyncTaskPoolExt<()> + AsyncTaskPool<(), Pool = P>,
 {
     let world = world.clone();
 
-    let runner = world.get_resource_mut::<RenderGraphRunner<P>>().unwrap();
+    let runner = world.get_resource_mut::<RenderGraphRunner<O, P>>().unwrap();
 
-    let rg = world.get_resource_mut::<RenderGraph<()>>().unwrap();
+    let rg = world.get_resource_mut::<RenderGraph<O>>().unwrap();
     let device = world.get_resource::<RenderDevice>().unwrap();
     let queue = world.get_resource::<RenderQueue>().unwrap();
     runner
@@ -95,17 +97,19 @@ where
 }
 
 /// 每帧 调用一次，用于 驱动 渲染图
-async fn render_system<P>(world: WorldMut) -> std::io::Result<()>
+async fn render_system<O, P>(world: WorldMut) -> std::io::Result<()>
 where
+    O: NodeOutputType,
     P: AsyncTaskPoolExt<()> + AsyncTaskPool<(), Pool = P>,
 {
-    let graph_runner = world.get_resource_mut::<RenderGraphRunner<P>>().unwrap();
+    let graph_runner = world.get_resource_mut::<RenderGraphRunner<O, P>>().unwrap();
     graph_runner.run().await;
 
     let world = world.clone();
 
     let views = world.get_resource_mut::<TextureViews>().unwrap();
     let windows = world.get_resource::<RenderWindows>().unwrap();
+
     // 呈现 所有的 窗口 -- 交换链
     for (_, window) in windows.iter() {
         let view = views.get_mut(window.get_view()).unwrap().as_mut().unwrap();
@@ -114,16 +118,25 @@ where
             trace!("render_system: after surface_texture.present");
         }
     }
+   
+    // todo  实现 raf
+    // res_rendered_callback(); --> 
+    // for {
+    //     let res = getSurfaceView();
+    // }
+    // res_raf_callback();  ---> { 16ms 的  dispatch.run(); }
+
     Ok(())
 }
 
-fn insert_render_graph<P>(world: &mut World, rt: AsyncRuntime<(), P>)
+fn insert_render_graph<O, P>(world: &mut World, rt: AsyncRuntime<(), P>)
 where
+    O: NodeOutputType,
     P: AsyncTaskPoolExt<()> + AsyncTaskPool<(), Pool = P>,
 {
-    world.insert_resource(RenderGraph::<()>::default());
+    world.insert_resource(RenderGraph::<O>::default());
 
-    let rg_runner = RenderGraphRunner::new(rt);
+    let rg_runner = RenderGraphRunner::<O, P>::new(rt);
     world.insert_resource(rg_runner);
 }
 
@@ -133,18 +146,19 @@ fn insert_resources(world: &mut World) {
     pass::insert_resources(world);
 }
 
-fn register_system<P>(world: &mut World) -> RenderStage
+fn register_system<O, P>(world: &mut World) -> RenderStage
 where
+    O: NodeOutputType,
     P: AsyncTaskPoolExt<()> + AsyncTaskPool<(), Pool = P>,
 {
     let extract_stage = StageBuilder::new();
 
     let mut prepare_stage = StageBuilder::new();
     prepare_stage.add_node(prepare_windows.system(world));
-    prepare_stage.add_node(prepare_rg::<P>.system(world));
+    prepare_stage.add_node(prepare_rg::<O, P>.system(world));
 
     let mut render_stage = StageBuilder::new();
-    render_stage.add_node(render_system::<P>.system(world));
+    render_stage.add_node(render_system::<O, P>.system(world));
 
     RenderStage {
         extract_stage,

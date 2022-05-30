@@ -69,13 +69,12 @@ impl Node for Pass2DNode {
     fn prepare(
         &self,
         _context: RenderContext,
-        _inputs: &[()],
     ) -> Option<BoxFuture<'static, Result<(), NodeRunError>>> {
         None
     }
 
     fn run(
-        &mut self,
+        &self,
         context: RenderContext,
         mut commands: ShareRefCell<CommandEncoder>,
         _inputs: &[()],

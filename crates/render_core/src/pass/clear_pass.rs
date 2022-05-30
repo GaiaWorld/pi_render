@@ -5,7 +5,7 @@ use crate::{
     }, components::view::target::{RenderTargetKey, RenderTargets, TextureViews, RenderTarget},
 };
 use futures::{future::BoxFuture, FutureExt};
-use pi_ecs::{prelude::World, entity::Entity};
+use pi_ecs::{prelude::World};
 use pi_share::ShareRefCell;
 use pi_slotmap::{new_key_type, SlotMap};
 use wgpu::CommandEncoder;
@@ -84,13 +84,13 @@ impl Node for ClearPassNode {
     fn prepare(
         &self,
         _context: RenderContext,
-        _inputs: &[()],
+      
     ) -> Option<BoxFuture<'static, Result<(), NodeRunError>>> {
         None
     }
 
     fn run(
-        &mut self,
+        &self,
         context: RenderContext,
         mut commands: ShareRefCell<CommandEncoder>,
         _inputs: &[()],
