@@ -12,7 +12,6 @@ extern crate lazy_static;
 
 pub mod components;
 pub mod graph;
-pub mod pass;
 pub mod rhi;
 
 mod math;
@@ -144,7 +143,6 @@ where
 // 添加 其他 Res
 fn insert_resources(world: &mut World) {
     components::init_ecs(world);
-    pass::insert_resources(world);
 }
 
 fn register_system<O, P>(world: &mut World) -> RenderStage

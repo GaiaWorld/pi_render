@@ -15,10 +15,13 @@ members = ["crates/*"]
 render_core = { path = "crates/render_core" }
 
 [dev-dependencies]
+pi_slotmap = "0.1"
 pi_ecs = "0.1"
 pi_share = "0.1"
 pi_async = "0.1"
+pi_map = "0.1"
 
+nalgebra = "0.30"
 futures = "0.3"
 winit = "0.26"
 log = "0.4"
@@ -33,10 +36,6 @@ path = "examples/hello_winit/main.rs"
 [[example]]
 name = "clean"
 path = "examples/clean/main.rs"
-
-[[example]]
-name = "quad"
-path = "examples/quad/main.rs"
 
 [patch.crates-io]
 pi_ecs = { path = "../pi_ecs" }

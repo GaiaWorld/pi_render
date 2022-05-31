@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use super::camera::Camera2D;
-use crate::rhi::{bind_group::BindGroup, buffer::Buffer, pipeline::RenderPipeline, IndexFormat};
+use pi_render::rhi::{bind_group::BindGroup, buffer::Buffer, pipeline::RenderPipeline, IndexFormat};
 use pi_ecs::prelude::World;
 use pi_map::vecmap::VecMap;
 use wgpu::RenderPass;

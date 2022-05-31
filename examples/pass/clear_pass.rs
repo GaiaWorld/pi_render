@@ -1,4 +1,5 @@
-use crate::{
+
+use pi_render::{
     graph::{
         node::{Node, NodeRunError},
         RenderContext,
@@ -81,20 +82,12 @@ impl ClearPassNode {}
 impl Node for ClearPassNode {
 	type Output = ();
 
-    fn prepare(
-        &self,
-        _context: RenderContext,
-      
-    ) -> Option<BoxFuture<'static, Result<(), NodeRunError>>> {
-        None
-    }
-
-    fn run(
-        &self,
+    fn run<'a>(
+        &'a self,
         context: RenderContext,
-        mut commands: ShareRefCell<CommandEncoder>,
-        _inputs: &[()],
-    ) -> BoxFuture<'static, Result<(), NodeRunError>> {
+        commands: ShareRefCell<CommandEncoder>,
+        _inputs: &'a [()],
+    ) -> BoxFuture<'a, Result<Self::Output, NodeRunError>> {
         let RenderContext { world, .. } = context;
         async move {
             let clears = world.get_resource::<ClearOptions>().unwrap();
