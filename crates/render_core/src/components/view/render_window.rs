@@ -24,25 +24,18 @@ pub struct RenderWindow {
     present_mode: PresentMode,
     last_size: PhysicalSize<u32>,
     handle: ShareRefCell<Window>,
-    view: TextureViewKey,
 }
 
 impl RenderWindow {
     pub fn new(
         handle: ShareRefCell<Window>,
         present_mode: PresentMode,
-        view: TextureViewKey,
     ) -> Self {
         Self {
             handle,
             present_mode,
             last_size: PhysicalSize::default(),
-            view,
         }
-    }
-
-    pub fn get_view(&self) -> TextureViewKey {
-        self.view
     }
 }
 

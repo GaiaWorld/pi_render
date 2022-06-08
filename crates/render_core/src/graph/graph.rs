@@ -86,6 +86,7 @@ impl<O: NodeOutputType> RenderGraph<O> {
     ) -> Result<(), RenderGraphError> {
         let node = node.into();
         let node_id = self.get_node_id(node)?;
+		println!("set_finish len, render_graph address: {:p}", self);
 
         if is_finish {
             self.finish_nodes.insert(node_id);

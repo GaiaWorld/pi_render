@@ -70,11 +70,12 @@ impl TargetView {
 	pub fn uv(&self) -> [f32;8] {
 		let (xmin, xmax, ymin, ymax) = (
 			self.info.rectangle.min.x as f32/self.target.width as f32,
-			self.info.rectangle.max.y as f32/self.target.height as f32,
-			self.info.rectangle.min.x as f32/self.target.width as f32,
+			self.info.rectangle.max.x as f32/self.target.width as f32,
+			self.info.rectangle.min.y as f32/self.target.height as f32,
 			self.info.rectangle.max.y as f32/self.target.height as f32,
 		);
-		[xmin, xmin, xmax, ymin, xmax, ymax, xmin, ymax]
+		// [xmin, ymax, xmin, ymin, xmax, ymin, xmax, ymax]
+		[xmin, ymin, xmin, ymax, xmax, ymax, xmax, ymin]
 	}
 	/// 渲染目标类型id
 	pub fn ty_index(&self) -> DefaultKey {
@@ -102,7 +103,9 @@ impl Deref for ShareTargetView {
 
 impl Drop for ShareTargetView {
     fn drop(&mut self) {
-        self.0.1.0.write().unwrap().deallocate(&self.0.0);
+		if Share::strong_count(&self.0) == 1 {
+			self.0.1.0.write().unwrap().deallocate(&self.0.0);
+		}
     }
 }
 
@@ -200,14 +203,14 @@ impl AtlasAllocator {
 			type_map: XHashMap::default(),
 			all_allocator: SlotMap::default(),
 			depth_descript: TextureDescriptor {
-				mip_level_count: 0,
-				sample_count: 0,
+				mip_level_count: 1,
+				sample_count: 1,
 				dimension: TextureDimension::D2,
-				format: TextureFormat::Depth24Plus,
-				usage: TextureUsages::COPY_SRC | TextureUsages::COPY_DST,
+				format: TextureFormat::Depth32Float,
+				usage: TextureUsages::COPY_SRC | TextureUsages::COPY_DST | TextureUsages::RENDER_ATTACHMENT,
 
 				base_mip_level: 0,
-				base_array_layer: 1,
+				base_array_layer: 0,
 				array_layer_count: None,
 				view_dimension: None,
 			},
@@ -218,6 +221,7 @@ impl AtlasAllocator {
 			excludes: SecondaryMap::new(),
 		}
 	}
+
 	/// 获取或创建渲染目标类型
 	fn get_or_create_type(&mut self, descript: TargetDescriptor) -> TargetType {
 		match self.type_map.entry(calc_hash(&descript)) {
@@ -295,7 +299,7 @@ impl AtlasAllocator {
 		let mut alloctor = &mut self.all_allocator[view.ty_index].list[view.index];
 		alloctor.allocator.deallocate(view.info.id);
 		alloctor.count -= 1;
-		
+
 		if alloctor.count == 0 {
 			let t = self.all_allocator[view.ty_index].list.remove(view.index).unwrap();
 			// 缓冲深度纹理
