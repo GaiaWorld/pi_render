@@ -1,3 +1,7 @@
+#[path = "../pass/mod.rs"]
+mod pass;
+use pass::clear_pass::{ClearOption, ClearOptions, ClearPassNode};
+
 use log::{debug, info};
 use pi_async::rt::{
     single_thread::{SingleTaskPool, SingleTaskRunner},
@@ -11,7 +15,6 @@ use pi_render::{
     },
     graph::graph::RenderGraph,
     init_render,
-    pass::clear_pass::{ClearOption, ClearOptions, ClearPassNode},
     rhi::{options::RenderOptions, PresentMode},
     RenderStage,
 };
