@@ -43,8 +43,8 @@ pub struct TargetDescriptor {
 
 /// 渲染目标
 pub struct Fbo {
-	pub depth: Option<Handle<RenderRes<wgpu::TextureView>>>,
-	pub colors: SmallVec<[Handle<RenderRes<wgpu::TextureView>>;1]>,
+	pub depth: Option<(Handle<RenderRes<wgpu::TextureView>>, Share<wgpu::Texture>)>,
+	pub colors: SmallVec<[(Handle<RenderRes<wgpu::TextureView>>, Share<wgpu::Texture>);1]>,
 	pub width: u32,
 	pub height: u32,
 }
@@ -306,7 +306,8 @@ impl AtlasAllocator {
 			if let Some(r) = &t.target.depth {
 				self.unuse_textures.push(
 					UnuseTexture { 
-						weak: Share::downgrade(r), 
+						weak: Share::downgrade(&r.0), 
+						weak_texture: Share::downgrade(&r.1),
 						width: t.target.width, 
 						height: t.target.height, 
 						hash: 0, // 深度hash为0，是否需要修改为其他数字，TODO 
@@ -317,7 +318,8 @@ impl AtlasAllocator {
 			for color_index in 0..t.target.colors.len() {
 				self.unuse_textures.push(
 					UnuseTexture { 
-						weak: Share::downgrade(&t.target.colors[color_index]), 
+						weak: Share::downgrade(&t.target.colors[color_index].0), 
+						weak_texture: Share::downgrade(&t.target.colors[color_index].1),
 						width: t.target.width, 
 						height: t.target.height, 
 						hash: self.all_allocator[view.ty_index].info.texture_hash[color_index],
@@ -376,7 +378,7 @@ impl AtlasAllocator {
 		descript: &TextureDescriptor,
 		aspect: TextureAspect,
 		hash: u64,
-		len: usize) -> Handle<RenderRes<wgpu::TextureView>> {
+		len: usize) -> (Handle<RenderRes<wgpu::TextureView>>, Share<wgpu::Texture>) {
 		if self.unuse_textures.len() > 0 {
 			let mut i = 0;
 			while i < self.unuse_textures.len() {
@@ -394,7 +396,7 @@ impl AtlasAllocator {
 					let unuse_texture = self.unuse_textures.swap_remove(i);
 					match unuse_texture.weak.upgrade() {
 						Some(r) => {
-							return r;
+							return (r, unuse_texture.weak_texture.upgrade().unwrap());
 						},
 						None => {
 							continue
@@ -430,10 +432,12 @@ impl AtlasAllocator {
 
 		self.texture_cur_index += 1;
 		let key = calc_hash(&(hash, self.texture_cur_index, width, height));
-		AssetMgr::insert(
+		(AssetMgr::insert(
 			&self.texture_assets_mgr, 
 			key, 
-			RenderRes::new(texture_view, calc_texture_size(desc))).unwrap()
+			RenderRes::new(texture_view, calc_texture_size(desc))).unwrap(),
+			Share::new(texture)
+		)
 	}
 
 	
@@ -462,6 +466,7 @@ struct SingleAllocator {
 
 struct UnuseTexture {
 	weak: ShareWeak<Droper<RenderRes<wgpu::TextureView>>>,
+	weak_texture: ShareWeak<wgpu::Texture>,
 	width: u32,
 	height: u32,
 	hash: u64,

@@ -150,6 +150,11 @@ impl ScreenTexture {
     }
 
 	#[inline]
+    pub fn texture(&self) -> &Option<Share<wgpu::SurfaceTexture>> {
+        &self.texture
+    }
+
+	#[inline]
     pub fn next_frame(&mut self, device: &RenderDevice, config: &SurfaceConfiguration) {
         if let ScreenTexture {
             surface,
