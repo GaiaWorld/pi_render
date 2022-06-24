@@ -16,7 +16,6 @@ render_core = { path = "crates/render_core" }
 
 [dev-dependencies]
 pi_slotmap = "0.1"
-pi_ecs = "0.1"
 pi_share = "0.1"
 pi_async = "0.1"
 pi_map = "0.1"
@@ -29,6 +28,8 @@ wgpu = "0.12"
 env_logger = "0.9"
 float-ord = "0.3"
 
+pi_ecs = { git = "https://github.com/GaiaWorld/pi_ecs.git" }
+
 [[example]]
 name = "hello_winit"
 path = "examples/hello_winit/main.rs"
@@ -37,5 +38,5 @@ path = "examples/hello_winit/main.rs"
 name = "clean"
 path = "examples/clean/main.rs"
 
-[patch.crates-io]
-pi_ecs = { path = "../pi_ecs" }
+# [patch.crates-io]
+# pi_ecs = { path = "../pi_ecs" }
