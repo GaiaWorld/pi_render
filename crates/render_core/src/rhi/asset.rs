@@ -1,5 +1,6 @@
 use derive_deref_rs::Deref;
 use pi_assets::asset::Asset;
+use wgpu::TextureView;
 
 #[derive(Debug, Deref)]
 pub struct RenderRes<T> {
@@ -33,5 +34,27 @@ pub fn calc_texture_size(desc: wgpu::TextureDescriptor) -> usize {
 		wgpu::TextureFormat::Depth32Float => size * 4,
 		wgpu::TextureFormat::Depth24Plus => size * 3,
 		_ => size,
+	}
+}
+
+pub struct TextureRes {
+	pub width: u32,
+	pub height: u32,
+	pub texture_view: TextureView,
+	size: usize,
+}
+
+impl TextureRes {
+	pub fn new(width: u32, height: u32, size: usize, texture_view: TextureView) -> Self {
+		Self { width, height, size, texture_view }
+	}
+}
+
+
+impl Asset for TextureRes{
+	type Key = u64;
+
+	fn size(&self) -> usize {
+		self.size
 	}
 }

@@ -6,7 +6,7 @@ use super::{
 use crate::rhi::{device::RenderDevice, RenderQueue};
 use futures::{future::BoxFuture, FutureExt};
 use log::{error, info};
-use pi_async::rt::{AsyncRuntime, AsyncTaskPool, AsyncTaskPoolExt};
+use pi_async::rt::AsyncRuntime;
 use pi_async_graph::{async_graph, ExecNode, RunFactory, Runner};
 use pi_ecs::prelude::World;
 use pi_graph::{DirectedGraph, DirectedGraphNode, NGraph, NGraphBuilder};
@@ -22,13 +22,13 @@ pub enum RenderGraphRunnerError {
 }
 
 // 渲染图 执行器
-pub struct RenderGraphRunner<O, P>
+pub struct RenderGraphRunner<O, A>
 where
     O: NodeOutputType,
-    P: AsyncTaskPoolExt<()> + AsyncTaskPool<(), Pool = P>,
+	A: AsyncRuntime + Send + 'static
 {
     // 异步运行时
-    rt: AsyncRuntime<(), P>,
+    rt: A,
 
     // 读写锁
     pub(crate) slot_lock: Arc<Mutex<XHashMap<NodeId, Vec<O>>>>,
@@ -43,13 +43,13 @@ where
     pub(crate) run_graph: Option<Arc<NGraph<NodeId, ExecNode<DumpNode, DumpNode>>>>,
 }
 
-impl<O, P> RenderGraphRunner<O, P>
+impl<O, A> RenderGraphRunner<O, A>
 where
     O: NodeOutputType,
-    P: AsyncTaskPoolExt<()> + AsyncTaskPool<(), Pool = P>,
+	A: AsyncRuntime + Send + 'static
 {
     /// 创建
-    pub fn new(rt: AsyncRuntime<(), P>) -> Self {
+    pub fn new(rt: A) -> Self {
         Self {
             rt,
             prepare_graph: None,
@@ -166,7 +166,7 @@ where
                 panic!("render_graph::prepare failed");
             }
             Some(ref g) => {
-                let ag = async_graph(self.rt.clone(), g.clone());
+                let _ag = async_graph(self.rt.clone(), g.clone());
             }
         }
 

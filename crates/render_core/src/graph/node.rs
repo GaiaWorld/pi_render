@@ -10,7 +10,7 @@
 use super::RenderContext;
 use downcast_rs::Downcast;
 use futures::{future::BoxFuture, FutureExt};
-use pi_share::{ShareRefCell, cell::TrustCell};
+use pi_share::ShareRefCell;
 use pi_slotmap::new_key_type;
 use std::{borrow::Cow, fmt::Debug, sync::Arc};
 use thiserror::Error;

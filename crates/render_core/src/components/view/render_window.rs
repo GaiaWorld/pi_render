@@ -1,7 +1,7 @@
 use crate::{
     rhi::{
         device::RenderDevice,
-        texture::{PiRenderDefault, TextureView, ScreenTexture},
+        texture::{PiRenderDefault, ScreenTexture},
         PresentMode, RenderInstance,
     },
 };
@@ -11,8 +11,6 @@ use pi_slotmap::{new_key_type, SlotMap};
 use std::{ops::Deref, sync::Arc};
 use wgpu::TextureFormat;
 use winit::{dpi::PhysicalSize, window::Window};
-
-use super::target::TextureViewKey;
 
 new_key_type! {
     pub struct RenderWindowKey;
