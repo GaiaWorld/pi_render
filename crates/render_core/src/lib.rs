@@ -13,6 +13,7 @@ extern crate lazy_static;
 pub mod components;
 pub mod graph;
 pub mod rhi;
+pub mod font;
 
 mod math;
 pub use math::*;

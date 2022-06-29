@@ -9,6 +9,7 @@ license = "MIT OR Apache-2.0"
 keywords = ["pi"]
 
 [features]
+location=[]
 
 [dependencies]
 paste = "1.0"
@@ -21,6 +22,7 @@ pi_null = "0.1"
 pi_ecs_macros = "0.1"
 pi_share = "0.1"
 pi_slotmap = "0.1"
+async-trait = "0.1"
 render_utils = { version = "0.1", path = "../render_utils" }
 render_crevice = { version = "0.1", path = "../render_crevice", features = [
     "nalgebra",
@@ -59,6 +61,7 @@ lazy_static="1.4"
 pi_atom = "0.1"
 
 pi_ecs = { git = "https://github.com/GaiaWorld/pi_ecs.git" }
+pi_hal={git="https://github.com/GaiaWorld/pi_hal.git"}
 
 # [patch.crates-io]
 # pi_ecs = { path = "../../../pi_ecs" }
