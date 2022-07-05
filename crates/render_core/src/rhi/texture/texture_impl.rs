@@ -156,18 +156,14 @@ impl ScreenTexture {
 
 	#[inline]
     pub fn next_frame(&mut self, device: &RenderDevice, config: &SurfaceConfiguration) {
-        if let ScreenTexture {
-            surface,
-            texture,
-            view,
-            ..
-        } = self
-        {
-            let t = match surface.get_current_texture() {
+        assert_eq!(self.texture.is_some(), self.view.is_some());
+        
+        if self.texture.is_none() {
+            let t = match self.surface.get_current_texture() {
                 Ok(swap_chain_frame) => swap_chain_frame,
                 Err(wgpu::SurfaceError::Outdated) => {
-                    device.configure_surface(surface, config);
-                    surface
+                    device.configure_surface(self.surface.as_ref(), config);
+                    self.surface
                         .get_current_texture()
                         .expect("Error reconfiguring surface")
                 }
@@ -177,8 +173,8 @@ impl ScreenTexture {
             let t = Share::new(t);
             let v = Share::new(t.texture.create_view(&Default::default()));
 
-            *texture = Some(t);
-            *view = Some(v);
+            self.texture = Some(t);
+            self.view = Some(v);
         }
     }
 

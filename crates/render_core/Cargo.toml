@@ -63,5 +63,7 @@ pi_atom = "0.1"
 pi_ecs = { git = "https://github.com/GaiaWorld/pi_ecs.git" }
 pi_hal={git="https://github.com/GaiaWorld/pi_hal.git"}
 
+parking_lot = "0.11"
+
 # [patch.crates-io]
 # pi_ecs = { path = "../../../pi_ecs" }

@@ -4,14 +4,14 @@ use pass::clear_pass::{ClearOption, ClearOptions, ClearPassNode};
 
 use log::{debug, info};
 use pi_async::rt::{
-    single_thread::{SingleTaskPool, SingleTaskRunner},
-    AsyncRuntime,
+    single_thread::{SingleTaskPool, SingleTaskRunner, SingleTaskRuntime},
+    AsyncRuntime, worker_thread::WorkerRuntime, AsyncRuntimeBuilder,
 };
 use pi_ecs::prelude::{Dispatcher, SingleDispatcher, World};
 use pi_render::{
     components::view::{
         render_window::{RenderWindow, RenderWindows},
-        target::{RenderTarget, RenderTargets, TextureViews},
+        target::{RenderTarget, RenderTargets, TextureViews}, target_alloc::ShareTargetView,
     },
     graph::graph::RenderGraph,
     init_render,
@@ -28,7 +28,7 @@ use winit::{
 // 渲染 环境
 #[derive(Default)]
 struct RenderExample {
-    dispatcher: Option<SingleDispatcher<SingleTaskPool<()>>>,
+    dispatcher: Option<SingleDispatcher<WorkerRuntime<(), SingleTaskPool<()>>>>,
 }
 
 impl RenderExample {
@@ -37,7 +37,7 @@ impl RenderExample {
         mut world: World,
         options: RenderOptions,
         window: ShareRefCell<winit::window::Window>,
-        rt: AsyncRuntime<(), SingleTaskPool<()>>,
+        rt: WorkerRuntime,
     ) {
         info!("RenderExample::init");
 
@@ -46,7 +46,7 @@ impl RenderExample {
             extract_stage,
             prepare_stage,
             render_stage,
-        } = init_render::<(), SingleTaskPool<()>>(&mut world, options, window, rt.clone()).await;
+        } = init_render::<Option<ShareTargetView>, _>(&mut world, options, window, rt.clone()).await;
 
         let stages = vec![
             Arc::new(extract_stage.build(&world.clone())),
@@ -54,7 +54,7 @@ impl RenderExample {
             Arc::new(render_stage.build(&world.clone())),
         ];
 
-        self.dispatcher = Some(SingleDispatcher::new(rt));
+        self.dispatcher = Some(SingleDispatcher::new(rt.clone()));
 
         // Render Graph
         let rg = world.get_resource_mut::<RenderGraph<()>>().unwrap();
@@ -79,7 +79,7 @@ fn run_window_loop(
     window: ShareRefCell<winit::window::Window>,
     event_loop: EventLoop<()>,
     example: ShareRefCell<RenderExample>,
-    rt: AsyncRuntime<(), SingleTaskPool<()>>,
+    rt: WorkerRuntime<()>,
 ) {
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
@@ -132,8 +132,12 @@ fn main() {
 
     let world = World::new();
 
-    let runner = SingleTaskRunner::<()>::default();
-    let runtime = AsyncRuntime::Local(runner.startup().unwrap());
+    let runtime = AsyncRuntimeBuilder::default_worker_thread(
+		None,
+		None,
+		None,
+		None,
+	);
 
     let rt = runtime.clone();
     let example = ShareRefCell::new(RenderExample::default());
@@ -156,7 +160,7 @@ fn main() {
             let view = texture_views.insert(None);
 
             // 创建 RenderWindow
-            let render_window = RenderWindow::new(win, PresentMode::Mailbox, view);
+            let render_window = RenderWindow::new(win, PresentMode::Mailbox);
             let render_windows = world.get_resource_mut::<RenderWindows>().unwrap();
             render_windows.insert(render_window);
 
@@ -186,12 +190,12 @@ fn main() {
                 None => {}
             }
 
-            loop {
-                let count = runner.run().unwrap();
-                if count == 0 {
-                    break;
-                }
-            }
+            // loop {
+            //     let count = runner.run().unwrap();
+            //     if count == 0 {
+            //         break;
+            //     }
+            // }
             std::thread::sleep(std::time::Duration::from_millis(16));
         }
     });
