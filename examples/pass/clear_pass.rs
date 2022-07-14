@@ -1,12 +1,12 @@
-
+use futures::{future::BoxFuture, FutureExt};
+use pi_ecs::prelude::World;
 use pi_render::{
+    components::view::target::{RenderTarget, RenderTargetKey, RenderTargets, TextureViews},
     graph::{
         node::{Node, NodeRunError},
         RenderContext,
-    }, components::view::target::{RenderTargetKey, RenderTargets, TextureViews, RenderTarget},
+    },
 };
-use futures::{future::BoxFuture, FutureExt};
-use pi_ecs::{prelude::World};
 use pi_share::ShareRefCell;
 use pi_slotmap::{new_key_type, SlotMap};
 use wgpu::CommandEncoder;
@@ -39,7 +39,6 @@ impl From<&ClearColor> for wgpu::Color {
         }
     }
 }
-
 
 pub type ClearOptions = SlotMap<ClearOptionKey, ClearOption>;
 
@@ -80,7 +79,7 @@ pub struct ClearPassNode;
 impl ClearPassNode {}
 
 impl Node for ClearPassNode {
-	type Output = ();
+    type Output = ();
 
     fn run<'a>(
         &'a self,
@@ -94,15 +93,7 @@ impl Node for ClearPassNode {
             let rts = world.get_resource::<RenderTargets>().unwrap();
             let views = world.get_resource::<TextureViews>().unwrap();
 
-            for (
-                _,
-                ClearOption {
-                    target,
-                    color,
-                    ..
-                },
-            ) in clears.iter()
-            {
+            for (_, ClearOption { target, color, .. }) in clears.iter() {
                 if color.is_none() {
                     continue;
                 }
@@ -125,16 +116,34 @@ impl Node for ClearPassNode {
                     .collect::<Vec<wgpu::RenderPassColorAttachment>>();
 
                 // TODO Detph-Stencil
-                let depth_stencil_attachment = None;
+                // let depth_stencil_attachment = None;
 
-                let _render_pass = commands.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    label: None,
-                    color_attachments: &color_attachments,
-                    depth_stencil_attachment,
-                });
+                {
+                    // let render_pass = commands.0.borrow_mut().begin_render_pass(&wgpu::RenderPassDescriptor {
+                    //     label: None,
+                    //     color_attachments: &color_attachments,
+                    //     depth_stencil_attachment,
+                    // });
+                }
+                
             }
             Ok(())
         }
         .boxed()
+    }
+
+    fn prepare<'a>(
+        &'a self,
+        _context: RenderContext,
+    ) -> Option<BoxFuture<'a, Result<(), NodeRunError>>> {
+        None
+    }
+
+    fn finish<'a>(
+        &'a self,
+        _context: RenderContext,
+        _inputs: &'a [Self::Output],
+    ) -> BoxFuture<'a, Result<(), NodeRunError>> {
+        async { Ok(()) }.boxed()
     }
 }

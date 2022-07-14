@@ -30,7 +30,13 @@ use pi_ecs::{
 };
 use pi_share::ShareRefCell;
 use rhi::{device::RenderDevice, options::RenderOptions, setup_render_context, RenderQueue, texture::ScreenTexture};
-use std::borrow::BorrowMut;
+use std::{
+    borrow::BorrowMut,
+    collections::HashMap,
+    sync::{
+        atomic::{AtomicBool, AtomicU64, Ordering},
+    },
+};
 use thiserror::Error;
 use winit::window::Window;
 
@@ -167,3 +173,45 @@ where
     }
 }
 
+use parking_lot::RwLock;
+
+lazy_static! {
+    static ref IS_FIRST: AtomicBool = AtomicBool::new(true);
+    static ref FAQ_HANDLE: AtomicU64 = AtomicU64::new(0);
+    static ref FAQ_MAP: RwLock<HashMap<u64, Box<dyn Fn() + Send + Sync + 'static>>> =
+        RwLock::new(HashMap::new());
+}
+
+pub fn request_animation_frame<F: Fn() + Send + Sync + 'static>(cb: F) -> u64 {
+    let handle = FAQ_HANDLE.fetch_add(1, Ordering::Relaxed);
+    let _ = FAQ_MAP.write().insert(handle, Box::new(cb));
+
+    if IS_FIRST.load(Ordering::Relaxed) {
+        IS_FIRST.store(false, Ordering::Relaxed);
+        render();
+    }
+
+    handle
+}
+
+pub fn cancel_animation_frame(handle: u64) {
+    let _ = FAQ_MAP.write().remove(&handle);
+}
+
+fn render() {
+    // let frame_time = 17;
+    std::thread::spawn(move || loop {
+        // next_frame();
+        let begin = std::time::Instant::now();
+        for cb in FAQ_MAP.read().values() {
+            cb();
+        }
+        let end = begin.elapsed().as_millis() as u64;
+        // TODO: 必须强制休眠一点时间，必然会崩溃
+        std::thread::sleep(std::time::Duration::from_millis(1));
+        // if frame_time > end {
+        //     std::thread::sleep(std::time::Duration::from_millis(20));
+        // }
+        // prepare();
+    });
+}
