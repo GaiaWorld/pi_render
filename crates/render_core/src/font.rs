@@ -5,6 +5,7 @@ use std::{
 };
 
 use pi_assets::{asset::Handle, mgr::AssetMgr};
+use pi_atom::Atom;
 use pi_hash::DefaultHasher;
 use pi_share::{Share, ShareMutex};
 use wgpu::{Texture, ImageCopyTexture, TextureAspect, ImageDataLayout, Extent3d, Origin3d, TextureView};
@@ -12,12 +13,12 @@ use pi_hal::font::font::FontMgr;
 pub use pi_hal::font::font::{ Font, Size, GlyphId, FontId, Glyph};
 pub use pi_hal::font::text_split::*;
 
-use crate::rhi::{asset::RenderRes, device::RenderDevice, RenderQueue};
+use crate::rhi::{asset::{RenderRes, TextureRes}, device::RenderDevice, RenderQueue};
 
 pub struct FontSheet {
 	font_mgr: FontMgr,
 	texture_version: Share<ShareMutex<usize>>,
-	texture_view: Handle<RenderRes<TextureView>>,
+	texture_view: Handle<TextureRes>,
 	texture: Share<Texture>,
 	queue: RenderQueue,
 }
@@ -25,7 +26,7 @@ pub struct FontSheet {
 impl FontSheet {
 	pub fn new(
 		device: &RenderDevice,
-		texture_asset_mgr: &Share<AssetMgr<RenderRes<TextureView>>>,
+		texture_asset_mgr: &Share<AssetMgr<TextureRes>>,
 		queue: &RenderQueue,
 	) -> FontSheet {
 		let width = 1024;
@@ -40,13 +41,13 @@ impl FontSheet {
 			mip_level_count: 1,
 			sample_count: 1,
 			dimension: wgpu::TextureDimension::D2,
-			format: wgpu::TextureFormat::Bgra8UnormSrgb,
+			format: wgpu::TextureFormat::Bgra8Unorm,
 			usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
 		});
 		let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-		let key = calc_hash(&"text texture view");
-		texture_asset_mgr.cache(key, RenderRes::new(texture_view, 1024 * 1024 * 4));
-		let texture_view = texture_asset_mgr.get(&key).unwrap();
+		// let key = calc_hash(&"text texture view");
+		let key = Atom::from("_$text").get_hash() as u64;
+		let texture_view = texture_asset_mgr.insert(key, TextureRes::new(1024, 1024, 1024 * 1024 * 4, texture_view, false)).unwrap();
 
 		// 宽高可能可变，TODO
 		Self { 
@@ -64,7 +65,7 @@ impl FontSheet {
 	}
 
 	/// 纹理
-	pub fn texture_view(&self) -> &Handle<RenderRes<TextureView>> {
+	pub fn texture_view(&self) -> &Handle<TextureRes> {
 		&self.texture_view
 	}
 

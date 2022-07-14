@@ -1,9 +1,9 @@
 //! 渲染目标分配器
 
-use std::{hash::{Hash, Hasher}, collections::hash_map::Entry, intrinsics::transmute, num::NonZeroU32, ops::Deref};
+use std::{hash::{Hash, Hasher}, collections::hash_map::Entry, intrinsics::transmute, num::NonZeroU32, ops::Deref, mem::size_of};
 
 use guillotiere::{Size, Allocation, Rectangle};
-use pi_assets::{asset::{Handle, Droper}, mgr::AssetMgr};
+use pi_assets::{asset::{Handle, Droper, Asset}, mgr::AssetMgr, homogeneous::HomogeneousMgr};
 use pi_share::{Share, ShareWeak, ShareRwLock};
 use pi_slotmap::{DefaultKey, SlotMap, SecondaryMap};
 use pi_hash::{DefaultHasher, XHashMap};
@@ -148,11 +148,15 @@ pub trait GetTargetView {
 pub struct SafeAtlasAllocator(Share<ShareRwLock<AtlasAllocator>>);
 impl SafeAtlasAllocator {
 	/// 创建分配器
-	pub fn new(device: RenderDevice, texture_assets_mgr: Share<AssetMgr<RenderRes<wgpu::TextureView>>>) -> Self {
+	pub fn new(
+		device: RenderDevice, 
+		texture_assets_mgr: Share<AssetMgr<RenderRes<wgpu::TextureView>>>,
+		unuse_textures: Share<HomogeneousMgr<RenderRes<UnuseTexture>>>
+	) -> Self {
 		Self (
 			Share::new(
 				ShareRwLock::new(
-					AtlasAllocator::new(device, texture_assets_mgr))))
+					AtlasAllocator::new(device, texture_assets_mgr, unuse_textures))))
 	}
 
 	pub fn get_or_create_type(&self, descript: TargetDescriptor) -> TargetType {
@@ -183,9 +187,11 @@ struct AtlasAllocator {
 	all_allocator: SlotMap<DefaultKey, AllocatorGroup>,
 	// 深度纹理描述，当前为内置固定描述，是否需要扩展？TODO
 	depth_descript: TextureDescriptor,
-	// 未使用的纹理缓冲
-	// 预计纹理格式和尺寸都不会有太大的差距（通常是屏幕大小、rgba格式），所以将所有的未使用纹理放在一起，而不分类
-	unuse_textures: Vec<UnuseTexture>,
+	// // 未使用的纹理缓冲
+	// // 预计纹理格式和尺寸都不会有太大的差距（通常是屏幕大小、rgba格式），所以将所有的未使用纹理放在一起，而不分类
+	// unuse_textures: Vec<UnuseTexture>,
+	
+	unuse_textures: Share<HomogeneousMgr<RenderRes<UnuseTexture>>>,
 	// 纹理资源管理器，将纹理资源放入资源管理器，未只用的纹理不立即销毁
 	texture_assets_mgr: Share<AssetMgr<RenderRes<wgpu::TextureView>>>,
 	// 递增的数字，用于缓存纹理创建的纹理（纹理本身描述会重复，不能以描述的hash值作为key，而是以描述hash+ texture_cur_index作为纹理的key）
@@ -198,7 +204,11 @@ struct AtlasAllocator {
 }
 
 impl AtlasAllocator {
-	fn new(device: RenderDevice, texture_assets_mgr: Share<AssetMgr<RenderRes<wgpu::TextureView>>>) -> Self {
+	fn new(
+		device: RenderDevice, 
+		texture_assets_mgr: Share<AssetMgr<RenderRes<wgpu::TextureView>>>,
+		unuse_textures: Share<HomogeneousMgr<RenderRes<UnuseTexture>>>,
+	) -> Self {
 		Self {
 			type_map: XHashMap::default(),
 			all_allocator: SlotMap::default(),
@@ -214,7 +224,7 @@ impl AtlasAllocator {
 				array_layer_count: None,
 				view_dimension: None,
 			},
-			unuse_textures: Vec::new(),
+			unuse_textures,
 			texture_cur_index: 0,
 			device,
 			texture_assets_mgr,
@@ -304,26 +314,44 @@ impl AtlasAllocator {
 			let t = self.all_allocator[view.ty_index].list.remove(view.index).unwrap();
 			// 缓冲深度纹理
 			if let Some(r) = &t.target.depth {
-				self.unuse_textures.push(
-					UnuseTexture { 
-						weak: Share::downgrade(&r.0), 
-						weak_texture: Share::downgrade(&r.1),
-						width: t.target.width, 
-						height: t.target.height, 
-						hash: 0, // 深度hash为0，是否需要修改为其他数字，TODO 
-					});
+				self.unuse_textures.create(RenderRes::new(UnuseTexture { 
+					view: r.0.clone(),
+					texture: r.1.clone(),
+					// weak: Share::downgrade(&r.0), 
+					// weak_texture: Share::downgrade(&r.1),
+					width: t.target.width, 
+					height: t.target.height, 
+					hash: 0, // 深度hash为0，是否需要修改为其他数字，TODO 
+				}, size_of::<UnuseTexture>())); 
+				// self.unuse_textures.push(
+				// 	UnuseTexture { 
+				// 		view: (**r.0).clone(),
+				// 		texture: (**r.1).clone(),
+				// 		// weak: Share::downgrade(&r.0), 
+				// 		// weak_texture: Share::downgrade(&r.1),
+				// 		width: t.target.width, 
+				// 		height: t.target.height, 
+				// 		hash: 0, // 深度hash为0，是否需要修改为其他数字，TODO 
+				// 	});
 			}
 
 			// 缓冲颜色纹理
 			for color_index in 0..t.target.colors.len() {
-				self.unuse_textures.push(
-					UnuseTexture { 
-						weak: Share::downgrade(&t.target.colors[color_index].0), 
-						weak_texture: Share::downgrade(&t.target.colors[color_index].1),
-						width: t.target.width, 
-						height: t.target.height, 
-						hash: self.all_allocator[view.ty_index].info.texture_hash[color_index],
-					});
+				self.unuse_textures.create(RenderRes::new(UnuseTexture { 
+					view: t.target.colors[color_index].0.clone(),
+					texture: t.target.colors[color_index].1.clone(), 
+					width: t.target.width, 
+					height: t.target.height, 
+					hash: self.all_allocator[view.ty_index].info.texture_hash[color_index],
+				}, size_of::<UnuseTexture>()));
+				// self.unuse_textures.push(
+				// 	UnuseTexture { 
+				// 		weak: Share::downgrade(&t.target.colors[color_index].0), 
+				// 		weak_texture: Share::downgrade(&t.target.colors[color_index].1),
+				// 		width: t.target.width, 
+				// 		height: t.target.height, 
+				// 		hash: self.all_allocator[view.ty_index].info.texture_hash[color_index],
+				// 	});
 			}
 		}
 	}
@@ -379,33 +407,23 @@ impl AtlasAllocator {
 		aspect: TextureAspect,
 		hash: u64,
 		len: usize) -> (Handle<RenderRes<wgpu::TextureView>>, Share<wgpu::Texture>) {
-		if self.unuse_textures.len() > 0 {
-			let mut i = 0;
-			while i < self.unuse_textures.len() {
-				let t = &self.unuse_textures[i];
-				if t.hash == hash && 
-					(( // 只需要一张纹理，则只要该纹理的大小大于等于要求的大小即可
-						len == 1 &&
-						t.width >= width &&
-						t.height >= height) ||
-					( // 需要多张纹理，该纹理的大小必须等于要求的大小（如果大于等于就可以，后续如果找不到缓冲的纹理，则需要创建比要求的大小更大的纹理）
-						len > 1 && 
-						t.width == width &&
-						t.height == height)) {
-
-					let unuse_texture = self.unuse_textures.swap_remove(i);
-					match unuse_texture.weak.upgrade() {
-						Some(r) => {
-							return (r, unuse_texture.weak_texture.upgrade().unwrap());
-						},
-						None => {
-							continue
-						},
-					};
-				} else {
-					i += 1;
-				}
+		let unuse = self.unuse_textures.pop_by_filter(|t| {
+			if t.hash == hash && 
+				(( // 只需要一张纹理，则只要该纹理的大小大于等于要求的大小即可
+					len == 1 &&
+					t.width >= width &&
+					t.height >= height) ||
+				( // 需要多张纹理，该纹理的大小必须等于要求的大小（如果大于等于就可以，后续如果找不到缓冲的纹理，则需要创建比要求的大小更大的纹理）
+					len > 1 && 
+					t.width == width &&
+					t.height == height)) {
+				return true;
 			}
+			return false;
+		});
+		// 找到一个匹配的纹理，直接返回
+		if let Some(r) = unuse {
+			return (r.view.clone(), r.texture.clone());
 		}
 
 		let desc = wgpu::TextureDescriptor {
@@ -464,9 +482,11 @@ struct SingleAllocator {
 	count: usize,
 }
 
-struct UnuseTexture {
-	weak: ShareWeak<Droper<RenderRes<wgpu::TextureView>>>,
-	weak_texture: ShareWeak<wgpu::Texture>,
+pub struct UnuseTexture {
+	// weak: ShareWeak<Droper<RenderRes<wgpu::TextureView>>>,
+	// weak_texture: ShareWeak<wgpu::Texture>,
+	view: Share<Droper<RenderRes<wgpu::TextureView>>>,
+	texture: Share<wgpu::Texture>,
 	width: u32,
 	height: u32,
 	hash: u64,

@@ -51,12 +51,13 @@ pub struct TextureRes {
 	pub width: u32,
 	pub height: u32,
 	pub texture_view: TextureView,
+	pub is_opacity: bool,
 	size: usize,
 }
 
 impl TextureRes {
-	pub fn new(width: u32, height: u32, size: usize, texture_view: TextureView) -> Self {
-		Self { width, height, size, texture_view }
+	pub fn new(width: u32, height: u32, size: usize, texture_view: TextureView, is_opacity: bool) -> Self {
+		Self { width, height, size, texture_view, is_opacity }
 	}
 }
 
@@ -125,27 +126,27 @@ pub async fn create_texture_from_image<G: Garbageer<TextureRes>>(
 ) -> Handle<TextureRes> {
 	let buffer_temp;
 	let buffer_temp1;
-	let (width, height, buffer, ty, pre_pixel_size) = match image {
-		DynamicImage::ImageLuma8(image) => (image.width(), image.height(), image.as_raw(), wgpu::TextureFormat::R8Unorm, 1),
+	let (width, height, buffer, ty, pre_pixel_size, is_opacity) = match image {
+		DynamicImage::ImageLuma8(image) => (image.width(), image.height(), image.as_raw(), wgpu::TextureFormat::R8Unorm, 1, true),
 		DynamicImage::ImageRgb8(r) => {
 			buffer_temp =  image.to_rgba8();
-			(r.width(), r.height(), buffer_temp.as_raw(), wgpu::TextureFormat::Rgba8UnormSrgb, 4)
+			(r.width(), r.height(), buffer_temp.as_raw(), wgpu::TextureFormat::Rgba8Unorm, 4, true)
 		},
-		DynamicImage::ImageRgba8(image) => (image.width(), image.height(), image.as_raw(), wgpu::TextureFormat::Rgba8UnormSrgb, 4),
+		DynamicImage::ImageRgba8(image) => (image.width(), image.height(), image.as_raw(), wgpu::TextureFormat::Rgba8Unorm, 4, false),
 		DynamicImage::ImageBgr8(r) => {
 			buffer_temp1 =  image.to_bgra8();
-			(r.width(), r.height(), buffer_temp1.as_raw(), wgpu::TextureFormat::Bgra8UnormSrgb, 4)
+			(r.width(), r.height(), buffer_temp1.as_raw(), wgpu::TextureFormat::Bgra8Unorm, 4, true)
 		},
-		DynamicImage::ImageBgra8(image) => (image.width(), image.height(), image.as_raw(), wgpu::TextureFormat::Bgra8UnormSrgb, 4),
+		DynamicImage::ImageBgra8(image) => (image.width(), image.height(), image.as_raw(), wgpu::TextureFormat::Bgra8Unorm, 4, false),
 
 		_ => panic!("不支持的图片格式"),
 
 		// DynamicImage::ImageLumaA8(image) => panic!("不支持的图片格式: DynamicImage::ImageLumaA8"),
-		// DynamicImage::ImageLuma16(image) => (image.width(), image.height(), image.as_raw(), wgpu::TextureFormat::Bgra8UnormSrgb),
-		// DynamicImage::ImageLumaA16(image) => (image.width(), image.height(), image.as_raw(), wgpu::TextureFormat::Bgra8UnormSrgb),
+		// DynamicImage::ImageLuma16(image) => (image.width(), image.height(), image.as_raw(), wgpu::TextureFormat::Bgra8Unorm),
+		// DynamicImage::ImageLumaA16(image) => (image.width(), image.height(), image.as_raw(), wgpu::TextureFormat::Bgra8Unorm),
 
-		// DynamicImage::ImageRgb16(image) => (image.width(), image.height(), image.as_raw(), wgpu::TextureFormat::Bgra8UnormSrgb),
-		// DynamicImage::ImageRgba16(image) => (image.width(), image.height(), image.as_raw(), wgpu::TextureFormat::Bgra8UnormSrgb),
+		// DynamicImage::ImageRgb16(image) => (image.width(), image.height(), image.as_raw(), wgpu::TextureFormat::Bgra8Unorm),
+		// DynamicImage::ImageRgba16(image) => (image.width(), image.height(), image.as_raw(), wgpu::TextureFormat::Bgra8Unorm),
 	};
 	let texture_extent = wgpu::Extent3d {
 		width,
@@ -175,5 +176,5 @@ pub async fn create_texture_from_image<G: Garbageer<TextureRes>>(
 		texture_extent,
 	);
 
-	recv.receive(key.get_hash() as u64, Ok(TextureRes::new(width, height, byte_size, texture_view))).await.unwrap()
+	recv.receive(key.get_hash() as u64, Ok(TextureRes::new(width, height, byte_size, texture_view, is_opacity))).await.unwrap()
 }
