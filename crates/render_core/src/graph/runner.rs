@@ -295,7 +295,8 @@ fn crate_run_node<O: NodeOutputType>(
             queue.submit(vec![commands.finish()]);
 
             {
-                finish_lock.lock().unwrap();
+                // let _r = finish_lock.lock().unwrap();
+				finish_lock.lock().unwrap();// 未实现Send，可能有问题？TODO
                 let runner = node.finish(context1, inputs.as_slice());
                 let _ = runner.await.unwrap();
             }

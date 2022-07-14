@@ -202,11 +202,11 @@ fn render() {
     // let frame_time = 17;
     std::thread::spawn(move || loop {
         // next_frame();
-        let begin = std::time::Instant::now();
+        // let begin = std::time::Instant::now();
         for cb in FAQ_MAP.read().values() {
             cb();
         }
-        let end = begin.elapsed().as_millis() as u64;
+        // let end = begin.elapsed().as_millis() as u64;
         // TODO: 必须强制休眠一点时间，必然会崩溃
         std::thread::sleep(std::time::Duration::from_millis(1));
         // if frame_time > end {

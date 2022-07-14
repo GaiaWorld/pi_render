@@ -1,5 +1,4 @@
 use std::{
-	sync::atomic::AtomicUsize, 
 	num::NonZeroU32,
 	hash::{Hash, Hasher},
 };
@@ -8,12 +7,12 @@ use pi_assets::{asset::Handle, mgr::AssetMgr};
 use pi_atom::Atom;
 use pi_hash::DefaultHasher;
 use pi_share::{Share, ShareMutex};
-use wgpu::{Texture, ImageCopyTexture, TextureAspect, ImageDataLayout, Extent3d, Origin3d, TextureView};
+use wgpu::{Texture, ImageCopyTexture, TextureAspect, ImageDataLayout, Extent3d, Origin3d};
 use pi_hal::font::font::FontMgr;
 pub use pi_hal::font::font::{ Font, Size, GlyphId, FontId, Glyph};
 pub use pi_hal::font::text_split::*;
 
-use crate::rhi::{asset::{RenderRes, TextureRes}, device::RenderDevice, RenderQueue};
+use crate::rhi::{asset::TextureRes, device::RenderDevice, RenderQueue};
 
 pub struct FontSheet {
 	font_mgr: FontMgr,

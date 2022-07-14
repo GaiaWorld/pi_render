@@ -2,10 +2,10 @@ use std::io::ErrorKind;
 
 use async_trait::async_trait;
 use derive_deref_rs::Deref;
-use pi_assets::{asset::{Asset, Garbageer, Handle}, mgr::{AssetMgr, LoadResult, Receiver}};
+use pi_assets::{asset::{Asset, Garbageer, Handle}, mgr::{LoadResult, Receiver}};
 use pi_atom::Atom;
 use pi_hal::{
-	image::{ImageRes, DynamicImage},
+	image::DynamicImage,
 	loader::AsyncLoader,
 };
 use wgpu::TextureView;
@@ -104,7 +104,7 @@ impl<'a, G: Garbageer<Self>> AsyncLoader<'a, Self, ImageTextureDesc<'a>, G> for 
 				let image = pi_hal::image::from_path_or_url(desc.url.as_str()).await;
 				let image = match image {
 					Ok(r) => r,
-					Err(e) =>  {
+					Err(_e) =>  {
 						log::error!("load image fail: {:?}", desc.url.as_str());
 						return Err(std::io::Error::new(ErrorKind::NotFound, ""));
 					},

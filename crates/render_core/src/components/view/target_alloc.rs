@@ -3,8 +3,8 @@
 use std::{hash::{Hash, Hasher}, collections::hash_map::Entry, intrinsics::transmute, num::NonZeroU32, ops::Deref, mem::size_of};
 
 use guillotiere::{Size, Allocation, Rectangle};
-use pi_assets::{asset::{Handle, Droper, Asset}, mgr::AssetMgr, homogeneous::HomogeneousMgr};
-use pi_share::{Share, ShareWeak, ShareRwLock};
+use pi_assets::{asset::{Handle, Droper}, mgr::AssetMgr, homogeneous::HomogeneousMgr};
+use pi_share::{Share, ShareRwLock};
 use pi_slotmap::{DefaultKey, SlotMap, SecondaryMap};
 use pi_hash::{DefaultHasher, XHashMap};
 use pi_atom::Atom;
