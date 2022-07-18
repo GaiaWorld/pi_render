@@ -47,9 +47,7 @@ impl<O: NodeOutputType> Default for RenderGraph<O> {
 
 impl<O: NodeOutputType> RenderGraph<O> {
     /// 移除 节点
-    pub fn remove_node<T>(&mut self, id: NodeId, name: impl Into<Cow<'static, str>>)
-    where
-        T: Node<Output = O>,
+    pub fn remove_node(&mut self, id: NodeId, name: impl Into<Cow<'static, str>>)
     {
         if self.nodes.get(id).is_some() {
             self.is_topology_change = true;
@@ -175,10 +173,21 @@ impl<O: NodeOutputType> RenderGraph<O> {
                 builder = builder.node(node_id, node_id);
             }
 
+			let mut remove_edges = Vec::new();
             for (before_id, after_id) in &self.edges {
-                // 和 渲染圖 依賴 相反
-                builder = builder.edge(*after_id, *before_id);
+				if self.nodes.get(*after_id).is_none() || self.nodes.get(*before_id).is_none() {
+					remove_edges.push((*before_id, *after_id));
+				} else {
+					 // 和 渲染圖 依賴 相反
+					 builder = builder.edge(*after_id, *before_id);
+				}
             }
+
+			if remove_edges.len() > 0 {
+				for i in remove_edges.iter() {
+					self.edges.remove(i);
+				}
+			}
 
             let ng = match builder.build() {
                 Ok(ng) => ng,
