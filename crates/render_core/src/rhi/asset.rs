@@ -102,13 +102,13 @@ impl<'a, G: Garbageer<Self>> AsyncLoader<'a, Self, ImageTextureDesc<'a>, G> for 
 			LoadResult::Wait(f) => f.await,
 			LoadResult::Receiver(recv) => {
 				let image = pi_hal::image::from_path_or_url(desc.url.as_str()).await;
-				let image = match image {
-					Ok(r) => r,
-					Err(_e) =>  {
-						log::error!("load image fail: {:?}", desc.url.as_str());
-						return Err(std::io::Error::new(ErrorKind::NotFound, ""));
-					},
-				};
+				// let image = match image {
+				// 	Ok(r) => r,
+				// 	Err(_e) =>  {
+				// 		log::error!("load image fail: {:?}", desc.url.as_str());
+				// 		return Err(std::io::Error::new(ErrorKind::NotFound, ""));
+				// 	},
+				// };
 
 				let texture = create_texture_from_image(&image, &desc.device, &desc.queue, &desc.url, recv).await;
 				Ok(texture)
