@@ -21,12 +21,12 @@ pub type RenderWindows = SlotMap<RenderWindowKey, RenderWindow>;
 pub struct RenderWindow {
     present_mode: PresentMode,
     last_size: PhysicalSize<u32>,
-    handle: ShareRefCell<Window>,
+    handle: Arc<Window>,
 }
 
 impl RenderWindow {
     pub fn new(
-        handle: ShareRefCell<Window>,
+        handle: Arc<Window>,
         present_mode: PresentMode,
     ) -> Self {
         Self {

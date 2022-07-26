@@ -34,7 +34,7 @@ use std::{
     borrow::BorrowMut,
     collections::HashMap,
     sync::{
-        atomic::{AtomicBool, AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering}, Arc,
     },
 };
 use thiserror::Error;
@@ -57,7 +57,7 @@ pub struct RenderStage {
 pub async fn init_render<O, A>(
     world: &mut World,
     options: RenderOptions,
-    window: ShareRefCell<Window>,
+    window: Arc<Window>,
     rt: A
 ) -> RenderStage
 where

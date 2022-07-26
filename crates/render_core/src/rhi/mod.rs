@@ -128,12 +128,12 @@ pub type RenderInstance = wgpu::Instance;
 pub async fn setup_render_context(
     mut world: World,
     options: RenderOptions,
-    window: ShareRefCell<winit::window::Window>,
+    window: Arc<winit::window::Window>,
 ) {
     let backends = options.backends;
 
     let instance = wgpu::Instance::new(backends);
-    let surface = unsafe { instance.create_surface(window.deref()) };
+    let surface = unsafe { instance.create_surface(window.as_ref()) };
     let request_adapter_options = wgpu::RequestAdapterOptions {
         power_preference: options.power_preference,
         compatible_surface: Some(&surface),
