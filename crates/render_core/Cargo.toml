@@ -28,7 +28,7 @@ render_crevice = { version = "0.1", path = "../render_crevice", features = [
     "nalgebra",
 ] }
 uuid = { version = "0.8", features = ["v4", "serde"] }
-winit = {path = "../../../winit"}
+winit = {git = "http://ser.yinengyun.com:10082/tech/winit.git"}
 anyhow = "1.0"
 downcast-rs = "1.2"
 futures = "0.3"
