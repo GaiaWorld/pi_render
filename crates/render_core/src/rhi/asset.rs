@@ -165,6 +165,7 @@ pub async fn create_texture_from_image<G: Garbageer<TextureRes>>(
 		usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
 	});
 	let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+
 	queue.write_texture(
 		texture.as_image_copy(),
 		buffer,

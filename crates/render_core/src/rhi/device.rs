@@ -16,6 +16,9 @@ pub struct RenderDevice(Arc<wgpu::Device>);
 
 impl From<Arc<wgpu::Device>> for RenderDevice {
     fn from(device: Arc<wgpu::Device>) -> Self {
+
+		log::warn!("=============== limits = {:?}", device.limits());
+
         Self(device)
     }
 }
@@ -168,3 +171,6 @@ impl RenderDevice {
         row_bytes + padded_bytes_per_row_padding
     }
 }
+
+pub struct Binding (usize);
+

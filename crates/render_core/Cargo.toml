@@ -22,6 +22,8 @@ pi_null = "0.1"
 pi_ecs_macros = "0.1"
 pi_share = "0.1"
 pi_slotmap = "0.1"
+
+bitvec={version = "1.0", features = ["serde"]}
 async-trait = "0.1"
 render_utils = { version = "0.1", path = "../render_utils" }
 render_crevice = { version = "0.1", path = "../render_crevice", features = [
@@ -67,3 +69,6 @@ parking_lot = "0.11"
 
 # [patch.crates-io]
 # pi_ecs = { path = "../../../pi_ecs" }
+
+[dev-dependencies]
+bytemuck = { version = "1.4", features = ["derive"] }

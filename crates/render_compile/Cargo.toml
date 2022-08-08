@@ -1,0 +1,23 @@
+[package]
+name = "render_compile"
+version = "0.1.0"
+authors = ["suncy <530739162@qq.com>"]
+edition = "2021"
+description = "Renderer for PI Engine"
+repository = "https://github.com/GaiaWorld/pi_render"
+license = "MIT OR Apache-2.0"
+keywords = ["pi", "compile", "shader"]
+
+[dependencies]
+naga = { version = "0.8", features = [
+    "glsl-in",
+    "spv-in",
+    "spv-out",
+    "wgsl-in",
+    "wgsl-out",
+]}
+thiserror = "1.0"
+Inflector = "0.11"
+pi_ordmap = "0.1"
+log = "0.4"
+pi_render = { git = "https://github.com/GaiaWorld/pi_render.git" }

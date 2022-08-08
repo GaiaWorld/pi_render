@@ -292,7 +292,9 @@ fn crate_run_node<O: NodeOutputType>(
             let commands = Arc::try_unwrap(commands.0).unwrap();
             let commands = commands.into_inner();
 
+			// let time = std::time::Instant::now();
             queue.submit(vec![commands.finish()]);
+			// log::warn!("submit===={:?}", std::time::Instant::now() - time);
 
             {
                 // let _r = finish_lock.lock().unwrap();

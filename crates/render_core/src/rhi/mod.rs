@@ -12,10 +12,12 @@ pub mod shader;
 pub mod texture;
 pub mod uniform_vec;
 pub mod asset;
+pub mod block_alloc;
+pub mod dyn_uniform_buffer;
 
 use self::{device::RenderDevice, options::RenderOptions};
 use crate::rhi::options::RenderPriority;
-use log::{debug, info};
+use log::{debug, info, warn};
 use pi_ecs::prelude::World;
 use pi_share::ShareRefCell;
 use std::{ops::Deref, sync::Arc};
@@ -165,7 +167,7 @@ async fn initialize_renderer(
         .expect("Unable to find a GPU! Make sure you have installed required drivers!");
 
     let adapter_info = adapter.get_info();
-    info!("initialize_renderer {:?}", adapter_info);
+    warn!("initialize_renderer {:?}", adapter_info);
 
     let trace_path = None;
 
