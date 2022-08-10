@@ -17,7 +17,7 @@ render_core = { path = "crates/render_core" }
 [dev-dependencies]
 pi_slotmap = "0.1"
 pi_share = "0.1"
-pi_async = "0.2"
+pi_async = "0.4"
 pi_map = "0.1"
 
 nalgebra = "0.30"

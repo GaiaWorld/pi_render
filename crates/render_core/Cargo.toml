@@ -13,7 +13,7 @@ location=[]
 
 [dependencies]
 paste = "1.0"
-pi_async = "0.2"
+pi_async = "0.4"
 pi_async_graph = "0.2"
 pi_graph = "0.1"
 pi_hash = "0.1"
