@@ -200,7 +200,7 @@ async fn initialize_renderer(
         // specified max_limits. For 'min' limits, take the maximum instead. This is intended to
         // err on the side of being conservative. We can't claim 'higher' limits that are supported
         // but we can constrain to 'lower' limits.
-        limits = wgpu::Limits {
+        limits = wgpu::Limits { 
             max_texture_dimension_1d: limits
                 .max_texture_dimension_1d
                 .min(constrained_limits.max_texture_dimension_1d),
