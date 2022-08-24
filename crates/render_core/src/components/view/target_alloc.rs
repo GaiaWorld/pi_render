@@ -104,7 +104,7 @@ impl Deref for ShareTargetView {
 impl Drop for ShareTargetView {
     fn drop(&mut self) {
 		if Share::strong_count(&self.0) == 1 {
-			self.0.1.0.write().unwrap().deallocate(&self.0.0);
+			self.0.1.0.write().deallocate(&self.0.0);
 		}
     }
 }
@@ -160,20 +160,20 @@ impl SafeAtlasAllocator {
 	}
 
 	pub fn get_or_create_type(&self, descript: TargetDescriptor) -> TargetType {
-		self.0.write().unwrap().get_or_create_type(descript)
+		self.0.write().get_or_create_type(descript)
 	}
 
 	/// 创建一个渲染目标类型，并且不共享（get_or_create_type无法通过hash命中该类型）
 	#[inline]
 	pub fn create_type(&mut self, descript: TargetDescriptor) -> TargetType {
-		self.0.write().unwrap().create_type(descript)
+		self.0.write().create_type(descript)
 	}
 
 	/// 分配矩形区域
 	pub fn allocate<G: GetTargetView, T: Iterator<Item=G>>(&self, width: u32, height: u32, target_type: TargetType, exclude: T) -> ShareTargetView {
 		ShareTargetView(
 			Share::new(
-				(self.0.write().unwrap().allocate(width, height, target_type, exclude), self.clone())
+				(self.0.write().allocate(width, height, target_type, exclude), self.clone())
 			)
 		)
 	}

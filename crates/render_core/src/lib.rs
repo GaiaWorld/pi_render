@@ -14,6 +14,7 @@ pub mod components;
 pub mod graph;
 pub mod rhi;
 pub mod font;
+pub mod graph_new;
 
 mod math;
 pub use math::*;

@@ -70,7 +70,7 @@ impl FontSheet {
 
 	/// 取到纹理版本
 	pub fn texture_version(&self) -> usize {
-		*self.texture_version.lock().unwrap()
+		*self.texture_version.lock()
 	}
 
 	/// 纹理宽高
@@ -135,7 +135,7 @@ impl FontSheet {
 					height: image.height as u32,
 					depth_or_array_layers: 1,
 				});
-			let mut v = version.lock().unwrap();
+			let mut v = version.lock();
 			*v = *v + 1;
 		})
 	}

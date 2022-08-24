@@ -34,7 +34,7 @@ impl DynUniformBuffer {
 	#[inline]
 	pub fn alloc_binding<T: Bind>(&mut self) -> BindOffset {
 		BindOffset{
-			offset: self.cache_buffer.lock().unwrap().alloc::<T>(),
+			offset: self.cache_buffer.lock().alloc::<T>(),
 			context: self.cache_buffer.clone()
 		}
 		
@@ -42,26 +42,26 @@ impl DynUniformBuffer {
 
 	#[inline]
 	pub fn set_uniform<T: Uniform>(&mut self, binding_offset: &BindOffset, t: &T) {
-		self.cache_buffer.lock().unwrap().full::<T>(**binding_offset, t);
+		self.cache_buffer.lock().full::<T>(**binding_offset, t);
 		self.is_change = true;
 	}
 
 	/// 写入buffer到现存，返回是否重新创建了buffer
     pub fn write_buffer(&mut self, device: &RenderDevice, queue: &RenderQueue) -> bool {
-        let size = self.cache_buffer.lock().unwrap().buffer().len();
+        let size = self.cache_buffer.lock().buffer().len();
 
         if self.capacity < size {
             self.buffer = Some(device.create_buffer_with_data(&BufferInitDescriptor {
                 label: self.label.as_deref(),
                 usage: BufferUsages::COPY_DST | BufferUsages::UNIFORM,
-                contents: self.cache_buffer.lock().unwrap().buffer(),
+                contents: self.cache_buffer.lock().buffer(),
             }));
             self.capacity = size;
 			self.is_change = true;
 			return true;
         } else if let Some(buffer) = &self.buffer {
 			if self.is_change {
-				queue.write_buffer(buffer, 0, self.cache_buffer.lock().unwrap().buffer());
+				queue.write_buffer(buffer, 0, self.cache_buffer.lock().buffer());
 				self.is_change = false
 			}
 		}
@@ -89,7 +89,7 @@ impl std::ops::Deref for BindOffset {
 
 impl Drop for BindOffset {
     fn drop(&mut self) {
-        self.context.lock().unwrap().remove(self.offset);
+        self.context.lock().remove(self.offset);
     }
 }
 
