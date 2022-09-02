@@ -13,14 +13,14 @@ extern crate lazy_static;
 pub mod components;
 pub mod font;
 pub mod graph;
-pub mod new_graph;
+pub mod graph_new;
 pub mod rhi;
 
 mod math;
 pub use math::*;
 
 use crate::components::view::render_window::{prepare_windows, RenderWindows};
-use graph::{graph::RenderGraph, GraphError};
+use graph_new::{graph::RenderGraph, GraphError};
 use log::trace;
 use pi_async::rt::AsyncRuntime;
 use pi_ecs::{

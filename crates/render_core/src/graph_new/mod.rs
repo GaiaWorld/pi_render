@@ -1,49 +1,46 @@
+pub mod graph;
 pub mod node;
 pub mod param;
 
-use crate::rhi::{device::RenderDevice, RenderQueue};
-use pi_ecs::prelude::World;
-use thiserror::Error;
-
-pub use param::*;
 pub use node::{NodeId, NodeLabel};
 
+use crate::rhi::{device::RenderDevice, RenderQueue};
+use thiserror::Error;
+
+/// 渲染图 执行过程需要的环境
 #[derive(Clone)]
 pub struct RenderContext {
-    // ECS 的 World，用于 查询 渲染数据
-    pub world: World,
-    // 队列，用于 创建 和 提交 CommandEncoder
-    pub queue: RenderQueue,
     // 渲染 设备，用于 创建资源
     pub device: RenderDevice,
+
+    // 队列，用于 创建 和 提交 CommandEncoder
+    pub queue: RenderQueue,
 }
 
+/// 渲染图 执行过程中 遇到的 相关错误信息
 #[derive(Error, Debug, Eq, PartialEq)]
-pub enum RenderGraphError {
-    #[error("NGGraph is null")]
-    NoneNGraph,
-    #[error("node does not exist")]
-    InvalidNode(NodeLabel),
+pub enum GraphError {
+    #[error("ngraph is null: `{0}`")]
+    NoneNGraph(String),
+
+    #[error("node does not exist: `{0}`")]
+    NoneNode(NodeLabel),
+
+    #[error("node is already exist: `{0}`")]
+    ExitNode(NodeLabel),
+
+    #[error("run ngraph failed, reason = `{0}`")]
+    RunNGraphError(String),
+
+    #[error("run custom node method failed, reason = `{0}`")]
+    RunNodeError(String),
+    
+    #[error("build ng failed, reason = `{0}`")]
+    BuildError(String),
+
     #[error("node does not match the given type")]
     WrongNodeType,
-    #[error("attempted to connect a node output slot to an incompatible input node slot")]
-    MismatchedNodeSlots {
-        output_node: NodeId,
-        output_slot: usize,
-        input_node: NodeId,
-        input_slot: usize,
-    },
-    #[error("node has an unconnected input slot")]
-    UnconnectedNodeInputSlot { node: NodeId, input_slot: usize },
-    #[error("node has an unconnected output slot")]
-    UnconnectedNodeOutputSlot { node: NodeId, output_slot: usize },
-    #[error("node input slot already occupied")]
-    NodeInputSlotAlreadyOccupied {
-        node: NodeId,
-        input_slot: usize,
-        occupied_by_node: NodeId,
-    },
 
-	#[error("Input and output types do not match")]
-	MismatchedParam,
+    #[error("Input and output types do not match")]
+    MismatchedParam,
 }

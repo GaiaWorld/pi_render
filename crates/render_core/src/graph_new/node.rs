@@ -1,150 +1,38 @@
-use std::{borrow::Cow, any::TypeId};
-
+use super::{
+    param::{InParam, OutParam},
+    GraphError, RenderContext,
+};
 use futures::{future::BoxFuture, FutureExt};
-use pi_share::{Share, Cell, ShareRefCell};
+use pi_share::{cell::TrustCell, Share, ShareRefCell};
 use pi_slotmap::new_key_type;
-use thiserror::Error;
+use std::{
+    any::TypeId,
+    borrow::Cow,
+    sync::atomic::{AtomicI32, Ordering},
+};
 use wgpu::CommandEncoder;
-
-use super::{RenderContext, param::{FillTarget, FillSrc}, RenderGraphError, Param};
 
 new_key_type! {
     /// 渲染节点 ID
     pub struct NodeId;
 }
 
-/// 渲染节点
-pub trait Node: Send + Sync + 'static {
-	type Input: Param + Default;
-	type Output: Param + Default;
+/// 渲染节点，给 外部 扩展 使用
+pub trait Node: 'static + Send + Sync {
+    /// 输入参数
+    type Input: InParam + Default;
 
-	/// 异步执行 渲染方法
-    /// 一个渲染节点，通常是 开始 RenderPass
-    /// 将 渲染指令 录制在 wgpu 中
-	fn run(
-		&self, 
-		context: RenderContext,
-        commands: ShareRefCell<CommandEncoder>,
+    /// 输出参数
+    type Output: OutParam + Default + Clone;
+
+    /// 执行
+    fn run<'a>(
+        &'a self,
+        context: RenderContext,
+        commands: Share<TrustCell<CommandEncoder>>,
         input: &Self::Input,
-	) -> Self::Output;
-
-	/// 异步 创建 gpu 资源
-    /// 该函数 在 所有节点的 run方法 之前
-    /// 存放资源的地方
-    /// 资源可以来自 渲染图 之外，也可以来自 渲染节点
-	fn prepare<'a>(
-        &'a self,
-        context: RenderContext,
-    ) -> Option<BoxFuture<'a, Result<(), NodeRunError>>> {
-        None
-    }
-
-    /// 每个节点 执行完 run之后，就会 执行 finish
-    /// 由 渲染图 runner 进行 加锁，保证内部的 代码可以串行
-    fn finish<'a>(
-        &'a self,
-        context: RenderContext,
-        input: &'a Self::Input,
-    ) -> BoxFuture<'a, Result<(), NodeRunError>> {
-        async { Ok(()) }.boxed()
-    }
+    ) -> BoxFuture<'a, Result<Self::Output, String>>;
 }
-
-/// 渲染图 运行过程 遇到的 错误
-#[derive(Error, Debug, Eq, PartialEq)]
-pub enum NodeRunError {
-    #[error("encountered node depend error")]
-    DependError,
-}
-
-pub trait GraphNode: FillTarget {
-	/// 检查参数匹配
-	fn check_param_match(
-		&self, 
-		next_node: &Share<Cell<dyn GraphNode>>,
-	) -> Result<(), RenderGraphError>;
-
-	/// 异步执行 渲染方法
-    /// 一个渲染节点，通常是 开始 RenderPass
-    /// 将 渲染指令 录制在 wgpu 中
-	fn run(
-		&self, 
-		next_nodes: &mut Vec<Share<Cell<dyn GraphNode>>>,
-		context: RenderContext,
-        commands: ShareRefCell<CommandEncoder>
-	);
-
-	/// 异步 创建 gpu 资源
-    /// 该函数 在 所有节点的 run方法 之前
-    /// 存放资源的地方
-    /// 资源可以来自 渲染图 之外，也可以来自 渲染节点
-	fn prepare<'a>(
-        &'a self,
-        context: RenderContext,
-    ) -> Option<BoxFuture<'a, Result<(), NodeRunError>>>;
-
-    /// 每个节点 执行完 run之后，就会 执行 finish
-    /// 由 渲染图 runner 进行 加锁，保证内部的 代码可以串行
-    fn finish<'a>(
-        &'a self,
-        context: RenderContext,
-    ) -> BoxFuture<'a, Result<(), NodeRunError>>;
-
-}
-
-pub struct GraphNodeImpl<I: Param + Default, O: Param + Default + Clone, R: Node<Input=I, Output=O>> {
-	input: I,
-	node: R,
-	id: NodeId,
-}
-
-impl<I: Param + Default + Clone, O: Param + Default + Clone, R: Node<Input=I, Output=O> > FillTarget for GraphNodeImpl<I, O, R> {
-    unsafe fn fill(&mut self, src_id: NodeId, src_ptr: usize, ty: TypeId) {
-        self.input.fill(src_id, src_ptr, ty);
-    }
-
-    fn check_macth(&self, ty: TypeId) -> Result<(), RenderGraphError> {
-        self.input.check_macth(ty)
-    }
-}
-
-
-impl<I: Param + Default + Clone, O: Param + Default + Clone, R: Node<Input=I, Output=O> > GraphNode for GraphNodeImpl<I, O, R> {
-	#[inline]
-	fn check_param_match(
-		&self, 
-		next_node: &Share<Cell<dyn GraphNode>>,
-	) -> Result<(), RenderGraphError> {
-		O::check_macths(&*next_node.borrow())
-	}
-
-	#[inline]
-	fn run(&self, next_nodes: &mut Vec<Share<Cell<dyn GraphNode>>>, context: RenderContext, mut commands: ShareRefCell<CommandEncoder>) {
-		let r = self.node.run(context, commands, &self.input);
-		for next in next_nodes.iter() {
-			r.clone().fill_to(self.id,&mut *next.borrow_mut())
-		}
-	}
-
-	#[inline]
-	fn prepare<'a>(
-        &'a self,
-        context: RenderContext,
-    ) -> Option<BoxFuture<'a, Result<(), NodeRunError>>> {
-		self.node.prepare(context)
-	}
-
-	
-	fn finish<'a>(
-        &'a self,
-        context: RenderContext,
-    ) -> BoxFuture<'a, Result<(), NodeRunError>>{
-		self.node.finish(context, &self.input)
-	}
-}
-
-// 	input.fill()
-// }
 
 /// [`NodeLabel`] 用 名字 或者 [`NodeId`] 来 引用 [`NodeState`]
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -176,5 +64,142 @@ impl From<&'static str> for NodeLabel {
 impl From<NodeId> for NodeLabel {
     fn from(value: NodeId) -> Self {
         NodeLabel::Id(value)
+    }
+}
+
+// ====================== crate内 使用的 数据结构
+
+pub(crate) struct NodeState(pub Share<TrustCell<dyn InternalNode>>);
+
+// 渲染节点，给 渲染图 内部 使用
+pub(crate) trait InternalNode: OutParam {
+    // 当 sub_ng 改变后，需要调用
+    fn reset_next_refs(&mut self);
+
+    // 当 sub_ng 改变后，需要调用
+    fn inc_next_refs(&mut self);
+
+    // 重置 输出参数为 Default
+    fn reset_output(&mut self);
+
+    // 检查 Self 的 输入参数
+    fn is_input_match(&mut self, pre_id: NodeId, pre_node: &dyn InternalNode) -> bool;
+
+    /// 填充 Self 的 输入参数
+    fn fill_input(&mut self, pre_id: NodeId, pre_node: &dyn InternalNode);
+
+    /// 录制渲染指令
+    fn run<'a>(
+        &'a self,
+        context: RenderContext,
+        commands: ShareRefCell<CommandEncoder>,
+    ) -> BoxFuture<'a, Result<(), GraphError>>;
+}
+
+/// 链接 NodeInteral 和 Node 的 结构体
+pub(crate) struct GraphNodeImpl<I, O, R>
+where
+    I: InParam + Default,
+    O: OutParam + Default + Clone,
+    R: Node<Input = I, Output = O>,
+{
+    node: R,
+    input: I,
+    output: O,
+
+    // 该节点 的后继 节点数量
+    // 当渲染图改变节点的拓扑关系后，需要调用一次
+    next_refs: i32,
+
+    // 该节点 当前 后继节点数量
+    // 每帧 运行 渲染图 前，让它等于  next_refs
+    curr_next_refs: AtomicI32,
+}
+
+impl<I, O, R> GraphNodeImpl<I, O, R>
+where
+    I: InParam + Default,
+    O: OutParam + Default + Clone,
+    R: Node<Input = I, Output = O>,
+{
+    pub(crate) fn new(node: R) -> Self {
+        Self {
+            node,
+
+            input: Default::default(),
+            output: Default::default(),
+
+            next_refs: 0,
+            curr_next_refs: AtomicI32::new(0),
+        }
+    }
+
+    // 每帧 后继的渲染节点 获取参数时候，需要调用 此函数
+    fn dec_curr_ref(&mut self) {
+        // 注：这里 last_count 是 self.curr_next_refs 减1 前 的结果
+        let last_count = self.curr_next_refs.fetch_sub(1, Ordering::SeqCst);
+        assert!(
+            last_count >= 1,
+            "RenderNode error, last_count = {}",
+            last_count
+        );
+
+        // 输出参数重置为 Default
+        if last_count == 1 {
+            self.imp.reset_output();
+        }
+    }
+}
+
+impl<I, O, R> OutParam for GraphNodeImpl<I, O, R>
+where
+    I: InParam + Default,
+    O: OutParam + Default + Clone,
+    R: Node<Input = I, Output = O>,
+{
+    fn is_out_macth(&self, ty: TypeId) -> bool {}
+
+    fn fill_to(self, next_id: NodeId, ty: TypeId) {}
+}
+
+impl<I, O, R> InternalNode for GraphNodeImpl<I, O, R>
+where
+    I: InParam + Default,
+    O: OutParam + Default + Clone,
+    R: Node<Input = I, Output = O>,
+{
+    fn reset_next_refs(&mut self) {
+        self.next_refs = 0;
+    }
+
+    fn inc_next_refs(&mut self) {
+        self.next_refs += 1;
+    }
+
+    fn reset_output(&mut self) {
+        self.output = Default::default();
+        self.curr_next_refs.store(self.next_refs, Ordering::SeqCst);
+    }
+
+    fn is_input_match(&mut self, pre_id: NodeId, pre_node: &dyn InternalNode) -> bool {
+        self.input.is_in_macth(pre_node, TypeId::of::<Self::I>())
+    }
+
+    // 每个节点 每帧 需要调用的 入口
+    fn fill_input(&mut self, pre_id: NodeId, pre_node: &dyn InternalNode) {}
+
+    fn run<'a>(
+        &'a self,
+        context: RenderContext,
+        commands: ShareRefCell<CommandEncoder>,
+    ) -> BoxFuture<'a, Result<(), String>> {
+        async move {
+            let runner = self.node.run(context, commands.clone(), &self.input);
+            match runner.await {
+                Ok(output) => self.output = output,
+                Err(msg) => Err(GraphError::RunNodeError(msg)),
+            }
+        }
+        .boxed()
     }
 }
