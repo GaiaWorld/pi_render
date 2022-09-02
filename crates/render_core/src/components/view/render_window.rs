@@ -6,9 +6,9 @@ use crate::{
     },
 };
 use pi_ecs::prelude::{Res, ResMut, World, res::WriteRes};
-use pi_share::ShareRefCell;
+use pi_share::Share;
 use pi_slotmap::{new_key_type, SlotMap};
-use std::{ops::Deref, sync::Arc};
+use std::{ops::Deref};
 use wgpu::TextureFormat;
 use winit::{dpi::PhysicalSize, window::Window};
 
@@ -21,12 +21,12 @@ pub type RenderWindows = SlotMap<RenderWindowKey, RenderWindow>;
 pub struct RenderWindow {
     present_mode: PresentMode,
     last_size: PhysicalSize<u32>,
-    handle: Arc<Window>,
+    handle: Share<Window>,
 }
 
 impl RenderWindow {
     pub fn new(
-        handle: Arc<Window>,
+        handle: Share<Window>,
         present_mode: PresentMode,
     ) -> Self {
         Self {
@@ -42,7 +42,7 @@ pub fn insert_resources(world: &mut World) {
     world.insert_resource(RenderWindows::default());
 }
 
-pub async fn prepare_windows<'w>(
+pub(crate) async fn prepare_windows<'w>(
     device: Res<'w, RenderDevice>,
     instance: Res<'w, RenderInstance>,
     mut windows: ResMut<'w, RenderWindows>,
@@ -57,7 +57,7 @@ pub async fn prepare_windows<'w>(
         let is_first = view.get().is_none();
         if is_first {
             let surface = unsafe { instance.create_surface(window.handle.deref()) };
-            let surface = Arc::new(surface);
+            let surface = Share::new(surface);
 			view.write(ScreenTexture::with_surface(surface));
         }
 

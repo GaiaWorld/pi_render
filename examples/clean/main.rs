@@ -5,21 +5,22 @@ use pass::clear_pass::{ClearOption, ClearOptions, ClearPassNode};
 use log::{debug, info};
 use pi_async::rt::{
     single_thread::{SingleTaskPool, SingleTaskRunner, SingleTaskRuntime},
-    AsyncRuntime, worker_thread::WorkerRuntime, AsyncRuntimeBuilder,
+    worker_thread::WorkerRuntime,
+    AsyncRuntime, AsyncRuntimeBuilder,
 };
 use pi_ecs::prelude::{Dispatcher, SingleDispatcher, World};
 use pi_render::{
     components::view::{
         render_window::{RenderWindow, RenderWindows},
-        target::{RenderTarget, RenderTargets, TextureViews}, target_alloc::ShareTargetView,
+        target::{RenderTarget, RenderTargets, TextureViews},
+        target_alloc::ShareTargetView,
     },
     graph::graph::RenderGraph,
     init_render,
     rhi::{options::RenderOptions, PresentMode},
     RenderStage,
 };
-use pi_share::ShareRefCell;
-use std::sync::Arc;
+use pi_share::{Share, ShareRefCell};
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
@@ -46,12 +47,13 @@ impl RenderExample {
             extract_stage,
             prepare_stage,
             render_stage,
-        } = init_render::<Option<ShareTargetView>, _>(&mut world, options, window, rt.clone()).await;
+        } = init_render::<Option<ShareTargetView>, _>(&mut world, options, window, rt.clone())
+            .await;
 
         let stages = vec![
-            Arc::new(extract_stage.build(&world.clone())),
-            Arc::new(prepare_stage.build(&world.clone())),
-            Arc::new(render_stage.build(&world.clone())),
+            Share::new(extract_stage.build(&world.clone())),
+            Share::new(prepare_stage.build(&world.clone())),
+            Share::new(render_stage.build(&world.clone())),
         ];
 
         self.dispatcher = Some(SingleDispatcher::new(rt.clone()));
@@ -132,12 +134,7 @@ fn main() {
 
     let world = World::new();
 
-    let runtime = AsyncRuntimeBuilder::default_worker_thread(
-		None,
-		None,
-		None,
-		None,
-	);
+    let runtime = AsyncRuntimeBuilder::default_worker_thread(None, None, None, None);
 
     let rt = runtime.clone();
     let example = ShareRefCell::new(RenderExample::default());

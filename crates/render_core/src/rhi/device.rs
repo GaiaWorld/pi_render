@@ -7,17 +7,16 @@ use super::{
 };
 use derive_deref_rs::Deref;
 use futures::Future;
-use std::sync::Arc;
+use pi_share::Share;
 use wgpu::{util::DeviceExt, BufferAsyncError};
 
 /// This GPU device is responsible for the creation of most rendering and compute resources.
 #[derive(Clone, Deref)]
-pub struct RenderDevice(Arc<wgpu::Device>);
+pub struct RenderDevice(Share<wgpu::Device>);
 
-impl From<Arc<wgpu::Device>> for RenderDevice {
-    fn from(device: Arc<wgpu::Device>) -> Self {
-
-		log::warn!("=============== limits = {:?}", device.limits());
+impl From<Share<wgpu::Device>> for RenderDevice {
+    fn from(device: Share<wgpu::Device>) -> Self {
+        log::warn!("=============== limits = {:?}", device.limits());
 
         Self(device)
     }
@@ -172,5 +171,4 @@ impl RenderDevice {
     }
 }
 
-pub struct Binding (usize);
-
+pub struct Binding(usize);

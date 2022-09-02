@@ -1,4 +1,5 @@
-use std::{borrow::Cow, ops::Deref, sync::Arc};
+use pi_share::Share;
+use std::{borrow::Cow, ops::Deref};
 use uuid::Uuid;
 use wgpu::{
     BufferAddress, ColorTargetState, DepthStencilState, MultisampleState, PrimitiveState,
@@ -13,13 +14,13 @@ use super::{bind_group_layout::BindGroupLayout, shader::ShaderId};
 /// Can be created via [`RenderDevice::create_render_pipeline`](crate::renderer::RenderDevice::create_render_pipeline).
 #[derive(Clone, Debug)]
 pub struct RenderPipeline {
-    value: Arc<wgpu::RenderPipeline>,
+    value: Share<wgpu::RenderPipeline>,
 }
 
 impl From<wgpu::RenderPipeline> for RenderPipeline {
     fn from(value: wgpu::RenderPipeline) -> Self {
         RenderPipeline {
-            value: Arc::new(value),
+            value: Share::new(value),
         }
     }
 }
@@ -44,7 +45,7 @@ pub struct ComputePipelineId(Uuid);
 #[derive(Clone, Debug)]
 pub struct ComputePipeline {
     id: ComputePipelineId,
-    value: Arc<wgpu::ComputePipeline>,
+    value: Share<wgpu::ComputePipeline>,
 }
 
 impl ComputePipeline {
@@ -59,7 +60,7 @@ impl From<wgpu::ComputePipeline> for ComputePipeline {
     fn from(value: wgpu::ComputePipeline) -> Self {
         ComputePipeline {
             id: ComputePipelineId(Uuid::new_v4()),
-            value: Arc::new(value),
+            value: Share::new(value),
         }
     }
 }

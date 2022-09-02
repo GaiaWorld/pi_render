@@ -2,8 +2,9 @@ use futures::future::{BoxFuture, FutureExt};
 use naga::{back::wgsl::WriterFlags, valid::ModuleInfo, Module};
 use once_cell::sync::Lazy;
 use pi_hash::{XHashMap, XHashSet};
+use pi_share::Share;
 use regex::Regex;
-use std::{borrow::Cow, ops::Deref, path::PathBuf, sync::Arc};
+use std::{borrow::Cow, ops::Deref, path::PathBuf};
 use thiserror::Error;
 use uuid::Uuid;
 use wgpu::{util::make_spirv, ShaderModuleDescriptor, ShaderSource};
@@ -242,7 +243,7 @@ impl ShaderReflection {
 /// 得到 未经过预处理的 Shader
 pub fn load_shader(
     path: PathBuf,
-    bytes: Arc<[u8]>,
+    bytes: Share<[u8]>,
 ) -> BoxFuture<'static, Result<Shader, anyhow::Error>> {
     async move {
         // 根据后缀名判断 是 那种类型
@@ -377,14 +378,14 @@ impl ShaderProcessor {
     /// shader: 文本
     /// shader_defs: 预处理 宏
     /// import_shaders: 提供给 该shader找的 import 的 其他 Shader
-	pub fn process(
+    pub fn process(
         &self,
         id: &ShaderId,
         shader_defs: &XHashSet<String>,
         shaders: &XHashMap<ShaderId, Shader>,
         import_shaders: &XHashMap<ShaderImport, ShaderId>,
     ) -> Result<ProcessedShader, ProcessShaderError> {
-		let shader = shaders.get(id).unwrap();
+        let shader = shaders.get(id).unwrap();
         let shader_str = match &shader.source {
             Source::Wgsl(source) => source.deref(),
             Source::Glsl(source, _stage) => source.deref(),
@@ -1216,10 +1217,7 @@ fn in_main_present() { }
 
         let foo = Shader::from_wgsl(FOO);
         let mut import_shaders = XHashMap::default();
-        import_shaders.insert(
-            ShaderImport::Path("libs/foo".to_string()),
-            foo.id(),
-        );
+        import_shaders.insert(ShaderImport::Path("libs/foo".to_string()), foo.id());
         shaders.insert(foo.id(), foo);
 
         let result = processor
@@ -1280,7 +1278,7 @@ fn in_main() { }
         let result = processor
             .process(&id, &shader_defs, &shaders, &import_shaders)
             .unwrap();
-		let r = result.get_wgsl_source().unwrap();
+        let r = result.get_wgsl_source().unwrap();
         assert_eq!(result.get_wgsl_source().unwrap(), EXPECTED);
     }
 }

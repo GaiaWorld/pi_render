@@ -2,26 +2,25 @@
 //! 对 wgpu 的 封装
 //! 封装成 可 Clone 的 API 对象
 
+pub mod asset;
 pub mod bind_group;
 pub mod bind_group_layout;
+pub mod block_alloc;
 pub mod buffer;
 pub mod device;
+pub mod dyn_uniform_buffer;
 pub mod options;
 pub mod pipeline;
 pub mod shader;
 pub mod texture;
 pub mod uniform_vec;
-pub mod asset;
-pub mod block_alloc;
-pub mod dyn_uniform_buffer;
 
 use self::{device::RenderDevice, options::RenderOptions};
 use crate::rhi::options::RenderPriority;
-use log::{debug, info, warn};
+use log::{debug, warn};
 use pi_ecs::prelude::World;
-use pi_share::ShareRefCell;
-use std::{ops::Deref, sync::Arc};
 
+use pi_share::Share;
 pub use render_crevice::*;
 pub use wgpu::{
     util::BufferInitDescriptor,
@@ -122,7 +121,7 @@ pub use wgpu::{
     VertexStepMode,
 };
 
-pub type RenderQueue = Arc<wgpu::Queue>;
+pub type RenderQueue = Share<wgpu::Queue>;
 pub type RenderInstance = wgpu::Instance;
 
 /// 初始化 渲染 环境
@@ -130,7 +129,7 @@ pub type RenderInstance = wgpu::Instance;
 pub async fn setup_render_context(
     mut world: World,
     options: RenderOptions,
-    window: Arc<winit::window::Window>,
+    window: Share<winit::window::Window>,
 ) {
     let backends = options.backends;
 
@@ -200,7 +199,7 @@ async fn initialize_renderer(
         // specified max_limits. For 'min' limits, take the maximum instead. This is intended to
         // err on the side of being conservative. We can't claim 'higher' limits that are supported
         // but we can constrain to 'lower' limits.
-        limits = wgpu::Limits { 
+        limits = wgpu::Limits {
             max_texture_dimension_1d: limits
                 .max_texture_dimension_1d
                 .min(constrained_limits.max_texture_dimension_1d),
@@ -296,8 +295,8 @@ async fn initialize_renderer(
         )
         .await
         .unwrap();
-    let device = Arc::new(device);
-    let queue = Arc::new(queue);
+    let device = Share::new(device);
+    let queue = Share::new(queue);
 
     (RenderDevice::from(device), queue, adapter_info)
 }

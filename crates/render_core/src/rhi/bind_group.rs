@@ -1,10 +1,6 @@
-use std::{ops::Deref, sync::Arc};
-use pi_map::vecmap::VecMap;
-use pi_share::{ShareMutex, ShareRwLock, Share};
-use pi_slotmap::SlotMap;
+use pi_share::Share;
+use std::ops::Deref;
 use uuid::Uuid;
-
-use super::block_alloc::{BlockAlloter, BlockIndex};
 
 #[derive(Copy, Clone, Hash, Eq, PartialEq, Debug)]
 pub struct BindGroupId(Uuid);
@@ -12,7 +8,7 @@ pub struct BindGroupId(Uuid);
 #[derive(Clone, Debug)]
 pub struct BindGroup {
     id: BindGroupId,
-    value: Arc<wgpu::BindGroup>,
+    value: Share<wgpu::BindGroup>,
 }
 
 impl BindGroup {
@@ -26,7 +22,7 @@ impl From<wgpu::BindGroup> for BindGroup {
     fn from(value: wgpu::BindGroup) -> Self {
         BindGroup {
             id: BindGroupId(Uuid::new_v4()),
-            value: Arc::new(value),
+            value: Share::new(value),
         }
     }
 }

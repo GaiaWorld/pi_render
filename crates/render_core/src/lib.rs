@@ -11,32 +11,30 @@ extern crate paste;
 extern crate lazy_static;
 
 pub mod components;
-pub mod graph;
-pub mod rhi;
 pub mod font;
-pub mod graph_new;
+pub mod graph;
+pub mod new_graph;
+pub mod rhi;
 
 mod math;
 pub use math::*;
 
-use crate::components::{
-    view::render_window::{prepare_windows, RenderWindows},
-};
-use graph::{graph::RenderGraph, runner::RenderGraphRunner, node::NodeOutputType};
+use crate::components::view::render_window::{prepare_windows, RenderWindows};
+use graph::{graph::RenderGraph, GraphError};
 use log::trace;
 use pi_async::rt::AsyncRuntime;
 use pi_ecs::{
     prelude::{world::WorldMut, StageBuilder, World},
     sys::system::IntoSystem,
 };
-use pi_share::ShareRefCell;
-use rhi::{device::RenderDevice, options::RenderOptions, setup_render_context, RenderQueue, texture::ScreenTexture};
+use pi_share::Share;
+use rhi::{
+    device::RenderDevice, options::RenderOptions, setup_render_context, texture::ScreenTexture,
+    RenderQueue,
+};
 use std::{
-    borrow::BorrowMut,
     collections::HashMap,
-    sync::{
-        atomic::{AtomicBool, AtomicU64, Ordering}, Arc,
-    },
+    sync::atomic::{AtomicBool, AtomicU64, Ordering},
 };
 use thiserror::Error;
 use winit::window::Window;
@@ -49,21 +47,19 @@ pub enum RenderContextError {
 }
 
 pub struct RenderStage {
-    pub extract_stage: StageBuilder,
     pub prepare_stage: StageBuilder,
     pub render_stage: StageBuilder,
 }
 
 /// 初始化
-pub async fn init_render<O, A>(
+pub async fn init_render<A>(
     world: &mut World,
     options: RenderOptions,
-    window: Arc<Window>,
-    rt: A
+    window: Share<Window>,
+    rt: A,
 ) -> RenderStage
 where
-    O: NodeOutputType,
-	A: AsyncRuntime + Send + 'static
+    A: 'static + AsyncRuntime + Send,
 {
     // 一次性 注册 所有的 组件
     // register_components(world.new_archetype::<RenderArchetype>()).create();
@@ -71,48 +67,33 @@ where
     // 初始化渲染，加入如下 Res: RenderInstance, RenderQueue, RenderDevice, RenderOptions, AdapterInfo
     setup_render_context(world.clone(), options, window).await;
     // 添加 渲染图 Res
-    insert_render_graph::<O, A>(world, rt);
+    insert_render_graph::<A>(world, rt);
     // 添加 其他 Res
     insert_resources(world);
 
     // 注册 必要的 Stage 和 System
-    register_system::<O, A>(world)
+    register_system::<A>(world)
 }
 
-// RenderGraph Build & Prepare
-pub async fn prepare_rg<O, A>(world: WorldMut) -> std::io::Result<()>
+// Build RenderGraph
+async fn build_graph<A>(world: WorldMut) -> Result<(), GraphError>
 where
-    O: NodeOutputType,
-	A: AsyncRuntime + Send + 'static
+    A: 'static + AsyncRuntime + Send,
 {
-    let world = world.clone();
-
-    let runner = world.get_resource_mut::<RenderGraphRunner<O, A>>().unwrap();
-
-    let rg = world.get_resource_mut::<RenderGraph<O>>().unwrap();
+    let rg = world.get_resource_mut::<RenderGraph>().unwrap();
     let device = world.get_resource::<RenderDevice>().unwrap();
     let queue = world.get_resource::<RenderQueue>().unwrap();
-    runner
-        .build(
-            world.clone(),
-            device.clone(),
-            queue.clone(),
-            rg.borrow_mut(),
-        )
-        .unwrap();
-    runner.prepare().await;
-	
-    Ok(())
+
+    rg.build(device.clone(), queue.clone())
 }
 
 /// 每帧 调用一次，用于 驱动 渲染图
-async fn render_system<O, A>(world: WorldMut) -> std::io::Result<()>
+async fn render_system<A>(world: WorldMut) -> Result<(), GraphError>
 where
-    O: NodeOutputType,
-	A: AsyncRuntime + Send + 'static
+    A: 'static + AsyncRuntime + Send,
 {
-    let graph_runner = world.get_resource_mut::<RenderGraphRunner<O, A>>().unwrap();
-    graph_runner.run().await;
+    let graph = world.get_resource_mut::<RenderGraph<A>>().unwrap();
+    graph.run().await;
 
     let world = world.clone();
 
@@ -126,9 +107,9 @@ where
             trace!("render_system: after surface_texture.present");
         }
     }
-   
+
     // todo  实现 raf
-    // res_rendered_callback(); --> 
+    // res_rendered_callback(); -->
     // for {
     //     let res = getSurfaceView();
     // }
@@ -137,15 +118,11 @@ where
     Ok(())
 }
 
-fn insert_render_graph<O, A>(world: &mut World, rt: A)
+fn insert_render_graph<A>(world: &mut World, rt: A)
 where
-    O: NodeOutputType,
-	A: AsyncRuntime + Send + 'static
+    A: 'static + AsyncRuntime + Send,
 {
-    world.insert_resource(RenderGraph::<O>::default());
-
-    let rg_runner = RenderGraphRunner::<O, A>::new(rt);
-    world.insert_resource(rg_runner);
+    world.insert_resource(RenderGraph::<A>::new(rt));
 }
 
 // 添加 其他 Res
@@ -153,22 +130,18 @@ fn insert_resources(world: &mut World) {
     components::init_ecs(world);
 }
 
-fn register_system<O, A>(world: &mut World) -> RenderStage
+fn register_system<A>(world: &mut World) -> RenderStage
 where
-    O: NodeOutputType,
-	A: AsyncRuntime + Send + 'static
+    A: 'static + AsyncRuntime + Send,
 {
-    let extract_stage = StageBuilder::new();
-
     let mut prepare_stage = StageBuilder::new();
     prepare_stage.add_node(prepare_windows.system(world));
-    prepare_stage.add_node(prepare_rg::<O, A>.system(world));
+    prepare_stage.add_node(build_graph::<A>.system(world));
 
     let mut render_stage = StageBuilder::new();
-    render_stage.add_node(render_system::<O, A>.system(world));
+    render_stage.add_node(render_system::<A>.system(world));
 
     RenderStage {
-        extract_stage,
         prepare_stage,
         render_stage,
     }

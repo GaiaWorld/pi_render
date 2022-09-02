@@ -1,4 +1,5 @@
-use std::{ops::Deref, sync::Arc};
+use pi_share::Share;
+use std::ops::Deref;
 use uuid::Uuid;
 
 #[derive(Copy, Clone, Hash, Eq, PartialEq, Debug)]
@@ -7,7 +8,7 @@ pub struct BindGroupLayoutId(Uuid);
 #[derive(Clone, Debug)]
 pub struct BindGroupLayout {
     id: BindGroupLayoutId,
-    value: Arc<wgpu::BindGroupLayout>,
+    value: Share<wgpu::BindGroupLayout>,
 }
 
 impl PartialEq for BindGroupLayout {
@@ -32,7 +33,7 @@ impl From<wgpu::BindGroupLayout> for BindGroupLayout {
     fn from(value: wgpu::BindGroupLayout) -> Self {
         BindGroupLayout {
             id: BindGroupLayoutId(Uuid::new_v4()),
-            value: Arc::new(value),
+            value: Share::new(value),
         }
     }
 }

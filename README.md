@@ -2,45 +2,23 @@
 
 Renderer for PI Engine
 
-## extract_**
+## 2022.08.31
 
-+ extract_windows
-+ extract_cameras
-+ extract_clear_color
-+ extract_core_pipeline_camera_phases
++ 删除 RenderGraphRunner （包括 Res），相关方法通过 RenderGraph 调用
++ 去掉 RenderGraph 的 O 泛型，改为 A 异步运行时
++ 去掉 extract_stage 阶段
++ 去掉 trait Node 的 prepare 操作
++ 将 Node 的 Param 改为 Input 和 Output
 
 ## prepare_***
 
++ build_graph
 + prepare_windows
-+ prepare_view_targets
-+ prepare_view_uniforms
-+ prepare_core_views_system
 
 ## Res
 
 + RenderGraph
-+ RenderGraphRunner
 + RenderInstance
 + RenderDevice
 + RenderQueue
-
-
 + RenderWindows
-+ WindowSurfaces
-
-
-`下面的是还没准备好的`
-
-
-## Component
-
-+ RenderView
-+ ViewTarget
-+ RenderCamera
-+ ViewUniformOffset
-
-+ ViewUniforms
-+ RenderCameraNames
-+ ClearColor
-+ RenderTargetClearColors
-+ TextureCache

@@ -1,8 +1,7 @@
 use std::{
     ops::{Bound, Deref, RangeBounds},
-    sync::Arc,
 };
-
+use pi_share::Share;
 use uuid::Uuid;
 
 #[derive(Copy, Clone, Hash, Eq, PartialEq, Debug)]
@@ -12,7 +11,7 @@ pub struct BufferId(Uuid);
 #[derive(Clone, Debug)]
 pub struct Buffer {
     id: BufferId,
-    value: Arc<wgpu::Buffer>,
+    value: Share<wgpu::Buffer>,
 }
 
 impl Buffer {
@@ -47,7 +46,7 @@ impl From<wgpu::Buffer> for Buffer {
     fn from(value: wgpu::Buffer) -> Self {
         Buffer {
             id: BufferId(Uuid::new_v4()),
-            value: Arc::new(value),
+            value: Share::new(value),
         }
     }
 }
