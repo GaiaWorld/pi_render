@@ -11,11 +11,11 @@ use futures::{future::BoxFuture, FutureExt};
 use log::error;
 use pi_async::rt::AsyncRuntime;
 use pi_async_graph::{async_graph, ExecNode, RunFactory, Runner};
-use pi_graph::{DirectedGraph, NGraph, NGraphBuilder};
+use pi_graph::{DirectedGraph, DirectedGraphNode, NGraph, NGraphBuilder};
 use pi_hash::{XHashMap, XHashSet};
-use pi_share::{Share, ShareRefCell};
+use pi_share::{cell::TrustCell, Share, ShareRefCell};
 use pi_slotmap::SlotMap;
-use std::borrow::Cow;
+use std::{borrow::Cow, sync::Arc};
 
 /// 渲染图
 pub struct RenderGraph<A>
@@ -63,7 +63,7 @@ impl<A> RenderGraph<A>
 where
     A: 'static + AsyncRuntime + Send,
 {
-    pub fn new(rt: A) {
+    pub fn new(rt: A) -> Self {
         Self {
             node_names: XHashMap::default(),
 
@@ -103,7 +103,7 @@ where
         self.is_topo_dirty = true;
 
         let mut node_state = NodeState::new(node);
-        node_state.name = Some(name.clone());
+
         let node_id = self.nodes.insert(node_state);
 
         self.node_names.insert(name, node_id);
@@ -121,7 +121,7 @@ where
             self.node_names.remove(&name.into());
 
             // 图：删点 必 删边
-            let remove_edges = vec![];
+            let mut remove_edges = vec![];
             for (before, after) in self.edges.iter() {
                 if id == *before || id == *after {
                     remove_edges.push((*before, *after));
@@ -212,13 +212,13 @@ where
         }
 
         // 拓扑结构
-        let ng = self.get_topo_ng().unwrap();
+        self.get_topo_ng().unwrap();
 
         // 子图结构
-        let sub_ng = self.get_sub_ng(ng).unwrap();
+        self.get_sub_ng().unwrap();
 
         // 构建 run_ng
-        self.create_run_ng(sub_ng, &device, &queue);
+        self.create_run_ng(&device, &queue);
 
         Ok(())
     }
@@ -271,37 +271,30 @@ where
         }
     }
 
-    fn get_node_mut(&mut self, label: impl Into<NodeLabel>) -> Option<&mut NodeState> {
-        let id = self.get_node_id(label);
-        match id {
-            Ok(id) => self.nodes.get_mut(id),
-            Err(_) => None,
-        }
-    }
-
     // 取 拓扑子图，有必要就重新构建
-    fn get_sub_ng(&mut self, ng: &NGraph<NodeId, NodeId>) -> Option<&mut NGraph<NodeId, NodeId>> {
+    fn get_sub_ng(&mut self) -> Option<()> {
         // 子图没修改，返回 原图
         if !self.is_finish_dirty {
-            return self.topo_sub_ng.as_mut();
+            return Some(());
         }
 
         let finishes = self.clone_finish_nodes();
 
+        let ng = self.topo_ng.as_ref().unwrap();
+
         // 以终为起，构建需要的 节点
         let sub_ng = ng.gen_graph_from_keys(&finishes);
 
-        self.set_sub_next_refs(&sub_ng);
-
         self.topo_sub_ng = Some(sub_ng);
-        self.topo_sub_ng.as_mut()
+
+        Some(())
     }
 
     // 取 拓扑图，有必要就重新构建
-    fn get_topo_ng(&mut self) -> Option<&mut NGraph<NodeId, NodeId>> {
+    fn get_topo_ng(&mut self) -> Option<()> {
         // 拓扑 没修改，返回 原图
         if !self.is_topo_dirty {
-            return self.topo_ng.as_mut();
+            return Some(());
         }
         self.is_topo_dirty = false;
 
@@ -329,19 +322,20 @@ where
         };
 
         self.topo_ng = Some(ng);
-        self.topo_ng.as_mut()
+        Some(())
     }
 
     // 创建真正的 运行图
     fn create_run_ng(
         &mut self,
-        sub_ng: &NGraph<NodeId, NodeId>,
         device: &RenderDevice,
         queue: &RenderQueue,
     ) -> Result<(), GraphError> {
         let mut run_builder = NGraphBuilder::<NodeId, ExecNode<EmptySyncRun, EmptySyncRun>>::new();
 
+        let sub_ng = self.topo_sub_ng.as_ref().unwrap();
         let topo_ids = sub_ng.topological_sort();
+
         // 异步图 节点
         for id in topo_ids {
             let node = self.create_run_node(*id, device, queue)?;
@@ -358,13 +352,20 @@ where
                 let from = *from.value();
                 let to = *to.value();
 
+                // 构造边
                 run_builder = run_builder.edge(from, to);
+
+                let f_n = self.nodes.get_mut(from).unwrap().clone();
+
+                // 为 to 天上 prenode = from
+                let t_n = self.nodes.get_mut(to).unwrap();
+                t_n.0.as_ref().borrow_mut().add_pre_node((from, f_n));
             }
         }
 
         match run_builder.build() {
             Ok(g) => {
-                self.run_ng = Some(g);
+                self.run_ng = Some(Share::new(g));
                 Ok(())
             }
             Err(e) => {
@@ -373,7 +374,6 @@ where
                 Err(GraphError::BuildError(msg))
             }
         }
-        Ok(())
     }
 
     // 创建 渲染 节点
@@ -383,28 +383,34 @@ where
         device: &RenderDevice,
         queue: &RenderQueue,
     ) -> Result<ExecNode<EmptySyncRun, EmptySyncRun>, GraphError> {
-        let node = self.get_node(NodeLabel::Id(node_id)).unwrap();
-        let node = node.imp.clone();
+        let n = self.get_node(NodeLabel::Id(node_id));
+        let node = n.unwrap().0.clone();
 
-        let context = RenderContext {
-            device: device.clone(),
-            queue: queue.clone(),
-        };
+        let device = device.clone();
+        let queue = queue.clone();
 
         // 该函数 会在 ng 图上，每帧每节点 执行一次
-        let f = move || -> BoxFuture<'static, Result<(), GraphError>> {
-            async move {
-                // 获取该节点的输入参数，在这里处理
+        let f = move || -> BoxFuture<'static, std::io::Result<()>> {
+            let node = node.clone();
+            let device = device.clone();
+            let queue = queue.clone();
 
+            async move {
                 let commands =
                     device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
 
                 let commands = ShareRefCell::new(commands);
 
+                let context = RenderContext {
+                    device: device.clone(),
+                    queue: queue.clone(),
+                };
+
                 node.as_ref()
-                    .borrow()
+                    .borrow_mut()
                     .run(context, commands.clone())
-                    .await?;
+                    .await
+                    .unwrap();
 
                 let commands = Share::try_unwrap(commands.0).unwrap();
                 let commands = commands.into_inner();
@@ -419,23 +425,9 @@ where
         Ok(ExecNode::Async(Box::new(f)))
     }
 
-    // 设置 子图中 每个节点 后继的 引用数量
-    fn set_sub_next_refs(&mut self, sub_ng: &NGraph<NodeId, NodeId>) {
-        let topo_ids = sub_ng.topological_sort();
-
-        // 所有节点 清 0
-        for to in topo_ids {
-            let n = self.nodes.get_mut(*to).unwrap();
-            n.reset_next_refs();
-        }
-
-        for to in topo_ids {
-            let from_ids = sub_ng.get(to).unwrap().to();
-            for target in from_ids {
-                let n = self.nodes.get_mut(*target).unwrap();
-                n.inc_next_refs();
-            }
-        }
+    // 供 GraphRunner 使用，和 使用者 无关
+    fn clone_finish_nodes(&self) -> Vec<NodeId> {
+        self.finish_nodes.iter().copied().collect()
     }
 }
 
@@ -451,6 +443,6 @@ impl RunFactory for EmptySyncRun {
     type R = EmptySyncRun;
 
     fn create(&self) -> Self::R {
-        Self::R
+        EmptySyncRun
     }
 }

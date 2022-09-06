@@ -31,6 +31,8 @@ float-ord = "0.3"
 
 pi_ecs = { git = "https://github.com/GaiaWorld/pi_ecs.git" }
 
+render_derive = {path = "crates/render_derive"}
+
 [[example]]
 name = "hello_winit"
 path = "examples/hello_winit/main.rs"

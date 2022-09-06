@@ -17,10 +17,10 @@ pub struct RenderGraph<O: NodeOutputType> {
     is_topology_change: bool,
 
     // 只要 高层不改 链接关系，ng就一直用这个；
-    pub(crate) ng: Option<NGraph<NodeId, NodeId>>,
+    ng: Option<NGraph<NodeId, NodeId>>,
     
     // 最终节点，渲染到屏幕的节点
-    pub(crate) finish_nodes: XHashSet<NodeId>,
+    finish_nodes: XHashSet<NodeId>,
     
     // 边 (before, after)
     edges: XHashSet<(NodeId, NodeId)>,
@@ -183,12 +183,10 @@ impl<O: NodeOutputType> RenderGraph<O> {
 				}
             }
 
-			if remove_edges.len() > 0 {
-				for i in remove_edges.iter() {
-					self.edges.remove(i);
-				}
-			}
-
+			for i in remove_edges.iter() {
+                self.edges.remove(i);
+            }
+	
             let ng = match builder.build() {
                 Ok(ng) => ng,
                 Err(e) => {

@@ -12,7 +12,7 @@ extern crate lazy_static;
 
 pub mod components;
 pub mod font;
-pub mod graph;
+// pub mod graph;
 pub mod graph_new;
 pub mod rhi;
 
@@ -80,7 +80,7 @@ async fn build_graph<A>(world: WorldMut) -> Result<(), GraphError>
 where
     A: 'static + AsyncRuntime + Send,
 {
-    let rg = world.get_resource_mut::<RenderGraph>().unwrap();
+    let rg = world.get_resource_mut::<RenderGraph<A>>().unwrap();
     let device = world.get_resource::<RenderDevice>().unwrap();
     let queue = world.get_resource::<RenderQueue>().unwrap();
 

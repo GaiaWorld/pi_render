@@ -23,10 +23,10 @@ pub enum GraphError {
     #[error("ngraph is null: `{0}`")]
     NoneNGraph(String),
 
-    #[error("node does not exist: `{0}`")]
+    #[error("node does not exist")]
     NoneNode(NodeLabel),
 
-    #[error("node is already exist: `{0}`")]
+    #[error("node is already exist")]
     ExitNode(NodeLabel),
 
     #[error("run ngraph failed, reason = `{0}`")]
@@ -34,7 +34,7 @@ pub enum GraphError {
 
     #[error("run custom node method failed, reason = `{0}`")]
     RunNodeError(String),
-    
+
     #[error("build ng failed, reason = `{0}`")]
     BuildError(String),
 
@@ -44,3 +44,4 @@ pub enum GraphError {
     #[error("Input and output types do not match")]
     MismatchedParam,
 }
+
