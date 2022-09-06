@@ -25,7 +25,6 @@ pub struct B {
 
 #[test]
 fn simple_graph() {
-    
     struct Node1;
 
     impl Node for Node1 {
@@ -45,7 +44,7 @@ fn simple_graph() {
 
                 Ok(A {
                     a: 1.2,
-                    b: 235,
+                    b: 43435,
                     c: "abcdefg".to_string(),
                 })
             }
@@ -71,6 +70,8 @@ fn simple_graph() {
                 assert_eq!(input.a, 1.2);
                 assert_eq!(input.c, "abcdefg".to_string());
 
+                println!("End Node 2 run");
+
                 Ok(())
             }
             .boxed()
@@ -84,9 +85,9 @@ fn simple_graph() {
     g.add_node("Node1", Node1);
     g.add_node("Node2", Node2);
     g.add_depend("Node1", "Node2");
-    g.set_finish("Node2", true);
+    g.set_finish("Node2", true).unwrap();
 
-    rt.spawn(rt.alloc(), async move {
+    let _ = rt.spawn(rt.alloc(), async move {
         let (device, queue) = init_render().await;
 
         g.build(device, queue).unwrap();
@@ -94,7 +95,7 @@ fn simple_graph() {
         g.run().await.unwrap();
     });
 
-    std::thread::sleep(Duration::from_secs(2 * 60 * 60));
+    std::thread::sleep(Duration::from_secs(5));
 }
 
 async fn init_render() -> (RenderDevice, RenderQueue) {

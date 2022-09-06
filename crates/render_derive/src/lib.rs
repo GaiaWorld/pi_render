@@ -47,11 +47,7 @@ pub fn derive_node_param(input: TokenStream) -> TokenStream {
             .map(|field| {
                 let name = field.ident.as_ref().unwrap();
                 quote! {
-                    let r = pi_render::graph_new::param::InParam::fill_from(&mut self.#name, pre_id, out_param);
-                    println!("input field name = {}, result = {}", #name, r);
-                    if r {
-                        return true;
-					}
+                    r |= pi_render::graph_new::param::InParam::fill_from(&mut self.#name, pre_id, out_param);
                 }
             })
             .collect::<Vec<TokenStream2>>();
@@ -61,10 +57,8 @@ pub fn derive_node_param(input: TokenStream) -> TokenStream {
             .map(|field| {
                 let name = field.ident.as_ref().unwrap();
                 quote! {
-                    let r = pi_render::graph_new::param::OutParam::get_content(&self.#name, ty);
-                    println!("output field name = {}, ty = {:?}, r = {}", #name, ty, r);
-                    if r != 0 {
-                        return r;
+                    if pi_render::graph_new::param::OutParam::fill_to(&self.#name, this_id, to, ty) {
+                        return true;
                     }
                 }
             })
@@ -72,20 +66,20 @@ pub fn derive_node_param(input: TokenStream) -> TokenStream {
 
         quote! {
             impl #impl_generics pi_render::graph_new::param::OutParam for #name #ty_generics #where_clause {
-                fn get_content(&self, ty: std::any::TypeId) -> usize {
+                fn fill_to(&self, this_id: pi_render::graph_new::node::NodeId, to: &mut dyn pi_render::graph_new::param::Assign, ty: std::any::TypeId) -> bool {
                     #(#outputs)*
                     
-                    0
+                    false
                 }
             }
 
             impl #impl_generics pi_render::graph_new::param::InParam for #name #ty_generics #where_clause {
                 fn fill_from<T: pi_render::graph_new::param::OutParam + ?Sized>(&mut self, pre_id: pi_render::graph_new::node::NodeId, out_param: &T) -> bool {
+                    let mut r = false;
+
                     #(#inputs;)*
                     
-                    println!("failed input");
-                        
-                    false
+                    r
                 }
             }
         }
@@ -93,21 +87,20 @@ pub fn derive_node_param(input: TokenStream) -> TokenStream {
         // 整体 作为 输入 输入 参数
         quote! {
             impl #impl_generics pi_render::graph_new::param::OutParam for #name #ty_generics #where_clause {
-                fn get_content(&self, ty: std::any::TypeId) -> usize {
-                    if ty == std::any::TypeId::of::<Self>() {
+                fn fill_to(&self, this_id: pi_render::graph_new::node::NodeId, to: &mut dyn pi_render::graph_new::param::Assign, ty: std::any::TypeId) -> bool {
+                    let r = ty == std::any::TypeId::of::<Self>();
+                    if r {
                         let c = Clone::clone(self);
                         
                         // 隐藏条件，必须 为 Self 实现 Clone
                         let p = &c as *const Self as usize;
+                        to.assign(this_id, p);
 
                         // 注: Copy 和 Drop 不能 共存
                         // 不能 释放放这个 c，因为 c 是要拿去 填充 输入的
                         std::mem::forget(c);
-
-                        p
-                    } else {
-                        0
                     }
+                    r
                 }
             }
 
@@ -117,17 +110,7 @@ pub fn derive_node_param(input: TokenStream) -> TokenStream {
                     pre_id: pi_render::graph_new::node::NodeId,
                     out_param: &T,
                 ) -> bool {
-                    let v = out_param.get_content(std::any::TypeId::of::<Self>());
-
-                    println!("Input fill_from, type = {:?}, v = {}", std::any::TypeId::of::<Self>(), v);
-                    
-                    if v != 0 {
-                        *self = unsafe {
-                            std::ptr::read(v as *const Self)
-                        };
-                    }
-
-                    v != 0
+                    out_param.fill_to(&self, pre_id, self, std::any::TypeId::of::<Self>())()
                 }
             }
         }

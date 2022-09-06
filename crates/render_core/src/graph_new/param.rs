@@ -47,16 +47,19 @@ pub trait NodeParam: InParam + OutParam {}
 impl<T: InParam + OutParam> NodeParam for T {}
 
 /// 渲染图节点的 输入参数，用于 trait Node 的 关联类型 Input
-pub trait InParam: 'static + Send + Sync {
+pub trait InParam: 'static + Send + Sync + Assign {
     // 由 节点 在 运行前 主动调用，每个 前置节点的 输出参数 调用一次
     fn fill_from<T: OutParam + ?Sized>(&mut self, pre_id: NodeId, out_param: &T) -> bool;
 }
 
 /// 渲染图节点的 输出参数，用于 trait Node 的 关联类型 Output
 pub trait OutParam: 'static + Send + Sync {
-    /// clone 一个 指定 ty 类型 的 指针返回
-    /// 如果不匹配，则返回 0
-    fn get_content(&self, ty: TypeId) -> usize;
+    fn fill_to(&self, this_id: NodeId, to: &mut dyn Assign, ty: TypeId) -> bool;
+}
+
+// 赋值
+pub trait Assign {
+    fn assign(&mut self, pre_id: NodeId, ptr: usize);
 }
 
 /// 输入参数 收集器
@@ -67,13 +70,25 @@ pub struct InCollector<T: OutParam>(pub XHashMap<NodeId, T>);
 
 impl<T: OutParam + Default> InParam for InCollector<T> {
     fn fill_from<Ty: OutParam + ?Sized>(&mut self, pre_id: NodeId, out_param: &Ty) -> bool {
-        let v = out_param.get_content(TypeId::of::<T>());
-        if v != 0 {
-            let v = unsafe { std::ptr::read(v as *const T) };
+        out_param.fill_to(pre_id, self, TypeId::of::<T>())
+    }
+}
+
+impl<T: OutParam + Default> Assign for InCollector<T> {
+    fn assign(&mut self, pre_id: NodeId, ptr: usize) {
+        if ptr != 0 {
+            let v = unsafe { std::ptr::read(ptr as *const T) };
             self.0.insert(pre_id, v);
         }
+    }
+}
 
-        v != 0
+impl<T> Assign for T {
+    default fn assign(&mut self, _: NodeId, ptr: usize) {
+        if ptr != 0 {
+            let v = unsafe { std::ptr::read(ptr as *const T) };
+            *self = v;
+        }
     }
 }
 
@@ -82,30 +97,21 @@ impl<T: OutParam + Default> InParam for InCollector<T> {
 macro_rules! impl_base_copy {
     ($ty: ty) => {
         impl InParam for $ty {
-            fn fill_from<T: OutParam + ?Sized>(&mut self, _: NodeId, out_param: &T) -> bool {
-                let v = out_param.get_content(TypeId::of::<Self>());
-                println!("impl_base_copy, InParam ty = $ty, v = {}", v);
-                if v != 0 {
-                    *self = unsafe { std::ptr::read(v as *const Self) };
-                }
-
-                v != 0
+            fn fill_from<T: OutParam + ?Sized>(&mut self, pre_id: NodeId, out_param: &T) -> bool {
+                out_param.fill_to(pre_id, self, TypeId::of::<Self>())
             }
         }
 
         impl OutParam for $ty {
-            fn get_content(&self, ty: TypeId) -> usize {
-                println!("impl_base_copy, OutParam ty = $ty");
-                if ty == TypeId::of::<Self>() {
+            fn fill_to(&self, this_id: NodeId, to: &mut dyn Assign, ty: TypeId) -> bool {
+                let r = ty == TypeId::of::<Self>();
+                if r {
                     // Self 必须 实现 Copy
                     let c = *self;
-                    
                     let p = &c as *const Self as usize;
-                    
-                    p
-                } else {
-                    0
+                    to.assign(this_id, p);
                 }
+                r
             }
         }
     };
@@ -116,34 +122,27 @@ macro_rules! impl_base_copy {
 macro_rules! impl_base_noncopy {
     ($ty: ty) => {
         impl InParam for $ty {
-            fn fill_from<T: OutParam + ?Sized>(&mut self, _: NodeId, out_param: &T) -> bool {
-                let v = out_param.get_content(TypeId::of::<Self>());
-                println!("impl_base_noncopy, InParam ty = $ty, v = {}", v);
-                if v != 0 {
-                    *self = unsafe { std::ptr::read(v as *const Self) };
-                }
-
-                v != 0
+            fn fill_from<T: OutParam + ?Sized>(&mut self, pre_id: NodeId, out_param: &T) -> bool {
+                out_param.fill_to(pre_id, self, TypeId::of::<Self>())
             }
         }
 
         impl OutParam for $ty {
-            fn get_content(&self, ty: TypeId) -> usize {
-                println!("impl_base_noncopy, OutParam ty = $ty");
-                if ty == TypeId::of::<Self>() {
-                    // 为了让外部调用者 更清楚的知道 必须为 Self 实现 Clone
+            fn fill_to(&self, this_id: NodeId, to: &mut dyn Assign, ty: TypeId) -> bool {
+                let r = ty == TypeId::of::<Self>();
+                if r {
+                    // 为了让外部调用者 更清楚的知道 必须为 Self     实现 Clone
                     let c = Clone::clone(self);
-                    
+
                     let p = &c as *const Self as usize;
-                    
+
+                    to.assign(this_id, p);
+
                     // 注: Copy 和 Drop 不能 共存
                     // 不能 释放放这个 c，因为 c 是要拿去 填充 输入的
                     std::mem::forget(c);
-                    
-                    p
-                } else {
-                    0
                 }
+                r
             }
         }
     };

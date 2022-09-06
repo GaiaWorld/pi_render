@@ -1,5 +1,5 @@
 use super::{
-    param::{InParam, OutParam},
+    param::{InParam, OutParam, Assign},
     GraphError, RenderContext,
 };
 use futures::{future::BoxFuture, FutureExt};
@@ -139,9 +139,8 @@ where
     O: OutParam + Default,
     R: Node<Input = I, Output = O>,
 {
-    fn get_content(&self, ty: TypeId) -> usize {
-        println!("=========== GraphNodeImpl, get_content output = {:?}", ty);
-        self.output.get_content(ty)
+    fn fill_to(&self, this_id: NodeId, to: &mut dyn Assign, ty: TypeId) -> bool {
+        self.output.fill_to(this_id, to, ty)
     }
 }
 
