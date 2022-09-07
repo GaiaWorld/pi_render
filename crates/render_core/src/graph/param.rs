@@ -1,39 +1,16 @@
-//! 参数 的 展开逻辑
+//! 参数 展开
 //!
-//! 节点1 有 struct Output {A, B}
-//! 节点2 有 struct Input {A, C}
+//! 限制（graph.build 时 检查）
+//!     1，同一个 Input Output 如果 展开，pub 字段 不能有 重复类型
+//!     2，连接同一个 输入的 多个 输出，不能有 相同类型；例外：输入收集器
 //!
-//! 节点2 是 节点1 的 后继
+//! 功能 （graph.build 时 完成）
+//!     3，知道 哪些 输入 输出 的 字段 没有被 关联（graph.build 时检查）
+//!     4，TODO 优化，记住 一个 输出的 字段 可以 到哪些 前置节点 获取
 //!
-//! 节点1 被 抽象成 dyn InternalNode
-//!
-//! Input.fill_from(1.id, <dyn InternalNode>1);
-//!     A.fill_from(1.id, <dyn InternalNode>1);
-//!         let a = <dyn InternalNode>1.get_content(typeid A);
-//!               = Output.get_content(typeid A);
-//!         Input.A = ptr::read(a);
-//!     C.fill_from(1.id, <dyn InternalNode>1);
-//!         let c = <dyn InternalNode>1.get_content(typeid C);
-//!               = Output.get_content(typeid C);
-//!         c 为 0
-//!
-//! Output.get_content(typeid A) -> uszie
-//!     let c = A.get_content(typeid A)
-//!     if c !== 0 { return c }
-//!     let c = B.get_content(typeid A)
-//!
-//! A.get_content(id)  {
-//!     if id == typeof(A) {
-//!         let c = Clone::clone(*self);
-//!         std::mem::forget(c);
-//!         &c as *const A as usize
-//!     } else {
-//!         0
-//!     }
-//! }
 
 use super::node::NodeId;
-use pi_hash::XHashMap;
+use pi_hash::{XHashMap, XHashSet};
 use std::any::TypeId;
 
 /// 渲染图节点的 参数，用于 派生宏
@@ -48,12 +25,23 @@ impl<T: InParam + OutParam> NodeParam for T {}
 
 /// 渲染图节点的 输入参数，用于 trait Node 的 关联类型 Input
 pub trait InParam: 'static + Send + Sync + Assign {
+    // 返回 out_param 能否 填充 本参数
+    fn can_fill<O: OutParam + ?Sized>(
+        &self,
+        map: &mut XHashMap<TypeId, Vec<NodeId>>,
+        pre_id: NodeId,
+        out_param: &O,
+    ) -> bool;
+
     // 由 节点 在 运行前 主动调用，每个 前置节点的 输出参数 调用一次
-    fn fill_from<T: OutParam + ?Sized>(&mut self, pre_id: NodeId, out_param: &T) -> bool;
+    fn fill_from<O: OutParam + ?Sized>(&mut self, pre_id: NodeId, out_param: &O) -> bool;
 }
 
 /// 渲染图节点的 输出参数，用于 trait Node 的 关联类型 Output
 pub trait OutParam: 'static + Send + Sync {
+    /// 判断 本 参数 能否 填充 ty
+    fn can_fill(&self, set: &mut Option<&mut XHashSet<TypeId>>, ty: TypeId) -> bool;
+
     fn fill_to(&self, this_id: NodeId, to: &mut dyn Assign, ty: TypeId) -> bool;
 }
 
@@ -69,7 +57,22 @@ pub trait Assign {
 pub struct InCollector<T: OutParam>(pub XHashMap<NodeId, T>);
 
 impl<T: OutParam + Default> InParam for InCollector<T> {
-    fn fill_from<Ty: OutParam + ?Sized>(&mut self, pre_id: NodeId, out_param: &Ty) -> bool {
+    fn can_fill<O: OutParam + ?Sized>(
+        &self,
+        map: &mut XHashMap<TypeId, Vec<NodeId>>,
+        pre_id: NodeId,
+        out_param: &O,
+    ) -> bool {
+        let ty = TypeId::of::<T>();
+        let r = out_param.can_fill(&mut None, ty.clone());
+        if r {
+            let v = map.entry(ty).or_insert(vec![]);
+            v.push(pre_id);
+        }
+        r
+    }
+
+    fn fill_from<O: OutParam + ?Sized>(&mut self, pre_id: NodeId, out_param: &O) -> bool {
         out_param.fill_to(pre_id, self, TypeId::of::<T>())
     }
 }
@@ -97,12 +100,40 @@ impl<T> Assign for T {
 macro_rules! impl_base_copy {
     ($ty: ty) => {
         impl InParam for $ty {
-            fn fill_from<T: OutParam + ?Sized>(&mut self, pre_id: NodeId, out_param: &T) -> bool {
+            fn can_fill<O: OutParam + ?Sized>(
+                &self,
+                map: &mut XHashMap<TypeId, Vec<NodeId>>,
+                pre_id: NodeId,
+                out_param: &O,
+            ) -> bool {
+                let ty = TypeId::of::<Self>();
+                let r = out_param.can_fill(&mut None, ty.clone());
+                if r {
+                    let v = map.entry(ty).or_insert(vec![]);
+                    v.push(pre_id);
+                }
+                r
+            }
+
+            fn fill_from<O: OutParam + ?Sized>(&mut self, pre_id: NodeId, out_param: &O) -> bool {
                 out_param.fill_to(pre_id, self, TypeId::of::<Self>())
             }
         }
 
         impl OutParam for $ty {
+            fn can_fill(&self, set: &mut Option<&mut XHashSet<TypeId>>, ty: TypeId) -> bool {
+                let r = ty == TypeId::of::<Self>();
+                if r && set.is_some() {
+                    match set {
+                        None => {}
+                        Some(s) => {
+                            s.insert(ty);
+                        }
+                    }
+                }
+                r
+            }
+
             fn fill_to(&self, this_id: NodeId, to: &mut dyn Assign, ty: TypeId) -> bool {
                 let r = ty == TypeId::of::<Self>();
                 if r {
@@ -122,12 +153,40 @@ macro_rules! impl_base_copy {
 macro_rules! impl_base_noncopy {
     ($ty: ty) => {
         impl InParam for $ty {
+            fn can_fill<O: OutParam + ?Sized>(
+                &self,
+                map: &mut XHashMap<TypeId, Vec<NodeId>>,
+                pre_id: NodeId,
+                out_param: &O,
+            ) -> bool {
+                let ty = TypeId::of::<Self>();
+                let r = out_param.can_fill(&mut None, ty.clone());
+                if r {
+                    let v = map.entry(ty).or_insert(vec![]);
+                    v.push(pre_id);
+                }
+                r
+            }
+
             fn fill_from<T: OutParam + ?Sized>(&mut self, pre_id: NodeId, out_param: &T) -> bool {
                 out_param.fill_to(pre_id, self, TypeId::of::<Self>())
             }
         }
 
         impl OutParam for $ty {
+            fn can_fill(&self, set: &mut Option<&mut XHashSet<TypeId>>, ty: TypeId) -> bool {
+                let r = ty == TypeId::of::<Self>();
+                if r && set.is_some() {
+                    match set {
+                        None => {}
+                        Some(s) => {
+                            s.insert(ty);
+                        }
+                    }
+                }
+                r
+            }
+
             fn fill_to(&self, this_id: NodeId, to: &mut dyn Assign, ty: TypeId) -> bool {
                 let r = ty == TypeId::of::<Self>();
                 if r {

@@ -1,5 +1,6 @@
 mod enum_variant_meta;
 mod modules;
+
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
@@ -38,47 +39,89 @@ pub fn derive_node_param(input: TokenStream) -> TokenStream {
             .filter(|field| matches!(&field.vis, syn::Visibility::Public(_)))
             .collect::<Vec<&Field>>();
 
+        // 如果 所有的 字段 都不是 pub 字段，报错
         if pub_fileds.is_empty() {
-            panic!("{:?} isn't no pub field", name);
+            panic!("Type {:?} isn't no pub field", name);
         }
 
-        let inputs = pub_fileds
+        let can_inputs = pub_fileds
             .iter()
             .map(|field| {
                 let name = field.ident.as_ref().unwrap();
                 quote! {
-                    r |= pi_render::graph_new::param::InParam::fill_from(&mut self.#name, pre_id, out_param);
+                    r |= pi_render::graph::param::InParam::can_fill(&self.#name, map, pre_id, out_param);
                 }
             })
             .collect::<Vec<TokenStream2>>();
 
-        let outputs = pub_fileds
+        let input_fills = pub_fileds
+        .iter()
+        .map(|field| {
+            let name = field.ident.as_ref().unwrap();
+            quote! {
+                r |= pi_render::graph::param::InParam::fill_from(&mut self.#name, pre_id, out_param);
+            }
+        })
+        .collect::<Vec<TokenStream2>>();
+
+        let output_fills = pub_fileds
             .iter()
             .map(|field| {
                 let name = field.ident.as_ref().unwrap();
                 quote! {
-                    if pi_render::graph_new::param::OutParam::fill_to(&self.#name, this_id, to, ty) {
+                    if pi_render::graph::param::OutParam::fill_to(&self.#name, this_id, to, ty) {
                         return true;
                     }
                 }
             })
             .collect::<Vec<TokenStream2>>();
 
+        let can_outputs = pub_fileds
+            .iter()
+            .map(|field| {
+                let name = field.ident.as_ref().unwrap();
+                quote! {
+                    if pi_render::graph::param::OutParam::can_fill(&self.#name, set, ty) {
+                        return true;
+                    }
+                }
+            })
+            .collect::<Vec<TokenStream2>>();
         quote! {
-            impl #impl_generics pi_render::graph_new::param::OutParam for #name #ty_generics #where_clause {
-                fn fill_to(&self, this_id: pi_render::graph_new::node::NodeId, to: &mut dyn pi_render::graph_new::param::Assign, ty: std::any::TypeId) -> bool {
-                    #(#outputs)*
-                    
+            impl #impl_generics pi_render::graph::param::OutParam for #name #ty_generics #where_clause {
+
+                fn can_fill(&self, set: &mut Option<&mut pi_hash::XHashSet<std::any::TypeId>>, ty: std::any::TypeId) -> bool {
+                    #(#can_outputs)*
+
+                    false
+                }
+
+                fn fill_to(&self, this_id: pi_render::graph::node::NodeId, to: &mut dyn pi_render::graph::param::Assign, ty: std::any::TypeId) -> bool {
+                    #(#output_fills)*
+
                     false
                 }
             }
 
-            impl #impl_generics pi_render::graph_new::param::InParam for #name #ty_generics #where_clause {
-                fn fill_from<T: pi_render::graph_new::param::OutParam + ?Sized>(&mut self, pre_id: pi_render::graph_new::node::NodeId, out_param: &T) -> bool {
+            impl #impl_generics pi_render::graph::param::InParam for #name #ty_generics #where_clause {
+                fn can_fill<O: pi_render::graph::param::OutParam + ?Sized>(
+                    &self,
+                    map: &mut pi_hash::XHashMap<std::any::TypeId, Vec<pi_render::graph::NodeId>>,
+                    pre_id: pi_render::graph::node::NodeId,
+                    out_param: &O,
+                ) -> bool {
                     let mut r = false;
 
-                    #(#inputs;)*
-                    
+                    #(#can_inputs;)*
+
+                    r
+                }
+
+                fn fill_from<O: pi_render::graph::param::OutParam + ?Sized>(&mut self, pre_id: pi_render::graph::node::NodeId, out_param: &O) -> bool {
+                    let mut r = false;
+
+                    #(#input_fills;)*
+
                     r
                 }
             }
@@ -86,12 +129,26 @@ pub fn derive_node_param(input: TokenStream) -> TokenStream {
     } else {
         // 整体 作为 输入 输入 参数
         quote! {
-            impl #impl_generics pi_render::graph_new::param::OutParam for #name #ty_generics #where_clause {
-                fn fill_to(&self, this_id: pi_render::graph_new::node::NodeId, to: &mut dyn pi_render::graph_new::param::Assign, ty: std::any::TypeId) -> bool {
+            impl #impl_generics pi_render::graph::param::OutParam for #name #ty_generics #where_clause {
+                fn can_fill(&self, set: &mut Option<&mut pi_hash::XHashSet<std::any::TypeId>>, ty: std::any::TypeId) -> bool {
+                    let r = ty == std::any::TypeId::of::<Self>();
+                    if r && set.is_some() {
+                        match set {
+                            None => {}
+                            Some(s) => {
+                                s.insert(ty);
+                            }
+                        }
+
+                    }
+                    r
+                }
+
+                fn fill_to(&self, this_id: pi_render::graph::node::NodeId, to: &mut dyn pi_render::graph::param::Assign, ty: std::any::TypeId) -> bool {
                     let r = ty == std::any::TypeId::of::<Self>();
                     if r {
                         let c = Clone::clone(self);
-                        
+
                         // 隐藏条件，必须 为 Self 实现 Clone
                         let p = &c as *const Self as usize;
                         to.assign(this_id, p);
@@ -104,13 +161,29 @@ pub fn derive_node_param(input: TokenStream) -> TokenStream {
                 }
             }
 
-            impl #impl_generics pi_render::graph_new::param::InParam for #name #ty_generics #where_clause {
-                fn fill_from<T: pi_render::graph_new::param::OutParam + ?Sized>(
-                    &mut self,
-                    pre_id: pi_render::graph_new::node::NodeId,
-                    out_param: &T,
+            impl #impl_generics pi_render::graph::param::InParam for #name #ty_generics #where_clause {
+
+                fn can_fill<O: pi_render::graph::param::OutParam + ?Sized>(
+                    &self,
+                    map: &mut pi_hash::XHashMap<std::any::TypeId, Vec<pi_render::graph::node::NodeId>>,
+                    pre_id: pi_render::graph::node::NodeId,
+                    out_param: &O,
                 ) -> bool {
-                    out_param.fill_to(&self, pre_id, self, std::any::TypeId::of::<Self>())()
+                    let ty = std::any::TypeId::of::<Self>();
+                    let r = out_param.can_fill(&mut None, ty.clone());
+                    if r {
+                        let v = map.entry(ty).or_insert(vec![]);
+                        v.push(pre_id);
+                    }
+                    r
+                }
+
+                fn fill_from<O: pi_render::graph::param::OutParam + ?Sized>(
+                    &mut self,
+                    pre_id: pi_render::graph::node::NodeId,
+                    out_param: &O,
+                ) -> bool {
+                    out_param.fill_to(pre_id, self, std::any::TypeId::of::<Self>())
                 }
             }
         }
