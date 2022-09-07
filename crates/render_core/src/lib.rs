@@ -84,7 +84,7 @@ where
     let device = world.get_resource::<RenderDevice>().unwrap();
     let queue = world.get_resource::<RenderQueue>().unwrap();
 
-    rg.build(device.clone(), queue.clone())
+    rg.build(device.clone(), queue.clone()).await
 }
 
 /// 每帧 调用一次，用于 驱动 渲染图
@@ -113,8 +113,8 @@ where
     // for {
     //     let res = getSurfaceView();
     // }
-    // res_raf_callback();  ---> { 16ms 的  dispatch.run(); }
 
+    // res_raf_callback();  ---> { 16ms 的  dispatch.run(); }
     Ok(())
 }
 
@@ -135,8 +135,8 @@ where
     A: 'static + AsyncRuntime + Send,
 {
     let mut prepare_stage = StageBuilder::new();
-    prepare_stage.add_node(prepare_windows.system(world));
     prepare_stage.add_node(build_graph::<A>.system(world));
+    prepare_stage.add_node(prepare_windows.system(world));
 
     let mut render_stage = StageBuilder::new();
     render_stage.add_node(render_system::<A>.system(world));

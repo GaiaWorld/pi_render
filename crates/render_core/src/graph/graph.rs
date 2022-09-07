@@ -15,7 +15,7 @@ use pi_graph::{DirectedGraph, DirectedGraphNode, NGraph, NGraphBuilder};
 use pi_hash::{XHashMap, XHashSet};
 use pi_share::{Share, ShareRefCell};
 use pi_slotmap::SlotMap;
-use std::borrow::Cow;
+use std::{borrow::Cow, sync::Arc};
 
 /// 渲染图
 pub struct RenderGraph<A>
@@ -196,7 +196,11 @@ impl<A> RenderGraph<A>
 where
     A: 'static + AsyncRuntime + Send,
 {
-    pub fn build(&mut self, device: RenderDevice, queue: RenderQueue) -> Result<(), GraphError> {
+    pub async fn build(
+        &mut self,
+        device: RenderDevice,
+        queue: RenderQueue,
+    ) -> Result<(), GraphError> {
         if self.is_topo_dirty {
             self.is_finish_dirty = true;
 
@@ -217,10 +221,19 @@ where
         // 子图结构
         self.get_sub_ng().unwrap();
 
-        // 构建 run_ng
-        self.create_run_ng(&device, &queue);
+        // 构建 run_ng，返回 构建图
+        let g = self.create_run_ng(&device, &queue)?;
 
-        Ok(())
+        // 立即 执行 构建图
+        match async_graph(self.rt.clone(), Arc::new(g)).await {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                let err = GraphError::RunNGraphError(format!("run_ng, {:?}", e));
+
+                error!("{}", err);
+                return Err(err);
+            }
+        }
     }
 
     /// 执行 渲染
@@ -263,7 +276,8 @@ where
         }
     }
 
-    fn get_node(&self, label: impl Into<NodeLabel>) -> Option<&NodeState> {
+    // 取 label 对应的 NodeState
+    fn get_node_state(&self, label: impl Into<NodeLabel>) -> Option<&NodeState> {
         let id = self.get_node_id(label);
         match id {
             Ok(id) => self.nodes.get(id),
@@ -277,6 +291,7 @@ where
         if !self.is_finish_dirty {
             return Some(());
         }
+        self.is_finish_dirty = false;
 
         let finishes = self.clone_finish_nodes();
 
@@ -326,13 +341,14 @@ where
     }
 
     // 创建真正的 运行图
+    // 返回 构建 的 执行图
     fn create_run_ng(
         &mut self,
         device: &RenderDevice,
         queue: &RenderQueue,
-    ) -> Result<(), GraphError> {
-
-        let mut build_builder = NGraphBuilder::<NodeId, ExecNode<EmptySyncRun, EmptySyncRun>>::new();
+    ) -> Result<NGraph<NodeId, ExecNode<EmptySyncRun, EmptySyncRun>>, GraphError> {
+        let mut build_builder =
+            NGraphBuilder::<NodeId, ExecNode<EmptySyncRun, EmptySyncRun>>::new();
         let mut run_builder = NGraphBuilder::<NodeId, ExecNode<EmptySyncRun, EmptySyncRun>>::new();
 
         let sub_ng = self.topo_sub_ng.as_ref().unwrap();
@@ -340,6 +356,10 @@ where
 
         // 异步图 节点
         for id in topo_ids {
+            // 先重置 节点
+            let n = self.get_node_state(*id).unwrap();
+            n.0.as_ref().borrow_mut().reset();
+
             let node = self.create_run_node(*id, device, queue)?;
             run_builder = run_builder.node(*id, node);
 
@@ -372,21 +392,17 @@ where
         match run_builder.build() {
             Ok(g) => {
                 self.run_ng = Some(Share::new(g));
-                Ok(())
             }
             Err(e) => {
                 let msg = format!("run_ng e = {:?}", e);
                 error!("{}", msg);
-                Err(GraphError::BuildError(msg))
+                return Err(GraphError::BuildError(msg));
             }
         }
 
         // 构建图 只用 一次，用完 就 释放
         match build_builder.build() {
-            Ok(g) => {
-                g.run();
-                Ok(())
-            }
+            Ok(g) => Ok(g),
             Err(e) => {
                 let msg = format!("build_builder e = {:?}", e);
                 error!("{}", msg);
@@ -402,7 +418,7 @@ where
         device: &RenderDevice,
         queue: &RenderQueue,
     ) -> Result<ExecNode<EmptySyncRun, EmptySyncRun>, GraphError> {
-        let n = self.get_node(NodeLabel::Id(node_id));
+        let n = self.get_node_state(NodeLabel::Id(node_id));
         let node = n.unwrap().0.clone();
 
         let device = device.clone();
@@ -420,11 +436,7 @@ where
                     queue: queue.clone(),
                 };
 
-                node.as_ref()
-                    .borrow()
-                    .build(context)
-                    .await
-                    .unwrap();
+                node.as_ref().borrow().build(context).await.unwrap();
 
                 Ok(())
             }
@@ -441,7 +453,7 @@ where
         device: &RenderDevice,
         queue: &RenderQueue,
     ) -> Result<ExecNode<EmptySyncRun, EmptySyncRun>, GraphError> {
-        let n = self.get_node(NodeLabel::Id(node_id));
+        let n = self.get_node_state(NodeLabel::Id(node_id));
         let node = n.unwrap().0.clone();
 
         let device = device.clone();
@@ -489,7 +501,6 @@ where
     }
 }
 
-// TODO 挪到 pi_graph 去，作为 默认实现
 // 渲染图 不需要 同步节点，故这里写个空方法
 struct EmptySyncRun;
 

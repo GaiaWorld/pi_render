@@ -39,7 +39,7 @@ pub trait Node: 'static + Send + Sync {
     ) -> Option<BoxFuture<'a, Result<(), String>>> {
         None
     }
- 
+
     /// 执行，每帧会调用一次
     fn run<'a>(
         &'a self,
@@ -83,7 +83,6 @@ impl From<NodeId> for NodeLabel {
     }
 }
 
-
 /// 用于 参数 该节点 参数的 用途
 #[derive(Debug)]
 pub struct ParamUsage {
@@ -104,9 +103,19 @@ impl Default for ParamUsage {
 }
 
 impl ParamUsage {
+    pub(crate) fn reset(&mut self) {
+        self.input_map_fill.clear();
+        self.output_usage_set.as_ref().borrow_mut().clear();
+    }
+
     /// ty 作为输入 的 一部分，是否 被 输出 填充
     pub fn is_input_fill(&self, ty: TypeId) -> bool {
-        self.input_map_fill.contains_key(&ty)
+        if let Some(v) = self.input_map_fill.get(&ty) {
+            v.len() > 0
+        } else {
+            // 这时候，ty 不属于 Input 的 字段
+            false
+        }
     }
 
     /// ty 作为输出 的 一部分，是否 被 某个后继节点 使用
@@ -120,6 +129,9 @@ impl ParamUsage {
 // 渲染节点，给 渲染图 内部 使用
 pub(crate) trait InternalNode: OutParam {
     // 当 sub_ng 改变后，需要调用
+    fn reset(&mut self);
+
+    // 当 sub_ng 改变后，需要调用
     fn inc_next_refs(&mut self);
 
     // 添加 前置节点
@@ -130,11 +142,8 @@ pub(crate) trait InternalNode: OutParam {
 
     // 构建，当渲染图 构建时候，会调用一次
     // 一般 用于 准备 渲染 资源的 创建
-    fn build<'a>(
-        &'a self,
-        context: RenderContext,
-    ) -> BoxFuture<'a, Result<(), String>>;
-    
+    fn build<'a>(&'a self, context: RenderContext) -> BoxFuture<'a, Result<(), String>>;
+
     // 执行渲染图
     fn run<'a>(
         &'a mut self,
@@ -212,6 +221,17 @@ where
     O: OutParam + Default,
     R: Node<Input = I, Output = O>,
 {
+    fn reset(&mut self) {
+        self.input = Default::default();
+        self.output = Default::default();
+
+        self.param_usage.reset();
+        self.pre_nodes.clear();
+
+        self.total_next_refs = 0;
+        self.curr_next_refs = AtomicI32::new(0);
+    }
+
     fn inc_next_refs(&mut self) {
         self.total_next_refs += 1;
     }
@@ -242,15 +262,14 @@ where
         }
     }
 
-    fn build<'a>(
-        &'a self,
-        context: RenderContext,
-    ) -> BoxFuture<'a, Result<(), String>>> {
+    fn build<'a>(&'a self, context: RenderContext) -> BoxFuture<'a, Result<(), String>> {
         async move {
-            let Some(f) = self.node.build(context, &self.param_usage) {
-                f.await.boxed()
+            match self.node.build(context, &self.param_usage) {
+                Some(f) => f.await,
+                None => Ok(()),
             }
-        }.boxed()
+        }
+        .boxed()
     }
 
     fn run<'a>(
@@ -278,6 +297,7 @@ where
                     self.curr_next_refs
                         .store(self.total_next_refs, Ordering::SeqCst);
 
+                    self.input = Default::default();
                     self.output = output;
                     Ok(())
                 }

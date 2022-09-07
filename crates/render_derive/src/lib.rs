@@ -47,8 +47,16 @@ pub fn derive_node_param(input: TokenStream) -> TokenStream {
         let can_inputs = pub_fileds
             .iter()
             .map(|field| {
+                let ty = &field.ty;
                 let name = field.ident.as_ref().unwrap();
                 quote! {
+                    // println!("Input field {:?}, type = {:}", stringify!(#name), stringify!(#ty));
+                    let t = std::any::TypeId::of::<#ty>();
+                    if field_set.contains(&t) {
+                        panic!("Input field {:?}, type = {:}", stringify!(#name), stringify!(#ty));
+                    }
+                    field_set.insert(t);
+
                     r |= pi_render::graph::param::InParam::can_fill(&self.#name, map, pre_id, out_param);
                 }
             })
@@ -79,8 +87,18 @@ pub fn derive_node_param(input: TokenStream) -> TokenStream {
         let can_outputs = pub_fileds
             .iter()
             .map(|field| {
+                let ty = &field.ty;
                 let name = field.ident.as_ref().unwrap();
                 quote! {
+                    let t = std::any::TypeId::of::<#ty>();
+                    // ("Output field {:?}, type = {:}", stringify!(#name), stringify!(#ty));
+                    
+                    if field_set.contains(&t) {
+                        panic!("Output field {:?}, type = {:}", stringify!(#name), stringify!(#ty));
+                    }
+
+                    field_set.insert(t);
+
                     if pi_render::graph::param::OutParam::can_fill(&self.#name, set, ty) {
                         return true;
                     }
@@ -91,6 +109,8 @@ pub fn derive_node_param(input: TokenStream) -> TokenStream {
             impl #impl_generics pi_render::graph::param::OutParam for #name #ty_generics #where_clause {
 
                 fn can_fill(&self, set: &mut Option<&mut pi_hash::XHashSet<std::any::TypeId>>, ty: std::any::TypeId) -> bool {
+                    let mut field_set = pi_hash::XHashSet::<std::any::TypeId>::default();
+
                     #(#can_outputs)*
 
                     false
@@ -111,6 +131,7 @@ pub fn derive_node_param(input: TokenStream) -> TokenStream {
                     out_param: &O,
                 ) -> bool {
                     let mut r = false;
+                    let mut field_set = pi_hash::XHashSet::<std::any::TypeId>::default();
 
                     #(#can_inputs;)*
 
@@ -131,6 +152,7 @@ pub fn derive_node_param(input: TokenStream) -> TokenStream {
         quote! {
             impl #impl_generics pi_render::graph::param::OutParam for #name #ty_generics #where_clause {
                 fn can_fill(&self, set: &mut Option<&mut pi_hash::XHashSet<std::any::TypeId>>, ty: std::any::TypeId) -> bool {
+
                     let r = ty == std::any::TypeId::of::<Self>();
                     if r && set.is_some() {
                         match set {
@@ -172,8 +194,11 @@ pub fn derive_node_param(input: TokenStream) -> TokenStream {
                     let ty = std::any::TypeId::of::<Self>();
                     let r = out_param.can_fill(&mut None, ty.clone());
                     if r {
-                        let v = map.entry(ty).or_insert(vec![]);
-                        v.push(pre_id);
+                        if map.get(&ty).is_some() {
+                            // 输入 类型 不能 相同
+                            panic!("derive NodeParam: input type same, type = {:?}", ty);
+                        }                        
+                        map.insert(ty, vec![pre_id]);
                     }
                     r
                 }

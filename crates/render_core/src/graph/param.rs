@@ -53,10 +53,10 @@ pub trait Assign {
 /// 输入参数 收集器
 /// 如 某个节点A 的 多个前置节点 的 输出类型 都是 T，那么可以 在 A 的 输入中 指定 InCollector<T>，将多个前置节点输出的T收集起来
 /// 哈希表 Key = 前置节点的 NodeId，值 = 该 前置节点的输出
-#[derive(Debug, Default)]
-pub struct InCollector<T: OutParam>(pub XHashMap<NodeId, T>);
+#[derive(Debug, Default, Clone)]
+pub struct InParamCollector<T: OutParam + Clone>(pub XHashMap<NodeId, T>);
 
-impl<T: OutParam + Default> InParam for InCollector<T> {
+impl<T: OutParam + Clone> InParam for InParamCollector<T> {
     fn can_fill<O: OutParam + ?Sized>(
         &self,
         map: &mut XHashMap<TypeId, Vec<NodeId>>,
@@ -77,7 +77,17 @@ impl<T: OutParam + Default> InParam for InCollector<T> {
     }
 }
 
-impl<T: OutParam + Default> Assign for InCollector<T> {
+impl<T: OutParam + Clone> OutParam for InParamCollector<T> {
+    fn can_fill(&self, _set: &mut Option<&mut XHashSet<TypeId>>, _ty: TypeId) -> bool {
+        panic!("can_fillInParamCollector can't as Output");
+    }
+
+    fn fill_to(&self, _this_id: NodeId, _to: &mut dyn Assign, _ty: TypeId) -> bool {
+        panic!("fill_to InParamCollector can't as Output");
+    }
+}
+
+impl<T: OutParam + Clone> Assign for InParamCollector<T> {
     fn assign(&mut self, pre_id: NodeId, ptr: usize) {
         if ptr != 0 {
             let v = unsafe { std::ptr::read(ptr as *const T) };
@@ -109,8 +119,11 @@ macro_rules! impl_base_copy {
                 let ty = TypeId::of::<Self>();
                 let r = out_param.can_fill(&mut None, ty.clone());
                 if r {
-                    let v = map.entry(ty).or_insert(vec![]);
-                    v.push(pre_id);
+                    if map.get(&ty).is_some() {
+                        // 输入 类型 不能 相同
+                        panic!("impl_base_copy: input type same, type = {:?}", ty);
+                    }
+                    map.insert(ty, vec![pre_id]);
                 }
                 r
             }
@@ -162,8 +175,11 @@ macro_rules! impl_base_noncopy {
                 let ty = TypeId::of::<Self>();
                 let r = out_param.can_fill(&mut None, ty.clone());
                 if r {
-                    let v = map.entry(ty).or_insert(vec![]);
-                    v.push(pre_id);
+                    if map.get(&ty).is_some() {
+                        // 输入 类型 不能 相同
+                        panic!("impl_base_noncopy: input type same, type = {:?}", ty);
+                    }
+                    map.insert(ty, vec![pre_id]);
                 }
                 r
             }
