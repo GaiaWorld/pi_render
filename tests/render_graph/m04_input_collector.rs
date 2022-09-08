@@ -18,9 +18,7 @@ fn input_collector() {
 
     let runtime = AsyncRuntimeBuilder::default_worker_thread(None, None, None, None);
 
-    let rt = runtime.clone();
-
-    let mut g = RenderGraph::new(runtime);
+    let mut g = RenderGraph::default();
     
     let n11 = g.add_node("Node11", Node1(11)).unwrap();
     let n12 = g.add_node("Node12", Node1(12)).unwrap();
@@ -43,14 +41,15 @@ fn input_collector() {
     g.add_depend("Node15", "Node2");
 
     g.set_finish("Node2", true).unwrap();
-
-    let _ = rt.spawn(rt.alloc(), async move {
+    
+    let rt = runtime.clone();
+    let _ = runtime.spawn(runtime.alloc(), async move {
         let (device, queue) = init_render().await;
 
-        g.build(device, queue).await.unwrap();
+        g.build(&rt, device, queue).await.unwrap();
 
         println!("======== run graph");
-        g.run().await.unwrap();
+        g.run(&rt).await.unwrap();
     });
 
     std::thread::sleep(Duration::from_secs(5));

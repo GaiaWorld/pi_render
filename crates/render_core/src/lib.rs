@@ -51,6 +51,11 @@ pub struct RenderStage {
     pub render_stage: StageBuilder,
 }
 
+/// 渲染用的 异步运行时
+struct RenderAsyncRuntime<A: 'static + AsyncRuntime + Send> {
+    rt: A,
+}
+
 /// 初始化
 pub async fn init_render<A>(
     world: &mut World,
@@ -80,11 +85,17 @@ async fn build_graph<A>(world: WorldMut) -> Result<(), GraphError>
 where
     A: 'static + AsyncRuntime + Send,
 {
-    let rg = world.get_resource_mut::<RenderGraph<A>>().unwrap();
+    let rg = world.get_resource_mut::<RenderGraph>().unwrap();
     let device = world.get_resource::<RenderDevice>().unwrap();
     let queue = world.get_resource::<RenderQueue>().unwrap();
 
-    rg.build(device.clone(), queue.clone()).await
+    let rt = world.get_resource::<RenderAsyncRuntime<A>>().unwrap();
+
+    rg.build(&rt.rt, device.clone(), queue.clone())
+        .await
+        .unwrap();
+
+    Ok(())
 }
 
 /// 每帧 调用一次，用于 驱动 渲染图
@@ -92,8 +103,10 @@ async fn render_system<A>(world: WorldMut) -> Result<(), GraphError>
 where
     A: 'static + AsyncRuntime + Send,
 {
-    let graph = world.get_resource_mut::<RenderGraph<A>>().unwrap();
-    graph.run().await;
+    let graph = world.get_resource_mut::<RenderGraph>().unwrap();
+
+    let rt = world.get_resource::<RenderAsyncRuntime<A>>().unwrap();
+    graph.run(&rt.rt).await.unwrap();
 
     let world = world.clone();
 
@@ -108,13 +121,6 @@ where
         }
     }
 
-    // todo  实现 raf
-    // res_rendered_callback(); -->
-    // for {
-    //     let res = getSurfaceView();
-    // }
-
-    // res_raf_callback();  ---> { 16ms 的  dispatch.run(); }
     Ok(())
 }
 
@@ -122,7 +128,9 @@ fn insert_render_graph<A>(world: &mut World, rt: A)
 where
     A: 'static + AsyncRuntime + Send,
 {
-    world.insert_resource(RenderGraph::<A>::new(rt));
+    let r = RenderAsyncRuntime { rt };
+    world.insert_resource(r);
+    world.insert_resource(RenderGraph::default());
 }
 
 // 添加 其他 Res

@@ -65,23 +65,22 @@ fn out_same_type() {
 
     let runtime = AsyncRuntimeBuilder::default_worker_thread(None, None, None, None);
 
-    let rt = runtime.clone();
-
-    let mut g = RenderGraph::new(runtime);
+    let mut g = RenderGraph::default();
     g.add_node("Node1", Node1);
     g.add_node("Node2", Node2); 
 
     g.add_depend("Node1", "Node2");
 
     g.set_finish("Node2", true).unwrap();
-
-    let _ = rt.spawn(rt.alloc(), async move {
+    
+    let rt = runtime.clone();
+    let _ = runtime.spawn(runtime.alloc(), async move {
         let (device, queue) = init_render().await;
 
-        g.build(device, queue).await.unwrap();
+        g.build(&rt, device, queue).await.unwrap();
 
         println!("======== run graph");
-        g.run().await.unwrap();
+        g.run(&rt).await.unwrap();
     });
 
     std::thread::sleep(Duration::from_secs(5));
@@ -140,23 +139,22 @@ fn in_same_type() {
 
     let runtime = AsyncRuntimeBuilder::default_worker_thread(None, None, None, None);
 
-    let rt = runtime.clone();
-
-    let mut g = RenderGraph::new(runtime);
+    let mut g = RenderGraph::default();
     g.add_node("Node1", Node1);
     g.add_node("Node2", Node2);
 
     g.add_depend("Node1", "Node2");
 
     g.set_finish("Node2", true).unwrap();
-
-    let _ = rt.spawn(rt.alloc(), async move {
+    
+    let rt = runtime.clone();
+    let _ = runtime.spawn(runtime.alloc(), async move {
         let (device, queue) = init_render().await;
 
-        g.build(device, queue).await.unwrap();
+        g.build(&rt, device, queue).await.unwrap();
 
         println!("======== run graph");
-        g.run().await.unwrap();
+        g.run(&rt).await.unwrap();
     });
 
     std::thread::sleep(Duration::from_secs(5));
@@ -206,9 +204,7 @@ fn multi_output_type() {
 
     let runtime = AsyncRuntimeBuilder::default_worker_thread(None, None, None, None);
 
-    let rt = runtime.clone();
-
-    let mut g = RenderGraph::new(runtime);
+    let mut g = RenderGraph::default();
     g.add_node("Node11", Node1);
     g.add_node("Node12", Node1);
     
@@ -219,13 +215,14 @@ fn multi_output_type() {
 
     g.set_finish("Node2", true).unwrap();
 
-    let _ = rt.spawn(rt.alloc(), async move {
+    let rt = runtime.clone();
+    let _ = runtime.spawn(runtime.alloc(), async move {
         let (device, queue) = init_render().await;
 
-        g.build(device, queue).await.unwrap();
+        g.build(&rt, device, queue).await.unwrap();
 
         println!("======== run graph");
-        g.run().await.unwrap();
+        g.run(&rt).await.unwrap();
     });
 
     std::thread::sleep(Duration::from_secs(5));

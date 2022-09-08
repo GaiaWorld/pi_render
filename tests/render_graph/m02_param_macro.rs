@@ -81,9 +81,7 @@ fn two_node_with_noslot() {
 
     let runtime = AsyncRuntimeBuilder::default_worker_thread(None, None, None, None);
 
-    let rt = runtime.clone();
-
-    let mut g = RenderGraph::new(runtime);
+    let mut g = RenderGraph::default();
 
     g.add_node("Node1", Node1);
     g.add_node("Node2", Node2);
@@ -91,14 +89,15 @@ fn two_node_with_noslot() {
     g.add_depend("Node1", "Node2");
 
     g.set_finish("Node2", true).unwrap();
-
-    let _ = rt.spawn(rt.alloc(), async move {
+    
+    let rt = runtime.clone();
+    let _ = runtime.spawn(runtime.alloc(), async move {
         let (device, queue) = init_render().await;
 
-        g.build(device, queue).await.unwrap();
+        g.build(&rt, device, queue).await.unwrap();
 
         println!("======== 1 run graph");
-        g.run().await.unwrap();
+        g.run(&rt).await.unwrap();
     });
 
     std::thread::sleep(Duration::from_secs(5));
@@ -200,9 +199,7 @@ fn two_node_with_slot() {
 
     let runtime = AsyncRuntimeBuilder::default_worker_thread(None, None, None, None);
 
-    let rt = runtime.clone();
-
-    let mut g = RenderGraph::new(runtime);
+    let mut g = RenderGraph::default();
 
     g.add_node("Node1", Node1);
     g.add_node("Node2", Node2);
@@ -210,14 +207,15 @@ fn two_node_with_slot() {
     g.add_depend("Node1", "Node2");
 
     g.set_finish("Node2", true).unwrap();
-
-    let _ = rt.spawn(rt.alloc(), async move {
+    
+    let rt = runtime.clone();
+    let _ = runtime.spawn(runtime.alloc(), async move {
         let (device, queue) = init_render().await;
 
-        g.build(device, queue).await.unwrap();
+        g.build(&rt, device, queue).await.unwrap();
 
         println!("======== 1 run graph");
-        g.run().await.unwrap();
+        g.run(&rt).await.unwrap();
     });
 
     std::thread::sleep(Duration::from_secs(5));

@@ -17,9 +17,7 @@ use std::{any::TypeId, sync::Arc, time::Duration};
 fn change_graph() {
     let runtime = AsyncRuntimeBuilder::default_worker_thread(None, None, None, None);
 
-    let rt = runtime.clone();
-
-    let mut g = RenderGraph::new(runtime);
+    let mut g = RenderGraph::default();
 
     let n1 = Node1::default();
     let n2 = Node2::default();
@@ -35,18 +33,19 @@ fn change_graph() {
     g.add_depend("Node2", "Node3");
 
     g.set_finish("Node3", true).unwrap();
-
-    let _ = rt.spawn(rt.alloc(), async move {
+    
+    let rt = runtime.clone();
+    let _ = runtime.spawn(runtime.alloc(), async move {
         let (device, queue) = init_render().await;
 
         println!("======================== should build call ");
 
-        g.build(device.clone(), queue.clone()).await.unwrap();
-        g.run().await.unwrap();
+        g.build(&rt, device.clone(), queue.clone()).await.unwrap();
+        g.run(&rt).await.unwrap();
 
         println!("======================== shouldn't build call ");
-        g.build(device.clone(), queue.clone()).await.unwrap();
-        g.run().await.unwrap();
+        g.build(&rt, device.clone(), queue.clone()).await.unwrap();
+        g.run(&rt, ).await.unwrap();
 
         *n1.0.as_ref().borrow_mut() = false;
         *n2.0.as_ref().borrow_mut() = false;
@@ -63,12 +62,12 @@ fn change_graph() {
         g.set_finish("Node4", true).unwrap();
 
         println!("======================== should build call ");
-        g.build(device.clone(), queue.clone()).await.unwrap();
-        g.run().await.unwrap();
+        g.build(&rt, device.clone(), queue.clone()).await.unwrap();
+        g.run(&rt).await.unwrap();
 
         println!("======================== shouldn't build call ");
-        g.build(device, queue).await.unwrap();
-        g.run().await.unwrap();
+        g.build(&rt, device, queue).await.unwrap();
+        g.run(&rt).await.unwrap();
     });
 
     std::thread::sleep(Duration::from_secs(5));

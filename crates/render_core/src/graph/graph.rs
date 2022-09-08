@@ -18,10 +18,7 @@ use pi_slotmap::SlotMap;
 use std::{borrow::Cow, sync::Arc};
 
 /// 渲染图
-pub struct RenderGraph<A>
-where
-    A: 'static + AsyncRuntime + Send,
-{
+pub struct RenderGraph {
     // ================== 拓扑信息
 
     // 名字 和 NodeId 映射
@@ -49,21 +46,14 @@ where
     topo_sub_ng: Option<NGraph<NodeId, NodeId>>,
     // ================== 运行信息
 
-    // 异步运行时
-    rt: A,
-
     // 录制渲染指令的 异步执行图，用于 更新 GPU 资源
     // 当 渲染图 拓扑改变 或 finish 节点 改变后，会 重新 构建个 新的
     // run_ng边 和 edges 的 (before, after) 相同
     run_ng: Option<Share<NGraph<NodeId, ExecNode<EmptySyncRun, EmptySyncRun>>>>,
 }
 
-/// 渲染图的 拓扑信息 相关 方法
-impl<A> RenderGraph<A>
-where
-    A: 'static + AsyncRuntime + Send,
-{
-    pub fn new(rt: A) -> Self {
+impl Default for RenderGraph {
+    fn default() -> Self {
         Self {
             node_names: XHashMap::default(),
 
@@ -78,11 +68,13 @@ where
             is_finish_dirty: true,
             topo_sub_ng: None,
 
-            rt,
             run_ng: None,
         }
     }
+}
 
+/// 渲染图的 拓扑信息 相关 方法
+impl RenderGraph {
     /// 添加 名为 name 的 节点
     pub fn add_node<I, O, R>(
         &mut self,
@@ -192,12 +184,10 @@ where
 }
 
 /// 渲染图的 执行 相关
-impl<A> RenderGraph<A>
-where
-    A: 'static + AsyncRuntime + Send,
-{
-    pub async fn build(
+impl RenderGraph {
+    pub async fn build<A: 'static + AsyncRuntime + Send>(
         &mut self,
+        rt: &A,
         device: RenderDevice,
         queue: RenderQueue,
     ) -> Result<(), GraphError> {
@@ -225,7 +215,7 @@ where
         let g = self.create_run_ng(&device, &queue)?;
 
         // 立即 执行 构建图
-        match async_graph(self.rt.clone(), Arc::new(g)).await {
+        match async_graph(rt.clone(), Arc::new(g)).await {
             Ok(_) => Ok(()),
             Err(e) => {
                 let err = GraphError::RunNGraphError(format!("run_ng, {:?}", e));
@@ -237,7 +227,10 @@ where
     }
 
     /// 执行 渲染
-    pub async fn run(&mut self) -> Result<(), GraphError> {
+    pub async fn run<A: 'static + AsyncRuntime + Send>(
+        &mut self,
+        rt: &A,
+    ) -> Result<(), GraphError> {
         match self.run_ng {
             None => {
                 let e = GraphError::NoneNGraph("run_ng".to_string());
@@ -245,7 +238,7 @@ where
 
                 Err(e)
             }
-            Some(ref g) => match async_graph(self.rt.clone(), g.clone()).await {
+            Some(ref g) => match async_graph(rt.clone(), g.clone()).await {
                 Ok(_) => Ok(()),
                 Err(e) => {
                     let err = GraphError::RunNGraphError(format!("run_ng, {:?}", e));
@@ -260,10 +253,7 @@ where
 
 // ================== 以下方法 仅供 crate 使用
 
-impl<A> RenderGraph<A>
-where
-    A: 'static + AsyncRuntime + Send,
-{
+impl RenderGraph {
     fn get_node_id(&self, label: impl Into<NodeLabel>) -> Result<NodeId, GraphError> {
         let label = label.into();
         match label {
