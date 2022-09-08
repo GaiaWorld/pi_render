@@ -11,6 +11,7 @@ use futures::{future::BoxFuture, FutureExt};
 use log::error;
 use pi_async::rt::AsyncRuntime;
 use pi_async_graph::{async_graph, ExecNode, RunFactory, Runner};
+use pi_ecs::world::World;
 use pi_graph::{DirectedGraph, DirectedGraphNode, NGraph, NGraphBuilder};
 use pi_hash::{XHashMap, XHashSet};
 use pi_share::{Share, ShareRefCell};
@@ -190,6 +191,7 @@ impl RenderGraph {
         rt: &A,
         device: RenderDevice,
         queue: RenderQueue,
+        world: World,
     ) -> Result<(), GraphError> {
         if self.is_topo_dirty {
             self.is_finish_dirty = true;
@@ -212,7 +214,7 @@ impl RenderGraph {
         self.get_sub_ng().unwrap();
 
         // 构建 run_ng，返回 构建图
-        let g = self.create_run_ng(&device, &queue)?;
+        let g = self.create_run_ng(&device, &queue, &world)?;
 
         // 立即 执行 构建图
         match async_graph(rt.clone(), Arc::new(g)).await {
@@ -336,6 +338,7 @@ impl RenderGraph {
         &mut self,
         device: &RenderDevice,
         queue: &RenderQueue,
+        world: &World,
     ) -> Result<NGraph<NodeId, ExecNode<EmptySyncRun, EmptySyncRun>>, GraphError> {
         let mut build_builder =
             NGraphBuilder::<NodeId, ExecNode<EmptySyncRun, EmptySyncRun>>::new();
@@ -350,10 +353,10 @@ impl RenderGraph {
             let n = self.get_node_state(*id).unwrap();
             n.0.as_ref().borrow_mut().reset();
 
-            let node = self.create_run_node(*id, device, queue)?;
+            let node = self.create_run_node(*id, device, queue, world)?;
             run_builder = run_builder.node(*id, node);
 
-            let node = self.create_build_node(*id, device, queue)?;
+            let node = self.create_build_node(*id, device, queue, world)?;
             build_builder = build_builder.node(*id, node);
         }
 
@@ -407,25 +410,25 @@ impl RenderGraph {
         node_id: NodeId,
         device: &RenderDevice,
         queue: &RenderQueue,
+        world: &World,
     ) -> Result<ExecNode<EmptySyncRun, EmptySyncRun>, GraphError> {
         let n = self.get_node_state(NodeLabel::Id(node_id));
         let node = n.unwrap().0.clone();
 
         let device = device.clone();
         let queue = queue.clone();
+        let world = world.clone();
 
         // 该函数 会在 ng 图上，每帧每节点 执行一次
         let f = move || -> BoxFuture<'static, std::io::Result<()>> {
             let node = node.clone();
-            let device = device.clone();
-            let queue = queue.clone();
+            let context = RenderContext {
+                device: device.clone(),
+                queue: queue.clone(),
+                world: world.clone(),
+            };
 
             async move {
-                let context = RenderContext {
-                    device: device.clone(),
-                    queue: queue.clone(),
-                };
-
                 node.as_ref().borrow().build(context).await.unwrap();
 
                 Ok(())
@@ -442,29 +445,33 @@ impl RenderGraph {
         node_id: NodeId,
         device: &RenderDevice,
         queue: &RenderQueue,
+        world: &World,
     ) -> Result<ExecNode<EmptySyncRun, EmptySyncRun>, GraphError> {
         let n = self.get_node_state(NodeLabel::Id(node_id));
         let node = n.unwrap().0.clone();
 
         let device = device.clone();
         let queue = queue.clone();
-
+        let world = world.clone();
+        
         // 该函数 会在 ng 图上，每帧每节点 执行一次
         let f = move || -> BoxFuture<'static, std::io::Result<()>> {
             let node = node.clone();
+           
             let device = device.clone();
             let queue = queue.clone();
+            let world = world.clone();
 
             async move {
+                let context = RenderContext {
+                    device: device.clone(),
+                    queue: queue.clone(),
+                    world: world.clone(),
+                };
                 let commands =
                     device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
 
                 let commands = ShareRefCell::new(commands);
-
-                let context = RenderContext {
-                    device: device.clone(),
-                    queue: queue.clone(),
-                };
 
                 node.as_ref()
                     .borrow_mut()

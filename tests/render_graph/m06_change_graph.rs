@@ -1,5 +1,6 @@
 use futures::{future::BoxFuture, FutureExt};
 use pi_async::rt::{AsyncRuntime, AsyncRuntimeBuilder};
+use pi_ecs::world::World;
 use pi_render::{
     graph::{
         graph::RenderGraph,
@@ -15,6 +16,8 @@ use std::{any::TypeId, sync::Arc, time::Duration};
 // 构建 & 修改 渲染图 测试
 #[test]
 fn change_graph() {
+    let world = World::new();
+    
     let runtime = AsyncRuntimeBuilder::default_worker_thread(None, None, None, None);
 
     let mut g = RenderGraph::default();
@@ -40,11 +43,11 @@ fn change_graph() {
 
         println!("======================== should build call ");
 
-        g.build(&rt, device.clone(), queue.clone()).await.unwrap();
+        g.build(&rt, device.clone(), queue.clone(), world.clone()).await.unwrap();
         g.run(&rt).await.unwrap();
 
         println!("======================== shouldn't build call ");
-        g.build(&rt, device.clone(), queue.clone()).await.unwrap();
+        g.build(&rt, device.clone(), queue.clone(), world.clone()).await.unwrap();
         g.run(&rt, ).await.unwrap();
 
         *n1.0.as_ref().borrow_mut() = false;
@@ -62,11 +65,11 @@ fn change_graph() {
         g.set_finish("Node4", true).unwrap();
 
         println!("======================== should build call ");
-        g.build(&rt, device.clone(), queue.clone()).await.unwrap();
+        g.build(&rt, device.clone(), queue.clone(), world.clone()).await.unwrap();
         g.run(&rt).await.unwrap();
 
         println!("======================== shouldn't build call ");
-        g.build(&rt, device, queue).await.unwrap();
+        g.build(&rt, device, queue, world).await.unwrap();
         g.run(&rt).await.unwrap();
     });
 

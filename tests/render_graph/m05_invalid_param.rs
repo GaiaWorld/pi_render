@@ -1,5 +1,6 @@
 use futures::{future::BoxFuture, FutureExt};
 use pi_async::rt::{AsyncRuntime, AsyncRuntimeBuilder};
+use pi_ecs::world::World;
 use pi_render::{
     graph::{
         graph::RenderGraph,
@@ -64,7 +65,8 @@ fn out_same_type() {
     }
 
     let runtime = AsyncRuntimeBuilder::default_worker_thread(None, None, None, None);
-
+    
+    let world = World::new();
     let mut g = RenderGraph::default();
     g.add_node("Node1", Node1);
     g.add_node("Node2", Node2); 
@@ -77,7 +79,7 @@ fn out_same_type() {
     let _ = runtime.spawn(runtime.alloc(), async move {
         let (device, queue) = init_render().await;
 
-        g.build(&rt, device, queue).await.unwrap();
+        g.build(&rt, device, queue, world).await.unwrap();
 
         println!("======== run graph");
         g.run(&rt).await.unwrap();
@@ -138,7 +140,8 @@ fn in_same_type() {
     }
 
     let runtime = AsyncRuntimeBuilder::default_worker_thread(None, None, None, None);
-
+    
+    let world = World::new();
     let mut g = RenderGraph::default();
     g.add_node("Node1", Node1);
     g.add_node("Node2", Node2);
@@ -151,7 +154,7 @@ fn in_same_type() {
     let _ = runtime.spawn(runtime.alloc(), async move {
         let (device, queue) = init_render().await;
 
-        g.build(&rt, device, queue).await.unwrap();
+        g.build(&rt, device, queue, world).await.unwrap();
 
         println!("======== run graph");
         g.run(&rt).await.unwrap();
@@ -201,7 +204,8 @@ fn multi_output_type() {
             .boxed()
         }
     }
-
+    
+    let world = World::new();
     let runtime = AsyncRuntimeBuilder::default_worker_thread(None, None, None, None);
 
     let mut g = RenderGraph::default();
@@ -219,7 +223,7 @@ fn multi_output_type() {
     let _ = runtime.spawn(runtime.alloc(), async move {
         let (device, queue) = init_render().await;
 
-        g.build(&rt, device, queue).await.unwrap();
+        g.build(&rt, device, queue, world).await.unwrap();
 
         println!("======== run graph");
         g.run(&rt).await.unwrap();

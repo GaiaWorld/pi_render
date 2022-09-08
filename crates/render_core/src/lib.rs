@@ -91,7 +91,7 @@ where
 
     let rt = world.get_resource::<RenderAsyncRuntime<A>>().unwrap();
 
-    rg.build(&rt.rt, device.clone(), queue.clone())
+    rg.build(&rt.rt, device.clone(), queue.clone(), world.clone())
         .await
         .unwrap();
 

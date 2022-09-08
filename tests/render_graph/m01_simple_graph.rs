@@ -1,5 +1,6 @@
 use futures::{future::BoxFuture, FutureExt};
 use pi_async::rt::{AsyncRuntime, AsyncRuntimeBuilder};
+use pi_ecs::world::World;
 use pi_render::{
     graph::{
         graph::RenderGraph,
@@ -77,6 +78,8 @@ fn two_node_with_simple_param() {
         }
     }
 
+    let world = World::new();
+
     let runtime = AsyncRuntimeBuilder::default_worker_thread(None, None, None, None);
 
     let mut g = RenderGraph::default();
@@ -92,7 +95,7 @@ fn two_node_with_simple_param() {
     let _ = runtime.spawn(runtime.alloc(), async move {
         let (device, queue) = init_render().await;
 
-        g.build(&rt, device, queue).await.unwrap();
+        g.build(&rt, device, queue, world).await.unwrap();
 
         println!("======== 1 run graph");
         g.run(&rt).await.unwrap();
@@ -165,6 +168,8 @@ fn two_node_with_no_match() {
         }
     }
 
+    let world = World::new();
+
     let runtime = AsyncRuntimeBuilder::default_worker_thread(None, None, None, None);
 
     let mut g = RenderGraph::default();
@@ -179,7 +184,7 @@ fn two_node_with_no_match() {
     let rt = runtime.clone();
     let _ = runtime.spawn(runtime.alloc(), async move {
         let (device, queue) = init_render().await;
-        g.build(&rt, device, queue).await.unwrap();
+        g.build(&rt, device, queue, world).await.unwrap();
 
         println!("======== 1 run graph");
         g.run(&rt).await.unwrap();

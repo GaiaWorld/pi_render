@@ -1,5 +1,6 @@
 use futures::{future::BoxFuture, FutureExt};
 use pi_async::rt::{AsyncRuntime, AsyncRuntimeBuilder};
+use pi_ecs::world::World;
 use pi_render::{
     graph::{
         graph::RenderGraph,
@@ -38,12 +39,13 @@ fn multi_node() {
 
     g.set_finish("Node6", true).unwrap();
     
+    let world = World::new();
     let rt = runtime.clone();
     let _ = runtime.spawn(runtime.alloc(), async move {
         let rt = rt.clone();
         let (device, queue) = init_render().await;
 
-        g.build(&rt, device, queue).await.unwrap();
+        g.build(&rt, device, queue, world).await.unwrap();
 
         println!("======== 1 run graph");
         g.run(&rt).await.unwrap();

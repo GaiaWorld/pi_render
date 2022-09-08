@@ -1,8 +1,16 @@
+//! 渲染图 模块
+//! 
+//! 主要类
+//!     + struct GenerateGraph
+//!     + struct RenderGraph
+//!     + trait Node
+//!     
 pub mod graph;
 pub mod node;
 pub mod param;
 
 pub use node::{NodeId, NodeLabel};
+use pi_ecs::world::World;
 
 use crate::rhi::{device::RenderDevice, RenderQueue};
 use thiserror::Error;
@@ -10,11 +18,14 @@ use thiserror::Error;
 /// 渲染图 执行过程需要的环境
 #[derive(Clone)]
 pub struct RenderContext {
-    // 渲染 设备，用于 创建资源
+    /// 渲染 设备，用于 创建资源
     pub device: RenderDevice,
 
-    // 队列，用于 创建 和 提交 CommandEncoder
+    /// 队列，用于 创建 和 提交 CommandEncoder
     pub queue: RenderQueue,
+
+    /// ECS world
+    pub world: World,
 }
 
 /// 渲染图 执行过程中 遇到的 相关错误信息
