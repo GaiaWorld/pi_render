@@ -81,7 +81,8 @@ where
 }
 
 // Build RenderGraph
-async fn build_graph<A>(world: WorldMut) -> Result<(), GraphError>
+// 注：System 的返回值 一定要 std::io::Result 才是 异步类型
+async fn build_graph<A>(world: WorldMut) -> std::io::Result<()> 
 where
     A: 'static + AsyncRuntime + Send,
 {
@@ -98,8 +99,9 @@ where
     Ok(())
 }
 
-/// 每帧 调用一次，用于 驱动 渲染图
-async fn render_system<A>(world: WorldMut) -> Result<(), GraphError>
+// 每帧 调用一次，用于 驱动 渲染图
+// 注：System 的返回值 一定要 std::io::Result 才是 异步类型
+async fn render_system<A>(world: WorldMut) -> std::io::Result<()> 
 where
     A: 'static + AsyncRuntime + Send,
 {
