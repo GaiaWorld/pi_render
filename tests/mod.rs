@@ -1,1 +1,1 @@
-pub mod render_graph;
+pub mod generic_graph;
