@@ -106,8 +106,17 @@ impl<T> Assign for T {
 // 为基本类型实现 InParam
 // 为 实现了 Copy 的 基本类型 实现 OutParam
 macro_rules! impl_base_copy {
-    ($ty: ty) => {
-        impl InParam for $ty {
+    // 用逗号 将 多个类型 impl_base_copy!(i8, i16, i32, f32)
+    ($first:ty, $($rest:ty),+) => {
+        impl_base_copy!($first);
+        $(
+            impl_base_copy!($rest);
+        )+
+    };
+
+    // 基本情况，只有一个参数时
+    ($typ:ty) => {
+        impl InParam for $typ {
             fn can_fill<O: OutParam + ?Sized>(
                 &self,
                 map: &mut XHashMap<TypeId, Vec<NodeId>>,
@@ -131,7 +140,7 @@ macro_rules! impl_base_copy {
             }
         }
 
-        impl OutParam for $ty {
+        impl OutParam for $typ {
             fn can_fill(&self, set: &mut Option<&mut XHashSet<TypeId>>, ty: TypeId) -> bool {
                 let r = ty == TypeId::of::<Self>();
                 if r && set.is_some() {
@@ -162,8 +171,17 @@ macro_rules! impl_base_copy {
 // 为基本类型实现 InParam
 // 为 实现了 Clone 没有实现 Copy 的 基本类型 实现 OutParam
 macro_rules! impl_base_noncopy {
-    ($ty: ty) => {
-        impl InParam for $ty {
+    // 用逗号 将 多个类型 串起来调用，例子：impl_base_noncopy!(Arc, Rc, String)
+    ($first:ty, $($rest:ty),+) => {
+        impl_base_noncopy!($first);
+        $(
+            impl_base_noncopy!($rest);
+        )+
+    };
+
+    // 基本情况，只有一个参数时
+    ($typ: ty) => {
+        impl InParam for $typ {
             fn can_fill<O: OutParam + ?Sized>(
                 &self,
                 map: &mut XHashMap<TypeId, Vec<NodeId>>,
@@ -187,7 +205,7 @@ macro_rules! impl_base_noncopy {
             }
         }
 
-        impl OutParam for $ty {
+        impl OutParam for $typ {
             fn can_fill(&self, set: &mut Option<&mut XHashSet<TypeId>>, ty: TypeId) -> bool {
                 let r = ty == TypeId::of::<Self>();
                 if r && set.is_some() {
@@ -223,17 +241,19 @@ macro_rules! impl_base_noncopy {
 
 impl_base_noncopy!(String);
 
-impl_base_copy!(());
-impl_base_copy!(bool);
-impl_base_copy!(i8);
-impl_base_copy!(i16);
-impl_base_copy!(i32);
-impl_base_copy!(i64);
-impl_base_copy!(i128);
-impl_base_copy!(u8);
-impl_base_copy!(u16);
-impl_base_copy!(u32);
-impl_base_copy!(u64);
-impl_base_copy!(u128);
-impl_base_copy!(f32);
-impl_base_copy!(f64);
+impl_base_copy!(
+    (),
+    bool,
+    i8,
+    i16,
+    i32,
+    i64,
+    i128,
+    u8,
+    u16,
+    u32,
+    u64,
+    u128,
+    f32,
+    f64
+);
