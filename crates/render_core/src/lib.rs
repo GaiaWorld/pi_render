@@ -13,7 +13,7 @@ extern crate lazy_static;
 
 pub mod components;
 pub mod font;
-pub mod generic_graph;
+pub mod depend_graph;
 pub mod graph;
 pub mod rhi;
 

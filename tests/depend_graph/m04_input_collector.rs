@@ -1,8 +1,8 @@
 use futures::{future::BoxFuture, FutureExt};
 use pi_async::rt::{AsyncRuntime, AsyncRuntimeBuilder};
-use pi_render::generic_graph::{
-    graph::GenericGraph,
-    node::{GenericNode, ParamUsage},
+use pi_render::depend_graph::{
+    graph::DependGraph,
+    node::{DependNode, ParamUsage},
     param::InParamCollector,
 };
 use pi_share::Share;
@@ -14,7 +14,7 @@ use std::{any::TypeId, time::Duration};
 fn input_collector() {
     let runtime = AsyncRuntimeBuilder::default_worker_thread(None, None, None, None);
 
-    let mut g = GenericGraph::default();
+    let mut g = DependGraph::default();
 
     let n11 = g.add_node("Node11", Node1(11)).unwrap();
     let n12 = g.add_node("Node12", Node1(12)).unwrap();
@@ -30,11 +30,11 @@ fn input_collector() {
     println!("node14 id = {:?}", n14);
     println!("node15 id = {:?}", n15);
 
-    g.add_depend("Node11", "Node2");
-    g.add_depend("Node12", "Node2");
-    g.add_depend("Node13", "Node2");
-    g.add_depend("Node14", "Node2");
-    g.add_depend("Node15", "Node2");
+    g.add_node_depend("Node11", "Node2");
+    g.add_node_depend("Node12", "Node2");
+    g.add_node_depend("Node13", "Node2");
+    g.add_node_depend("Node14", "Node2");
+    g.add_node_depend("Node15", "Node2");
 
     g.set_finish("Node2", true).unwrap();
 
@@ -76,7 +76,7 @@ pub struct Input2 {
 
 struct Node1(u32);
 
-impl GenericNode for Node1 {
+impl DependNode for Node1 {
     type Input = ();
     type Output = Output1;
 
@@ -107,7 +107,7 @@ impl GenericNode for Node1 {
 }
 
 struct Node2;
-impl GenericNode for Node2 {
+impl DependNode for Node2 {
     type Input = Input2;
     type Output = ();
 

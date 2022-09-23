@@ -1,8 +1,8 @@
 use futures::{future::BoxFuture, FutureExt};
 use pi_async::rt::{AsyncRuntime, AsyncRuntimeBuilder};
-use pi_render::generic_graph::{
-    graph::GenericGraph,
-    node::{GenericNode, ParamUsage},
+use pi_render::depend_graph::{
+    graph::DependGraph,
+    node::{DependNode, ParamUsage},
 };
 use pi_share::Share;
 use render_derive::NodeParam;
@@ -13,7 +13,7 @@ use std::{any::TypeId, time::Duration};
 fn multi_node() {
     let runtime = AsyncRuntimeBuilder::default_worker_thread(None, None, None, None);
 
-    let mut g = GenericGraph::default();
+    let mut g = DependGraph::default();
 
     g.add_node("Node1", Node1);
     g.add_node("Node2", Node2);
@@ -22,14 +22,14 @@ fn multi_node() {
     g.add_node("Node5", Node5);
     g.add_node("Node6", Node6);
 
-    g.add_depend("Node1", "Node4");
-    g.add_depend("Node2", "Node4");
+    g.add_node_depend("Node1", "Node4");
+    g.add_node_depend("Node2", "Node4");
 
-    g.add_depend("Node2", "Node5");
-    g.add_depend("Node3", "Node5");
+    g.add_node_depend("Node2", "Node5");
+    g.add_node_depend("Node3", "Node5");
 
-    g.add_depend("Node4", "Node6");
-    g.add_depend("Node5", "Node6");
+    g.add_node_depend("Node4", "Node6");
+    g.add_node_depend("Node5", "Node6");
 
     g.set_finish("Node6", true).unwrap();
 
@@ -121,7 +121,7 @@ pub struct Input5 {
 }
 
 struct Node1;
-impl GenericNode for Node1 {
+impl DependNode for Node1 {
     type Input = ();
     type Output = Output1;
 
@@ -149,7 +149,7 @@ impl GenericNode for Node1 {
 }
 
 struct Node2;
-impl GenericNode for Node2 {
+impl DependNode for Node2 {
     type Input = ();
     type Output = Output2;
 
@@ -178,7 +178,7 @@ impl GenericNode for Node2 {
 }
 
 struct Node3;
-impl GenericNode for Node3 {
+impl DependNode for Node3 {
     type Input = ();
     type Output = Output3;
 
@@ -204,7 +204,7 @@ impl GenericNode for Node3 {
 }
 
 struct Node4;
-impl GenericNode for Node4 {
+impl DependNode for Node4 {
     type Input = Input4;
     type Output = A;
 
@@ -233,7 +233,7 @@ impl GenericNode for Node4 {
 }
 
 struct Node5;
-impl GenericNode for Node5 {
+impl DependNode for Node5 {
     type Input = Input5;
     type Output = F;
 
@@ -262,7 +262,7 @@ impl GenericNode for Node5 {
 }
 
 struct Node6;
-impl GenericNode for Node6 {
+impl DependNode for Node6 {
     type Input = A;
     type Output = ();
 

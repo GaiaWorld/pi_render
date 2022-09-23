@@ -1,8 +1,8 @@
 use futures::{future::BoxFuture, FutureExt};
 use pi_async::rt::{AsyncRuntime, AsyncRuntimeBuilder};
-use pi_render::generic_graph::{
-    graph::GenericGraph,
-    node::{GenericNode, ParamUsage},
+use pi_render::depend_graph::{
+    graph::DependGraph,
+    node::{DependNode, ParamUsage},
 };
 use pi_share::Share;
 use render_derive::NodeParam;
@@ -21,7 +21,7 @@ fn out_same_type() {
     }
 
     struct Node1;
-    impl GenericNode for Node1 {
+    impl DependNode for Node1 {
         type Input = ();
         type Output = Output1;
 
@@ -42,7 +42,7 @@ fn out_same_type() {
     }
 
     struct Node2;
-    impl GenericNode for Node2 {
+    impl DependNode for Node2 {
         type Input = ();
         type Output = ();
 
@@ -57,11 +57,11 @@ fn out_same_type() {
 
     let runtime = AsyncRuntimeBuilder::default_worker_thread(None, None, None, None);
 
-    let mut g = GenericGraph::default();
+    let mut g = DependGraph::default();
     g.add_node("Node1", Node1);
     g.add_node("Node2", Node2);
 
-    g.add_depend("Node1", "Node2");
+    g.add_node_depend("Node1", "Node2");
 
     g.set_finish("Node2", true).unwrap();
 
@@ -89,7 +89,7 @@ fn in_same_type() {
     }
 
     struct Node1;
-    impl GenericNode for Node1 {
+    impl DependNode for Node1 {
         type Input = ();
         type Output = ();
 
@@ -103,7 +103,7 @@ fn in_same_type() {
     }
 
     struct Node2;
-    impl GenericNode for Node2 {
+    impl DependNode for Node2 {
         type Input = Input1;
         type Output = ();
 
@@ -118,11 +118,11 @@ fn in_same_type() {
 
     let runtime = AsyncRuntimeBuilder::default_worker_thread(None, None, None, None);
 
-    let mut g = GenericGraph::default();
+    let mut g = DependGraph::default();
     g.add_node("Node1", Node1);
     g.add_node("Node2", Node2);
 
-    g.add_depend("Node1", "Node2");
+    g.add_node_depend("Node1", "Node2");
 
     g.set_finish("Node2", true).unwrap();
 
@@ -142,7 +142,7 @@ fn in_same_type() {
 #[test]
 fn multi_output_type() {
     struct Node1;
-    impl GenericNode for Node1 {
+    impl DependNode for Node1 {
         type Input = ();
         type Output = u32;
 
@@ -156,7 +156,7 @@ fn multi_output_type() {
     }
 
     struct Node2;
-    impl GenericNode for Node2 {
+    impl DependNode for Node2 {
         type Input = u32;
         type Output = ();
 
@@ -171,14 +171,14 @@ fn multi_output_type() {
 
     let runtime = AsyncRuntimeBuilder::default_worker_thread(None, None, None, None);
 
-    let mut g = GenericGraph::default();
+    let mut g = DependGraph::default();
     g.add_node("Node11", Node1);
     g.add_node("Node12", Node1);
 
     g.add_node("Node2", Node2);
 
-    g.add_depend("Node11", "Node2");
-    g.add_depend("Node12", "Node2");
+    g.add_node_depend("Node11", "Node2");
+    g.add_node_depend("Node12", "Node2");
 
     g.set_finish("Node2", true).unwrap();
 

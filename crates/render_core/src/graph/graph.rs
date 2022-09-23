@@ -7,7 +7,7 @@ use super::{
     GraphError, RenderContext,
 };
 use crate::{
-    generic_graph::graph::GenericGraph,
+    depend_graph::graph::DependGraph,
     rhi::{device::RenderDevice, RenderQueue},
 };
 use pi_async::rt::AsyncRuntime;
@@ -20,7 +20,7 @@ pub struct RenderGraph {
     device: RenderDevice,
     queue: RenderQueue,
 
-    imp: GenericGraph,
+    imp: DependGraph,
 }
 
 /// 渲染图的 拓扑信息 相关 方法
@@ -59,8 +59,8 @@ impl RenderGraph {
     }
 
     /// 移除 节点
-    pub fn remove_node(&mut self, id: NodeId, name: impl Into<Cow<'static, str>>) {
-        self.imp.remove_node(id, name)
+    pub fn remove_node(&mut self, label: impl Into<NodeLabel>) -> Result<(), GraphError> {
+        self.imp.remove_node(label)
     }
 
     /// 建立 Node 的 依赖关系
@@ -68,30 +68,36 @@ impl RenderGraph {
     #[inline]
     pub fn add_depend(
         &mut self,
-        before: impl Into<NodeLabel>,
-        after: impl Into<NodeLabel>,
+        before_label: impl Into<NodeLabel>,
+        before_slot: impl Into<Cow<'static, str>>,
+        after_label: impl Into<NodeLabel>,
+        after_slot: impl Into<Cow<'static, str>>,
     ) -> Result<(), GraphError> {
-        self.imp.add_depend(before, after)
+        self.imp
+            .add_depend(before_label, before_slot, after_label, after_slot)
     }
 
     /// 移除依赖
     #[inline]
     pub fn remove_depend(
         &mut self,
-        before: impl Into<NodeLabel>,
-        after: impl Into<NodeLabel>,
+        before_label: impl Into<NodeLabel>,
+        before_slot: impl Into<Cow<'static, str>>,
+        after_label: impl Into<NodeLabel>,
+        after_slot: impl Into<Cow<'static, str>>,
     ) -> Result<(), GraphError> {
-        self.imp.remove_depend(before, after)
+        self.imp
+            .remove_depend(before_label, before_slot, after_label, after_slot)
     }
 
     /// 设置 是否 是 最终节点
     #[inline]
     pub fn set_finish(
         &mut self,
-        node: impl Into<NodeLabel>,
+        label: impl Into<NodeLabel>,
         is_finish: bool,
     ) -> Result<(), GraphError> {
-        self.imp.set_finish(node, is_finish)
+        self.imp.set_finish(label, is_finish)
     }
 }
 

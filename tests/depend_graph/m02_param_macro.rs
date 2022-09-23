@@ -1,20 +1,24 @@
 use futures::{future::BoxFuture, FutureExt};
 use pi_async::rt::{AsyncRuntime, AsyncRuntimeBuilder};
-use pi_render::generic_graph::{
-    graph::GenericGraph,
-    node::{GenericNode, ParamUsage},
+use pi_render::depend_graph::{
+    graph::DependGraph,
+    node::{DependNode, ParamUsage},
 };
 use pi_share::Share;
+use render_derive::NodeParam;
 use std::{any::TypeId, time::Duration};
 
 // 两个 节点
-// 输入 输出 基本类型
+// 输入 输出 结构体，不展开
 #[test]
-fn two_node_with_simple_param() {
+fn two_node_with_noslot() {
+    #[derive(NodeParam, Clone, Debug, Default, PartialEq, Eq)]
+    pub struct A(u32);
+
     struct Node1;
-    impl GenericNode for Node1 {
+    impl DependNode for Node1 {
         type Input = ();
-        type Output = f32;
+        type Output = A;
 
         fn run<'a>(
             &'a self,
@@ -29,23 +33,20 @@ fn two_node_with_simple_param() {
             // 输入：空元组 没前缀节点填，为 false
             assert!(!usage.is_input_fill(TypeId::of::<()>()));
 
-            // 输出：f32 有 后继节点使用，为 true
-            assert!(usage.is_output_usage(TypeId::of::<f32>()));
-
-            // 输出：u64 根本 不属于 该输出，自然不会有 后继节点使用，为 false
-            assert!(!usage.is_output_usage(TypeId::of::<u64>()));
+            // 输出：A 有 后继节点使用，为 true
+            assert!(usage.is_output_usage(TypeId::of::<A>()));
 
             async move {
                 println!("======== Enter Async Node1 Running");
-                Ok(30.25)
+                Ok(A(12))
             }
             .boxed()
         }
     }
 
     struct Node2;
-    impl GenericNode for Node2 {
-        type Input = f32;
+    impl DependNode for Node2 {
+        type Input = A;
         type Output = ();
 
         fn run<'a>(
@@ -56,10 +57,10 @@ fn two_node_with_simple_param() {
             println!("======== Enter Node2 Running");
 
             // 输入就是 Node1 的 输出
-            assert_eq!(*input, 30.25);
+            assert_eq!(*input, A(12));
 
-            // f32 被 前置节点 Node1 填充，所以 这里 返回 true
-            assert!(usage.is_input_fill(TypeId::of::<f32>()));
+            // A 被 前置节点 Node1 填充，返回 true
+            assert!(usage.is_input_fill(TypeId::of::<A>()));
 
             async move {
                 println!("======== Enter Async Node2 Running");
@@ -70,12 +71,13 @@ fn two_node_with_simple_param() {
     }
 
     let runtime = AsyncRuntimeBuilder::default_worker_thread(None, None, None, None);
-    let mut g = GenericGraph::default();
+
+    let mut g = DependGraph::default();
 
     g.add_node("Node1", Node1);
     g.add_node("Node2", Node2);
 
-    g.add_depend("Node1", "Node2");
+    g.add_node_depend("Node1", "Node2");
 
     g.set_finish("Node2", true).unwrap();
 
@@ -91,14 +93,34 @@ fn two_node_with_simple_param() {
 }
 
 // 两个 节点
-// 输入 输出 基本类型
-// 不匹配 的 参数
+// 输入 输出 结构体，展开 字段
 #[test]
-fn two_node_with_no_match() {
+fn two_node_with_slot() {
+    #[derive(NodeParam, Clone, Debug, Default, PartialEq, Eq)]
+    pub struct A(u32);
+
+    #[derive(NodeParam, Clone, Debug, Default)]
+    #[field_slots]
+    pub struct Output1 {
+        pub a: A,
+        pub b: u32,
+        pub c: String,
+
+        d: f32,
+    }
+
+    #[derive(NodeParam, Clone, Debug, Default)]
+    #[field_slots]
+    pub struct Input2 {
+        pub i1: u32,
+        pub i2: String,
+        pub i3: f32,
+    }
+
     struct Node1;
-    impl GenericNode for Node1 {
+    impl DependNode for Node1 {
         type Input = ();
-        type Output = f32;
+        type Output = Output1;
 
         fn run<'a>(
             &'a self,
@@ -113,20 +135,26 @@ fn two_node_with_no_match() {
             // 输入：空元组 没前缀节点填，为 false
             assert!(!usage.is_input_fill(TypeId::of::<()>()));
 
-            // 输出：f32 没有 后继节点使用，为 false
-            assert!(!usage.is_output_usage(TypeId::of::<f32>()));
+            assert!(usage.is_output_usage(TypeId::of::<u32>()));
+            assert!(usage.is_output_usage(TypeId::of::<String>()));
+            assert!(!usage.is_output_usage(TypeId::of::<A>()));
 
             async move {
                 println!("======== Enter Async Node1 Running");
-                Ok(30.25)
+                Ok(Output1 {
+                    a: A(34),
+                    b: 67,
+                    c: "abcdefg".to_string(),
+                    d: 89.34,
+                })
             }
             .boxed()
         }
     }
 
     struct Node2;
-    impl GenericNode for Node2 {
-        type Input = u64;
+    impl DependNode for Node2 {
+        type Input = Input2;
         type Output = ();
 
         fn run<'a>(
@@ -137,10 +165,13 @@ fn two_node_with_no_match() {
             println!("======== Enter Node2 Running");
 
             // 输入就是 Node1 的 输出
-            assert_eq!(*input, 0);
+            assert_eq!(input.i1, 67);
+            assert_eq!(input.i2, "abcdefg".to_string());
+            assert_eq!(input.i3, 0.0);
 
-            // u64 没有被 前置节点 Node1 填充，返回 false
-            assert!(!usage.is_input_fill(TypeId::of::<u64>()));
+            assert!(usage.is_input_fill(TypeId::of::<u32>()));
+            assert!(usage.is_input_fill(TypeId::of::<String>()));
+            assert!(!usage.is_input_fill(TypeId::of::<f32>()));
 
             async move {
                 println!("======== Enter Async Node2 Running");
@@ -152,12 +183,12 @@ fn two_node_with_no_match() {
 
     let runtime = AsyncRuntimeBuilder::default_worker_thread(None, None, None, None);
 
-    let mut g = GenericGraph::default();
+    let mut g = DependGraph::default();
 
     g.add_node("Node1", Node1);
     g.add_node("Node2", Node2);
 
-    g.add_depend("Node1", "Node2");
+    g.add_node_depend("Node1", "Node2");
 
     g.set_finish("Node2", true).unwrap();
 

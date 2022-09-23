@@ -3,12 +3,12 @@ use super::{
     param::{InParam, OutParam},
     RenderContext,
 };
-use crate::generic_graph::node::GenericNode;
+use crate::depend_graph::node::DependNode;
 use futures::{future::BoxFuture, FutureExt};
 use pi_share::{Share, ShareRefCell};
 use wgpu::CommandEncoder;
 
-pub use crate::generic_graph::node::{NodeId, NodeLabel, ParamUsage};
+pub use crate::depend_graph::node::{NodeId, NodeLabel, ParamUsage};
 
 /// 渲染节点，给 外部 扩展 使用
 pub trait Node: 'static + Send + Sync {
@@ -62,7 +62,7 @@ where
     }
 }
 
-impl<I, O, R> GenericNode for NodeImpl<I, O, R>
+impl<I, O, R> DependNode for NodeImpl<I, O, R>
 where
     I: InParam + Default,
     O: OutParam + Default + Clone,

@@ -1,8 +1,8 @@
 use futures::{future::BoxFuture, FutureExt};
 use pi_async::rt::{AsyncRuntime, AsyncRuntimeBuilder};
-use pi_render::generic_graph::{
-    graph::GenericGraph,
-    node::{GenericNode, ParamUsage},
+use pi_render::depend_graph::{
+    graph::DependGraph,
+    node::{DependNode, ParamUsage},
 };
 use pi_share::{cell::TrustCell, Share};
 use render_derive::NodeParam;
@@ -13,7 +13,7 @@ use std::{any::TypeId, sync::Arc, time::Duration};
 fn change_graph() {
     let runtime = AsyncRuntimeBuilder::default_worker_thread(None, None, None, None);
 
-    let mut g = GenericGraph::default();
+    let mut g = DependGraph::default();
 
     let n1 = Node1::default();
     let n2 = Node2::default();
@@ -25,8 +25,8 @@ fn change_graph() {
     g.add_node("Node3", n3.clone());
     g.add_node("Node4", n4.clone());
 
-    g.add_depend("Node1", "Node3");
-    g.add_depend("Node2", "Node3");
+    g.add_node_depend("Node1", "Node3");
+    g.add_node_depend("Node2", "Node3");
 
     g.set_finish("Node3", true).unwrap();
 
@@ -46,11 +46,11 @@ fn change_graph() {
         *n3.0.as_ref().borrow_mut() = false;
         *n4.0.as_ref().borrow_mut() = false;
 
-        g.remove_depend("Node1", "Node3");
-        g.remove_depend("Node2", "Node3");
+        g.remove_node_depend("Node1", "Node3");
+        g.remove_node_depend("Node2", "Node3");
 
-        g.add_depend("Node1", "Node4");
-        g.add_depend("Node2", "Node4");
+        g.add_node_depend("Node1", "Node4");
+        g.add_node_depend("Node2", "Node4");
 
         g.set_finish("Node3", false).unwrap();
         g.set_finish("Node4", true).unwrap();
@@ -121,7 +121,7 @@ impl Default for Node1 {
     }
 }
 
-impl GenericNode for Node1 {
+impl DependNode for Node1 {
     type Input = ();
     type Output = Output1;
 
@@ -167,7 +167,7 @@ impl Default for Node2 {
     }
 }
 
-impl GenericNode for Node2 {
+impl DependNode for Node2 {
     type Input = ();
     type Output = Output2;
 
@@ -216,7 +216,7 @@ impl Default for Node3 {
     }
 }
 
-impl GenericNode for Node3 {
+impl DependNode for Node3 {
     type Input = Input3;
     type Output = ();
 
@@ -255,7 +255,7 @@ impl Default for Node4 {
     }
 }
 
-impl GenericNode for Node4 {
+impl DependNode for Node4 {
     type Input = B;
     type Output = ();
 
