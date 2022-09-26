@@ -1,13 +1,8 @@
 use futures::{future::BoxFuture, FutureExt};
 use pi_async::rt::{AsyncRuntime, AsyncRuntimeBuilder};
-use pi_ecs::world::World;
-use pi_render::{
-    graph::{
-        graph::RenderGraph,
-        node::{Node, ParamUsage},
-        RenderContext,
-    },
-    rhi::{device::RenderDevice, RenderQueue},
+use pi_render::generic_graph::{
+    graph::GenericGraph,
+    node::{GenericNode, ParamUsage},
 };
 use pi_share::{cell::TrustCell, Share};
 use render_derive::NodeParam;
@@ -16,11 +11,9 @@ use std::{any::TypeId, sync::Arc, time::Duration};
 // 构建 & 修改 渲染图 测试
 #[test]
 fn change_graph() {
-    let world = World::new();
-    
     let runtime = AsyncRuntimeBuilder::default_worker_thread(None, None, None, None);
 
-    let mut g = RenderGraph::default();
+    let mut g = GenericGraph::default();
 
     let n1 = Node1::default();
     let n2 = Node2::default();
@@ -36,19 +29,17 @@ fn change_graph() {
     g.add_depend("Node2", "Node3");
 
     g.set_finish("Node3", true).unwrap();
-    
+
     let rt = runtime.clone();
     let _ = runtime.spawn(runtime.alloc(), async move {
-        let (device, queue) = init_render().await;
-
         println!("======================== should build call ");
 
-        g.build(&rt, device.clone(), queue.clone(), world.clone()).await.unwrap();
+        g.build(&rt).await.unwrap();
         g.run(&rt).await.unwrap();
 
         println!("======================== shouldn't build call ");
-        g.build(&rt, device.clone(), queue.clone(), world.clone()).await.unwrap();
-        g.run(&rt, ).await.unwrap();
+        g.build(&rt).await.unwrap();
+        g.run(&rt).await.unwrap();
 
         *n1.0.as_ref().borrow_mut() = false;
         *n2.0.as_ref().borrow_mut() = false;
@@ -65,15 +56,15 @@ fn change_graph() {
         g.set_finish("Node4", true).unwrap();
 
         println!("======================== should build call ");
-        g.build(&rt, device.clone(), queue.clone(), world.clone()).await.unwrap();
+        g.build(&rt).await.unwrap();
         g.run(&rt).await.unwrap();
 
         println!("======================== shouldn't build call ");
-        g.build(&rt, device, queue, world).await.unwrap();
+        g.build(&rt).await.unwrap();
         g.run(&rt).await.unwrap();
     });
 
-    std::thread::sleep(Duration::from_secs(5));
+    std::thread::sleep(Duration::from_secs(3));
 }
 
 #[derive(NodeParam, Debug, Default, Clone, Eq, PartialEq)]
@@ -130,23 +121,17 @@ impl Default for Node1 {
     }
 }
 
-impl Node for Node1 {
+impl GenericNode for Node1 {
     type Input = ();
     type Output = Output1;
 
-    fn build<'a>(
-        &'a self,
-        context: RenderContext,
-        usage: &'a ParamUsage,
-    ) -> Option<BoxFuture<'a, Result<(), String>>> {
+    fn build<'a>(&'a self, usage: &'a ParamUsage) -> Option<BoxFuture<'a, Result<(), String>>> {
         println!("++++++++++++++++++++++++ Node1 Build");
         None
     }
 
     fn run<'a>(
         &'a self,
-        context: RenderContext,
-        commands: pi_share::ShareRefCell<wgpu::CommandEncoder>,
         input: &Self::Input,
         usage: &'a ParamUsage,
     ) -> futures::future::BoxFuture<'a, Result<Self::Output, String>> {
@@ -182,23 +167,17 @@ impl Default for Node2 {
     }
 }
 
-impl Node for Node2 {
+impl GenericNode for Node2 {
     type Input = ();
     type Output = Output2;
 
-    fn build<'a>(
-        &'a self,
-        context: RenderContext,
-        usage: &'a ParamUsage,
-    ) -> Option<BoxFuture<'a, Result<(), String>>> {
+    fn build<'a>(&'a self, usage: &'a ParamUsage) -> Option<BoxFuture<'a, Result<(), String>>> {
         println!("++++++++++++++++++++++++ Node2 Build");
         None
     }
 
     fn run<'a>(
         &'a self,
-        context: RenderContext,
-        commands: pi_share::ShareRefCell<wgpu::CommandEncoder>,
         input: &'a Self::Input,
         usage: &'a ParamUsage,
     ) -> futures::future::BoxFuture<'a, Result<Self::Output, String>> {
@@ -237,23 +216,17 @@ impl Default for Node3 {
     }
 }
 
-impl Node for Node3 {
+impl GenericNode for Node3 {
     type Input = Input3;
     type Output = ();
 
-    fn build<'a>(
-        &'a self,
-        context: RenderContext,
-        usage: &'a ParamUsage,
-    ) -> Option<BoxFuture<'a, Result<(), String>>> {
+    fn build<'a>(&'a self, usage: &'a ParamUsage) -> Option<BoxFuture<'a, Result<(), String>>> {
         println!("++++++++++++++++++++++++ Node3 Build");
         None
     }
 
     fn run<'a>(
         &'a self,
-        context: RenderContext,
-        commands: pi_share::ShareRefCell<wgpu::CommandEncoder>,
         input: &'a Self::Input,
         usage: &'a ParamUsage,
     ) -> futures::future::BoxFuture<'a, Result<Self::Output, String>> {
@@ -282,23 +255,17 @@ impl Default for Node4 {
     }
 }
 
-impl Node for Node4 {
+impl GenericNode for Node4 {
     type Input = B;
     type Output = ();
 
-    fn build<'a>(
-        &'a self,
-        context: RenderContext,
-        usage: &'a ParamUsage,
-    ) -> Option<BoxFuture<'a, Result<(), String>>> {
+    fn build<'a>(&'a self, usage: &'a ParamUsage) -> Option<BoxFuture<'a, Result<(), String>>> {
         println!("++++++++++++++++++++++++ Node4 Build");
         None
     }
 
     fn run<'a>(
         &'a self,
-        context: RenderContext,
-        commands: pi_share::ShareRefCell<wgpu::CommandEncoder>,
         input: &'a Self::Input,
         usage: &'a ParamUsage,
     ) -> futures::future::BoxFuture<'a, Result<Self::Output, String>> {
@@ -318,32 +285,4 @@ impl Node for Node4 {
         }
         .boxed()
     }
-}
-
-async fn init_render() -> (RenderDevice, RenderQueue) {
-    let backends = wgpu::Backends::all();
-    let instance = wgpu::Instance::new(backends);
-
-    let adapter_options = wgpu::RequestAdapterOptions {
-        ..Default::default()
-    };
-    let adapter = instance
-        .request_adapter(&adapter_options)
-        .await
-        .expect("Unable to find a GPU! Make sure you have installed required drivers!");
-
-    let (device, queue) = adapter
-        .request_device(
-            &wgpu::DeviceDescriptor {
-                ..Default::default()
-            },
-            None,
-        )
-        .await
-        .unwrap();
-
-    let device = Share::new(device);
-    let queue = Share::new(queue);
-
-    (RenderDevice::from(device), queue)
 }

@@ -1,13 +1,8 @@
 use futures::{future::BoxFuture, FutureExt};
 use pi_async::rt::{AsyncRuntime, AsyncRuntimeBuilder};
-use pi_ecs::world::{World, WorldId};
-use pi_render::{
-    graph::{
-        graph::RenderGraph,
-        node::{Node, ParamUsage},
-        RenderContext,
-    },
-    rhi::{device::RenderDevice, RenderQueue},
+use pi_render::generic_graph::{
+    graph::GenericGraph,
+    node::{GenericNode, ParamUsage},
 };
 use pi_share::Share;
 use render_derive::NodeParam;
@@ -17,19 +12,16 @@ use std::{any::TypeId, time::Duration};
 // 输入 输出 结构体，不展开
 #[test]
 fn two_node_with_noslot() {
-
     #[derive(NodeParam, Clone, Debug, Default, PartialEq, Eq)]
     pub struct A(u32);
 
     struct Node1;
-    impl Node for Node1 {
+    impl GenericNode for Node1 {
         type Input = ();
         type Output = A;
 
         fn run<'a>(
             &'a self,
-            context: RenderContext,
-            commands: pi_share::ShareRefCell<wgpu::CommandEncoder>,
             input: &Self::Input,
             usage: &'a ParamUsage,
         ) -> futures::future::BoxFuture<'a, Result<Self::Output, String>> {
@@ -53,14 +45,12 @@ fn two_node_with_noslot() {
     }
 
     struct Node2;
-    impl Node for Node2 {
+    impl GenericNode for Node2 {
         type Input = A;
         type Output = ();
 
         fn run<'a>(
             &'a self,
-            context: RenderContext,
-            commands: pi_share::ShareRefCell<wgpu::CommandEncoder>,
             input: &Self::Input,
             usage: &'a ParamUsage,
         ) -> futures::future::BoxFuture<'a, Result<Self::Output, String>> {
@@ -71,7 +61,7 @@ fn two_node_with_noslot() {
 
             // A 被 前置节点 Node1 填充，返回 true
             assert!(usage.is_input_fill(TypeId::of::<A>()));
-            
+
             async move {
                 println!("======== Enter Async Node2 Running");
                 Ok(())
@@ -80,10 +70,9 @@ fn two_node_with_noslot() {
         }
     }
 
-    let world = World::new();
     let runtime = AsyncRuntimeBuilder::default_worker_thread(None, None, None, None);
 
-    let mut g = RenderGraph::default();
+    let mut g = GenericGraph::default();
 
     g.add_node("Node1", Node1);
     g.add_node("Node2", Node2);
@@ -91,25 +80,22 @@ fn two_node_with_noslot() {
     g.add_depend("Node1", "Node2");
 
     g.set_finish("Node2", true).unwrap();
-    
+
     let rt = runtime.clone();
     let _ = runtime.spawn(runtime.alloc(), async move {
-        let (device, queue) = init_render().await;
-
-        g.build(&rt, device, queue, world).await.unwrap();
+        g.build(&rt).await.unwrap();
 
         println!("======== 1 run graph");
         g.run(&rt).await.unwrap();
     });
 
-    std::thread::sleep(Duration::from_secs(5));
+    std::thread::sleep(Duration::from_secs(3));
 }
 
 // 两个 节点
 // 输入 输出 结构体，展开 字段
 #[test]
 fn two_node_with_slot() {
-
     #[derive(NodeParam, Clone, Debug, Default, PartialEq, Eq)]
     pub struct A(u32);
 
@@ -132,14 +118,12 @@ fn two_node_with_slot() {
     }
 
     struct Node1;
-    impl Node for Node1 {
+    impl GenericNode for Node1 {
         type Input = ();
         type Output = Output1;
 
         fn run<'a>(
             &'a self,
-            context: RenderContext,
-            commands: pi_share::ShareRefCell<wgpu::CommandEncoder>,
             input: &Self::Input,
             usage: &'a ParamUsage,
         ) -> futures::future::BoxFuture<'a, Result<Self::Output, String>> {
@@ -169,14 +153,12 @@ fn two_node_with_slot() {
     }
 
     struct Node2;
-    impl Node for Node2 {
+    impl GenericNode for Node2 {
         type Input = Input2;
         type Output = ();
 
         fn run<'a>(
             &'a self,
-            context: RenderContext,
-            commands: pi_share::ShareRefCell<wgpu::CommandEncoder>,
             input: &Self::Input,
             usage: &'a ParamUsage,
         ) -> futures::future::BoxFuture<'a, Result<Self::Output, String>> {
@@ -186,11 +168,11 @@ fn two_node_with_slot() {
             assert_eq!(input.i1, 67);
             assert_eq!(input.i2, "abcdefg".to_string());
             assert_eq!(input.i3, 0.0);
-            
+
             assert!(usage.is_input_fill(TypeId::of::<u32>()));
             assert!(usage.is_input_fill(TypeId::of::<String>()));
             assert!(!usage.is_input_fill(TypeId::of::<f32>()));
-            
+
             async move {
                 println!("======== Enter Async Node2 Running");
                 Ok(())
@@ -199,10 +181,9 @@ fn two_node_with_slot() {
         }
     }
 
-    let world = World::new();
     let runtime = AsyncRuntimeBuilder::default_worker_thread(None, None, None, None);
 
-    let mut g = RenderGraph::default();
+    let mut g = GenericGraph::default();
 
     g.add_node("Node1", Node1);
     g.add_node("Node2", Node2);
@@ -210,44 +191,14 @@ fn two_node_with_slot() {
     g.add_depend("Node1", "Node2");
 
     g.set_finish("Node2", true).unwrap();
-    
+
     let rt = runtime.clone();
     let _ = runtime.spawn(runtime.alloc(), async move {
-        let (device, queue) = init_render().await;
-
-        g.build(&rt, device, queue, world).await.unwrap();
+        g.build(&rt).await.unwrap();
 
         println!("======== 1 run graph");
         g.run(&rt).await.unwrap();
     });
 
-    std::thread::sleep(Duration::from_secs(5));
-}
-
-async fn init_render() -> (RenderDevice, RenderQueue) {
-    let backends = wgpu::Backends::all();
-    let instance = wgpu::Instance::new(backends);
-
-    let adapter_options = wgpu::RequestAdapterOptions {
-        ..Default::default()
-    };
-    let adapter = instance
-        .request_adapter(&adapter_options)
-        .await
-        .expect("Unable to find a GPU! Make sure you have installed required drivers!");
-
-    let (device, queue) = adapter
-        .request_device(
-            &wgpu::DeviceDescriptor {
-                ..Default::default()
-            },
-            None,
-        )
-        .await
-        .unwrap();
-
-    let device = Share::new(device);
-    let queue = Share::new(queue);
-
-    (RenderDevice::from(device), queue)
+    std::thread::sleep(Duration::from_secs(3));
 }

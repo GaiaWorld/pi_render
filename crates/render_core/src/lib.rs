@@ -13,6 +13,7 @@ extern crate lazy_static;
 
 pub mod components;
 pub mod font;
+pub mod generic_graph;
 pub mod graph;
 pub mod rhi;
 
@@ -82,7 +83,7 @@ where
 
 // Build RenderGraph
 // 注：System 的返回值 一定要 std::io::Result 才是 异步类型
-async fn build_graph<A>(world: WorldMut) -> std::io::Result<()> 
+async fn build_graph<A>(world: WorldMut) -> std::io::Result<()>
 where
     A: 'static + AsyncRuntime + Send,
 {
@@ -92,16 +93,14 @@ where
 
     let rt = world.get_resource::<RenderAsyncRuntime<A>>().unwrap();
 
-    rg.build(&rt.rt, device.clone(), queue.clone(), world.clone())
-        .await
-        .unwrap();
+    rg.build(&rt.rt).await.unwrap();
 
     Ok(())
 }
 
 // 每帧 调用一次，用于 驱动 渲染图
 // 注：System 的返回值 一定要 std::io::Result 才是 异步类型
-async fn render_system<A>(world: WorldMut) -> std::io::Result<()> 
+async fn render_system<A>(world: WorldMut) -> std::io::Result<()>
 where
     A: AsyncRuntime + Send + 'static,
 {
@@ -132,7 +131,12 @@ where
 {
     let r = RenderAsyncRuntime { rt };
     world.insert_resource(r);
-    world.insert_resource(RenderGraph::default());
+
+    let device = world.get_resource::<RenderDevice>().unwrap().clone();
+    let queue = world.get_resource::<RenderQueue>().unwrap().clone();
+
+    let w = world.clone();
+    world.insert_resource(RenderGraph::new(w, device, queue));
 }
 
 // 添加 其他 Res
