@@ -12,7 +12,7 @@ use super::{
 };
 use futures::{future::BoxFuture, FutureExt};
 use log::error;
-use pi_async::rt::AsyncRuntime;
+use pi_async::prelude::AsyncRuntime;
 use pi_async_graph::{async_graph, ExecNode, RunFactory, Runner};
 use pi_graph::{DirectedGraph, DirectedGraphNode, NGraph, NGraphBuilder};
 use pi_hash::{XHashMap, XHashSet};
