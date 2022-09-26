@@ -10,7 +10,7 @@ use super::{
     param::{InParam, OutParam},
     GraphError,
 };
-use futures::{future::BoxFuture, FutureExt};
+use pi_futures::BoxFuture;
 use log::error;
 use pi_async::prelude::AsyncRuntime;
 use pi_async_graph::{async_graph, ExecNode, RunFactory, Runner};
@@ -429,12 +429,11 @@ impl GenericGraph {
         // 该函数 会在 ng 图上，每帧每节点 执行一次
         let f = move || -> BoxFuture<'static, std::io::Result<()>> {
             let node = node.clone();
-            async move {
+            Box::pin(async move {
                 node.as_ref().borrow().build().await.unwrap();
 
                 Ok(())
-            }
-            .boxed()
+            })
         };
 
         Ok(ExecNode::Async(Box::new(f)))
@@ -451,11 +450,10 @@ impl GenericGraph {
         // 该函数 会在 ng 图上，每帧每节点 执行一次
         let f = move || -> BoxFuture<'static, std::io::Result<()>> {
             let node = node.clone();
-            async move {
+            Box::pin(async move {
                 node.as_ref().borrow_mut().run().await.unwrap();
                 Ok(())
-            }
-            .boxed()
+            })
         };
 
         Ok(ExecNode::Async(Box::new(f)))

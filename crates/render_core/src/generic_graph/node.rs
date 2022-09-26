@@ -12,9 +12,9 @@ use super::{
     param::{Assign, InParam, OutParam},
     GraphError,
 };
-use futures::{future::BoxFuture, FutureExt};
+use pi_futures::BoxFuture;
 use pi_hash::{XHashMap, XHashSet};
-use pi_share::{cell::TrustCell, Share};
+use pi_share::{cell::TrustCell, Share, ThreadSync};
 use pi_slotmap::new_key_type;
 use std::{
     any::TypeId,
@@ -27,7 +27,7 @@ use std::{
 };
 
 /// 图节点，给 外部 扩展 使用
-pub trait GenericNode: 'static + Send + Sync {
+pub trait GenericNode: 'static + ThreadSync {
     /// 输入参数
     type Input: InParam + Default;
 
@@ -40,7 +40,7 @@ pub trait GenericNode: 'static + Send + Sync {
     /// usage 判断 该节点的 输入输出的 用途
     ///     + 判断 输入参数 是否 被前置节点 填充；
     ///     + 判断 输出参数 是否 被后继节点 使用；
-    fn build<'a>(&'a self, usage: &'a ParamUsage) -> Option<BoxFuture<'a, Result<(), String>>> {
+    fn build<'a>(&'a self, _usage: &'a ParamUsage) -> Option<BoxFuture<'a, Result<(), String>>> {
         None
     }
 
@@ -290,17 +290,16 @@ where
     }
 
     fn build<'a>(&'a self) -> BoxFuture<'a, Result<(), GraphError>> {
-        async move {
+        Box::pin(async move {
             match self.node.build(&self.param_usage) {
                 Some(f) => f.await.map_err(|e| GraphError::CustomBuildError(e)),
                 None => Ok(()),
             }
-        }
-        .boxed()
+        })
     }
 
     fn run<'a>(&'a mut self) -> BoxFuture<'a, Result<(), GraphError>> {
-        async move {
+        Box::pin(async move {
             for (pre_id, pre_node) in &self.pre_nodes {
                 let p = pre_node.0.as_ref();
                 let mut p = p.borrow_mut();
@@ -328,8 +327,7 @@ where
                 }
                 Err(msg) => Err(GraphError::CustomRunError(msg)),
             }
-        }
-        .boxed()
+        })
     }
 }
 

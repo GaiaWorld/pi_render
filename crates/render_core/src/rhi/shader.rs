@@ -1,4 +1,3 @@
-use futures::future::{FutureExt};
 use pi_futures::BoxFuture;
 use naga::{back::wgsl::WriterFlags, valid::ModuleInfo, Module};
 use once_cell::sync::Lazy;
@@ -246,7 +245,7 @@ pub fn load_shader(
     path: PathBuf,
     bytes: Share<[u8]>,
 ) -> BoxFuture<'static, Result<Shader, anyhow::Error>> {
-    async move {
+    Box::pin(async move {
         // 根据后缀名判断 是 那种类型
         let ext = path.extension().unwrap().to_str().unwrap();
 
@@ -267,8 +266,7 @@ pub fn load_shader(
         shader.import_path = Some(ShaderImport::Path(path.to_string_lossy().to_string()));
 
         Ok(shader)
-    }
-    .boxed()
+    })
 }
 
 /// 预处理 Shader 遇到的 错误
