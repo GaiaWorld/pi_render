@@ -7,9 +7,10 @@ use super::{
     GraphError, RenderContext,
 };
 use crate::rhi::{device::RenderDevice, RenderQueue};
-use futures::{future::BoxFuture, FutureExt};
+use futures::{FutureExt};
+use pi_futures::BoxFuture;
 use log::error;
-use pi_async::rt::AsyncRuntime;
+use pi_async::prelude::AsyncRuntime;
 use pi_async_graph::{async_graph, ExecNode, RunFactory, Runner};
 use pi_ecs::world::World;
 use pi_graph::{DirectedGraph, DirectedGraphNode, NGraph, NGraphBuilder};
@@ -428,12 +429,11 @@ impl RenderGraph {
                 world: world.clone(),
             };
 
-            async move {
+            Box::pin(async move {
                 node.as_ref().borrow().build(context).await.unwrap();
 
                 Ok(())
-            }
-            .boxed()
+            })
         };
 
         Ok(ExecNode::Async(Box::new(f)))
@@ -462,14 +462,14 @@ impl RenderGraph {
             let queue = queue.clone();
             let world = world.clone();
 
-            async move {
+            Box::pin(async move {
                 let context = RenderContext {
                     device: device.clone(),
                     queue: queue.clone(),
                     world: world.clone(),
                 };
                 let commands =
-                    device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+				device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
 
                 let commands = ShareRefCell::new(commands);
 
@@ -485,8 +485,7 @@ impl RenderGraph {
                 queue.submit(vec![commands.finish()]);
 
                 Ok(())
-            }
-            .boxed()
+            })
         };
 
         Ok(ExecNode::Async(Box::new(f)))

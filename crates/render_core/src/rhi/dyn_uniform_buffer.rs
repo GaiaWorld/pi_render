@@ -1,4 +1,3 @@
-use std::mem::size_of;
 
 use bitvec::vec::BitVec;
 use derive_deref_rs::Deref;

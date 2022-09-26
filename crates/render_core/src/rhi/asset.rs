@@ -1,7 +1,7 @@
-use async_trait::async_trait;
 use derive_deref_rs::Deref;
 use pi_assets::{asset::{Asset, Garbageer, Handle}, mgr::{LoadResult, Receiver}};
 use pi_atom::Atom;
+use pi_futures::BoxFuture;
 use pi_hal::{
 	image::DynamicImage,
 	loader::AsyncLoader,
@@ -92,26 +92,27 @@ pub struct ImageTextureDesc<'a> {
 	pub queue: &'a RenderQueue,
 }
 
-#[async_trait]
 impl<'a, G: Garbageer<Self>> AsyncLoader<'a, Self, ImageTextureDesc<'a>, G> for TextureRes  {
-	async fn async_load(desc: ImageTextureDesc<'a>, result: LoadResult<'a, Self, G>) -> std::io::Result<Handle<Self>> {
-		match result {
-			LoadResult::Ok(r) => Ok(r),
-			LoadResult::Wait(f) => f.await,
-			LoadResult::Receiver(recv) => {
-				let image = pi_hal::image::from_path_or_url(desc.url.as_str()).await;
-				// let image = match image {
-				// 	Ok(r) => r,
-				// 	Err(_e) =>  {
-				// 		log::error!("load image fail: {:?}", desc.url.as_str());
-				// 		return Err(std::io::Error::new(ErrorKind::NotFound, ""));
-				// 	},
-				// };
+	fn async_load(desc: ImageTextureDesc<'a>, result: LoadResult<'a, Self, G>) -> BoxFuture<'a, std::io::Result<Handle<Self>>> {
+		Box::pin(async move { 
+			match result {
+				LoadResult::Ok(r) => Ok(r),
+				LoadResult::Wait(f) => f.await,
+				LoadResult::Receiver(recv) => {
+					let image = pi_hal::image::load_from_url(&desc.url).await;
+					let image = match image {
+						Ok(r) => r,
+						Err(_e) =>  {
+							log::error!("load image fail: {:?}", desc.url.as_str());
+							return Err(std::io::Error::new(std::io::ErrorKind::NotFound, ""));
+						},
+					};
 
-				let texture = create_texture_from_image(&image, &desc.device, &desc.queue, &desc.url, recv).await;
-				Ok(texture)
+					let texture = create_texture_from_image(&image, &desc.device, &desc.queue, &desc.url, recv).await;
+					Ok(texture)
+				}
 			}
-		}
+		})
 	}
 }
 
@@ -123,7 +124,7 @@ pub async fn create_texture_from_image<G: Garbageer<TextureRes>>(
 	recv: Receiver<TextureRes, G>
 ) -> Handle<TextureRes> {
 	let buffer_temp;
-	let buffer_temp1;
+	// let buffer_temp1;
 	let (width, height, buffer, ty, pre_pixel_size, is_opacity) = match image {
 		DynamicImage::ImageLuma8(image) => (image.width(), image.height(), image.as_raw(), wgpu::TextureFormat::R8Unorm, 1, true),
 		DynamicImage::ImageRgb8(r) => {
@@ -131,11 +132,11 @@ pub async fn create_texture_from_image<G: Garbageer<TextureRes>>(
 			(r.width(), r.height(), buffer_temp.as_raw(), wgpu::TextureFormat::Rgba8Unorm, 4, true)
 		},
 		DynamicImage::ImageRgba8(image) => (image.width(), image.height(), image.as_raw(), wgpu::TextureFormat::Rgba8Unorm, 4, false),
-		DynamicImage::ImageBgr8(r) => {
-			buffer_temp1 =  image.to_bgra8();
-			(r.width(), r.height(), buffer_temp1.as_raw(), wgpu::TextureFormat::Bgra8Unorm, 4, true)
-		},
-		DynamicImage::ImageBgra8(image) => (image.width(), image.height(), image.as_raw(), wgpu::TextureFormat::Bgra8Unorm, 4, false),
+		// DynamicImage::ImageBgr8(r) => {
+		// 	buffer_temp1 =  image.to_bgra8();
+		// 	(r.width(), r.height(), buffer_temp1.as_raw(), wgpu::TextureFormat::Bgra8Unorm, 4, true)
+		// },
+		// DynamicImage::ImageBgra8(image) => (image.width(), image.height(), image.as_raw(), wgpu::TextureFormat::Bgra8Unorm, 4, false),
 
 		_ => panic!("不支持的图片格式"),
 

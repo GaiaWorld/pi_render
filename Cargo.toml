@@ -16,8 +16,8 @@ render_core = { path = "crates/render_core" }
 
 [dev-dependencies]
 pi_slotmap = "0.1"
-pi_share = "0.4.1"
-pi_async = "0.4"
+pi_share = "0.4"
+pi_async = "0.5"
 pi_map = "0.1"
 pi_hash = "0.1"
 
@@ -43,3 +43,9 @@ path = "examples/clean/main.rs"
 
 # [patch.crates-io]
 # pi_ecs = { path = "../pi_ecs" }
+
+[patch."https://github.com/GaiaWorld/pi_hal"]
+pi_hal = { path = "../pi_hal" }
+
+[patch."https://github.com/GaiaWorld/pi_ecs"]
+pi_ecs = { path = "../pi_ecs" }

@@ -9,6 +9,7 @@ pub mod graph;
 pub mod node;
 pub mod param;
 
+use derive_deref_rs::{Deref};
 pub use node::{NodeId, NodeLabel};
 use pi_ecs::world::World;
 

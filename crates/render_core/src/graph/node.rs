@@ -2,10 +2,12 @@ use super::{
     param::{Assign, InParam, OutParam},
     GraphError, RenderContext,
 };
-use futures::{future::BoxFuture, FutureExt};
+use futures::{FutureExt};
+use pi_futures::BoxFuture;
 use pi_hash::{XHashMap, XHashSet};
 use pi_share::{cell::TrustCell, Share, ShareRefCell};
 use pi_slotmap::new_key_type;
+use wgpu::CommandEncoder;
 use std::{
     any::TypeId,
     borrow::Cow,
@@ -15,7 +17,6 @@ use std::{
         Arc,
     },
 };
-use wgpu::CommandEncoder;
 
 new_key_type! {
     /// 渲染节点 ID
@@ -263,13 +264,12 @@ where
     }
 
     fn build<'a>(&'a self, context: RenderContext) -> BoxFuture<'a, Result<(), String>> {
-        async move {
+        Box::pin(async move {
             match self.node.build(context, &self.param_usage) {
                 Some(f) => f.await,
                 None => Ok(()),
             }
-        }
-        .boxed()
+        })
     }
 
     fn run<'a>(
@@ -277,7 +277,8 @@ where
         context: RenderContext,
         commands: ShareRefCell<CommandEncoder>,
     ) -> BoxFuture<'a, Result<(), GraphError>> {
-        async move {
+		let c = CommandEncoderWrap(commands);
+        Box::pin(async move {
             for (pre_id, pre_node) in &self.pre_nodes {
                 let p = pre_node.0.as_ref();
                 let mut p = p.borrow_mut();
@@ -289,7 +290,7 @@ where
 
             let runner = self
                 .node
-                .run(context, commands.clone(), &self.input, &self.param_usage);
+                .run(context, c.0.clone(), &self.input, &self.param_usage);
 
             match runner.await {
                 Ok(output) => {
@@ -303,8 +304,7 @@ where
                 }
                 Err(msg) => Err(GraphError::RunNodeError(msg)),
             }
-        }
-        .boxed()
+        })
     }
 }
 
@@ -325,3 +325,8 @@ impl NodeState {
         Self(imp)
     }
 }
+
+pub struct CommandEncoderWrap(pub ShareRefCell<CommandEncoder>);
+
+unsafe impl Send for CommandEncoderWrap {}
+unsafe impl Sync for CommandEncoderWrap {}
