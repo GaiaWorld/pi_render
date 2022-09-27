@@ -1,0 +1,22 @@
+[package]
+name = "render_geometry"
+version = "0.0.1"
+authors = ["baip0002 <2494156981@qq.com>"]
+edition = "2021"
+description = "Scene Data Geometry."
+repository = "https://github.com/GaiaWorld/pi_render"
+license = "MIT OR Apache-2.0"
+keywords = ["Scene Geometry"]
+
+[dependencies]
+wgpu = { version = "0.12", features = ["spirv", "glsl"] }
+bytemuck = { version = "1.4", features = ["derive"] }
+nalgebra = "0.30"
+pi_share = "0.4"
+pi_slotmap = "0.1"
+render_data_container = { path = "../render_data_container" }
+
+[patch."https://github.com/GaiaWorld/pi_share.git"]
+pi_share = { path = "../../../pi_share" }
+
+# [[example]]
