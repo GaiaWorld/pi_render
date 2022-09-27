@@ -8,6 +8,9 @@ repository = "https://github.com/GaiaWorld/pi_render"
 license = "MIT OR Apache-2.0"
 keywords = ["pi", "render"]
 
+[features]
+webgl = ["render_core/webgl"]
+
 [workspace]
 members = ["crates/*"]
 
