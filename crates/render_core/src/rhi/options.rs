@@ -1,13 +1,13 @@
 use std::borrow::Cow;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum RenderPriority {
     Compatibility,
     Functionality,
     WebGL2,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct RenderOptions {
     pub device_label: Option<Cow<'static, str>>,
     pub backends: wgpu::Backends,
