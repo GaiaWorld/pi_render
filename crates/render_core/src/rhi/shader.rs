@@ -1,4 +1,5 @@
-use futures::future::{BoxFuture, FutureExt};
+use futures::future::{FutureExt};
+use pi_futures::BoxFuture;
 use naga::{back::wgsl::WriterFlags, valid::ModuleInfo, Module};
 use once_cell::sync::Lazy;
 use pi_hash::{XHashMap, XHashSet};
@@ -1278,7 +1279,7 @@ fn in_main() { }
         let result = processor
             .process(&id, &shader_defs, &shaders, &import_shaders)
             .unwrap();
-        let r = result.get_wgsl_source().unwrap();
+        let _r = result.get_wgsl_source().unwrap();
         assert_eq!(result.get_wgsl_source().unwrap(), EXPECTED);
     }
 }

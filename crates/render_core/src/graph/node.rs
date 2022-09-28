@@ -4,7 +4,7 @@ use super::{
     RenderContext,
 };
 use crate::depend_graph::node::DependNode;
-use futures::{future::BoxFuture, FutureExt};
+use pi_futures::BoxFuture;
 use pi_share::{Share, ShareRefCell};
 use wgpu::CommandEncoder;
 

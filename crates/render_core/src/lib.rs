@@ -23,7 +23,7 @@ pub use math::*;
 use crate::components::view::render_window::{prepare_windows, RenderWindows};
 use graph::{graph::RenderGraph, GraphError};
 use log::trace;
-use pi_async::rt::AsyncRuntime;
+use pi_async::prelude::AsyncRuntime;
 use pi_ecs::{
     prelude::{world::WorldMut, StageBuilder, World},
     sys::system::IntoSystem,
@@ -102,7 +102,7 @@ where
 // 注：System 的返回值 一定要 std::io::Result 才是 异步类型
 async fn render_system<A>(world: WorldMut) -> std::io::Result<()>
 where
-    A: 'static + AsyncRuntime + Send,
+    A: AsyncRuntime + Send + 'static,
 {
     let graph = world.get_resource_mut::<RenderGraph>().unwrap();
 

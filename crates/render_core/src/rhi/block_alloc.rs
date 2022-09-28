@@ -1,8 +1,6 @@
-use std::{mem::size_of, ptr::write, hash::{Hash, Hasher}};
+use std::{mem::size_of};
 
 use bitvec::prelude::BitVec;
-use pi_hash::DefaultHasher;
-use pi_share::{ShareMutex, Share};
 
 /// 块分配器
 #[derive(Debug)]
@@ -187,6 +185,7 @@ impl Data {
 
 #[test]
 fn test() {
+	use pi_share::{Share, ShareMutex};
 	let mut block_alloter = BlockAlloter::new(256, 200, 8000);
 	let size = 8; // 位
 
@@ -212,7 +211,7 @@ fn test() {
 	for i in blocks.iter() {
 		let vec:Vec<u8> = Vec::with_capacity(256);
 		let time = std::time::Instant::now();
-		block_alloter.lock().full(i, 0, vec.as_slice());
+		block_alloter.lock().full(i, 0, vec.as_slice()).unwrap();
 		println!("time====={:?}", std::time::Instant::now() - time);
 	}
 

@@ -115,11 +115,11 @@ impl GetTargetView for ShareTargetView {
     }
 }
 
-impl GetTargetView for &ShareTargetView {
-    fn get_target_view(&self) -> Option<&TargetView>{
-        Some(&self.0.0)
-    }
-}
+// impl GetTargetView for &ShareTargetView {
+//     fn get_target_view(&self) -> Option<&TargetView>{
+//         Some(&self.0.0)
+//     }
+// }
 
 impl GetTargetView for Option<ShareTargetView> {
     fn get_target_view(&self) -> Option<&TargetView>{
@@ -130,17 +130,23 @@ impl GetTargetView for Option<ShareTargetView> {
 	}
 }
 
-impl GetTargetView for &Option<ShareTargetView> {
-    fn get_target_view(&self) -> Option<&TargetView>{
-		match self {
-			Some(r) => Some(&r.0.0),
-			None => None
-		}
-	}
-}
+// impl GetTargetView for &Option<ShareTargetView> {
+//     fn get_target_view(&self) -> Option<&TargetView>{
+// 		match self {
+// 			Some(r) => Some(&r.0.0),
+// 			None => None
+// 		}
+// 	}
+// }
 
 pub trait GetTargetView {
 	fn get_target_view(&self) -> Option<&TargetView>;
+}
+
+impl<T: GetTargetView> GetTargetView for &T {
+	fn get_target_view(&self) -> Option<&TargetView> {
+		GetTargetView::get_target_view(*self)
+	}
 }
 
 /// 线程安全的纹理分配器

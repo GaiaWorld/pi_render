@@ -10,7 +10,7 @@ use crate::{
     depend_graph::graph::DependGraph,
     rhi::{device::RenderDevice, RenderQueue},
 };
-use pi_async::rt::AsyncRuntime;
+use pi_async::prelude::AsyncRuntime;
 use pi_ecs::world::World;
 use std::borrow::Cow;
 
