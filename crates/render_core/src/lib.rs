@@ -20,7 +20,7 @@ pub mod rhi;
 mod math;
 pub use math::*;
 
-use crate::components::view::render_window::{prepare_windows, RenderWindows};
+use crate::{components::view::render_window::{prepare_windows, RenderWindows}, rhi::texture::PiRenderDefault};
 use graph::{graph::RenderGraph, GraphError};
 use log::trace;
 use pi_async::prelude::AsyncRuntime;
@@ -31,14 +31,15 @@ use pi_ecs::{
 use pi_share::Share;
 use rhi::{
     device::RenderDevice, options::RenderOptions, setup_render_context, texture::ScreenTexture,
-    RenderQueue,
+    RenderQueue, PresentMode
 };
 use std::{
     collections::HashMap,
-    sync::atomic::{AtomicBool, AtomicU64, Ordering},
+    sync::{atomic::{AtomicBool, AtomicU64, Ordering}, Arc},
 };
 use thiserror::Error;
-use winit::window::Window;
+use winit::{window::Window, dpi::PhysicalSize};
+use wgpu::TextureFormat;
 
 #[derive(Error, Debug)]
 
@@ -114,11 +115,31 @@ where
     let screen_texture = world.get_resource_mut::<ScreenTexture>().unwrap();
     let windows = world.get_resource::<RenderWindows>().unwrap();
 
+    let device = world.get_resource::<RenderDevice>().unwrap();
+
     // 呈现 所有的 窗口 -- 交换链
-    for (_, _window) in windows.iter() {
+    for (_, window) in windows.iter() {
         if let Some(view) = screen_texture.take_surface_texture() {
-            view.present();
             trace!("render_system: after surface_texture.present");
+            view.present();
+            
+            let PhysicalSize { width, height } = window.handle.inner_size();
+            let config = wgpu::SurfaceConfiguration {
+                format: TextureFormat::pi_render_default(),
+                width,
+                height,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                present_mode: match window.present_mode {
+                    PresentMode::Fifo => wgpu::PresentMode::Fifo,
+                    PresentMode::Mailbox => wgpu::PresentMode::Mailbox,
+                    PresentMode::Immediate => wgpu::PresentMode::Immediate,
+                },
+            };
+            screen_texture.next_frame(device, &config);
+
+            if let Some(draw_cb) = DRAW_CB.read().as_ref(){
+                draw_cb();
+            }
         }
     }
 
@@ -168,6 +189,8 @@ lazy_static! {
     static ref FAQ_HANDLE: AtomicU64 = AtomicU64::new(0);
     static ref FAQ_MAP: RwLock<HashMap<u64, Box<dyn Fn() + Send + Sync + 'static>>> =
         RwLock::new(HashMap::new());
+
+    pub static ref DRAW_CB: RwLock<Option<Arc<dyn Fn() + Send + Sync + 'static>>> = RwLock::new(None);
 }
 
 pub fn request_animation_frame<F: Fn() + Send + Sync + 'static>(cb: F) -> u64 {

@@ -19,9 +19,9 @@ new_key_type! {
 pub type RenderWindows = SlotMap<RenderWindowKey, RenderWindow>;
 
 pub struct RenderWindow {
-    present_mode: PresentMode,
+    pub present_mode: PresentMode,
     last_size: PhysicalSize<u32>,
-    handle: Share<Window>,
+    pub handle: Share<Window>,
 }
 
 impl RenderWindow {
@@ -88,8 +88,10 @@ pub(crate) async fn prepare_windows<'w>(
         }
 
 		// log::warn!("next_frame========================");
-        // 每帧 都要 设置 新的 SuraceTexture
-        let _ = view.next_frame(&device, &config);
+        // 第一次 设置 一下 新的 SuraceTexture
+        if is_first{
+            let _ = view.next_frame(&device, &config);
+        }
     }
     Ok(())
 }
