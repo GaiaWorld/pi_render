@@ -9,6 +9,7 @@
 
 use super::node::NodeId;
 use pi_hash::{XHashMap, XHashSet};
+use pi_share::ThreadSync;
 use std::any::TypeId;
 
 /// 渲染图节点的 参数，用于 派生宏
@@ -22,7 +23,7 @@ pub trait NodeParam: InParam + OutParam {}
 impl<T: InParam + OutParam> NodeParam for T {}
 
 /// 渲染图节点的 输入参数，用于 trait Node 的 关联类型 Input
-pub trait InParam: 'static + Send + Sync + Assign {
+pub trait InParam: 'static + ThreadSync + Assign {
     // 返回 out_param 能否 填充 本参数
     fn can_fill<O: OutParam + ?Sized>(
         &self,
@@ -36,7 +37,7 @@ pub trait InParam: 'static + Send + Sync + Assign {
 }
 
 /// 渲染图节点的 输出参数，用于 trait Node 的 关联类型 Output
-pub trait OutParam: 'static + Send + Sync {
+pub trait OutParam: 'static + ThreadSync {
     /// 判断 本 参数 能否 填充 ty
     fn can_fill(&self, set: &mut Option<&mut XHashSet<TypeId>>, ty: TypeId) -> bool;
 

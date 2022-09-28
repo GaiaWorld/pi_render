@@ -24,10 +24,6 @@ pub struct RenderWindow {
     handle: Share<Window>,
 }
 
-// 这里强制实现了Send和Sync，编译wasm要求， 如果和可以不实现？TODO
-unsafe impl Send for RenderWindow{}
-unsafe impl Sync for RenderWindow{}
-
 impl RenderWindow {
     pub fn new(
         handle: Share<Window>,

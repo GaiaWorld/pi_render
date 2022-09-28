@@ -2,24 +2,19 @@
 //!
 //! 主要 数据结构：
 //!
-//!     + trait DependNode 图节点的 对外接口
+//!     + trait GenericNode 图节点的 对外接口
 //!         - 关联类型：Input, Output
 //!     + NodeId     节点的id
 //!     + NodeLabel  节点标示，可以用 Id 或 String
 //!     + ParamUsage 参数的用途
 //!
-use crate::graph::node::Node;
-
 use super::{
-    graph::DependGraph,
     param::{Assign, InParam, OutParam},
     GraphError,
 };
-use futures::{future::BoxFuture, FutureExt};
-use pi_async::rt::AsyncRuntime;
-use pi_graph::NGraph;
+use pi_futures::BoxFuture;
 use pi_hash::{XHashMap, XHashSet};
-use pi_share::{cell::TrustCell, Share};
+use pi_share::{cell::TrustCell, Share, ThreadSync};
 use pi_slotmap::new_key_type;
 use std::{
     any::TypeId,
@@ -32,7 +27,7 @@ use std::{
 };
 
 /// 图节点，给 外部 扩展 使用
-pub trait DependNode: 'static + Send + Sync {
+pub trait DependNode: 'static + ThreadSync {
     /// 输入参数
     type Input: InParam + Default;
 
@@ -45,7 +40,7 @@ pub trait DependNode: 'static + Send + Sync {
     /// usage 判断 该节点的 输入输出的 用途
     ///     + 判断 输入参数 是否 被前置节点 填充；
     ///     + 判断 输出参数 是否 被后继节点 使用；
-    fn build<'a>(&'a self, usage: &'a ParamUsage) -> Option<BoxFuture<'a, Result<(), String>>> {
+    fn build<'a>(&'a self, _usage: &'a ParamUsage) -> Option<BoxFuture<'a, Result<(), String>>> {
         None
     }
 
@@ -142,194 +137,6 @@ impl ParamUsage {
     }
 }
 
-/// 子图：图本身作为一个节点
-/// graph成员 只能有一个起始节点，其类型为 Input
-/// graph成员 只能有一个finish节点，其类型为 Output
-pub struct SubGraph<A, GI, GO>(Arc<TrustCell<SubGraphImpl<A, GI, GO>>>)
-where
-    A: 'static + AsyncRuntime + Send,
-    GI: InParam + OutParam + Default + Clone,
-    GO: InParam + OutParam + Default + Clone;
-
-struct SubGraphImpl<A, GI, GO>
-where
-    A: 'static + AsyncRuntime + Send,
-    GI: InParam + OutParam + Default + Clone,
-    GO: InParam + OutParam + Default + Clone,
-{
-    rt: A,
-    graph: Option<DependGraph>,
-
-    input: InputNode<GI>,
-    output: OutputNode<GO>,
-
-    input_id: NodeId,
-    output_id: NodeId,
-}
-
-impl<A, GI, GO> SubGraph<A, GI, GO>
-where
-    A: 'static + AsyncRuntime + Send,
-    GI: InParam + OutParam + Default + Clone,
-    GO: InParam + OutParam + Default + Clone,
-{
-    // 输入输入输出
-    fn inject_input_outuput(
-        g: &mut DependGraph,
-        input: InputNode<GI>,
-        output: OutputNode<GO>,
-    ) -> Result<(NodeId, NodeId), GraphError> {
-        let finish_id = match g.get_once_finsh_id() {
-            Some(id) => id,
-            None => return Err(GraphError::SubGraphOutputError),
-        };
-
-        let from_id = g.get_input_nodes();
-        let from_id = if from_id.len() != 1 {
-            // 子图 输入节点不得多于一个
-            return Err(GraphError::SubGraphOutputError);
-        } else if let Some(id) = from_id.iter().next() {
-            *id
-        } else {
-            // 子图 输入节点不得为 0
-            return Err(GraphError::SubGraphOutputError);
-        };
-
-        let input_id = g.add_node("_$pi_m_sub_input$_", input)?;
-        let output_id = g.add_node("_$pi_m_sub_output$_", output)?;
-
-        // input -> g.入度为0的节点
-        g.add_depend(input_id, "", from_id, "").unwrap();
-
-        // g.finish --> output
-        g.add_depend(finish_id, "", output_id, "").unwrap();
-
-        Ok((input_id, output_id))
-    }
-
-    /// 创建子图
-    pub fn new(rt: A, mut graph: Option<DependGraph>) -> Result<Self, GraphError> {
-        let input = InputNode::default();
-        let output = OutputNode::default();
-
-        let (input_id, output_id) = if let Some(ref mut g) = graph {
-            Self::inject_input_outuput(g, input.clone(), output.clone())?
-        } else {
-            (NodeId::default(), NodeId::default())
-        };
-
-        Ok(Self(Arc::new(TrustCell::new(SubGraphImpl {
-            rt,
-            graph,
-
-            input,
-            output,
-
-            input_id,
-            output_id,
-        }))))
-    }
-
-    /// 更换 异步运行时
-    pub fn set_async_runtime(&self, rt: A) {
-        self.0.as_ref().borrow_mut().rt = rt;
-    }
-
-    /// 更换 运行的子图
-    pub fn set_graph(&self, mut g: DependGraph) -> Result<(), GraphError> {
-        let mut r = self.0.as_ref().borrow_mut();
-
-        let (i, o) = Self::inject_input_outuput(&mut g, r.input.clone(), r.output.clone())?;
-
-        r.input_id = i;
-        r.output_id = o;
-
-        r.graph = Some(g);
-
-        Ok(())
-    }
-
-    /// 取目前的子图，以便对子图 做 拓扑修改
-    pub fn get_graph(&self) -> Option<DependGraph> {
-        let mut r = self.0.as_ref().borrow_mut();
-
-        let input_id = r.input_id;
-        let output_id = r.output_id;
-        if let Some(ref mut g) = r.graph {
-            g.remove_node(input_id).unwrap();
-            g.remove_node(output_id).unwrap();
-        }
-
-        r.input_id = Default::default();
-        r.output_id = Default::default();
-
-        r.graph.take()
-    }
-}
-
-impl<A, GI, GO> DependNode for SubGraph<A, GI, GO>
-where
-    A: 'static + AsyncRuntime + Send,
-    GI: InParam + OutParam + Default + Clone,
-    GO: InParam + OutParam + Default + Clone,
-{
-    type Input = GI;
-    type Output = GO;
-
-    fn build<'a>(&'a self, _usage: &'a ParamUsage) -> Option<BoxFuture<'a, Result<(), String>>> {
-        {
-            let r = self.0.as_ref().borrow_mut();
-            r.graph.as_ref()?;
-        }
-
-        Some(
-            async move {
-                let mut r = self.0.as_ref().borrow_mut();
-                let rt = r.rt.clone();
-                let g = r.graph.as_mut().unwrap();
-
-                g.build(&rt).await.map_err(|e| e.to_string())
-            }
-            .boxed(),
-        )
-    }
-
-    fn run<'a>(
-        &'a self,
-        input: &'a Self::Input,
-        _usage: &'a ParamUsage,
-    ) -> BoxFuture<'a, Result<Self::Output, String>> {
-        async move {
-            let mut r = self.0.as_ref().borrow_mut();
-
-            // 将 input 扔到 self.input
-            *r.input.0.as_ref().borrow_mut() = input.clone();
-
-            let rt = r.rt.clone();
-            let output = r.output.clone();
-
-            match r.graph {
-                Some(ref mut g) => {
-                    match g.run(&rt).await {
-                        Ok(_) => {
-                            // 将 Output的值拿出来用
-                            let output = output.0.as_ref().borrow().clone();
-                            Ok(output)
-                        }
-                        Err(e) => {
-                            let msg = format!("sub_graph run_ng, {:?}", e);
-                            log::error!("{}", msg);
-                            return Err(msg);
-                        }
-                    }
-                }
-                None => return Err("sub_graph: no sub_graph".to_string()),
-            }
-        }
-        .boxed()
-    }
-}
-
 // ====================== crate内 使用的 数据结构
 
 impl Default for ParamUsage {
@@ -371,12 +178,12 @@ pub(crate) trait InternalNode: OutParam {
     fn run<'a>(&'a mut self) -> BoxFuture<'a, Result<(), GraphError>>;
 }
 
-/// 链接 NodeInteral 和 DependNode 的 结构体
-pub(crate) struct DependNodeImpl<I, O, R>
+/// 链接 NodeInteral 和 GenericNode 的 结构体
+pub(crate) struct GenericNodeImpl<I, O, R>
 where
     I: InParam + Default,
     O: OutParam + Default,
-    R: DependNode<Input = I, Output = O>,
+    R: GenericNode<Input = I, Output = O>,
 {
     node: R,
     input: I,
@@ -395,11 +202,11 @@ where
     curr_next_refs: AtomicI32,
 }
 
-impl<I, O, R> DependNodeImpl<I, O, R>
+impl<I, O, R> GenericNodeImpl<I, O, R>
 where
     I: InParam + Default,
     O: OutParam + Default,
-    R: DependNode<Input = I, Output = O>,
+    R: GenericNode<Input = I, Output = O>,
 {
     pub(crate) fn new(node: R) -> Self {
         Self {
@@ -416,11 +223,11 @@ where
     }
 }
 
-impl<I, O, R> OutParam for DependNodeImpl<I, O, R>
+impl<I, O, R> OutParam for GenericNodeImpl<I, O, R>
 where
     I: InParam + Default,
     O: OutParam + Default,
-    R: DependNode<Input = I, Output = O>,
+    R: GenericNode<Input = I, Output = O>,
 {
     fn can_fill(&self, set: &mut Option<&mut XHashSet<TypeId>>, ty: TypeId) -> bool {
         assert!(set.is_none());
@@ -434,11 +241,11 @@ where
     }
 }
 
-impl<I, O, R> InternalNode for DependNodeImpl<I, O, R>
+impl<I, O, R> InternalNode for GenericNodeImpl<I, O, R>
 where
     I: InParam + Default,
     O: OutParam + Default,
-    R: DependNode<Input = I, Output = O>,
+    R: GenericNode<Input = I, Output = O>,
 {
     fn reset(&mut self) {
         self.input = Default::default();
@@ -473,7 +280,7 @@ where
         let last_count = self.curr_next_refs.fetch_sub(1, Ordering::SeqCst);
         assert!(
             last_count >= 1,
-            "DependNode error, last_count = {}",
+            "GenericNode error, last_count = {}",
             last_count
         );
 
@@ -483,17 +290,16 @@ where
     }
 
     fn build<'a>(&'a self) -> BoxFuture<'a, Result<(), GraphError>> {
-        async move {
+        Box::pin(async move {
             match self.node.build(&self.param_usage) {
                 Some(f) => f.await.map_err(|e| GraphError::CustomBuildError(e)),
                 None => Ok(()),
             }
-        }
-        .boxed()
+        })
     }
 
     fn run<'a>(&'a mut self) -> BoxFuture<'a, Result<(), GraphError>> {
-        async move {
+        Box::pin(async move {
             for (pre_id, pre_node) in &self.pre_nodes {
                 let p = pre_node.0.as_ref();
                 let mut p = p.borrow_mut();
@@ -521,8 +327,7 @@ where
                 }
                 Err(msg) => Err(GraphError::CustomRunError(msg)),
             }
-        }
-        .boxed()
+        })
     }
 }
 
@@ -535,111 +340,12 @@ impl NodeState {
     where
         I: InParam + Default,
         O: OutParam + Default + Clone,
-        R: DependNode<Input = I, Output = O>,
+        R: GenericNode<Input = I, Output = O>,
     {
-        let imp = DependNodeImpl::new(node);
+        let imp = GenericNodeImpl::new(node);
 
         let imp = Arc::new(TrustCell::new(imp));
 
         Self(imp)
-    }
-}
-
-// ============================ 下面的 结构体 仅供 DependGraph 使用
-
-// 输入节点
-#[derive(Clone)]
-struct InputNode<I: InParam + OutParam + Default + Clone>(Arc<TrustCell<I>>);
-
-impl<I> InputNode<I>
-where
-    I: InParam + OutParam + Default + Clone,
-{
-    fn set_input(&self, data: &I) {
-        *self.0.as_ref().borrow_mut() = data.clone();
-    }
-}
-
-impl<I> Default for InputNode<I>
-where
-    I: InParam + OutParam + Default + Clone,
-{
-    fn default() -> Self {
-        Self(Arc::new(TrustCell::new(I::default())))
-    }
-}
-
-impl<I> DependNode for InputNode<I>
-where
-    I: InParam + OutParam + Default + Clone,
-{
-    type Input = ();
-    type Output = I;
-
-    fn build<'a>(
-        &'a self,
-        usage: &'a super::node::ParamUsage,
-    ) -> Option<BoxFuture<'a, Result<(), String>>> {
-        None
-    }
-
-    fn run<'a>(
-        &'a self,
-        input: &'a Self::Input,
-        usage: &'a super::node::ParamUsage,
-    ) -> BoxFuture<'a, Result<Self::Output, String>> {
-        let input = self.0.as_ref().borrow().clone();
-        async move { Ok(input) }.boxed()
-    }
-}
-
-// 输出节点
-#[derive(Clone)]
-struct OutputNode<O: InParam + OutParam + Default + Clone>(Arc<TrustCell<O>>);
-
-impl<O> OutputNode<O>
-where
-    O: InParam + OutParam + Default + Clone,
-{
-    fn get_output(&self) -> O {
-        let mut p = self.0.as_ref().borrow_mut();
-        let r = p.clone();
-        *p = Default::default();
-        r
-    }
-}
-
-impl<O> Default for OutputNode<O>
-where
-    O: InParam + OutParam + Default + Clone,
-{
-    fn default() -> Self {
-        Self(Arc::new(TrustCell::new(O::default())))
-    }
-}
-
-impl<O> DependNode for OutputNode<O>
-where
-    O: InParam + OutParam + Default + Clone,
-{
-    type Input = O;
-    type Output = ();
-
-    fn build<'a>(
-        &'a self,
-        usage: &'a super::node::ParamUsage,
-    ) -> Option<BoxFuture<'a, Result<(), String>>> {
-        None
-    }
-
-    fn run<'a>(
-        &'a self,
-        input: &'a Self::Input,
-        usage: &'a super::node::ParamUsage,
-    ) -> BoxFuture<'a, Result<Self::Output, String>> {
-        // 将 Input 保存起来
-        *self.0.as_ref().borrow_mut() = input.clone();
-
-        async move { Ok(()) }.boxed()
     }
 }

@@ -1,0 +1,17 @@
+[package]
+name = "render_data_container"
+version = "0.0.1"
+authors = ["baip0002 <2494156981@qq.com>"]
+edition = "2021"
+description = "scene data container."
+repository = "https://github.com/GaiaWorld/pi_render"
+license = "MIT OR Apache-2.0"
+keywords = ["scene data container"]
+
+[dependencies]
+nalgebra = "0.30"
+pi_slotmap = "0.1"
+bytemuck = { version = "1.4", features = ["derive"] }
+wgpu = { version = "0.12", features = ["spirv", "glsl"] }
+
+# [[example]]

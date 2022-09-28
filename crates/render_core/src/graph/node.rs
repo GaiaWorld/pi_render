@@ -5,13 +5,13 @@ use super::{
 };
 use crate::depend_graph::node::DependNode;
 use pi_futures::BoxFuture;
-use pi_share::{Share, ShareRefCell};
+use pi_share::{Share, ShareRefCell, ThreadSync};
 use wgpu::CommandEncoder;
 
 pub use crate::depend_graph::node::{NodeId, NodeLabel, ParamUsage};
 
 /// 渲染节点，给 外部 扩展 使用
-pub trait Node: 'static + Send + Sync {
+pub trait Node: 'static + ThreadSync {
     /// 输入参数
     type Input: InParam + Default;
 
@@ -22,8 +22,8 @@ pub trait Node: 'static + Send + Sync {
     /// 一般 用于 准备 渲染 资源的 创建
     fn build<'a>(
         &'a self,
-        context: RenderContext,
-        usage: &'a ParamUsage,
+        _context: RenderContext,
+        _usage: &'a ParamUsage,
     ) -> Option<BoxFuture<'a, Result<(), String>>> {
         None
     }
@@ -62,7 +62,7 @@ where
     }
 }
 
-impl<I, O, R> DependNode for NodeImpl<I, O, R>
+impl<I, O, R> GenericNode for NodeImpl<I, O, R>
 where
     I: InParam + Default,
     O: OutParam + Default + Clone,
@@ -85,7 +85,7 @@ where
     ) -> BoxFuture<'a, Result<Self::Output, String>> {
         let context = self.context.clone();
 
-        async move {
+        Box::pin( async move {
             // 每节点 一个 CommandEncoder
             let commands = self
                 .context
@@ -108,7 +108,6 @@ where
             self.context.queue.submit(vec![commands.finish()]);
 
             Ok(output)
-        }
-        .boxed()
+        })
     }
 }

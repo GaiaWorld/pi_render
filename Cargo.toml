@@ -8,11 +8,17 @@ repository = "https://github.com/GaiaWorld/pi_render"
 license = "MIT OR Apache-2.0"
 keywords = ["pi", "render"]
 
+[features]
+webgl = ["render_core/webgl"]
+
 [workspace]
 members = ["crates/*"]
 
 [dependencies]
 render_core = { path = "crates/render_core" }
+render_material = { path = "crates/render_material" }
+render_geometry = { path = "crates/render_geometry" }
+render_data_container = { path = "crates/render_data_container" }
 
 [dev-dependencies]
 pi_slotmap = "0.1"
