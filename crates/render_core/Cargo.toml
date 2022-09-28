@@ -10,7 +10,7 @@ keywords = ["pi"]
 
 [features]
 webgl = []
-location=[]
+location = []
 
 [dependencies]
 # pi_share = {version="0.4", features=["serial"]}
@@ -30,16 +30,15 @@ pi_null = "0.1"
 pi_ecs_macros = "0.1"
 pi_slotmap = "0.1"
 
-bitvec={version = "1.0", features = ["serde"]}
+bitvec = { version = "1.0", features = ["serde"] }
 render_utils = { version = "0.1", path = "../render_utils" }
 render_crevice = { version = "0.1", path = "../render_crevice", features = [
     "nalgebra",
 ] }
 uuid = { version = "1", features = ["v4", "serde"] }
-winit = {git = "http://ser.yinengyun.com:10082/tech/winit.git"}
+winit = { git = "http://ser.yinengyun.com:10082/tech/winit.git" }
 anyhow = "1.0"
 downcast-rs = "1.2"
-futures = "0.3"
 hex = "0.4"
 log = "0.4"
 naga = { version = "0.8", features = [
@@ -61,14 +60,14 @@ pi_any = "0.1"
 # pi_res_loader = { path = "../../../pi_res_loader" }
 # pi_res = { path = "../../../pi_res" }
 # pi_res_macros = { path = "../../../pi_res/macros" }
-
-guillotiere = {version="0.6"}
-smallvec="1.8"
-lazy_static="1.4"
+futures = "0.3"
+guillotiere = { version = "0.6" }
+smallvec = "1.8"
+lazy_static = "1.4"
 pi_atom = "0.2"
 
 pi_ecs = { git = "https://github.com/GaiaWorld/pi_ecs.git" }
-pi_hal={git="https://github.com/GaiaWorld/pi_hal.git"}
+pi_hal = { git = "https://github.com/GaiaWorld/pi_hal.git" }
 
 parking_lot = "0.11"
 

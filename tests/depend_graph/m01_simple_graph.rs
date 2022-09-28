@@ -1,4 +1,4 @@
-use futures::{future::BoxFuture, FutureExt};
+use pi_futures::BoxFuture;
 use pi_async::rt::{AsyncRuntime, AsyncRuntimeBuilder};
 use pi_render::depend_graph::{
     graph::DependGraph,
@@ -20,7 +20,7 @@ fn two_node_with_simple_param() {
             &'a self,
             input: &Self::Input,
             usage: &'a ParamUsage,
-        ) -> futures::future::BoxFuture<'a, Result<Self::Output, String>> {
+        ) -> BoxFuture<'a, Result<Self::Output, String>> {
             println!("======== Enter Node1 Running");
 
             // 输入 自然就是 空元组
@@ -35,11 +35,10 @@ fn two_node_with_simple_param() {
             // 输出：u64 根本 不属于 该输出，自然不会有 后继节点使用，为 false
             assert!(!usage.is_output_usage(TypeId::of::<u64>()));
 
-            async move {
+            Box::pin(async move {
                 println!("======== Enter Async Node1 Running");
                 Ok(30.25)
-            }
-            .boxed()
+            })
         }
     }
 
@@ -52,7 +51,7 @@ fn two_node_with_simple_param() {
             &'a self,
             input: &Self::Input,
             usage: &'a ParamUsage,
-        ) -> futures::future::BoxFuture<'a, Result<Self::Output, String>> {
+        ) -> BoxFuture<'a, Result<Self::Output, String>> {
             println!("======== Enter Node2 Running");
 
             // 输入就是 Node1 的 输出
@@ -61,11 +60,10 @@ fn two_node_with_simple_param() {
             // f32 被 前置节点 Node1 填充，所以 这里 返回 true
             assert!(usage.is_input_fill(TypeId::of::<f32>()));
 
-            async move {
+            Box::pin(async move {
                 println!("======== Enter Async Node2 Running");
                 Ok(())
-            }
-            .boxed()
+            })
         }
     }
 
@@ -104,7 +102,7 @@ fn two_node_with_no_match() {
             &'a self,
             input: &Self::Input,
             usage: &'a ParamUsage,
-        ) -> futures::future::BoxFuture<'a, Result<Self::Output, String>> {
+        ) -> BoxFuture<'a, Result<Self::Output, String>> {
             println!("======== Enter Node1 Running");
 
             // 输入 自然就是 空元组
@@ -116,11 +114,10 @@ fn two_node_with_no_match() {
             // 输出：f32 没有 后继节点使用，为 false
             assert!(!usage.is_output_usage(TypeId::of::<f32>()));
 
-            async move {
+            Box::pin(async move {
                 println!("======== Enter Async Node1 Running");
                 Ok(30.25)
-            }
-            .boxed()
+            })
         }
     }
 
@@ -133,7 +130,7 @@ fn two_node_with_no_match() {
             &'a self,
             input: &Self::Input,
             usage: &'a ParamUsage,
-        ) -> futures::future::BoxFuture<'a, Result<Self::Output, String>> {
+        ) -> BoxFuture<'a, Result<Self::Output, String>> {
             println!("======== Enter Node2 Running");
 
             // 输入就是 Node1 的 输出
@@ -142,11 +139,10 @@ fn two_node_with_no_match() {
             // u64 没有被 前置节点 Node1 填充，返回 false
             assert!(!usage.is_input_fill(TypeId::of::<u64>()));
 
-            async move {
+            Box::pin(async move {
                 println!("======== Enter Async Node2 Running");
                 Ok(())
-            }
-            .boxed()
+            })
         }
     }
 

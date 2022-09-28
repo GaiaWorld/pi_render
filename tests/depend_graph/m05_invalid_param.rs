@@ -1,4 +1,4 @@
-use futures::{future::BoxFuture, FutureExt};
+use pi_futures::BoxFuture;
 use pi_async::rt::{AsyncRuntime, AsyncRuntimeBuilder};
 use pi_render::depend_graph::{
     graph::DependGraph,
@@ -29,7 +29,7 @@ fn out_same_type() {
             &'a self,
             input: &Self::Input,
             usage: &'a ParamUsage,
-        ) -> futures::future::BoxFuture<'a, Result<Self::Output, String>> {
+        ) -> BoxFuture<'a, Result<Self::Output, String>> {
             async move {
                 Ok(Output1 {
                     a: 1.0,
@@ -50,7 +50,7 @@ fn out_same_type() {
             &'a self,
             input: &Self::Input,
             usage: &'a ParamUsage,
-        ) -> futures::future::BoxFuture<'a, Result<Self::Output, String>> {
+        ) -> BoxFuture<'a, Result<Self::Output, String>> {
             async move { Ok(()) }.boxed()
         }
     }
@@ -97,7 +97,7 @@ fn in_same_type() {
             &'a self,
             input: &Self::Input,
             usage: &'a ParamUsage,
-        ) -> futures::future::BoxFuture<'a, Result<Self::Output, String>> {
+        ) -> BoxFuture<'a, Result<Self::Output, String>> {
             async move { Ok(()) }.boxed()
         }
     }
@@ -111,7 +111,7 @@ fn in_same_type() {
             &'a self,
             input: &Self::Input,
             usage: &'a ParamUsage,
-        ) -> futures::future::BoxFuture<'a, Result<Self::Output, String>> {
+        ) -> BoxFuture<'a, Result<Self::Output, String>> {
             async move { Ok(()) }.boxed()
         }
     }
@@ -150,7 +150,7 @@ fn multi_output_type() {
             &'a self,
             input: &Self::Input,
             usage: &'a ParamUsage,
-        ) -> futures::future::BoxFuture<'a, Result<Self::Output, String>> {
+        ) -> BoxFuture<'a, Result<Self::Output, String>> {
             async move { Ok(1) }.boxed()
         }
     }
@@ -164,7 +164,7 @@ fn multi_output_type() {
             &'a self,
             input: &Self::Input,
             usage: &'a ParamUsage,
-        ) -> futures::future::BoxFuture<'a, Result<Self::Output, String>> {
+        ) -> BoxFuture<'a, Result<Self::Output, String>> {
             async move { Ok(()) }.boxed()
         }
     }

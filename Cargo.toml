@@ -28,7 +28,6 @@ pi_map = "0.1"
 pi_hash = "0.1"
 
 nalgebra = "0.30"
-futures = "0.3"
 winit = { git = "http://ser.yinengyun.com:10082/tech/winit.git" }
 log = "0.4"
 wgpu = "0.12"
@@ -50,8 +49,8 @@ path = "examples/clean/main.rs"
 # [patch.crates-io]
 # pi_ecs = { path = "../pi_ecs" }
 
-[patch."https://github.com/GaiaWorld/pi_hal"]
-pi_hal = { path = "../pi_hal" }
+# [patch."https://github.com/GaiaWorld/pi_hal"]
+# pi_hal = { path = "../pi_hal" }
 
-[patch."https://github.com/GaiaWorld/pi_ecs"]
-pi_ecs = { path = "../pi_ecs" }
+# [patch."https://github.com/GaiaWorld/pi_ecs"]
+# pi_ecs = { path = "../pi_ecs" }

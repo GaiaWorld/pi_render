@@ -126,7 +126,7 @@ impl DependNode for InputAdd {
         &'a self,
         input: &Self::Input,
         usage: &'a ParamUsage,
-    ) -> futures::future::BoxFuture<'a, Result<Self::Output, String>> {
+    ) -> pi_futures::BoxFuture<'a, Result<Self::Output, String>> {
         
         // 根据 拓扑结构判断
         // 如果 Input 的 Binary 对应的 字段 被前置节点填充，则表示 该节点 是计算的中间节点，用 前面的字段做输入
@@ -146,11 +146,10 @@ impl DependNode for InputAdd {
         // 输出：u64 根本 不属于 该输出，自然不会有 后继节点使用，为 false
         assert!(!usage.is_output_usage(TypeId::of::<u64>()));
 
-        async move {
+        Box::pin(async move {
             println!("======== Enter Async Node1 Running");
             Ok(30.25)
-        }
-        .boxed()
+        })
     }
 }
 ```

@@ -6,6 +6,8 @@
 
 /// 图模型
 pub mod graph;
+/// 子图模型
+pub mod sub_graph;
 /// 节点
 pub mod node;
 /// 节点 输入输出 参数

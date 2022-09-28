@@ -1,4 +1,4 @@
-use futures::{future::BoxFuture, FutureExt};
+use pi_futures::BoxFuture;
 use pi_async::rt::{AsyncRuntime, AsyncRuntimeBuilder};
 use pi_render::depend_graph::{
     graph::DependGraph,
@@ -134,7 +134,7 @@ impl DependNode for Node1 {
         &'a self,
         input: &Self::Input,
         usage: &'a ParamUsage,
-    ) -> futures::future::BoxFuture<'a, Result<Self::Output, String>> {
+    ) -> BoxFuture<'a, Result<Self::Output, String>> {
         let is_first_build = *self.0.as_ref().borrow();
         println!(
             "======== Enter Node1 Running, is_first_build = {}",
@@ -180,7 +180,7 @@ impl DependNode for Node2 {
         &'a self,
         input: &'a Self::Input,
         usage: &'a ParamUsage,
-    ) -> futures::future::BoxFuture<'a, Result<Self::Output, String>> {
+    ) -> BoxFuture<'a, Result<Self::Output, String>> {
         let is_first_build = *self.0.as_ref().borrow();
         println!(
             "======== Enter Node2 Running, is_first_build = {}",
@@ -229,7 +229,7 @@ impl DependNode for Node3 {
         &'a self,
         input: &'a Self::Input,
         usage: &'a ParamUsage,
-    ) -> futures::future::BoxFuture<'a, Result<Self::Output, String>> {
+    ) -> BoxFuture<'a, Result<Self::Output, String>> {
         println!("======== Enter Node3 Running");
         let is_first_build = *self.0.as_ref().borrow();
         assert!(is_first_build);
@@ -268,7 +268,7 @@ impl DependNode for Node4 {
         &'a self,
         input: &'a Self::Input,
         usage: &'a ParamUsage,
-    ) -> futures::future::BoxFuture<'a, Result<Self::Output, String>> {
+    ) -> BoxFuture<'a, Result<Self::Output, String>> {
         println!("======== Enter Node4 Running");
 
         let is_first_build = *self.0.as_ref().borrow();

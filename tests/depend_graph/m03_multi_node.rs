@@ -1,4 +1,4 @@
-use futures::{future::BoxFuture, FutureExt};
+use pi_futures::BoxFuture;
 use pi_async::rt::{AsyncRuntime, AsyncRuntimeBuilder};
 use pi_render::depend_graph::{
     graph::DependGraph,
@@ -129,7 +129,7 @@ impl DependNode for Node1 {
         &'a self,
         input: &Self::Input,
         usage: &'a ParamUsage,
-    ) -> futures::future::BoxFuture<'a, Result<Self::Output, String>> {
+    ) -> BoxFuture<'a, Result<Self::Output, String>> {
         println!("======== Enter Node1 Running");
 
         assert_eq!(input, &());
@@ -157,7 +157,7 @@ impl DependNode for Node2 {
         &'a self,
         input: &'a Self::Input,
         usage: &'a ParamUsage,
-    ) -> futures::future::BoxFuture<'a, Result<Self::Output, String>> {
+    ) -> BoxFuture<'a, Result<Self::Output, String>> {
         println!("======== Enter Node2 Running");
 
         assert!(!usage.is_input_fill(TypeId::of::<()>()));
@@ -186,7 +186,7 @@ impl DependNode for Node3 {
         &'a self,
         input: &'a Self::Input,
         usage: &'a ParamUsage,
-    ) -> futures::future::BoxFuture<'a, Result<Self::Output, String>> {
+    ) -> BoxFuture<'a, Result<Self::Output, String>> {
         println!("======== Enter Node3 Running");
 
         assert!(!usage.is_input_fill(TypeId::of::<()>()));
@@ -212,7 +212,7 @@ impl DependNode for Node4 {
         &'a self,
         input: &'a Self::Input,
         usage: &'a ParamUsage,
-    ) -> futures::future::BoxFuture<'a, Result<Self::Output, String>> {
+    ) -> BoxFuture<'a, Result<Self::Output, String>> {
         println!("======== Enter Node4 Running");
 
         assert!(usage.is_input_fill(TypeId::of::<A>()));
@@ -241,7 +241,7 @@ impl DependNode for Node5 {
         &'a self,
         input: &'a Self::Input,
         usage: &'a ParamUsage,
-    ) -> futures::future::BoxFuture<'a, Result<Self::Output, String>> {
+    ) -> BoxFuture<'a, Result<Self::Output, String>> {
         println!("======== Enter Node5 Running");
 
         assert!(usage.is_input_fill(TypeId::of::<C>()));
@@ -270,7 +270,7 @@ impl DependNode for Node6 {
         &'a self,
         input: &'a Self::Input,
         usage: &'a ParamUsage,
-    ) -> futures::future::BoxFuture<'a, Result<Self::Output, String>> {
+    ) -> BoxFuture<'a, Result<Self::Output, String>> {
         println!("======== Enter Node6 Running");
 
         assert!(usage.is_input_fill(TypeId::of::<A>()));

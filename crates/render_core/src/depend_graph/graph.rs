@@ -7,22 +7,20 @@
 //!   + DependGraph
 //!
 
-use crate::graph::node::Node;
-
 use super::{
     node::{DependNode, NodeId, NodeLabel, NodeState},
     param::{InParam, OutParam},
     GraphError,
 };
-use pi_futures::BoxFuture;
 use log::error;
 use pi_async::prelude::AsyncRuntime;
 use pi_async_graph::{async_graph, ExecNode, RunFactory, Runner};
+use pi_futures::BoxFuture;
 use pi_graph::{DirectedGraph, DirectedGraphNode, NGraph, NGraphBuilder};
 use pi_hash::{XHashMap, XHashSet};
 use pi_share::Share;
 use pi_slotmap::SlotMap;
-use std::{borrow::Cow, sync::Arc};
+use std::borrow::Cow;
 
 /// 依赖图
 pub struct DependGraph {
@@ -55,6 +53,11 @@ pub struct DependGraph {
     // 运行图 中 入度为0 的节点
     input_node_ids: Vec<NodeId>,
 
+    // 运行 节点 build 方法的图，当切仅当 图 有所变化时候，每个节点会重新运行一次；
+    // build_ng 如果为Some，这一帧会执行，紧接着 build_ng = None
+    // build_ng 边 和 edges 的 (before, after) 相同
+    build_ng: Option<Share<NGraph<NodeId, ExecNode<EmptySyncRun, EmptySyncRun>>>>,
+
     // 录制渲染指令的 异步执行图，用于 更新 GPU 资源
     // 当 渲染图 拓扑改变 或 finish 节点 改变后，会 重新 构建个 新的
     // run_ng边 和 edges 的 (before, after) 相同
@@ -77,6 +80,8 @@ impl Default for DependGraph {
             is_finish_dirty: true,
 
             input_node_ids: vec![],
+
+            build_ng: None,
             run_ng: None,
         }
     }
@@ -235,28 +240,17 @@ impl DependGraph {
 
 /// 渲染图的 执行 相关
 impl DependGraph {
-    pub async fn build<A: 'static + AsyncRuntime + Send>(
-        &mut self,
-        rt: &A,
-    ) -> Result<(), GraphError> {
+    /// 构建图，不需要 运行时
+    pub fn build(&mut self) -> Result<(), GraphError> {
         let sub_ng = match self.update_topo() {
             None => return Ok(()),
             Some(g) => g,
         };
 
         // 构建 run_ng，返回 构建图
-        let g = self.create_run_ng(sub_ng)?;
+        self.create_run_ng(sub_ng)?;
 
-        // 立即 执行 构建图
-        match async_graph(rt.clone(), Arc::new(g)).await {
-            Ok(_) => Ok(()),
-            Err(e) => {
-                let err = GraphError::RunNGraphError(format!("run_ng, {:?}", e));
-
-                error!("{}", err);
-                return Err(err);
-            }
-        }
+        Ok(())
     }
 
     /// 执行 渲染
@@ -264,11 +258,24 @@ impl DependGraph {
         &mut self,
         rt: &A,
     ) -> Result<(), GraphError> {
+        // 注 构建 ng 只运行一次
+        match self.build_ng.take() {
+            None => {}
+            Some(g) => match async_graph(rt.clone(), g.clone()).await {
+                Ok(_) => {}
+                Err(e) => {
+                    let err = GraphError::RunNGraphError(format!("run_ng, {:?}", e));
+
+                    error!("{}", err);
+                    return Err(err);
+                }
+            },
+        }
+
         match self.run_ng {
             None => {
                 let e = GraphError::NoneNGraph("run_ng".to_string());
                 error!("{}", e);
-
                 Err(e)
             }
             Some(ref g) => match async_graph(rt.clone(), g.clone()).await {
@@ -310,7 +317,7 @@ impl DependGraph {
                 .node_names
                 .get(name)
                 .cloned()
-                .ok_or(GraphError::NoneNode(label.into())),
+                .ok_or_else(|| GraphError::NoneNode(label.into())),
         }
     }
 
@@ -409,10 +416,7 @@ impl DependGraph {
 
     // 创建真正的 运行图
     // 返回 构建 的 执行图
-    fn create_run_ng(
-        &mut self,
-        sub_ng: NGraph<NodeId, NodeId>,
-    ) -> Result<NGraph<NodeId, ExecNode<EmptySyncRun, EmptySyncRun>>, GraphError> {
+    fn create_run_ng(&mut self, sub_ng: NGraph<NodeId, NodeId>) -> Result<(), GraphError> {
         let mut build_builder =
             NGraphBuilder::<NodeId, ExecNode<EmptySyncRun, EmptySyncRun>>::new();
 
@@ -468,7 +472,10 @@ impl DependGraph {
 
         // 构建图 只用 一次，用完 就 释放
         match build_builder.build() {
-            Ok(g) => Ok(g),
+            Ok(g) => {
+                self.build_ng = Some(Share::new(g));
+                Ok(())
+            }
             Err(e) => {
                 let msg = format!("build_builder e = {:?}", e);
                 error!("{}", msg);
@@ -489,7 +496,7 @@ impl DependGraph {
         let f = move || -> BoxFuture<'static, std::io::Result<()>> {
             let node = node.clone();
             Box::pin(async move {
-                node.as_ref().borrow().build().await.unwrap();
+                node.as_ref().borrow_mut().build().await.unwrap();
 
                 Ok(())
             })

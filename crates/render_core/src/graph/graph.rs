@@ -104,11 +104,8 @@ impl RenderGraph {
 /// 渲染图的 执行 相关
 impl RenderGraph {
     #[inline]
-    pub async fn build<A: 'static + AsyncRuntime + Send>(
-        &mut self,
-        rt: &A,
-    ) -> Result<(), GraphError> {
-        self.imp.build(rt).await
+    pub fn build(&mut self) -> Result<(), GraphError> {
+        self.imp.build()
     }
 
     /// 执行 渲染
