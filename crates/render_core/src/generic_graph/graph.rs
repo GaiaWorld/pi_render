@@ -239,7 +239,7 @@ impl GenericGraph {
         let g = self.create_run_ng()?;
 
         // 立即 执行 构建图
-        match async_graph(rt.clone(), Arc::new(g)).await {
+        match async_graph(rt.clone(), Share::new(g)).await {
             Ok(_) => Ok(()),
             Err(e) => {
                 let err = GraphError::RunNGraphError(format!("run_ng, {:?}", e));

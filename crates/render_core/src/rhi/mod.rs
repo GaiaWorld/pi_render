@@ -15,6 +15,8 @@ pub mod shader;
 pub mod texture;
 pub mod uniform_vec;
 
+use std::sync::Arc;
+
 use self::{device::RenderDevice, options::RenderOptions};
 use crate::rhi::options::RenderPriority;
 use log::{debug, warn};
@@ -129,7 +131,7 @@ pub type RenderInstance = wgpu::Instance;
 pub async fn setup_render_context(
     mut world: World,
     options: RenderOptions,
-    window: Share<winit::window::Window>,
+    window: Arc<winit::window::Window>,
 ) {
     let backends = options.backends;
 
@@ -281,6 +283,9 @@ async fn initialize_renderer(
             max_compute_workgroups_per_dimension: limits
                 .max_compute_workgroups_per_dimension
                 .min(constrained_limits.max_compute_workgroups_per_dimension),
+			max_buffer_size: limits
+				.max_buffer_size
+				.min(constrained_limits.max_buffer_size),
         };
     }
 

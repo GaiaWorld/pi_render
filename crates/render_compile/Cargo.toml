@@ -9,7 +9,7 @@ license = "MIT OR Apache-2.0"
 keywords = ["pi", "compile", "shader"]
 
 [dependencies]
-naga = { version = "0.8", features = [
+naga = { version = "0.9", features = [
     "glsl-in",
     "spv-in",
     "spv-out",
@@ -20,4 +20,4 @@ thiserror = "1.0"
 Inflector = "0.11"
 pi_ordmap = "0.1"
 log = "0.4"
-pi_render = { git = "https://github.com/GaiaWorld/pi_render.git" }
+pi_render = { path = "../render_core", package="render_core" }
