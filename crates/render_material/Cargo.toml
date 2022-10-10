@@ -9,7 +9,7 @@ license = "MIT OR Apache-2.0"
 keywords = ["Scene material"]
 
 [dependencies]
-wgpu = { version = "0.12", features = ["spirv", "glsl"] }
+wgpu = { version = "0.13", features = ["spirv", "glsl"] }
 nalgebra = "0.30"
 bytemuck = { version = "1.4", features = ["derive"] }
 pi_slotmap = "0.1"

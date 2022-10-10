@@ -344,7 +344,7 @@ impl NodeState {
     {
         let imp = GenericNodeImpl::new(node);
 
-        let imp = Arc::new(TrustCell::new(imp));
+        let imp = Share::new(TrustCell::new(imp));
 
         Self(imp)
     }

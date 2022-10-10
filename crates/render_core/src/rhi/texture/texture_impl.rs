@@ -214,8 +214,8 @@ impl PiRenderDefault for wgpu::TextureFormat {
     fn pi_render_default() -> Self {
         if cfg!(target_os = "android") || cfg!(target_arch = "wasm32") {
             // Bgra8UnormSrgb texture missing on some Android devices
-            wgpu::TextureFormat::Rgba8Unorm
-        } else {
+            wgpu::TextureFormat::Rgba8UnormSrgb
+        } else  {
             wgpu::TextureFormat::Bgra8Unorm
         }
     }

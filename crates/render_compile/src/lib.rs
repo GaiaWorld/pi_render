@@ -5,7 +5,7 @@ use std::{
 };
 
 use inflector::Inflector;
-use naga::{ScalarKind, StorageClass, ShaderStage, Binding};
+use naga::{ScalarKind, StorageAccess, ShaderStage, Binding, AddressSpace};
 use pi_ordmap::{sbtree::Tree, ordmap::{ImOrdMap, Iter, OrdMap}};
 use thiserror::Error;
 
@@ -675,7 +675,7 @@ enum UniformFrom {
 fn get_uniforms(module: &naga::Module) -> HashMap<(u32, u32), (&naga::Type, &Option<String>)> {
     let mut uniforms = HashMap::new();
     for item in module.global_variables.iter() {
-        if item.1.class == StorageClass::Uniform || item.1.class == StorageClass::Handle {
+        if item.1.space == AddressSpace::Uniform || item.1.space == AddressSpace::Handle {
             let ty = &module.types[item.1.ty];
             let (group, binding) = match &item.1.binding {
                 Some(r) => (r.group, r.binding),

@@ -7,6 +7,7 @@ use pi_assets::{asset::Handle, mgr::AssetMgr};
 use pi_atom::Atom;
 use pi_hash::DefaultHasher;
 use pi_share::{Share, ShareMutex};
+use pi_slotmap::Key;
 use wgpu::{Texture, ImageCopyTexture, TextureAspect, ImageDataLayout, Extent3d, Origin3d};
 use pi_hal::font::font::FontMgr;
 pub use pi_hal::font::font::{ Font, Size, GlyphId, FontId, Glyph};
@@ -40,7 +41,7 @@ impl FontSheet {
 			mip_level_count: 1,
 			sample_count: 1,
 			dimension: wgpu::TextureDimension::D2,
-			format: wgpu::TextureFormat::Bgra8Unorm,
+			format: wgpu::TextureFormat::Rgba8Unorm,
 			usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
 		});
 		let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());

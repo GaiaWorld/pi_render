@@ -31,7 +31,7 @@ nalgebra = "0.30"
 futures = "0.3"
 winit = { git = "http://ser.yinengyun.com:10082/tech/winit.git" }
 log = "0.4"
-wgpu = "0.12"
+wgpu = "0.13"
 env_logger = "0.9"
 float-ord = "0.3"
 
@@ -47,7 +47,8 @@ path = "examples/hello_winit/main.rs"
 name = "clean"
 path = "examples/clean/main.rs"
 
-# [patch.crates-io]
+[patch.crates-io]
+pi_assets={ path = "../pi_assets" }
 # pi_ecs = { path = "../pi_ecs" }
 
 [patch."https://github.com/GaiaWorld/pi_hal"]
