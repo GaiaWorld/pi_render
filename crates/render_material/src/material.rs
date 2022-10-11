@@ -182,10 +182,10 @@ impl UnifromData {
 /// * 纹理 Uniform 共用一个 set
 pub struct Material<VBK: TVertexBufferKindKey, MBKK: TMaterialBlockKindKey, TID: TextureID> {
     /** Uniforms */
-    uniform_bind_group: Option<wgpu::BindGroup>,
+    uniform_bind_group: Option<render_core::rhi::bind_group::BindGroup>,
     uniform_bind_about: Vec<Option<UniformBindGroupAbout>>,
     uniform_bind_dirty: Vec<bool>,
-    uniform_buffer: Option<wgpu::Buffer>,
+    uniform_buffer: Option<render_core::rhi::dyn_uniform_buffer::DynUniformBuffer>,
     uniform_descs: Vec<MaterialUniformDesc<MBKK>>,
     /// 每个Uniform在各自数据类型的存储数值中的存储位置
     uniform_type_save_index: Vec<usize>,
@@ -196,7 +196,7 @@ pub struct Material<VBK: TVertexBufferKindKey, MBKK: TMaterialBlockKindKey, TID:
     mat2_pool: Vec<UniformKindMat2>,
     mat4_pool: Vec<UniformKindMat4>,
     /** Textures */
-    texture_bind_group: Option<wgpu::BindGroup>,
+    texture_bind_group: Option<render_core::rhi::bind_group::BindGroup>,
     texture_keys: Vec<Option<TID>>,
     texture_samplers: Vec<MaterialTextureSampler>,
     texture_descs: Vec<MaterialTextureDesc<MBKK>>,
@@ -762,3 +762,17 @@ pub struct CastShadow;
 
 pub struct ReceiveShadow;
 
+pub struct MaterialBehavior {
+
+}
+
+impl MaterialBehavior {
+    pub fn draw<'a, GBID: TGeometryBufferID, GBP: GeometryBufferPool<GBID>>(
+        &'a self,
+        renderpass: &mut wgpu::RenderPass<'a>,
+        geometry: &Geometry<VBK, GBID>,
+        geo_buffer_pool: &'a GBP
+    ) -> Result<(), EMaterialError> {
+        Ok(())
+    }
+}
