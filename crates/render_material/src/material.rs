@@ -5,7 +5,7 @@ use render_data_container::{Matrix, Vector2, Vector4, Matrix2, Color4};
 
 use crate::{error::EMaterialError, texture::MaterialTextureSampler, uniform_info::calc_uniform_size};
 
-
+/// 数值 Uniform 数据类型枚举
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum EUniformDataFormat {
     Float,
@@ -16,6 +16,7 @@ pub enum EUniformDataFormat {
     Mat4,
 }
 impl EUniformDataFormat {
+    /// 各类数据类型对应的 字节数
     pub fn match_uniform_size(&self) -> wgpu::BufferAddress {
         match self {
             EUniformDataFormat::Float => 4,
@@ -26,6 +27,7 @@ impl EUniformDataFormat {
             EUniformDataFormat::Mat4 => 64,
         }
     }
+    /// 各类数据类型对应的 对齐字节数
     pub fn fill_size(&self) -> wgpu::BufferAddress {
         match self {
             EUniformDataFormat::Float => 4,
@@ -46,18 +48,19 @@ pub type UniformKindMat2    = Matrix2;
 pub type UniformKindMat4    = Matrix;
 // pub type UniformKindTexture2D = Option<(f32, f32, f32, f32)>;
 
-pub struct MaterialAttributeDesc<VBK: TVertexBufferKindKey, MBKK: TMaterialBlockKindKey> {
-    pub vertex: GeometryBufferDesc<VBK>,
-    pub bind: MBKK,
-}
-
+/// 材质上的 Uniform 数据描述
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct MaterialUniformDesc<MBKK: TMaterialBlockKindKey> {
+    /// 应用为哪个材质属性
     pub kind: MBKK,
+    /// 数据所属 bind 信息
     pub bind: usize,
+    /// 数据类型
     pub format: EUniformDataFormat,
+    pub visibility: wgpu::ShaderStages,
 }
 impl<MBKK: TMaterialBlockKindKey> MaterialUniformDesc<MBKK> {
+    /// 根据 uniform 数据类型统计 Uniform 整体占用的数据块尺寸
     pub fn calc_buffer_size(descs: &Vec<MaterialUniformDesc<MBKK>>) -> wgpu::BufferAddress {
         let mut result = 0;
         let mut last_size = 0;
@@ -82,15 +85,20 @@ impl<MBKK: TMaterialBlockKindKey> MaterialUniformDesc<MBKK> {
     }
 }
 
-
+///
+/// 材质上的 纹理 描述
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct MaterialTextureDesc<MBKK: TMaterialBlockKindKey> {
+    /// 应用为哪个材质属性
     pub kind: MBKK,
+    /// 纹理数据的 bind 信息
     pub bind: u32,
+    /// 纹理采样数据的 bind 信息
     pub bind_sampler: u32,
 }
 
-
+///
+/// Uniform 数据结构 - 用于逻辑操作
 pub enum UnifromData {
     Float(UniformKindFloat),
     Float2(UniformKindFloat2),
@@ -101,6 +109,7 @@ pub enum UnifromData {
 }
 
 impl UnifromData {
+    /// 获取 Float 数据
     pub fn to_float(&self, data: &mut UniformKindFloat) -> Result<(), EMaterialError> {
         match self {
             UnifromData::Float(v) => {
@@ -110,6 +119,7 @@ impl UnifromData {
             _ => Err(EMaterialError::UniformDataNotMatch),
         }
     }
+    /// 获取 Float2 数据
     pub fn to_float2(&self, data: &mut UniformKindFloat2) -> Result<(), EMaterialError> {
         match self {
             UnifromData::Float2(v) => {
@@ -119,6 +129,7 @@ impl UnifromData {
             _ => Err(EMaterialError::UniformDataNotMatch),
         }
     }
+    /// 获取 Float4 数据
     pub fn to_float4(&self, data: &mut UniformKindFloat4) -> Result<(), EMaterialError> {
         match self {
             UnifromData::Float4(v) => {
@@ -128,6 +139,7 @@ impl UnifromData {
             _ => Err(EMaterialError::UniformDataNotMatch),
         }
     }
+    /// 获取 Color4 数据
     pub fn to_color4(&self, data: &mut UniformKindColor4) -> Result<(), EMaterialError> {
         match self {
             UnifromData::Color4(v) => {
@@ -137,6 +149,7 @@ impl UnifromData {
             _ => Err(EMaterialError::UniformDataNotMatch),
         }
     }
+    /// 获取 Mat2 数据
     pub fn to_mat2(&self, data: &mut UniformKindMat2) -> Result<(), EMaterialError> {
         match self {
             UnifromData::Mat2(v) => {
@@ -146,6 +159,7 @@ impl UnifromData {
             _ => Err(EMaterialError::UniformDataNotMatch),
         }
     }
+    /// 获取 Mat4 数据
     pub fn to_mat4(&self, data: &mut UniformKindMat4) -> Result<(), EMaterialError> {
         match self {
             UnifromData::Mat4(v) => {
@@ -164,14 +178,17 @@ impl UnifromData {
 ///     * 接口封装层 setUniform数据类型(属性名称, Value)
 ///   * 此处封装为 set_uniform(属性描述, Value)
 ///     * 属性描述 对于一个 Shader 而言是唯一的
+/// * 数值 Uniform 共用一个 set
+/// * 纹理 Uniform 共用一个 set
 pub struct Material<VBK: TVertexBufferKindKey, MBKK: TMaterialBlockKindKey, TID: TextureID> {
     /** Uniforms */
-    uniform_bind_group: Option<wgpu::BindGroup>,
-    uniform_buffer: Option<wgpu::Buffer>,
+    uniform_bind_group: Option<render_core::rhi::bind_group::BindGroup>,
+    uniform_bind_about: Vec<Option<UniformBindGroupAbout>>,
+    uniform_bind_dirty: Vec<bool>,
+    uniform_buffer: Option<render_core::rhi::dyn_uniform_buffer::DynUniformBuffer>,
     uniform_descs: Vec<MaterialUniformDesc<MBKK>>,
     /// 每个Uniform在各自数据类型的存储数值中的存储位置
     uniform_type_save_index: Vec<usize>,
-    uniform_data_dirty: bool,
     float_pool: Vec<UniformKindFloat>,
     float2_pool: Vec<UniformKindFloat2>,
     float4_pool: Vec<UniformKindFloat4>,
@@ -179,7 +196,7 @@ pub struct Material<VBK: TVertexBufferKindKey, MBKK: TMaterialBlockKindKey, TID:
     mat2_pool: Vec<UniformKindMat2>,
     mat4_pool: Vec<UniformKindMat4>,
     /** Textures */
-    texture_bind_group: Option<wgpu::BindGroup>,
+    texture_bind_group: Option<render_core::rhi::bind_group::BindGroup>,
     texture_keys: Vec<Option<TID>>,
     texture_samplers: Vec<MaterialTextureSampler>,
     texture_descs: Vec<MaterialTextureDesc<MBKK>>,
@@ -193,6 +210,8 @@ impl<VBK: TVertexBufferKindKey, MBKK: TMaterialBlockKindKey, TID: TextureID> Def
     fn default() -> Self {
         Self {
             uniform_bind_group: None,
+            uniform_bind_about: vec![],
+            uniform_bind_dirty: vec![],
             uniform_buffer: None,
             uniform_descs: vec![],
             float_pool: vec![],
@@ -209,7 +228,6 @@ impl<VBK: TVertexBufferKindKey, MBKK: TMaterialBlockKindKey, TID: TextureID> Def
             uniform_type_save_index: vec![],
             attribute_descs: vec![],
             attribute_slot_desc: vec![],
-            uniform_data_dirty: false,
         }
     }
 }
@@ -219,11 +237,13 @@ impl<VBK: TVertexBufferKindKey, MBKK: TMaterialBlockKindKey, TID: TextureID> Mat
         &mut self,
         device: &wgpu::Device,
         attributes: Vec<GeometryBufferDesc<VBK>>,
-        usage: wgpu::BufferUsages,
+        uniform_usage: wgpu::BufferUsages,
         uniform_descs: Vec<MaterialUniformDesc<MBKK>>,
         textures: Vec<MaterialTextureDesc<MBKK>>,
         uniform_bind_group_layout: &wgpu::BindGroupLayout,
     ) {
+        self.uniform_bind_about.clear();
+        self.uniform_bind_dirty.clear();
         self.uniform_descs.clear();
         self.float_pool.clear();
         self.float2_pool.clear();
@@ -237,26 +257,29 @@ impl<VBK: TVertexBufferKindKey, MBKK: TMaterialBlockKindKey, TID: TextureID> Mat
         self.attribute_descs.clear();
         self.attribute_slot_desc.clear();
 
+        // 计算 数值 Uniform 需要的数据空间
         let buffer_size = calc_uniform_size(device, MaterialUniformDesc::calc_buffer_size(&uniform_descs) as wgpu::BufferAddress);
+        // 创建 数值 Unifrom 的 buffer
         self.uniform_buffer = Some(
             device.create_buffer(&wgpu::BufferDescriptor {
                 label: None,
                 size: buffer_size,
-                usage,
+                usage: uniform_usage,
                 mapped_at_creation: false,
             })
         );
+        // 初始化 数值 Uniform 信息记录
+        for desc in uniform_descs.iter() {
+            self.add_unifrom_desc(*desc);
+        }
 
+        // 初始化纹理信息记录
         for _ in textures.iter() {
             self.texture_keys.push(None);
             self.texture_samplers.push(MaterialTextureSampler::default());
         }
         self.texture_bind_group = None;
         self.texture_descs = textures;
-
-        for desc in uniform_descs.iter() {
-            self.add_unifrom_desc(*desc);
-        }
         self.attribute_descs = attributes;
 
         let mut uniform_binds = vec![];
@@ -281,6 +304,10 @@ impl<VBK: TVertexBufferKindKey, MBKK: TMaterialBlockKindKey, TID: TextureID> Mat
                 }
             )
         );
+    }
+
+    fn init_bind_group() {
+
     }
 
     fn add_unifrom_desc(&mut self, desc: MaterialUniformDesc<MBKK>) {
@@ -332,34 +359,34 @@ impl<VBK: TVertexBufferKindKey, MBKK: TMaterialBlockKindKey, TID: TextureID> Mat
                         match desc.format {
                             EUniformDataFormat::Float => {
                                 let value = self.float_pool.get_mut(*index).unwrap();
-                                self.uniform_data_dirty = true;
+                                self.uniform_bind_dirty = true;
                                 data.to_float(value)
                             },
                             EUniformDataFormat::Float2 => {
                                 let value = self.float2_pool.get_mut(*index).unwrap();
-                                self.uniform_data_dirty = true;
+                                self.uniform_bind_dirty = true;
                                 data.to_float2(value)
                             },
                             EUniformDataFormat::Float4 => {
                                 let value = self.float4_pool.get_mut(*index).unwrap();
-                                self.uniform_data_dirty = true;
+                                self.uniform_bind_dirty = true;
                                 // println!("################### Float4");
                                 data.to_float4(value)
                             },
                             EUniformDataFormat::Color4 => {
                                 let value = self.color4_pool.get_mut(*index).unwrap();
-                                self.uniform_data_dirty = true;
+                                self.uniform_bind_dirty = true;
                                 data.to_color4(value)
                             },
                             EUniformDataFormat::Mat2 => {
                                 let value = self.mat2_pool.get_mut(*index).unwrap();
-                                self.uniform_data_dirty = true;
+                                self.uniform_bind_dirty = true;
                                 data.to_mat2(value)
                             },
                             EUniformDataFormat::Mat4 => {
                                 // println!("################### Mat4");
                                 let value = self.mat4_pool.get_mut(*index).unwrap();
-                                self.uniform_data_dirty = true;
+                                self.uniform_bind_dirty = true;
                                 data.to_mat4(value)
                             },
                         }
@@ -449,7 +476,7 @@ impl<VBK: TVertexBufferKindKey, MBKK: TMaterialBlockKindKey, TID: TextureID> Mat
                 None => {},
             }
         }
-        if self.uniform_data_dirty {
+        if self.uniform_bind_dirty {
             match self.uniform_buffer.as_ref() {
                 Some(buffer) => {
                     let mut datas = vec![];
@@ -488,7 +515,7 @@ impl<VBK: TVertexBufferKindKey, MBKK: TMaterialBlockKindKey, TID: TextureID> Mat
                     
                     // println!("!!!!!!!!!!!!! {:?}", datas);
                     queue.write_buffer(buffer, 0, bytemuck::cast_slice(&datas));
-                    self.uniform_data_dirty = false;
+                    self.uniform_bind_dirty = false;
                 },
                 None => todo!(),
             }
@@ -606,6 +633,127 @@ impl<VBK: TVertexBufferKindKey, MBKK: TMaterialBlockKindKey, TID: TextureID> Mat
     pub fn attributes(&self) -> &Vec<GeometryBufferDesc<VBK>> {
         &self.attribute_descs
     }
+    fn analy_uniform_descs(&mut self, device: &wgpu::Device, descs: &Vec<MaterialUniformDesc<MBKK>>, uniform_usage: wgpu::BufferUsages) {
+        let mut bind_indexs = vec![];
+        descs.iter().for_each(|desc| {
+            if bind_indexs.contains(&desc.bind) == false {
+                match bind_indexs.binary_search(&desc.bind) {
+                    Ok(index) => {},
+                    Err(index) => bind_indexs.insert(index, desc.bind),
+                }
+            }
+        });
+
+        let mut offset = 0 as wgpu::BufferAddress;
+        let mut buffer_size = 0 as wgpu::BufferAddress;
+        let mut counter = 0 as usize;
+        bind_indexs.iter().for_each(|bind| {
+            let about = UniformBindGroupAbout::new(device, descs, *bind, offset);
+            if counter < *bind {
+                for _ in counter..*bind {
+                    self.uniform_bind_about.push(None);
+                }
+            }
+            self.uniform_bind_about.push(Some(about));
+
+            buffer_size += about.buffer_size;
+            offset      = buffer_size;
+            counter     = *bind;
+        });
+
+        self.uniform_buffer = Some(device.create_buffer(
+            &wgpu::BufferDescriptor {
+                label: None,
+                size: buffer_size,
+                usage: uniform_usage,
+                mapped_at_creation: false,
+            }
+        ));
+
+        let mut bind_entries = vec![];
+        let mut bind_layout_entries = vec![];
+        self.uniform_bind_about.iter().for_each(|about| {
+            match about {
+                Some(about) => {
+                    bind_entries.push(wgpu::BindGroupEntry {
+                        binding: about.bind as u32,
+                        resource: wgpu::BindingResource::Buffer (
+                            wgpu::BufferBinding {
+                                buffer: self.uniform_buffer.as_ref().unwrap(),
+                                offset: about.buffer_offset,
+                                size: wgpu::BufferSize::new(about.data_size),
+                            }
+                        ),
+                    });
+                    bind_layout_entries.push(
+                        wgpu::BindGroupLayoutEntry {
+                            binding: about.bind as u32,
+                            visibility: about.visibility,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Uniform,
+                                has_dynamic_offset: false,
+                                // min_binding_size: wgpu::BufferSize::new(uniform_size)
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                    )
+                },
+                None => {},
+            }
+        });
+
+        let uniform_layout = device.create_bind_group_layout(
+            &wgpu::BindGroupLayoutDescriptor {
+                label: None,
+                entries: bind_layout_entries.as_slice()
+            }
+        );
+
+        self.uniform_bind_group = Some(
+            device.create_bind_group(
+                &wgpu::BindGroupDescriptor {
+                    label: None,
+                    layout: &uniform_layout,
+                    entries: bind_entries.as_slice()
+                }
+            )
+        );
+
+    }
+}
+
+pub struct UniformBindGroupAbout {
+    pub buffer_offset: wgpu::BufferAddress,
+    pub buffer_size: wgpu::BufferAddress,
+    pub data_size: wgpu::BufferAddress,
+    pub bind: usize,
+    pub visibility: wgpu::ShaderStages,
+}
+
+impl UniformBindGroupAbout {
+    pub fn new<MBKK: TMaterialBlockKindKey>(device: &wgpu::Device, descs: &Vec<MaterialUniformDesc<MBKK>>, bind: usize, offset: wgpu::BufferAddress) -> Self {
+
+        let mut visibility = wgpu::ShaderStages::NONE;
+        let mut uniform_descs = vec![];
+        descs.iter().for_each(|desc| {
+            if desc.bind == bind {
+                uniform_descs.push(*desc);
+                visibility = visibility | desc.visibility;
+            }
+        });
+
+        let data_size = MaterialUniformDesc::calc_buffer_size(&uniform_descs) as wgpu::BufferAddress;
+        let buffer_size = calc_uniform_size(device, data_size);
+
+        Self {
+            buffer_offset: offset,
+            buffer_size,
+            data_size,
+            bind,
+            visibility,
+        }
+    }
 }
 
 pub struct LightingEnable;
@@ -614,3 +762,17 @@ pub struct CastShadow;
 
 pub struct ReceiveShadow;
 
+pub struct MaterialBehavior {
+
+}
+
+impl MaterialBehavior {
+    pub fn draw<'a, GBID: TGeometryBufferID, GBP: GeometryBufferPool<GBID>>(
+        &'a self,
+        renderpass: &mut wgpu::RenderPass<'a>,
+        geometry: &Geometry<VBK, GBID>,
+        geo_buffer_pool: &'a GBP
+    ) -> Result<(), EMaterialError> {
+        Ok(())
+    }
+}

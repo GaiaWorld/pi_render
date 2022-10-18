@@ -8,7 +8,7 @@ use crate::{
 use pi_ecs::prelude::{Res, ResMut, World, res::WriteRes};
 use pi_share::Share;
 use pi_slotmap::{new_key_type, SlotMap};
-use std::{ops::Deref};
+use std::{ops::Deref, sync::Arc};
 use wgpu::TextureFormat;
 use winit::{dpi::PhysicalSize, window::Window};
 
@@ -21,12 +21,12 @@ pub type RenderWindows = SlotMap<RenderWindowKey, RenderWindow>;
 pub struct RenderWindow {
     present_mode: PresentMode,
     last_size: PhysicalSize<u32>,
-    handle: Share<Window>,
+    handle: Arc<Window>,
 }
 
 impl RenderWindow {
     pub fn new(
-        handle: Share<Window>,
+        handle: Arc<Window>,
         present_mode: PresentMode,
     ) -> Self {
         Self {
@@ -69,11 +69,7 @@ pub(crate) async fn prepare_windows<'w>(
             width,
             height,
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            present_mode: match window.present_mode {
-                PresentMode::Fifo => wgpu::PresentMode::Fifo,
-                PresentMode::Mailbox => wgpu::PresentMode::Mailbox,
-                PresentMode::Immediate => wgpu::PresentMode::Immediate,
-            },
+            present_mode: window.present_mode.clone(),
         };
 
         let is_size_changed =

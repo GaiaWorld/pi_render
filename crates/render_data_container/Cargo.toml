@@ -12,6 +12,6 @@ keywords = ["scene data container"]
 nalgebra = "0.30"
 pi_slotmap = "0.1"
 bytemuck = { version = "1.4", features = ["derive"] }
-wgpu = { version = "0.12", features = ["spirv", "glsl"] }
+wgpu = { version = "0.13", features = ["spirv", "glsl"] }
 
 # [[example]]

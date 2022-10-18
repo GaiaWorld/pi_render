@@ -41,7 +41,7 @@ impl RenderDevice {
 
     /// Creates a [`ShaderModule`](wgpu::ShaderModule) from either SPIR-V or WGSL source code.
     #[inline]
-    pub fn create_shader_module(&self, desc: &wgpu::ShaderModuleDescriptor) -> wgpu::ShaderModule {
+    pub fn create_shader_module(&self, desc: wgpu::ShaderModuleDescriptor) -> wgpu::ShaderModule {
         self.0.create_shader_module(desc)
     }
 
@@ -49,7 +49,7 @@ impl RenderDevice {
     ///
     /// no-op on the web, device is automatically polled.
     #[inline]
-    pub fn poll(&self, maintain: wgpu::Maintain) {
+    pub fn poll(&self, maintain: wgpu::Maintain) -> bool {
         self.0.poll(maintain)
     }
 
@@ -160,8 +160,13 @@ impl RenderDevice {
         &self,
         buffer: &wgpu::BufferSlice<'_>,
         map_mode: wgpu::MapMode,
-    ) -> impl Future<Output = Result<(), BufferAsyncError>> + Send {
-        buffer.map_async(map_mode)
+    ) -> Result<(), BufferAsyncError> {
+		let var = pi_async::prelude::AsyncValue::new();
+		let var1 = var.clone();
+        buffer.map_async(map_mode, move |r| {
+			var1.set(r);
+		});
+		var.await
     }
 
     pub fn align_copy_bytes_per_row(row_bytes: usize) -> usize {

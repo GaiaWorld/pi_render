@@ -35,7 +35,7 @@ use rhi::{
 };
 use std::{
     collections::HashMap,
-    sync::atomic::{AtomicBool, AtomicU64, Ordering},
+    sync::{atomic::{AtomicBool, AtomicU64, Ordering}, Arc},
 };
 use thiserror::Error;
 use winit::window::Window;
@@ -61,7 +61,7 @@ struct RenderAsyncRuntime<A: 'static + AsyncRuntime + Send> {
 pub async fn init_render<A>(
     world: &mut World,
     options: RenderOptions,
-    window: Share<Window>,
+    window: Arc<Window>,
     rt: A,
 ) -> RenderStage
 where

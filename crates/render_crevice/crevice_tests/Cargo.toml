@@ -22,8 +22,9 @@ bytemuck = "1.7.2"
 memoffset = "0.6.4"
 mint = "0.5.5"
 
-naga = { version = "0.8.0", features = [
+futures = { version = "0.3.17", features = ["executor"], optional = true }
+naga = { version = "0.9.0", features = [
     "glsl-in",
     "wgsl-out",
 ], optional = true }
-wgpu = { version = "0.12", optional = true }
+wgpu = { version = "0.13", optional = true }

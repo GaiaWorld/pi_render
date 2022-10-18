@@ -9,6 +9,6 @@ license = "MIT OR Apache-2.0"
 keywords = ["scene pipeline key"]
 
 [dependencies]
-wgpu = { version = "0.12", features = ["spirv", "glsl"] }
+wgpu = { version = "0.13", features = ["spirv", "glsl"] }
 
 # [[example]]
