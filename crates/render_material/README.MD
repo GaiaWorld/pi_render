@@ -54,3 +54,25 @@
       * lightPosition
       * lightDirection
       * lightParams
+
+## 材质
+
+### 功能
+
+* 记录 bindgroup
+
+### draw
+
+* 
+
+## 材质属性块
+
+### 功能
+
+* 内部记录 TMaterialBlockKindKey 对应 要修改的 内存buffer 及 修改偏移
+
+### 
+
+### 材质属性修改接口
+
+* modify(&mut self, TMaterialBlockKindKey, UniformData)

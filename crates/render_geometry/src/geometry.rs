@@ -1,6 +1,6 @@
 
 use std::hash::Hash;
-use render_data_container::{TGeometryBufferID, TVertexBufferKindKey, GeometryBufferPool, EVertexDataFormat};
+use render_data_container::{TGeometryBufferID, TVertexDataKindKey, GeometryBufferPool, EVertexDataFormat};
 use pi_share::Share;
 use crate::error::EGeometryError;
 use crate::vertex_data::{VertexBufferU8, VertexBufferU16, VertexBufferU32, VertexBufferF32, VertexBufferF64};
@@ -27,14 +27,14 @@ use crate::vertex_data::{VertexBufferU8, VertexBufferU16, VertexBufferU32, Verte
 // }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct GeometryBufferDesc<VBK: TVertexBufferKindKey>{
+pub struct GeometryBufferDesc<VDK: TVertexDataKindKey>{
     pub slot: u32,
     pub format: EVertexDataFormat,
-    pub kind: VBK,
+    pub kind: VDK,
     pub size_per_vertex: usize,
 }
 
-pub struct Geometry<VBK: TVertexBufferKindKey, GBID: TGeometryBufferID> {
+pub struct Geometry<VDK: TVertexDataKindKey, GBID: TGeometryBufferID> {
     u8_buffers: Vec<GBID>,
     u16_buffers: Vec<GBID>,
     u32_buffers: Vec<GBID>,
@@ -42,21 +42,21 @@ pub struct Geometry<VBK: TVertexBufferKindKey, GBID: TGeometryBufferID> {
     f64_buffers: Vec<GBID>,
     indices_buffer: Option<GBID>,
     indices_buffer_u32: Option<GBID>,
-    data_descs: Vec<GeometryBufferDesc<VBK>>,
+    data_descs: Vec<GeometryBufferDesc<VDK>>,
     data_indexs: Vec<usize>,
-    vertex_count_query_desc: Option<GeometryBufferDesc<VBK>>,
-    instanced_count_query_desc: Option<GeometryBufferDesc<VBK>>,
-    instance_descs: Vec<GeometryBufferDesc<VBK>>,
+    vertex_count_query_desc: Option<GeometryBufferDesc<VDK>>,
+    instanced_count_query_desc: Option<GeometryBufferDesc<VDK>>,
+    instance_descs: Vec<GeometryBufferDesc<VDK>>,
     instance_indexs: Vec<usize>,
 }
 
-impl<VBK: TVertexBufferKindKey, GBID: TGeometryBufferID> Default for Geometry<VBK, GBID> {
+impl<VDK: TVertexDataKindKey, GBID: TGeometryBufferID> Default for Geometry<VDK, GBID> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<VBK: TVertexBufferKindKey, GBID: TGeometryBufferID> Geometry<VBK, GBID> {
+impl<VDK: TVertexDataKindKey, GBID: TGeometryBufferID> Geometry<VDK, GBID> {
     pub fn new() -> Self {
         Self {
             u8_buffers: vec![],
@@ -91,7 +91,7 @@ impl<VBK: TVertexBufferKindKey, GBID: TGeometryBufferID> Geometry<VBK, GBID> {
         self.instance_indexs = vec![];
     }
 
-    pub fn set(&mut self, desc: GeometryBufferDesc<VBK>, data: Option<GBID>) -> Result<(), EGeometryError> {
+    pub fn set(&mut self, desc: GeometryBufferDesc<VDK>, data: Option<GBID>) -> Result<(), EGeometryError> {
         if self.data_descs.contains(&desc) == false {
             match desc.format {
                 EVertexDataFormat::U8 => {
@@ -155,7 +155,7 @@ impl<VBK: TVertexBufferKindKey, GBID: TGeometryBufferID> Geometry<VBK, GBID> {
         }
     }
 
-    pub fn set_instance(&mut self, desc: GeometryBufferDesc<VBK>, data: Option<GBID>) -> Result<(), EGeometryError> {
+    pub fn set_instance(&mut self, desc: GeometryBufferDesc<VDK>, data: Option<GBID>) -> Result<(), EGeometryError> {
         if self.instance_descs.contains(&desc) == false {
             match desc.format {
                 EVertexDataFormat::U8 => {
@@ -219,7 +219,7 @@ impl<VBK: TVertexBufferKindKey, GBID: TGeometryBufferID> Geometry<VBK, GBID> {
         }
     }
 
-    pub fn get_vertices(&self, desc: &GeometryBufferDesc<VBK>) -> Option<GBID> {
+    pub fn get_vertices(&self, desc: &GeometryBufferDesc<VDK>) -> Option<GBID> {
         let mut result: Option<GBID> = None;
 
         match self.data_descs.binary_search(desc) {
@@ -257,7 +257,7 @@ impl<VBK: TVertexBufferKindKey, GBID: TGeometryBufferID> Geometry<VBK, GBID> {
         self.indices_buffer = data;
     }
     
-    pub fn get_instance(&self, desc: &GeometryBufferDesc<VBK>) -> Option<GBID> {
+    pub fn get_instance(&self, desc: &GeometryBufferDesc<VDK>) -> Option<GBID> {
         let mut result: Option<GBID> = None;
 
         match self.instance_descs.binary_search(desc) {
@@ -298,11 +298,11 @@ impl<VBK: TVertexBufferKindKey, GBID: TGeometryBufferID> Geometry<VBK, GBID> {
         }
     }
     /// 设置通过哪个 Buffer 描述查询 顶点数量
-    pub fn vertex_count_query_desc(&mut self, desc: GeometryBufferDesc<VBK>) {
+    pub fn vertex_count_query_desc(&mut self, desc: GeometryBufferDesc<VDK>) {
         self.vertex_count_query_desc = Some(desc);
     }
     /// 设置通过哪个 Buffer 描述查询 实例化数量
-    pub fn instanced_count_query_desc(&mut self, desc: GeometryBufferDesc<VBK>) {
+    pub fn instanced_count_query_desc(&mut self, desc: GeometryBufferDesc<VDK>) {
         self.instanced_count_query_desc = Some(desc);
     }
     pub fn get_vertices_number<GBP: GeometryBufferPool<GBID>>(&self, pool: &GBP) -> Option<usize> {
