@@ -1,5 +1,5 @@
-use pi_futures::BoxFuture;
 use pi_async::rt::{AsyncRuntime, AsyncRuntimeBuilder};
+use pi_futures::BoxFuture;
 use pi_render::depend_graph::{
     graph::DependGraph,
     node::{DependNode, ParamUsage},
@@ -26,18 +26,17 @@ fn out_same_type() {
         type Output = Output1;
 
         fn run<'a>(
-            &'a self,
+            &'a mut self,
             input: &Self::Input,
             usage: &'a ParamUsage,
         ) -> BoxFuture<'a, Result<Self::Output, String>> {
-            async move {
+            Box::pin(async move {
                 Ok(Output1 {
                     a: 1.0,
                     b: 2,
                     c: 3.0,
                 })
-            }
-            .boxed()
+            })
         }
     }
 
@@ -47,11 +46,11 @@ fn out_same_type() {
         type Output = ();
 
         fn run<'a>(
-            &'a self,
+            &'a mut self,
             input: &Self::Input,
             usage: &'a ParamUsage,
         ) -> BoxFuture<'a, Result<Self::Output, String>> {
-            async move { Ok(()) }.boxed()
+            Box::pin(async move { Ok(()) })
         }
     }
 
@@ -61,13 +60,13 @@ fn out_same_type() {
     g.add_node("Node1", Node1);
     g.add_node("Node2", Node2);
 
-    g.add_node_depend("Node1", "Node2");
+    g.add_depend("Node1", "Node2");
 
     g.set_finish("Node2", true).unwrap();
 
     let rt = runtime.clone();
     let _ = runtime.spawn(runtime.alloc(), async move {
-        g.build(&rt).await.unwrap();
+        g.build().unwrap();
 
         println!("======== run graph");
         g.run(&rt).await.unwrap();
@@ -94,11 +93,11 @@ fn in_same_type() {
         type Output = ();
 
         fn run<'a>(
-            &'a self,
+            &'a mut self,
             input: &Self::Input,
             usage: &'a ParamUsage,
         ) -> BoxFuture<'a, Result<Self::Output, String>> {
-            async move { Ok(()) }.boxed()
+            Box::pin(async move { Ok(()) })
         }
     }
 
@@ -108,11 +107,11 @@ fn in_same_type() {
         type Output = ();
 
         fn run<'a>(
-            &'a self,
+            &'a mut self,
             input: &Self::Input,
             usage: &'a ParamUsage,
         ) -> BoxFuture<'a, Result<Self::Output, String>> {
-            async move { Ok(()) }.boxed()
+            Box::pin(async move { Ok(()) })
         }
     }
 
@@ -122,13 +121,13 @@ fn in_same_type() {
     g.add_node("Node1", Node1);
     g.add_node("Node2", Node2);
 
-    g.add_node_depend("Node1", "Node2");
+    g.add_depend("Node1", "Node2");
 
     g.set_finish("Node2", true).unwrap();
 
     let rt = runtime.clone();
     let _ = runtime.spawn(runtime.alloc(), async move {
-        g.build(&rt).await.unwrap();
+        g.build().unwrap();
 
         println!("======== run graph");
         g.run(&rt).await.unwrap();
@@ -147,11 +146,11 @@ fn multi_output_type() {
         type Output = u32;
 
         fn run<'a>(
-            &'a self,
+            &'a mut self,
             input: &Self::Input,
             usage: &'a ParamUsage,
         ) -> BoxFuture<'a, Result<Self::Output, String>> {
-            async move { Ok(1) }.boxed()
+            Box::pin(async move { Ok(1) })
         }
     }
 
@@ -161,11 +160,11 @@ fn multi_output_type() {
         type Output = ();
 
         fn run<'a>(
-            &'a self,
+            &'a mut self,
             input: &Self::Input,
             usage: &'a ParamUsage,
         ) -> BoxFuture<'a, Result<Self::Output, String>> {
-            async move { Ok(()) }.boxed()
+            Box::pin(async move { Ok(()) })
         }
     }
 
@@ -177,14 +176,14 @@ fn multi_output_type() {
 
     g.add_node("Node2", Node2);
 
-    g.add_node_depend("Node11", "Node2");
-    g.add_node_depend("Node12", "Node2");
+    g.add_depend("Node11", "Node2");
+    g.add_depend("Node12", "Node2");
 
     g.set_finish("Node2", true).unwrap();
 
     let rt = runtime.clone();
     let _ = runtime.spawn(runtime.alloc(), async move {
-        g.build(&rt).await.unwrap();
+        g.build().unwrap();
 
         println!("======== run graph");
         g.run(&rt).await.unwrap();

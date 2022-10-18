@@ -21,6 +21,7 @@ render_geometry = { path = "crates/render_geometry" }
 render_data_container = { path = "crates/render_data_container" }
 
 [dev-dependencies]
+pi_futures = "0.1"
 pi_slotmap = "0.1"
 pi_share = "0.4"
 pi_async = "0.5"

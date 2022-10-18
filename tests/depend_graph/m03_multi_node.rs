@@ -1,5 +1,5 @@
-use pi_futures::BoxFuture;
 use pi_async::rt::{AsyncRuntime, AsyncRuntimeBuilder};
+use pi_futures::BoxFuture;
 use pi_render::depend_graph::{
     graph::DependGraph,
     node::{DependNode, ParamUsage},
@@ -22,14 +22,14 @@ fn multi_node() {
     g.add_node("Node5", Node5);
     g.add_node("Node6", Node6);
 
-    g.add_node_depend("Node1", "Node4");
-    g.add_node_depend("Node2", "Node4");
+    g.add_depend("Node1", "Node4");
+    g.add_depend("Node2", "Node4");
 
-    g.add_node_depend("Node2", "Node5");
-    g.add_node_depend("Node3", "Node5");
+    g.add_depend("Node2", "Node5");
+    g.add_depend("Node3", "Node5");
 
-    g.add_node_depend("Node4", "Node6");
-    g.add_node_depend("Node5", "Node6");
+    g.add_depend("Node4", "Node6");
+    g.add_depend("Node5", "Node6");
 
     g.set_finish("Node6", true).unwrap();
 
@@ -37,7 +37,7 @@ fn multi_node() {
     let _ = runtime.spawn(runtime.alloc(), async move {
         let rt = rt.clone();
 
-        g.build(&rt).await.unwrap();
+        g.build().unwrap();
 
         println!("======== 1 run graph");
         g.run(&rt).await.unwrap();
@@ -126,7 +126,7 @@ impl DependNode for Node1 {
     type Output = Output1;
 
     fn run<'a>(
-        &'a self,
+        &'a mut self,
         input: &Self::Input,
         usage: &'a ParamUsage,
     ) -> BoxFuture<'a, Result<Self::Output, String>> {
@@ -139,12 +139,11 @@ impl DependNode for Node1 {
         assert!(usage.is_output_usage(TypeId::of::<A>()));
         assert!(!usage.is_output_usage(TypeId::of::<B>()));
 
-        async move {
+        Box::pin(async move {
             println!("======== Enter Async Node1 Running");
 
             Ok(Output1 { a: A(1), b: B(2) })
-        }
-        .boxed()
+        })
     }
 }
 
@@ -154,7 +153,7 @@ impl DependNode for Node2 {
     type Output = Output2;
 
     fn run<'a>(
-        &'a self,
+        &'a mut self,
         input: &'a Self::Input,
         usage: &'a ParamUsage,
     ) -> BoxFuture<'a, Result<Self::Output, String>> {
@@ -165,15 +164,14 @@ impl DependNode for Node2 {
         assert!(usage.is_output_usage(TypeId::of::<C>()));
         assert!(!usage.is_output_usage(TypeId::of::<D>()));
 
-        async move {
+        Box::pin(async move {
             println!("======== Enter Async Node2 Running");
 
             Ok(Output2 {
                 c: C("3".to_string()),
                 d: D(44),
             })
-        }
-        .boxed()
+        })
     }
 }
 
@@ -183,7 +181,7 @@ impl DependNode for Node3 {
     type Output = Output3;
 
     fn run<'a>(
-        &'a self,
+        &'a mut self,
         input: &'a Self::Input,
         usage: &'a ParamUsage,
     ) -> BoxFuture<'a, Result<Self::Output, String>> {
@@ -194,12 +192,11 @@ impl DependNode for Node3 {
         assert!(!usage.is_output_usage(TypeId::of::<A>()));
         assert!(usage.is_output_usage(TypeId::of::<E>()));
 
-        async move {
+        Box::pin(async move {
             println!("======== Enter Async Node3 Running");
 
             Ok(Output3 { a: A(36), e: E(45) })
-        }
-        .boxed()
+        })
     }
 }
 
@@ -209,7 +206,7 @@ impl DependNode for Node4 {
     type Output = A;
 
     fn run<'a>(
-        &'a self,
+        &'a mut self,
         input: &'a Self::Input,
         usage: &'a ParamUsage,
     ) -> BoxFuture<'a, Result<Self::Output, String>> {
@@ -223,12 +220,11 @@ impl DependNode for Node4 {
         assert_eq!(input.a, A(1));
         assert_eq!(input.c, C("3".to_string()));
 
-        async move {
+        Box::pin(async move {
             println!("======== Enter Async Node4 Running");
 
             Ok(A(44))
-        }
-        .boxed()
+        })
     }
 }
 
@@ -238,7 +234,7 @@ impl DependNode for Node5 {
     type Output = F;
 
     fn run<'a>(
-        &'a self,
+        &'a mut self,
         input: &'a Self::Input,
         usage: &'a ParamUsage,
     ) -> BoxFuture<'a, Result<Self::Output, String>> {
@@ -252,12 +248,11 @@ impl DependNode for Node5 {
         assert_eq!(input.c, C("3".to_string()));
         assert_eq!(input.e, E(45));
 
-        async move {
+        Box::pin(async move {
             println!("======== Enter Async Node5 Running");
 
             Ok(F(55))
-        }
-        .boxed()
+        })
     }
 }
 
@@ -267,7 +262,7 @@ impl DependNode for Node6 {
     type Output = ();
 
     fn run<'a>(
-        &'a self,
+        &'a mut self,
         input: &'a Self::Input,
         usage: &'a ParamUsage,
     ) -> BoxFuture<'a, Result<Self::Output, String>> {
@@ -279,11 +274,10 @@ impl DependNode for Node6 {
 
         assert_eq!(*input, A(44));
 
-        async move {
+        Box::pin(async move {
             println!("======== Enter Async Node6 Running");
 
             Ok(())
-        }
-        .boxed()
+        })
     }
 }

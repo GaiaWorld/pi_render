@@ -30,17 +30,17 @@ fn input_collector() {
     println!("node14 id = {:?}", n14);
     println!("node15 id = {:?}", n15);
 
-    g.add_node_depend("Node11", "Node2");
-    g.add_node_depend("Node12", "Node2");
-    g.add_node_depend("Node13", "Node2");
-    g.add_node_depend("Node14", "Node2");
-    g.add_node_depend("Node15", "Node2");
+    g.add_depend("Node11", "Node2");
+    g.add_depend("Node12", "Node2");
+    g.add_depend("Node13", "Node2");
+    g.add_depend("Node14", "Node2");
+    g.add_depend("Node15", "Node2");
 
     g.set_finish("Node2", true).unwrap();
 
     let rt = runtime.clone();
     let _ = runtime.spawn(runtime.alloc(), async move {
-        g.build(&rt).await.unwrap();
+        g.build().unwrap();
 
         println!("======== run graph");
         g.run(&rt).await.unwrap();
@@ -81,7 +81,7 @@ impl DependNode for Node1 {
     type Output = Output1;
 
     fn run<'a>(
-        &'a self,
+        &'a mut self,
         input: &Self::Input,
         usage: &'a ParamUsage,
     ) -> BoxFuture<'a, Result<Self::Output, String>> {
@@ -94,15 +94,14 @@ impl DependNode for Node1 {
         assert!(usage.is_output_usage(TypeId::of::<A>()));
         assert!(!usage.is_output_usage(TypeId::of::<B>()));
 
-        async move {
+        Box::pin(async move {
             println!("======== Enter Async Node1 Running");
 
             Ok(Output1 {
                 a: A(self.0),
                 b: B(1),
             })
-        }
-        .boxed()
+        })
     }
 }
 
@@ -112,7 +111,7 @@ impl DependNode for Node2 {
     type Output = ();
 
     fn run<'a>(
-        &'a self,
+        &'a mut self,
         input: &'a Self::Input,
         usage: &'a ParamUsage,
     ) -> BoxFuture<'a, Result<Self::Output, String>> {
@@ -126,11 +125,10 @@ impl DependNode for Node2 {
             println!("id = {:?}, v = {:?}", id, v);
         }
 
-        async move {
+        Box::pin(async move {
             println!("======== Enter Async Node2 Running");
 
             Ok(())
-        }
-        .boxed()
+        })
     }
 }

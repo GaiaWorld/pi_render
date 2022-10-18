@@ -1,5 +1,5 @@
-//! 依赖图
 //!
+//! 依赖图
 //! + 槽位：add_depend 的 slot_name 如果为 ""，意味着整个参数 关联，不关联某个字段
 //!
 //! 主要数据结构
@@ -33,7 +33,7 @@ pub struct DependGraph {
     nodes: SlotMap<NodeId, (String, NodeState)>,
 
     // 边 (before, after)
-    edges: XHashSet<(NodeId, NodeId)>,
+    edges: XHashMap<NodeId, NodeSlot>,
 
     // 最终节点，渲染到屏幕的节点
     finish_nodes: XHashSet<NodeId>,
@@ -70,7 +70,7 @@ impl Default for DependGraph {
             node_names: XHashMap::default(),
 
             nodes: SlotMap::default(),
-            edges: XHashSet::default(),
+            edges: XHashMap::default(),
 
             finish_nodes: XHashSet::default(),
 
@@ -89,6 +89,16 @@ impl Default for DependGraph {
 
 /// 渲染图的 拓扑信息 相关 方法
 impl DependGraph {
+    /// 查 指定节点 的 前驱节点
+    pub fn get_prev_ids(&self, id: NodeId) -> Option<&[NodeId]> {
+        self.edges.get(&id).map(|v| v.prev_nodes.as_slice())
+    }
+
+    /// 查 指定节点 的 后继节点
+    pub fn get_next_ids(&self, id: NodeId) -> Option<&[NodeId]> {
+        self.edges.get(&id).map(|v| v.next_nodes.as_slice())
+    }
+
     /// 添加 名为 name 的 节点
     pub fn add_node<I, O, R>(
         &mut self,
@@ -115,7 +125,7 @@ impl DependGraph {
         let node_id = self.nodes.insert((name.to_string(), node_state));
 
         self.node_names.insert(name, node_id);
-
+        self.edges.insert(node_id, NodeSlot::default());
         Ok(node_id)
     }
 
@@ -125,7 +135,7 @@ impl DependGraph {
 
         let id = match self.get_node_id(&label) {
             Ok(v) => v,
-            Err(e) => return Ok(()),
+            Err(_) => return Ok(()),
         };
 
         // 拓扑结构改变
@@ -141,15 +151,20 @@ impl DependGraph {
         self.node_names.remove(name.to_string().as_str());
 
         // 图：删点 必 删边
-        let remove_edges = self
-            .edges
-            .iter()
-            .filter(|(before, after)| id == *before || id == *after)
-            .cloned()
-            .collect::<Vec<(NodeId, NodeId)>>();
+        if let Some(slot) = self.edges.remove(&id) {
+            for prev in slot.prev_nodes.iter() {
+                // 删除 所有 前驱节点 的 后继
+                self.edges
+                    .get_mut(prev)
+                    .and_then(|s| s.remove_next_slot(id));
+            }
 
-        for pair in remove_edges {
-            self.edges.remove(&pair);
+            for next in slot.next_nodes.iter() {
+                // 删除 所有 后继节点 的 前驱
+                self.edges
+                    .get_mut(next)
+                    .and_then(|s| s.remove_prev_slot(id));
+            }
         }
 
         Ok(())
@@ -186,14 +201,10 @@ impl DependGraph {
 
     /// 添加 Node 间 Slot 的 依赖
     /// 执行顺序 `before_label` 先于 `after_label`
-    /// 注：slot 为 ""，表示 匹配 整个参数
     pub fn add_depend(
         &mut self,
         before_label: impl Into<NodeLabel>,
-        before_slot: impl Into<Cow<'static, str>>,
-
         after_label: impl Into<NodeLabel>,
-        after_slot: impl Into<Cow<'static, str>>,
     ) -> Result<(), GraphError> {
         let before_label = before_label.into();
         let after_label = after_label.into();
@@ -201,11 +212,22 @@ impl DependGraph {
         let before_node = self.get_node_id(&before_label)?;
         let after_node = self.get_node_id(&after_label)?;
 
-        if self.edges.get(&(before_node, after_node)).is_none() {
+        if let Some(_) = self
+            .edges
+            .get_mut(&before_node)
+            .and_then(|slot| slot.add_next_slot(after_node))
+        {
             // 拓扑结构改变
             self.is_topo_dirty = true;
+        }
 
-            self.edges.insert((before_node, after_node));
+        if let Some(_) = self
+            .edges
+            .get_mut(&after_node)
+            .and_then(|slot| slot.add_prev_slot(before_node))
+        {
+            // 拓扑结构改变
+            self.is_topo_dirty = true;
         }
 
         Ok(())
@@ -213,13 +235,10 @@ impl DependGraph {
 
     /// 移除 Node 间 Slot 的 依赖
     /// 执行顺序 `before_label` 先于 `after_label`
-    /// 注：slot 为 ""，表示 匹配 整个参数
     pub fn remove_depend(
         &mut self,
         before_label: impl Into<NodeLabel>,
-        before_slot: impl Into<Cow<'static, str>>,
         after_label: impl Into<NodeLabel>,
-        after_slot: impl Into<Cow<'static, str>>,
     ) -> Result<(), GraphError> {
         let before_label = before_label.into();
         let after_label = after_label.into();
@@ -227,11 +246,22 @@ impl DependGraph {
         let before_node = self.get_node_id(&before_label)?;
         let after_node = self.get_node_id(&after_label)?;
 
-        if self.edges.get(&(before_node, after_node)).is_some() {
+        if let Some(_) = self
+            .edges
+            .get_mut(&after_node)
+            .and_then(|slot| slot.remove_prev_slot(before_node))
+        {
             // 拓扑结构改变
             self.is_topo_dirty = true;
+        }
 
-            self.edges.remove(&(before_node, after_node));
+        if let Some(_) = self
+            .edges
+            .get_mut(&before_node)
+            .and_then(|slot| slot.remove_next_slot(after_node))
+        {
+            // 拓扑结构改变
+            self.is_topo_dirty = true;
         }
 
         Ok(())
@@ -295,6 +325,7 @@ impl DependGraph {
 
 impl DependGraph {
     /// 如果 finishes 节点数量 不等于1，返回 None，否则返回 ID
+    #[inline]
     pub(crate) fn get_once_finsh_id(&mut self) -> Option<NodeId> {
         if self.finish_nodes.len() != 1 {
             None
@@ -304,6 +335,7 @@ impl DependGraph {
     }
 
     /// 根据当前的 finishes 去取 ng 的 入度为0的节点
+    #[inline]
     pub(crate) fn get_input_nodes(&mut self) -> &[NodeId] {
         self.update_topo();
 
@@ -395,11 +427,18 @@ impl DependGraph {
             builder = builder.node(node_id, node_id);
         }
 
-        for (before_id, after_id) in &self.edges {
-            assert!(self.nodes.get(*after_id).is_some() && self.nodes.get(*before_id).is_some());
+        {
+            let mut access_edges = XHashSet::<(NodeId, NodeId)>::default();
+            for (before, slot) in self.edges.iter() {
+                for after in slot.next_nodes.iter() {
+                    if !access_edges.contains(&(*before, *after)) {
+                        // 顺序 必须和 依赖图顺序 相反
+                        builder = builder.edge(*after, *before);
 
-            // 和 图 的 依赖 相反
-            builder = builder.edge(*after_id, *before_id);
+                        access_edges.insert((*before, *after));
+                    }
+                }
+            }
         }
 
         let ng = match builder.build() {
@@ -538,5 +577,64 @@ impl RunFactory for EmptySyncRun {
 
     fn create(&self) -> Self::R {
         EmptySyncRun
+    }
+}
+
+#[derive(Default)]
+struct NodeSlot {
+    prev_nodes: Vec<NodeId>,
+
+    next_nodes: Vec<NodeId>,
+}
+
+impl NodeSlot {
+    // 添加 next 对应的 slot
+    #[inline]
+    fn add_next_slot(&mut self, next: NodeId) -> Option<()> {
+        match self.next_nodes.iter().position(|s| *s == next) {
+            Some(_) => None,
+            None => {
+                self.next_nodes.push(next);
+                Some(())
+            }
+        }
+    }
+
+    // 到 id 的节点 添加 prev 对应的 slot
+    #[inline]
+    fn add_prev_slot(&mut self, prev: NodeId) -> Option<()> {
+        match self.prev_nodes.iter().position(|s| *s == prev) {
+            Some(_) => None,
+            None => {
+                self.prev_nodes.push(prev);
+                Some(())
+            }
+        }
+    }
+
+    // 到 id 的节点 删除 next 对应的 slot
+    #[inline]
+    fn remove_next_slot(&mut self, next: NodeId) -> Option<()> {
+        self.next_nodes
+            .iter()
+            .position(|value| *value == next)
+            .and_then(|index| {
+                self.next_nodes.swap_remove(index);
+                Some(())
+            })
+            .or_else(|| None)
+    }
+
+    // 到 id 的节点 删除 prev 对应的 slot
+    #[inline]
+    fn remove_prev_slot(&mut self, prev: NodeId) -> Option<()> {
+        self.prev_nodes
+            .iter()
+            .position(|value| *value == prev)
+            .and_then(|index| {
+                self.prev_nodes.swap_remove(index);
+                Some(())
+            })
+            .or_else(|| None)
     }
 }

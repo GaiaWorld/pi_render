@@ -26,6 +26,7 @@ pub struct RenderGraph {
 /// 渲染图的 拓扑信息 相关 方法
 impl RenderGraph {
     /// 创建
+    #[inline]
     pub fn new(world: World, device: RenderDevice, queue: RenderQueue) -> Self {
         Self {
             world,
@@ -33,6 +34,18 @@ impl RenderGraph {
             queue,
             imp: Default::default(),
         }
+    }
+
+    /// 查 指定节点 的 前驱节点
+    #[inline]
+    pub fn get_prev_ids(&self, id: NodeId) -> Option<&[NodeId]> {
+        self.imp.get_prev_ids(id)
+    }
+
+    /// 查 指定节点 的 后继节点
+    #[inline]
+    pub fn get_next_ids(&self, id: NodeId) -> Option<&[NodeId]> {
+        self.imp.get_next_ids(id)
     }
 
     /// 添加 名为 name 的 节点
@@ -59,6 +72,7 @@ impl RenderGraph {
     }
 
     /// 移除 节点
+    #[inline]
     pub fn remove_node(&mut self, label: impl Into<NodeLabel>) -> Result<(), GraphError> {
         self.imp.remove_node(label)
     }
@@ -69,12 +83,9 @@ impl RenderGraph {
     pub fn add_depend(
         &mut self,
         before_label: impl Into<NodeLabel>,
-        before_slot: impl Into<Cow<'static, str>>,
         after_label: impl Into<NodeLabel>,
-        after_slot: impl Into<Cow<'static, str>>,
     ) -> Result<(), GraphError> {
-        self.imp
-            .add_depend(before_label, before_slot, after_label, after_slot)
+        self.imp.add_depend(before_label, after_label)
     }
 
     /// 移除依赖
@@ -82,12 +93,9 @@ impl RenderGraph {
     pub fn remove_depend(
         &mut self,
         before_label: impl Into<NodeLabel>,
-        before_slot: impl Into<Cow<'static, str>>,
         after_label: impl Into<NodeLabel>,
-        after_slot: impl Into<Cow<'static, str>>,
     ) -> Result<(), GraphError> {
-        self.imp
-            .remove_depend(before_label, before_slot, after_label, after_slot)
+        self.imp.remove_depend(before_label, after_label)
     }
 
     /// 设置 是否 是 最终节点

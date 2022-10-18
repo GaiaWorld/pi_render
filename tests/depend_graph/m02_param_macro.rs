@@ -21,7 +21,7 @@ fn two_node_with_noslot() {
         type Output = A;
 
         fn run<'a>(
-            &'a self,
+            &'a mut self,
             input: &Self::Input,
             usage: &'a ParamUsage,
         ) -> BoxFuture<'a, Result<Self::Output, String>> {
@@ -49,7 +49,7 @@ fn two_node_with_noslot() {
         type Output = ();
 
         fn run<'a>(
-            &'a self,
+            &'a mut self,
             input: &Self::Input,
             usage: &'a ParamUsage,
         ) -> BoxFuture<'a, Result<Self::Output, String>> {
@@ -75,13 +75,13 @@ fn two_node_with_noslot() {
     g.add_node("Node1", Node1);
     g.add_node("Node2", Node2);
 
-    g.add_node_depend("Node1", "Node2");
+    g.add_depend("Node1", "Node2");
 
     g.set_finish("Node2", true).unwrap();
 
     let rt = runtime.clone();
     let _ = runtime.spawn(runtime.alloc(), async move {
-        g.build(&rt).await.unwrap();
+        g.build().unwrap();
 
         println!("======== 1 run graph");
         g.run(&rt).await.unwrap();
@@ -121,7 +121,7 @@ fn two_node_with_slot() {
         type Output = Output1;
 
         fn run<'a>(
-            &'a self,
+            &'a mut self,
             input: &Self::Input,
             usage: &'a ParamUsage,
         ) -> BoxFuture<'a, Result<Self::Output, String>> {
@@ -155,7 +155,7 @@ fn two_node_with_slot() {
         type Output = ();
 
         fn run<'a>(
-            &'a self,
+            &'a mut self,
             input: &Self::Input,
             usage: &'a ParamUsage,
         ) -> BoxFuture<'a, Result<Self::Output, String>> {
@@ -184,13 +184,13 @@ fn two_node_with_slot() {
     g.add_node("Node1", Node1);
     g.add_node("Node2", Node2);
 
-    g.add_node_depend("Node1", "Node2");
+    g.add_depend("Node1", "Node2");
 
     g.set_finish("Node2", true).unwrap();
 
     let rt = runtime.clone();
     let _ = runtime.spawn(runtime.alloc(), async move {
-        g.build(&rt).await.unwrap();
+        g.build().unwrap();
 
         println!("======== 1 run graph");
         g.run(&rt).await.unwrap();

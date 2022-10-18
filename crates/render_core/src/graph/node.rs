@@ -21,7 +21,7 @@ pub trait Node: 'static + ThreadSync {
     /// 构建，当渲染图 构建时候，会调用一次
     /// 一般 用于 准备 渲染 资源的 创建
     fn build<'a>(
-        &'a self,
+        &'a mut self,
         _context: RenderContext,
         _usage: &'a ParamUsage,
     ) -> Option<BoxFuture<'a, Result<(), String>>> {
@@ -30,7 +30,7 @@ pub trait Node: 'static + ThreadSync {
 
     /// 执行，每帧会调用一次
     fn run<'a>(
-        &'a self,
+        &'a mut self,
         context: RenderContext,
         commands: ShareRefCell<CommandEncoder>,
         input: &'a Self::Input,

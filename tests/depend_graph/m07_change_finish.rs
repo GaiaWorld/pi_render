@@ -32,11 +32,11 @@ fn change_finish() {
     let _ = runtime.spawn(runtime.alloc(), async move {
         println!("======================== should build call ");
 
-        g.build(&rt).await.unwrap();
+        g.build().unwrap();
         g.run(&rt).await.unwrap();
 
         println!("======================== shouldn't build call ");
-        g.build(&rt).await.unwrap();
+        g.build().unwrap();
         g.run(&rt).await.unwrap();
 
         *n1.0.as_ref().borrow_mut() = false;
@@ -46,11 +46,11 @@ fn change_finish() {
         g.set_finish("Node3", true).unwrap();
 
         println!("======================== should build call ");
-        g.build(&rt).await.unwrap();
+        g.build().unwrap();
         g.run(&rt).await.unwrap();
 
         println!("======================== shouldn't build call ");
-        g.build(&rt).await.unwrap();
+        g.build().unwrap();
         g.run(&rt).await.unwrap();
     });
 
@@ -89,13 +89,13 @@ impl GenericNode for Node1 {
     type Input = ();
     type Output = Output1;
 
-    fn build<'a>(&'a self, usage: &'a ParamUsage) -> Option<BoxFuture<'a, Result<(), String>>> {
+    fn build<'a>(&'a mut self, usage: &'a ParamUsage) -> Option<BoxFuture<'a, Result<(), String>>> {
         println!("++++++++++++++++++++++++ Node1 Build");
         None
     }
 
     fn run<'a>(
-        &'a self,
+        &'a mut self,
         input: &Self::Input,
         usage: &'a ParamUsage,
     ) -> BoxFuture<'a, Result<Self::Output, String>> {
@@ -113,12 +113,11 @@ impl GenericNode for Node1 {
             assert!(usage.is_output_usage(TypeId::of::<B>()));
         }
 
-        async move {
+        Box::pin(async move {
             println!("======== Enter Async Node1 Running");
 
             Ok(Output1 { a: A(1), b: B(2) })
-        }
-        .boxed()
+        })
     }
 }
 
@@ -135,13 +134,13 @@ impl GenericNode for Node2 {
     type Input = A;
     type Output = ();
 
-    fn build<'a>(&'a self, usage: &'a ParamUsage) -> Option<BoxFuture<'a, Result<(), String>>> {
+    fn build<'a>(&'a mut self, usage: &'a ParamUsage) -> Option<BoxFuture<'a, Result<(), String>>> {
         println!("++++++++++++++++++++++++ Node2 Build");
         None
     }
 
     fn run<'a>(
-        &'a self,
+        &'a mut self,
         input: &'a Self::Input,
         usage: &'a ParamUsage,
     ) -> BoxFuture<'a, Result<Self::Output, String>> {
@@ -153,12 +152,11 @@ impl GenericNode for Node2 {
 
         assert!(usage.is_input_fill(TypeId::of::<A>()));
 
-        async move {
+        Box::pin(async move {
             println!("======== Enter Async Node2 Running");
 
             Ok(())
-        }
-        .boxed()
+        })
     }
 }
 
@@ -175,13 +173,13 @@ impl GenericNode for Node3 {
     type Input = B;
     type Output = ();
 
-    fn build<'a>(&'a self, usage: &'a ParamUsage) -> Option<BoxFuture<'a, Result<(), String>>> {
+    fn build<'a>(&'a mut self, usage: &'a ParamUsage) -> Option<BoxFuture<'a, Result<(), String>>> {
         println!("++++++++++++++++++++++++ Node3 Build");
         None
     }
 
     fn run<'a>(
-        &'a self,
+        &'a mut self,
         input: &'a Self::Input,
         usage: &'a ParamUsage,
     ) -> BoxFuture<'a, Result<Self::Output, String>> {
@@ -191,11 +189,10 @@ impl GenericNode for Node3 {
 
         assert!(usage.is_input_fill(TypeId::of::<B>()));
 
-        async move {
+        Box::pin(async move {
             println!("======== Enter Async Node3 Running");
 
             Ok(())
-        }
-        .boxed()
+        })
     }
 }

@@ -3,7 +3,7 @@
 //! + 可以 clone，多个副本 指向 同一个子图
 //! + 可以 被高层 修改 拓扑结构（仅限于 Render System 不执行 时）
 //! + 在 构建时，会 拆分成 普通的 图节点（有可能递归 生成，因为 子图 节点 可能还有子图）
-//! + 构建时，子图的所有 输入/输出 节点（入度/出度 为0的节点）的 输入/输出 的并集，就是 这个 父图节点的输入/输出 
+//! + 构建时，子图的所有 输入/输出 节点（入度/出度 为0的节点）的 输入/输出 的并集，就是 这个 父图节点的输入/输出
 //!     - 限制：要求 每个节点的输入结构体的字段都不能同名
 //! + 运行时，一个图，只有 一个 运行时，不会为 子图 产生多个运行时
 
@@ -122,10 +122,10 @@ where
         let output_id = g.add_node("_$pi_m_sub_output$_", output)?;
 
         // input -> g.入度为0的节点
-        g.add_depend(input_id, "", from_id, "").unwrap();
+        g.add_depend(input_id, from_id).unwrap();
 
         // g.finish --> output
-        g.add_depend(finish_id, "", output_id, "").unwrap();
+        g.add_depend(finish_id, output_id).unwrap();
 
         Ok((input_id, output_id))
     }

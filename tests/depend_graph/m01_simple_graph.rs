@@ -17,7 +17,7 @@ fn two_node_with_simple_param() {
         type Output = f32;
 
         fn run<'a>(
-            &'a self,
+            &'a mut self,
             input: &Self::Input,
             usage: &'a ParamUsage,
         ) -> BoxFuture<'a, Result<Self::Output, String>> {
@@ -48,7 +48,7 @@ fn two_node_with_simple_param() {
         type Output = ();
 
         fn run<'a>(
-            &'a self,
+            &'a mut self,
             input: &Self::Input,
             usage: &'a ParamUsage,
         ) -> BoxFuture<'a, Result<Self::Output, String>> {
@@ -73,13 +73,13 @@ fn two_node_with_simple_param() {
     g.add_node("Node1", Node1);
     g.add_node("Node2", Node2);
 
-    g.add_node_depend("Node1", "Node2");
+    g.add_depend("Node1", "Node2");
 
     g.set_finish("Node2", true).unwrap();
 
     let rt = runtime.clone();
     let _ = runtime.spawn(runtime.alloc(), async move {
-        g.build(&rt).await.unwrap();
+        g.build().unwrap();
 
         println!("======== 1 run graph");
         g.run(&rt).await.unwrap();
@@ -99,7 +99,7 @@ fn two_node_with_no_match() {
         type Output = f32;
 
         fn run<'a>(
-            &'a self,
+            &'a mut self,
             input: &Self::Input,
             usage: &'a ParamUsage,
         ) -> BoxFuture<'a, Result<Self::Output, String>> {
@@ -127,7 +127,7 @@ fn two_node_with_no_match() {
         type Output = ();
 
         fn run<'a>(
-            &'a self,
+            &'a mut self,
             input: &Self::Input,
             usage: &'a ParamUsage,
         ) -> BoxFuture<'a, Result<Self::Output, String>> {
@@ -153,13 +153,13 @@ fn two_node_with_no_match() {
     g.add_node("Node1", Node1);
     g.add_node("Node2", Node2);
 
-    g.add_node_depend("Node1", "Node2");
+    g.add_depend("Node1", "Node2");
 
     g.set_finish("Node2", true).unwrap();
 
     let rt = runtime.clone();
     let _ = runtime.spawn(runtime.alloc(), async move {
-        g.build(&rt).await.unwrap();
+        g.build().unwrap();
 
         println!("======== 1 run graph");
         g.run(&rt).await.unwrap();

@@ -123,7 +123,7 @@ impl DependNode for InputAdd {
     type Output = i32;
 
     fn run<'a>(
-        &'a self,
+        &'a mut self,
         input: &Self::Input,
         usage: &'a ParamUsage,
     ) -> pi_futures::BoxFuture<'a, Result<Self::Output, String>> {

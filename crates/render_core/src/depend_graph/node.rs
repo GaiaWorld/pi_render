@@ -22,10 +22,7 @@ use std::{
     any::TypeId,
     borrow::Cow,
     ops::{Deref, DerefMut},
-    sync::{
-        atomic::{AtomicI32, Ordering},
-        Arc,
-    },
+    sync::atomic::{AtomicI32, Ordering},
 };
 
 /// 图节点，给 外部 扩展 使用
