@@ -357,3 +357,16 @@ pub fn update<T: Clone + Copy + Pod>(pool: &mut Vec<T>, data: &[T], offset: usiz
 
     pool.len()
 }
+
+pub fn calc_uniform_size(
+    device: &wgpu::Device,
+    used_size: u64,
+) -> u64 {
+    let limit = device.limits().min_uniform_buffer_offset_alignment as u64;
+    let t = used_size / limit;
+    if used_size - t * limit > 0 {
+        limit * (t + 1)
+    } else {
+        limit * t
+    }
+}

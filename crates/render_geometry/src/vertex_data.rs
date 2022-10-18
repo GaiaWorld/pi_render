@@ -1,4 +1,4 @@
-use render_data_container::{TVertexBufferKindKey, TGeometryBufferID};
+use render_data_container::{TVertexDataKindKey, TGeometryBufferID};
 
 #[derive(Debug, Clone, Copy)]
 pub enum EVertexDataKind {
@@ -30,7 +30,7 @@ pub enum EVertexDataKind {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct VertexAttributeDesc<VDK: TVertexBufferKindKey> {
+pub struct VertexAttributeDesc<VDK: TVertexDataKindKey> {
     kind: VDK,
     location: usize,
 }
