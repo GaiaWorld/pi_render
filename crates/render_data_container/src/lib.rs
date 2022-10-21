@@ -1,4 +1,5 @@
 use bytemuck::Pod;
+use pi_share::Share;
 use pi_slotmap::DefaultKey;
 use wgpu::util::DeviceExt;
 
@@ -174,7 +175,7 @@ pub trait GeometryBufferPool<GBID: TGeometryBufferID> {
     fn get(&self, key: &GBID) -> Option<&GeometryBuffer>;
     fn get_size(&self, key: &GBID) -> usize;
     fn get_mut(&mut self, key: &GBID) -> Option<&mut GeometryBuffer>;
-    fn get_buffer(&self, key: &GBID) -> Option<&wgpu::Buffer>;
+    fn get_buffer(&self, key: &GBID) -> Option<Share<&wgpu::Buffer>>;
 }
 
 #[derive(Debug)]
@@ -189,7 +190,7 @@ pub struct GeometryBuffer {
     f32: Vec<f32>,
     f64: Vec<f64>,
     _size: usize,
-    buffer: Option<wgpu::Buffer>,
+    buffer: Option<Share<wgpu::Buffer>>,
 }
 impl GeometryBuffer {
     pub fn new(updateable: bool, kind: EVertexDataFormat, as_indices: bool) -> Self {
@@ -255,19 +256,19 @@ impl GeometryBuffer {
                 };
                 self.buffer = match self.kind {
                     EVertexDataFormat::U8 => {
-                        Some( device.create_buffer_init( &wgpu::util::BufferInitDescriptor { label: None, contents: bytemuck::cast_slice(&self.u8), usage, } ) )
+                        Some( Share::from(device.create_buffer_init( &wgpu::util::BufferInitDescriptor { label: None, contents: bytemuck::cast_slice(&self.u8), usage, } )) )
                     },
                     EVertexDataFormat::U16 => {
-                        Some( device.create_buffer_init( &wgpu::util::BufferInitDescriptor { label: None, contents: bytemuck::cast_slice(&self.u16), usage, } ) )
+                        Some( Share::from(device.create_buffer_init( &wgpu::util::BufferInitDescriptor { label: None, contents: bytemuck::cast_slice(&self.u16), usage, } )) )
                     },
                     EVertexDataFormat::U32 => {
-                        Some( device.create_buffer_init( &wgpu::util::BufferInitDescriptor { label: None, contents: bytemuck::cast_slice(&self.u32), usage, } ) )
+                        Some( Share::from(device.create_buffer_init( &wgpu::util::BufferInitDescriptor { label: None, contents: bytemuck::cast_slice(&self.u32), usage, } )) )
                     },
                     EVertexDataFormat::F32 => {
-                        Some( device.create_buffer_init( &wgpu::util::BufferInitDescriptor { label: None, contents: bytemuck::cast_slice(&self.f32), usage, } ) )
+                        Some( Share::from(device.create_buffer_init( &wgpu::util::BufferInitDescriptor { label: None, contents: bytemuck::cast_slice(&self.f32), usage, } )) )
                     },
                     EVertexDataFormat::F64 => {
-                        Some( device.create_buffer_init( &wgpu::util::BufferInitDescriptor { label: None, contents: bytemuck::cast_slice(&self.f64), usage, } ) )
+                        Some( Share::from(device.create_buffer_init( &wgpu::util::BufferInitDescriptor { label: None, contents: bytemuck::cast_slice(&self.f64), usage, } )) )
                     },
                 }
             },
@@ -326,8 +327,11 @@ impl GeometryBuffer {
             false
         }
     }
-    pub fn get_buffer(&self) -> Option<&wgpu::Buffer> {
-        self.buffer.as_ref()
+    pub fn get_buffer(&self) -> Option<Share<&wgpu::Buffer>> {
+        match self.buffer.as_ref() {
+            Some(buffer) => Some(Share::from(buffer.as_ref())),
+            None => { None },
+        }
     }
     pub fn size(&self) -> usize {
         self._size

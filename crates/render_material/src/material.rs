@@ -1,7 +1,7 @@
 use std::hash::Hash;
 use render_core::rhi::{bind_group::BindGroup, dyn_uniform_buffer::BindOffset};
 use render_data_container::{TVertexDataKindKey, TMaterialBlockKindKey, TextureID, TexturePool, GeometryBufferPool, TGeometryBufferID, EVertexDataFormat, calc_uniform_size};
-use render_geometry::{geometry::{GeometryBufferDesc, Geometry}};
+use render_geometry::{geometry::{VertexAttributeMeta}};
 use render_data_container::{Matrix, Vector2, Vector4, Matrix2, Color4};
 
 use crate::{

@@ -11,6 +11,7 @@ keywords = ["scene data container"]
 [dependencies]
 nalgebra = "0.30"
 pi_slotmap = "0.1"
+pi_share = "0.4"
 bytemuck = { version = "1.4", features = ["derive"] }
 wgpu = { version = "0.13", features = ["spirv", "glsl"] }
 
