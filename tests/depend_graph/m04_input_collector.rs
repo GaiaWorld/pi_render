@@ -1,8 +1,8 @@
-use futures::{future::BoxFuture, FutureExt};
+use pi_futures::BoxFuture;
 use pi_async::rt::{AsyncRuntime, AsyncRuntimeBuilder};
-use pi_render::generic_graph::{
-    graph::GenericGraph,
-    node::{GenericNode, ParamUsage},
+use pi_render::depend_graph::{
+    graph::DependGraph,
+    node::{DependNode, ParamUsage},
     param::InParamCollector,
 };
 use pi_share::Share;
@@ -14,7 +14,7 @@ use std::{any::TypeId, time::Duration};
 fn input_collector() {
     let runtime = AsyncRuntimeBuilder::default_worker_thread(None, None, None, None);
 
-    let mut g = GenericGraph::default();
+    let mut g = DependGraph::default();
 
     let n11 = g.add_node("Node11", Node1(11)).unwrap();
     let n12 = g.add_node("Node12", Node1(12)).unwrap();
@@ -40,7 +40,7 @@ fn input_collector() {
 
     let rt = runtime.clone();
     let _ = runtime.spawn(runtime.alloc(), async move {
-        g.build(&rt).await.unwrap();
+        g.build().unwrap();
 
         println!("======== run graph");
         g.run(&rt).await.unwrap();
@@ -76,15 +76,15 @@ pub struct Input2 {
 
 struct Node1(u32);
 
-impl GenericNode for Node1 {
+impl DependNode for Node1 {
     type Input = ();
     type Output = Output1;
 
     fn run<'a>(
-        &'a self,
+        &'a mut self,
         input: &Self::Input,
         usage: &'a ParamUsage,
-    ) -> futures::future::BoxFuture<'a, Result<Self::Output, String>> {
+    ) -> BoxFuture<'a, Result<Self::Output, String>> {
         println!("======== Enter Node1 Running");
 
         assert_eq!(input, &());
@@ -94,28 +94,27 @@ impl GenericNode for Node1 {
         assert!(usage.is_output_usage(TypeId::of::<A>()));
         assert!(!usage.is_output_usage(TypeId::of::<B>()));
 
-        async move {
+        Box::pin(async move {
             println!("======== Enter Async Node1 Running");
 
             Ok(Output1 {
                 a: A(self.0),
                 b: B(1),
             })
-        }
-        .boxed()
+        })
     }
 }
 
 struct Node2;
-impl GenericNode for Node2 {
+impl DependNode for Node2 {
     type Input = Input2;
     type Output = ();
 
     fn run<'a>(
-        &'a self,
+        &'a mut self,
         input: &'a Self::Input,
         usage: &'a ParamUsage,
-    ) -> futures::future::BoxFuture<'a, Result<Self::Output, String>> {
+    ) -> BoxFuture<'a, Result<Self::Output, String>> {
         println!("======== Enter Node2 Running");
 
         assert!(usage.is_input_fill(TypeId::of::<A>()));
@@ -126,11 +125,10 @@ impl GenericNode for Node2 {
             println!("id = {:?}, v = {:?}", id, v);
         }
 
-        async move {
+        Box::pin(async move {
             println!("======== Enter Async Node2 Running");
 
             Ok(())
-        }
-        .boxed()
+        })
     }
 }

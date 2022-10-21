@@ -1,8 +1,8 @@
-use futures::{future::BoxFuture, FutureExt};
 use pi_async::rt::{AsyncRuntime, AsyncRuntimeBuilder};
-use pi_render::generic_graph::{
-    graph::GenericGraph,
-    node::{GenericNode, ParamUsage},
+use pi_futures::BoxFuture;
+use pi_render::depend_graph::{
+    graph::DependGraph,
+    node::{DependNode, ParamUsage},
 };
 use pi_share::Share;
 use render_derive::NodeParam;
@@ -21,43 +21,42 @@ fn out_same_type() {
     }
 
     struct Node1;
-    impl GenericNode for Node1 {
+    impl DependNode for Node1 {
         type Input = ();
         type Output = Output1;
 
         fn run<'a>(
-            &'a self,
+            &'a mut self,
             input: &Self::Input,
             usage: &'a ParamUsage,
-        ) -> futures::future::BoxFuture<'a, Result<Self::Output, String>> {
-            async move {
+        ) -> BoxFuture<'a, Result<Self::Output, String>> {
+            Box::pin(async move {
                 Ok(Output1 {
                     a: 1.0,
                     b: 2,
                     c: 3.0,
                 })
-            }
-            .boxed()
+            })
         }
     }
 
     struct Node2;
-    impl GenericNode for Node2 {
+    impl DependNode for Node2 {
         type Input = ();
         type Output = ();
 
         fn run<'a>(
-            &'a self,
+            &'a mut self,
             input: &Self::Input,
             usage: &'a ParamUsage,
-        ) -> futures::future::BoxFuture<'a, Result<Self::Output, String>> {
-            async move { Ok(()) }.boxed()
+        ) -> BoxFuture<'a, Result<Self::Output, String>> {
+            Box::pin(async move { Ok(()) })
         }
     }
 
     let runtime = AsyncRuntimeBuilder::default_worker_thread(None, None, None, None);
 
-    let mut g = GenericGraph::default();
+    let mut g = DependGraph::default();
     g.add_node("Node1", Node1);
     g.add_node("Node2", Node2);
 
@@ -67,7 +66,7 @@ fn out_same_type() {
 
     let rt = runtime.clone();
     let _ = runtime.spawn(runtime.alloc(), async move {
-        g.build(&rt).await.unwrap();
+        g.build().unwrap();
 
         println!("======== run graph");
         g.run(&rt).await.unwrap();
@@ -89,36 +88,36 @@ fn in_same_type() {
     }
 
     struct Node1;
-    impl GenericNode for Node1 {
+    impl DependNode for Node1 {
         type Input = ();
         type Output = ();
 
         fn run<'a>(
-            &'a self,
+            &'a mut self,
             input: &Self::Input,
             usage: &'a ParamUsage,
-        ) -> futures::future::BoxFuture<'a, Result<Self::Output, String>> {
-            async move { Ok(()) }.boxed()
+        ) -> BoxFuture<'a, Result<Self::Output, String>> {
+            Box::pin(async move { Ok(()) })
         }
     }
 
     struct Node2;
-    impl GenericNode for Node2 {
+    impl DependNode for Node2 {
         type Input = Input1;
         type Output = ();
 
         fn run<'a>(
-            &'a self,
+            &'a mut self,
             input: &Self::Input,
             usage: &'a ParamUsage,
-        ) -> futures::future::BoxFuture<'a, Result<Self::Output, String>> {
-            async move { Ok(()) }.boxed()
+        ) -> BoxFuture<'a, Result<Self::Output, String>> {
+            Box::pin(async move { Ok(()) })
         }
     }
 
     let runtime = AsyncRuntimeBuilder::default_worker_thread(None, None, None, None);
 
-    let mut g = GenericGraph::default();
+    let mut g = DependGraph::default();
     g.add_node("Node1", Node1);
     g.add_node("Node2", Node2);
 
@@ -128,7 +127,7 @@ fn in_same_type() {
 
     let rt = runtime.clone();
     let _ = runtime.spawn(runtime.alloc(), async move {
-        g.build(&rt).await.unwrap();
+        g.build().unwrap();
 
         println!("======== run graph");
         g.run(&rt).await.unwrap();
@@ -142,36 +141,36 @@ fn in_same_type() {
 #[test]
 fn multi_output_type() {
     struct Node1;
-    impl GenericNode for Node1 {
+    impl DependNode for Node1 {
         type Input = ();
         type Output = u32;
 
         fn run<'a>(
-            &'a self,
+            &'a mut self,
             input: &Self::Input,
             usage: &'a ParamUsage,
-        ) -> futures::future::BoxFuture<'a, Result<Self::Output, String>> {
-            async move { Ok(1) }.boxed()
+        ) -> BoxFuture<'a, Result<Self::Output, String>> {
+            Box::pin(async move { Ok(1) })
         }
     }
 
     struct Node2;
-    impl GenericNode for Node2 {
+    impl DependNode for Node2 {
         type Input = u32;
         type Output = ();
 
         fn run<'a>(
-            &'a self,
+            &'a mut self,
             input: &Self::Input,
             usage: &'a ParamUsage,
-        ) -> futures::future::BoxFuture<'a, Result<Self::Output, String>> {
-            async move { Ok(()) }.boxed()
+        ) -> BoxFuture<'a, Result<Self::Output, String>> {
+            Box::pin(async move { Ok(()) })
         }
     }
 
     let runtime = AsyncRuntimeBuilder::default_worker_thread(None, None, None, None);
 
-    let mut g = GenericGraph::default();
+    let mut g = DependGraph::default();
     g.add_node("Node11", Node1);
     g.add_node("Node12", Node1);
 
@@ -184,7 +183,7 @@ fn multi_output_type() {
 
     let rt = runtime.clone();
     let _ = runtime.spawn(runtime.alloc(), async move {
-        g.build(&rt).await.unwrap();
+        g.build().unwrap();
 
         println!("======== run graph");
         g.run(&rt).await.unwrap();

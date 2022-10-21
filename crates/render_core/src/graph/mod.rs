@@ -11,7 +11,7 @@ use crate::rhi::{device::RenderDevice, RenderQueue};
 use pi_ecs::world::World;
 
 /// 渲染图 执行过程中 遇到的 相关错误信息
-pub use crate::generic_graph::GraphError;
+pub use crate::depend_graph::GraphError;
 
 pub use node::{NodeId, NodeLabel};
 

@@ -1,6 +1,6 @@
-# 通用图模型
+# 依赖图模型
 
-模块 src/generic_graph
+模块 src/depend_graph
 
 ## 1、背景：一的渲染图
 
@@ -44,7 +44,7 @@
     - 及时 删除 输入输出参数，减少 GPU 开销；
     - 必要时候 利用 信号量，GPU级别的资源同步；免得堵塞 CPU
 
-### 2、generic_graph 的 图模型
+### 2、depend_graph 的 图模型
 
 ![渲染图 模型](img/01.png)
 
@@ -57,9 +57,9 @@
 
 ## 2、例子
 
-+ 根据需求，定义 结构体，并为它们分别实现 GenericNode
++ 根据需求，定义 结构体，并为它们分别实现 DependNode
 + 声明
-    - 创建 GenericGraph，将 上述 结构体 作为 节点 扔到 图中
+    - 创建 DependGraph，将 上述 结构体 作为 节点 扔到 图中
     - 指定 节点间的 执行 依赖关系
     - 指定 哪些节点 是 结束 节点
 + 构建：调用 build 方法，构建图；
@@ -112,10 +112,10 @@ impl Add {
 }
 ```
 
-2、为 InputAdd 实现 GenericNode
+2、为 InputAdd 实现 DependNode
 
 ``` rs
-impl GenericNode for InputAdd {
+impl DependNode for InputAdd {
     // 有输入，用 输入的 Binary；
     // 没有输入用 data
     type Input = Binary;
@@ -123,10 +123,10 @@ impl GenericNode for InputAdd {
     type Output = i32;
 
     fn run<'a>(
-        &'a self,
+        &'a mut self,
         input: &Self::Input,
         usage: &'a ParamUsage,
-    ) -> futures::future::BoxFuture<'a, Result<Self::Output, String>> {
+    ) -> pi_futures::BoxFuture<'a, Result<Self::Output, String>> {
         
         // 根据 拓扑结构判断
         // 如果 Input 的 Binary 对应的 字段 被前置节点填充，则表示 该节点 是计算的中间节点，用 前面的字段做输入
@@ -146,17 +146,16 @@ impl GenericNode for InputAdd {
         // 输出：u64 根本 不属于 该输出，自然不会有 后继节点使用，为 false
         assert!(!usage.is_output_usage(TypeId::of::<u64>()));
 
-        async move {
+        Box::pin(async move {
             println!("======== Enter Async Node1 Running");
             Ok(30.25)
-        }
-        .boxed()
+        })
     }
 }
 ```
 #### 加法节点
 
-### 2.2、声明：创建 GenericGraph，加入 节点
+### 2.2、声明：创建 DependGraph，加入 节点
 
 ### 2.3、声明：指定 节点 依赖
 
@@ -169,7 +168,7 @@ impl GenericNode for InputAdd {
 
 ### 3.1、node 图 节点
 
-+ trait `GenericNode` 图节点的 对外接口
++ trait `DependNode` 图节点的 对外接口
     - 关联类型：`Input`, `Output`
 + `NodeId` 节点的id
 + `NodeLabel` 节点标示，可以用 NodeId 或 String
@@ -183,10 +182,10 @@ impl GenericNode for InputAdd {
 
 ### 3.3、graph 图模型
 
-+ trait `GenericGraph`
++ trait `DependGraph`
 
 ## 4、graph 渲染图
 
-主要 利用 generic_graph 来实现 渲染图
+主要 利用 depend_graph 来实现 渲染图
 
 ### 4.1、概述

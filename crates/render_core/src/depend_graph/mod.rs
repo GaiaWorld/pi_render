@@ -6,6 +6,8 @@
 
 /// 图模型
 pub mod graph;
+/// 子图模型
+pub mod sub_graph;
 /// 节点
 pub mod node;
 /// 节点 输入输出 参数
@@ -32,12 +34,18 @@ pub enum GraphError {
     #[error("build ng failed, reason = `{0}`")]
     BuildError(String),
 
+    #[error("sub graph input node more than 1")]
+    SubGraphInputError,
+
+    #[error("sub graph finish node more than 1")]
+    SubGraphOutputError,
+
     /// 运行 节点 的 build 方法 遇到的错误
-    #[error("run GenericNode.build() failed, reason = `{0}`")]
+    #[error("run DependNode.build() failed, reason = `{0}`")]
     CustomBuildError(String),
 
     /// 运行 节点 的 run 方法 遇到的错误
-    #[error("run GenericNode.run() failed, reason = `{0}`")]
+    #[error("run DependNode.run() failed, reason = `{0}`")]
     CustomRunError(String),
 
     #[error("node does not match the given type")]

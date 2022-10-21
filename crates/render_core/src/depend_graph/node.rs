@@ -1,17 +1,19 @@
-//! 通用图 节点
+//! 依赖图 节点
 //!
 //! 主要 数据结构：
 //!
-//!     + trait GenericNode 图节点的 对外接口
+//!     + trait DependNode 图节点的 对外接口
 //!         - 关联类型：Input, Output
 //!     + NodeId     节点的id
 //!     + NodeLabel  节点标示，可以用 Id 或 String
 //!     + ParamUsage 参数的用途
 //!
 use super::{
+    graph::DependGraph,
     param::{Assign, InParam, OutParam},
     GraphError,
 };
+use pi_async::rt::AsyncRuntime;
 use pi_futures::BoxFuture;
 use pi_hash::{XHashMap, XHashSet};
 use pi_share::{cell::TrustCell, Share, ThreadSync};
@@ -20,27 +22,27 @@ use std::{
     any::TypeId,
     borrow::Cow,
     ops::{Deref, DerefMut},
-    sync::{
-        atomic::{AtomicI32, Ordering},
-        Arc,
-    },
+    sync::atomic::{AtomicI32, Ordering},
 };
 
 /// 图节点，给 外部 扩展 使用
-pub trait GenericNode: 'static + ThreadSync {
+pub trait DependNode: 'static + ThreadSync {
     /// 输入参数
     type Input: InParam + Default;
 
     /// 输出参数
     type Output: OutParam + Default + Clone;
 
-    /// 构建，当渲染图 构建时候，会调用一次
+    /// 准备: 当依赖图 重新构建 之后，第一次调用run之前，会调用一次
     /// 一般 用于 准备 渲染 资源的 创建
     /// 如果 无 异步资源创建，可以返回 None
     /// usage 判断 该节点的 输入输出的 用途
     ///     + 判断 输入参数 是否 被前置节点 填充；
     ///     + 判断 输出参数 是否 被后继节点 使用；
-    fn build<'a>(&'a self, _usage: &'a ParamUsage) -> Option<BoxFuture<'a, Result<(), String>>> {
+    fn prepare<'a>(
+        &'a mut self,
+        _usage: &'a ParamUsage,
+    ) -> Option<BoxFuture<'a, Result<(), String>>> {
         None
     }
 
@@ -52,10 +54,20 @@ pub trait GenericNode: 'static + ThreadSync {
     ///     该节点的 所有后继节点 取完 该节点的Output 作为 输入 之后，该节点的 Output 会重置为 Default
     /// usage 的 用法 见 build 方法
     fn run<'a>(
-        &'a self,
+        &'a mut self,
         input: &'a Self::Input,
         usage: &'a ParamUsage,
     ) -> BoxFuture<'a, Result<Self::Output, String>>;
+
+    /// 当 依赖图 拓扑结构改变时，第一次调用run之前，会调用一次
+    /// 目前，仅计划 给 框架 子图 使用
+    /// 外部使用人员 不用 管它
+    fn build<'a>(
+        &'a mut self,
+        _usage: &'a ParamUsage,
+    ) -> Option<BoxFuture<'a, Result<(), String>>> {
+        None
+    }
 }
 
 new_key_type! {
@@ -124,7 +136,7 @@ impl ParamUsage {
     /// ty 作为输入 的 一部分，是否 被 输出 填充
     pub fn is_input_fill(&self, ty: TypeId) -> bool {
         if let Some(v) = self.input_map_fill.get(&ty) {
-            v.len() > 0
+            !v.is_empty()
         } else {
             // 这时候，ty 不属于 Input 的 字段
             false
@@ -156,7 +168,7 @@ impl ParamUsage {
     }
 }
 
-// 渲染节点，给 渲染图 内部 使用
+// 渲染节点，给 依赖图 内部 使用
 pub(crate) trait InternalNode: OutParam {
     // 当 sub_ng 改变后，需要调用
     fn reset(&mut self);
@@ -170,20 +182,20 @@ pub(crate) trait InternalNode: OutParam {
     // 每帧 后继的渲染节点 获取参数时候，需要调用 此函数
     fn dec_curr_ref(&mut self);
 
-    // 构建，当渲染图 构建时候，会调用一次
+    // 构建，当依赖图 构建时候，会调用一次
     // 一般 用于 准备 渲染 资源的 创建
-    fn build<'a>(&'a self) -> BoxFuture<'a, Result<(), GraphError>>;
+    fn build<'a>(&'a mut self) -> BoxFuture<'a, Result<(), GraphError>>;
 
-    // 执行渲染图
+    // 执行依赖图
     fn run<'a>(&'a mut self) -> BoxFuture<'a, Result<(), GraphError>>;
 }
 
-/// 链接 NodeInteral 和 GenericNode 的 结构体
-pub(crate) struct GenericNodeImpl<I, O, R>
+/// 链接 NodeInteral 和 DependNode 的 结构体
+pub(crate) struct DependNodeImpl<I, O, R>
 where
     I: InParam + Default,
     O: OutParam + Default,
-    R: GenericNode<Input = I, Output = O>,
+    R: DependNode<Input = I, Output = O>,
 {
     node: R,
     input: I,
@@ -194,19 +206,19 @@ where
     pre_nodes: Vec<(NodeId, NodeState)>,
 
     // 该节点 的后继 节点数量
-    // 当渲染图改变节点的拓扑关系后，需要调用一次
+    // 当依赖图改变节点的拓扑关系后，需要调用一次
     total_next_refs: i32,
 
     // 该节点 当前 后继节点数量
-    // 每帧 运行 渲染图 前，让它等于  next_refs
+    // 每帧 运行 依赖图 前，让它等于  next_refs
     curr_next_refs: AtomicI32,
 }
 
-impl<I, O, R> GenericNodeImpl<I, O, R>
+impl<I, O, R> DependNodeImpl<I, O, R>
 where
     I: InParam + Default,
     O: OutParam + Default,
-    R: GenericNode<Input = I, Output = O>,
+    R: DependNode<Input = I, Output = O>,
 {
     pub(crate) fn new(node: R) -> Self {
         Self {
@@ -223,11 +235,11 @@ where
     }
 }
 
-impl<I, O, R> OutParam for GenericNodeImpl<I, O, R>
+impl<I, O, R> OutParam for DependNodeImpl<I, O, R>
 where
     I: InParam + Default,
     O: OutParam + Default,
-    R: GenericNode<Input = I, Output = O>,
+    R: DependNode<Input = I, Output = O>,
 {
     fn can_fill(&self, set: &mut Option<&mut XHashSet<TypeId>>, ty: TypeId) -> bool {
         assert!(set.is_none());
@@ -241,11 +253,11 @@ where
     }
 }
 
-impl<I, O, R> InternalNode for GenericNodeImpl<I, O, R>
+impl<I, O, R> InternalNode for DependNodeImpl<I, O, R>
 where
     I: InParam + Default,
     O: OutParam + Default,
-    R: GenericNode<Input = I, Output = O>,
+    R: DependNode<Input = I, Output = O>,
 {
     fn reset(&mut self) {
         self.input = Default::default();
@@ -280,7 +292,7 @@ where
         let last_count = self.curr_next_refs.fetch_sub(1, Ordering::SeqCst);
         assert!(
             last_count >= 1,
-            "GenericNode error, last_count = {}",
+            "DependNode error, last_count = {}",
             last_count
         );
 
@@ -289,7 +301,7 @@ where
         }
     }
 
-    fn build<'a>(&'a self) -> BoxFuture<'a, Result<(), GraphError>> {
+    fn build<'a>(&'a mut self) -> BoxFuture<'a, Result<(), GraphError>> {
         Box::pin(async move {
             match self.node.build(&self.param_usage) {
                 Some(f) => f.await.map_err(|e| GraphError::CustomBuildError(e)),
@@ -340,9 +352,9 @@ impl NodeState {
     where
         I: InParam + Default,
         O: OutParam + Default + Clone,
-        R: GenericNode<Input = I, Output = O>,
+        R: DependNode<Input = I, Output = O>,
     {
-        let imp = GenericNodeImpl::new(node);
+        let imp = DependNodeImpl::new(node);
 
         let imp = Share::new(TrustCell::new(imp));
 
