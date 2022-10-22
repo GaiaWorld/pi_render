@@ -45,4 +45,5 @@ pub struct VertexAttributeBufferMeta<GBID: TGeometryBufferID> {
     pub start: usize,
     pub end: usize,
     pub data_bytes_size: usize,
+    pub data_count: usize,
 }
