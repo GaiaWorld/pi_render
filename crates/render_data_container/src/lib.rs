@@ -259,12 +259,14 @@ impl GeometryBuffer {
                         Some( Share::from(device.create_buffer_init( &wgpu::util::BufferInitDescriptor { label: None, contents: bytemuck::cast_slice(&self.u8), usage, } )) )
                     },
                     EVertexDataFormat::U16 => {
+                        println!("{:?}", self.u16);
                         Some( Share::from(device.create_buffer_init( &wgpu::util::BufferInitDescriptor { label: None, contents: bytemuck::cast_slice(&self.u16), usage, } )) )
                     },
                     EVertexDataFormat::U32 => {
                         Some( Share::from(device.create_buffer_init( &wgpu::util::BufferInitDescriptor { label: None, contents: bytemuck::cast_slice(&self.u32), usage, } )) )
                     },
                     EVertexDataFormat::F32 => {
+                        println!("{:?}", self.f32);
                         Some( Share::from(device.create_buffer_init( &wgpu::util::BufferInitDescriptor { label: None, contents: bytemuck::cast_slice(&self.f32), usage, } )) )
                     },
                     EVertexDataFormat::F64 => {
