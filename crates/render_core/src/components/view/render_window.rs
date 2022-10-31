@@ -11,6 +11,7 @@ use pi_slotmap::{new_key_type, SlotMap};
 use std::{ops::Deref, sync::Arc};
 use wgpu::TextureFormat;
 use winit::{dpi::PhysicalSize, window::Window};
+use crate::DRAW_CB;
 
 new_key_type! {
     pub struct RenderWindowKey;
@@ -86,6 +87,10 @@ pub(crate) async fn prepare_windows<'w>(
 		// log::warn!("next_frame========================");
         // 每帧 都要 设置 新的 SuraceTexture
         let _ = view.next_frame(&device, &config);
+
+        if let Some(draw_cb) = DRAW_CB.read().as_ref(){
+            draw_cb();
+        }
     }
     Ok(())
 }

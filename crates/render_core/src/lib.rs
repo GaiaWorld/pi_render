@@ -166,6 +166,7 @@ lazy_static! {
     static ref FAQ_HANDLE: AtomicU64 = AtomicU64::new(0);
     static ref FAQ_MAP: RwLock<HashMap<u64, Box<dyn Fn() + Send + Sync + 'static>>> =
         RwLock::new(HashMap::new());
+    pub static ref DRAW_CB: RwLock<Option<Arc<dyn Fn() + Send + Sync + 'static>>> = RwLock::new(None);
 }
 
 pub fn request_animation_frame<F: Fn() + Send + Sync + 'static>(cb: F) -> u64 {
