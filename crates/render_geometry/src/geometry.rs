@@ -40,6 +40,7 @@ pub trait VertexAttributeMeta {
     }
 }
 
+#[derive(Debug)]
 pub struct VertexAttributeBufferMeta<GBID: TGeometryBufferID> {
     pub buffer_id: GBID,
     pub start: usize,
