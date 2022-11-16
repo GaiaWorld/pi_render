@@ -9,23 +9,23 @@ pub type SamplerKey = u64;
 #[derive(Debug, Default)]
 pub struct SamplerDesc {
     /// How to deal with out of bounds accesses in the u (i.e. x) direction
-    pub address_mode_u: AddressMode,
+    pub address_mode_u: wgpu::AddressMode,
     /// How to deal with out of bounds accesses in the v (i.e. y) direction
-    pub address_mode_v: AddressMode,
+    pub address_mode_v: wgpu::AddressMode,
     /// How to deal with out of bounds accesses in the w (i.e. z) direction
-    pub address_mode_w: AddressMode,
+    pub address_mode_w: wgpu::AddressMode,
     /// How to filter the texture when it needs to be magnified (made larger)
-    pub mag_filter: FilterMode,
+    pub mag_filter: wgpu::FilterMode,
     /// How to filter the texture when it needs to be minified (made smaller)
-    pub min_filter: FilterMode,
+    pub min_filter: wgpu::FilterMode,
     /// How to filter between mip map levels
-    pub mipmap_filter: FilterMode,
+    pub mipmap_filter: wgpu::FilterMode,
     /// If this is enabled, this is a comparison sampler using the given comparison function.
-    pub compare: Option<CompareFunction>,
+    pub compare: Option<wgpu::CompareFunction>,
     /// Valid values: 1, 2, 4, 8, and 16.
     pub anisotropy_clamp: EAnisotropyClamp,
     /// Border color to use when address_mode is [`AddressMode::ClampToBorder`]
-    pub border_color: Option<SamplerBorderColor>,
+    pub border_color: Option<wgpu::SamplerBorderColor>,
 }
 impl SamplerDesc {
     pub fn to_sampler_description(&self) -> wgpu::SamplerDescriptor {
@@ -46,11 +46,11 @@ impl SamplerDesc {
     pub fn anisotropy_clamp(&self) -> Option<NonZeroU8> {
         match self.anisotropy_clamp {
             EAnisotropyClamp::None      => None,
-            EAnisotropyClamp::One       => Some(1),
-            EAnisotropyClamp::Two       => Some(2),
-            EAnisotropyClamp::Four      => Some(4),
-            EAnisotropyClamp::Eight     => Some(8),
-            EAnisotropyClamp::Sixteen   => Some(16),
+            EAnisotropyClamp::One       => Some(NonZeroU8::new(1 )),
+            EAnisotropyClamp::Two       => Some(NonZeroU8::new(2 )),
+            EAnisotropyClamp::Four      => Some(NonZeroU8::new(4 )),
+            EAnisotropyClamp::Eight     => Some(NonZeroU8::new(8 )),
+            EAnisotropyClamp::Sixteen   => Some(NonZeroU8::new(16)),
         }
     }
 }
@@ -72,6 +72,7 @@ impl KeyCalcolator {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
 pub enum EAnisotropyClamp {
     None,
     One,
@@ -79,6 +80,11 @@ pub enum EAnisotropyClamp {
     Four,
     Eight,
     Sixteen,
+}
+impl Default for EAnisotropyClamp {
+    fn default() -> Self {
+        Self::None
+    }
 }
 
 #[derive(Debug, Default)]
@@ -122,9 +128,9 @@ impl SamplerPool {
         
         Self::cacl_compare(&mut calcolator, value.compare, BYTE_COMPARE);
         
-        Self::cacl_address_mode(&mut calcolator, value.anisotropy_clamp, BYTE_ANISOTROPY);
+        Self::cacl_anisotropy(&mut calcolator, value.anisotropy_clamp, BYTE_ANISOTROPY);
         
-        Self::cacl_address_mode(&mut calcolator, value.border_color, BYTE_BORDER_COLOR);
+        Self::cacl_border(&mut calcolator, value.border_color, BYTE_BORDER_COLOR);
 
         return calcolator.key;
     }
