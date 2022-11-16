@@ -46,11 +46,11 @@ impl SamplerDesc {
     pub fn anisotropy_clamp(&self) -> Option<NonZeroU8> {
         match self.anisotropy_clamp {
             EAnisotropyClamp::None      => None,
-            EAnisotropyClamp::One       => Some(NonZeroU8::new(1 )),
-            EAnisotropyClamp::Two       => Some(NonZeroU8::new(2 )),
-            EAnisotropyClamp::Four      => Some(NonZeroU8::new(4 )),
-            EAnisotropyClamp::Eight     => Some(NonZeroU8::new(8 )),
-            EAnisotropyClamp::Sixteen   => Some(NonZeroU8::new(16)),
+            EAnisotropyClamp::One       => NonZeroU8::new(1 ),
+            EAnisotropyClamp::Two       => NonZeroU8::new(2 ),
+            EAnisotropyClamp::Four      => NonZeroU8::new(4 ),
+            EAnisotropyClamp::Eight     => NonZeroU8::new(8 ),
+            EAnisotropyClamp::Sixteen   => NonZeroU8::new(16),
         }
     }
 }
