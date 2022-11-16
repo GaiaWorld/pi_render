@@ -14,6 +14,7 @@ nalgebra = "0.30"
 bytemuck = { version = "1.4", features = ["derive"] }
 pi_share = "0.4"
 pi_slotmap = "0.1"
+pi_hash = "0.1"
 render_data_container = { path = "../render_data_container" }
 render_geometry = { path = "../render_geometry" }
 render_core = { path = "../render_core" }

@@ -1,6 +1,7 @@
 pub mod bind_group_layout;
 pub mod bind_group;
 pub mod uniform_buffer;
+pub mod sampler;
 
 pub fn bind_group_entry_buffer(
     binding: u32,
