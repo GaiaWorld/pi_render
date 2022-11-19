@@ -15,8 +15,11 @@ bytemuck = { version = "1.4", features = ["derive"] }
 pi_share = "0.4"
 pi_slotmap = "0.1"
 pi_hash = "0.1"
+pi_atom={version="0.2", features = ["serde"]}
+
 render_data_container = { path = "../render_data_container" }
 render_geometry = { path = "../render_geometry" }
 render_core = { path = "../render_core" }
+render_pipeline_key = { path = "../render_pipeline_key" }
 
 # [[example]]

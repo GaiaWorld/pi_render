@@ -4,7 +4,7 @@ use std::num::NonZeroU8;
 use pi_hash::XHashMap;
 use render_core::rhi::{texture::Sampler, device::RenderDevice};
 
-pub type SamplerKey = u64;
+pub type SamplerAssetKey = u64;
 
 #[derive(Debug, Default)]
 pub struct SamplerDesc {
@@ -62,7 +62,7 @@ const BYTE_ANISOTROPY: u8 = 3;
 const BYTE_BORDER_COLOR: u8 = 3;
 
 struct KeyCalcolator {
-    pub key: SamplerKey,
+    pub key: SamplerAssetKey,
     pub use_bytes: u8,
 }
 
@@ -89,7 +89,7 @@ impl Default for EAnisotropyClamp {
 
 #[derive(Debug, Default)]
 pub struct SamplerPool {
-    map: XHashMap<SamplerKey, Sampler>,
+    map: XHashMap<SamplerAssetKey, Sampler>,
 }
 impl SamplerPool {
     pub fn create(
@@ -109,13 +109,16 @@ impl SamplerPool {
     }
     pub fn get(
         &self,
-        key: SamplerKey,
-    ) -> Option<&Sampler> {
-        self.map.get(&key)
+        key: SamplerAssetKey,
+    ) -> Option<Sampler> {
+        match self.map.get(&key) {
+            Some(value) => Some(value.clone()),
+            None => None,
+        }
     }
     pub fn cacl_key(
         value: &SamplerDesc,
-    ) -> SamplerKey {
+    ) -> SamplerAssetKey {
         let mut calcolator = KeyCalcolator::new();
 
         Self::cacl_address_mode(&mut calcolator, value.address_mode_u, BYTE_ADDRESS_MODE);
@@ -139,7 +142,7 @@ impl SamplerPool {
         value: wgpu::AddressMode,
         use_byte: u8,
     ) {
-        let diff = SamplerKey::pow(2, calcolator.use_bytes as u32);
+        let diff = SamplerAssetKey::pow(2, calcolator.use_bytes as u32);
         calcolator.key += match value {
             wgpu::AddressMode::ClampToEdge      => 0 * diff,
             wgpu::AddressMode::Repeat           => 1 * diff,
@@ -154,7 +157,7 @@ impl SamplerPool {
         value: wgpu::FilterMode,
         use_byte: u8,
     ) {
-        let diff = SamplerKey::pow(2, calcolator.use_bytes as u32);
+        let diff = SamplerAssetKey::pow(2, calcolator.use_bytes as u32);
         calcolator.key += match value {
             wgpu::FilterMode::Nearest       => 0 * diff,
             wgpu::FilterMode::Linear        => 1 * diff,
@@ -167,7 +170,7 @@ impl SamplerPool {
         value: Option<wgpu::CompareFunction>,
         use_byte: u8,
     ) {
-        let diff = SamplerKey::pow(2, calcolator.use_bytes as u32);
+        let diff = SamplerAssetKey::pow(2, calcolator.use_bytes as u32);
         calcolator.key += match value {
             Some(value) => {
                 match value {
@@ -191,7 +194,7 @@ impl SamplerPool {
         value: EAnisotropyClamp,
         use_byte: u8,
     ) {
-        let diff = SamplerKey::pow(2, calcolator.use_bytes as u32);
+        let diff = SamplerAssetKey::pow(2, calcolator.use_bytes as u32);
         calcolator.key += match value {
             EAnisotropyClamp::None      => 0 * diff,
             EAnisotropyClamp::One       => 1 * diff,
@@ -208,7 +211,7 @@ impl SamplerPool {
         value: Option<wgpu::SamplerBorderColor>,
         use_byte: u8,
     ) {
-        let diff = SamplerKey::pow(2, calcolator.use_bytes as u32);
+        let diff = SamplerAssetKey::pow(2, calcolator.use_bytes as u32);
         calcolator.key += match value {
             Some(value) => {
                 match value {
