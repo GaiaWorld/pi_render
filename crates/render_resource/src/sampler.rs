@@ -53,6 +53,28 @@ impl SamplerDesc {
             EAnisotropyClamp::Sixteen   => NonZeroU8::new(16),
         }
     }
+    
+    pub fn cacl_key(
+        &self,
+    ) -> SamplerAssetKey {
+        let mut calcolator = KeyCalcolator::new();
+
+        SamplerPool::cacl_address_mode(&mut calcolator, self.address_mode_u, BYTE_ADDRESS_MODE);
+        SamplerPool::cacl_address_mode(&mut calcolator, self.address_mode_v, BYTE_ADDRESS_MODE);
+        SamplerPool::cacl_address_mode(&mut calcolator, self.address_mode_w, BYTE_ADDRESS_MODE);
+        
+        SamplerPool::cacl_filter_mode(&mut calcolator, self.mag_filter, BYTE_FILTER_MODE);
+        SamplerPool::cacl_filter_mode(&mut calcolator, self.min_filter, BYTE_FILTER_MODE);
+        SamplerPool::cacl_filter_mode(&mut calcolator, self.mipmap_filter, BYTE_FILTER_MODE);
+        
+        SamplerPool::cacl_compare(&mut calcolator, self.compare, BYTE_COMPARE);
+        
+        SamplerPool::cacl_anisotropy(&mut calcolator, self.anisotropy_clamp, BYTE_ANISOTROPY);
+        
+        SamplerPool::cacl_border(&mut calcolator, self.border_color, BYTE_BORDER_COLOR);
+
+        return calcolator.key;
+    }
 }
 
 const BYTE_ADDRESS_MODE: u8 = 2;
