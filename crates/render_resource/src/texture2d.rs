@@ -1,6 +1,8 @@
 use pi_assets::asset::{Asset, Handle};
 use render_core::rhi::{texture::Sampler, asset::TextureRes};
 
+use crate::TextureAssetKey;
+
 
 pub struct Texture2D {
     pub texture: Handle<TextureRes>,
