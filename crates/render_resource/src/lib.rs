@@ -32,13 +32,13 @@ pub type ShaderDefineMode = u128;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ShaderEffectAssetKey {
-    pub shader: ShaderKey,
+    pub shader: ShaderAssetKey,
     pub define: ShaderDefineMode,
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct RenderPipelineAssetKey {
-    pub shader_effect: ShaderEffectKey,
+    pub shader_effect: ShaderEffectAssetKey,
     pub pipeline: PipelineKey,
 }
 
@@ -46,7 +46,7 @@ pub type BindGroupSet = u8;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BindGroupLayoutAssetKey {
-    pub shader_effect: ShaderEffectKey,
+    pub shader_effect: ShaderEffectAssetKey,
     pub set: BindGroupSet,
 }
 
