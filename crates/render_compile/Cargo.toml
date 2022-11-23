@@ -18,6 +18,6 @@ naga = { version = "0.9", features = [
 ]}
 thiserror = "1.0"
 Inflector = "0.11"
-pi_ordmap = "0.1"
+pi_ordmap = "0.2"
 log = "0.4"
 pi_render = { path = "../render_core", package="render_core" }
