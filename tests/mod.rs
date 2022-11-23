@@ -1,1 +1,1 @@
-pub mod generic_graph;
+pub mod depend_graph;

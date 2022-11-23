@@ -29,16 +29,3 @@ impl TextureScaleOffset {
         Self { u_scale, v_scale, u_offset, v_offset, use_x, use_y, use_w, use_h, width, height }
     }
 }
-
-pub fn calc_uniform_size(
-    device: &wgpu::Device,
-    used_size: u64,
-) -> u64 {
-    let limit = device.limits().min_uniform_buffer_offset_alignment as u64;
-    let t = used_size / limit;
-    if used_size - t * limit > 0 {
-        limit * (t + 1)
-    } else {
-        limit * t
-    }
-}

@@ -63,7 +63,7 @@ impl<T: OutParam + Clone> InParam for InParamCollector<T> {
         out_param: &O,
     ) -> bool {
         let ty = TypeId::of::<T>();
-        let r = out_param.can_fill(&mut None, ty.clone());
+        let r = out_param.can_fill(&mut None, ty);
         if r {
             let v = map.entry(ty).or_insert(vec![]);
             v.push(pre_id);

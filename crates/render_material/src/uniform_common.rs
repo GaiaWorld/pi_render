@@ -1,5 +1,5 @@
 pub struct UniformCommon {
-
+    pub offset: u32,
 }
 
 impl UniformCommon {

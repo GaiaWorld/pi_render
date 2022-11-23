@@ -7,7 +7,7 @@ use super::{
     GraphError, RenderContext,
 };
 use crate::{
-    generic_graph::graph::GenericGraph,
+    depend_graph::graph::DependGraph,
     rhi::{device::RenderDevice, RenderQueue},
 };
 use pi_async::prelude::AsyncRuntime;
@@ -20,12 +20,13 @@ pub struct RenderGraph {
     device: RenderDevice,
     queue: RenderQueue,
 
-    imp: GenericGraph,
+    imp: DependGraph,
 }
 
 /// 渲染图的 拓扑信息 相关 方法
 impl RenderGraph {
     /// 创建
+    #[inline]
     pub fn new(world: World, device: RenderDevice, queue: RenderQueue) -> Self {
         Self {
             world,
@@ -33,6 +34,18 @@ impl RenderGraph {
             queue,
             imp: Default::default(),
         }
+    }
+
+    /// 查 指定节点 的 前驱节点
+    #[inline]
+    pub fn get_prev_ids(&self, id: NodeId) -> Option<&[NodeId]> {
+        self.imp.get_prev_ids(id)
+    }
+
+    /// 查 指定节点 的 后继节点
+    #[inline]
+    pub fn get_next_ids(&self, id: NodeId) -> Option<&[NodeId]> {
+        self.imp.get_next_ids(id)
     }
 
     /// 添加 名为 name 的 节点
@@ -59,8 +72,9 @@ impl RenderGraph {
     }
 
     /// 移除 节点
-    pub fn remove_node(&mut self, id: NodeId, name: impl Into<Cow<'static, str>>) {
-        self.imp.remove_node(id, name)
+    #[inline]
+    pub fn remove_node(&mut self, label: impl Into<NodeLabel>) -> Result<(), GraphError> {
+        self.imp.remove_node(label)
     }
 
     /// 建立 Node 的 依赖关系
@@ -68,41 +82,38 @@ impl RenderGraph {
     #[inline]
     pub fn add_depend(
         &mut self,
-        before: impl Into<NodeLabel>,
-        after: impl Into<NodeLabel>,
+        before_label: impl Into<NodeLabel>,
+        after_label: impl Into<NodeLabel>,
     ) -> Result<(), GraphError> {
-        self.imp.add_depend(before, after)
+        self.imp.add_depend(before_label, after_label)
     }
 
     /// 移除依赖
     #[inline]
     pub fn remove_depend(
         &mut self,
-        before: impl Into<NodeLabel>,
-        after: impl Into<NodeLabel>,
+        before_label: impl Into<NodeLabel>,
+        after_label: impl Into<NodeLabel>,
     ) -> Result<(), GraphError> {
-        self.imp.remove_depend(before, after)
+        self.imp.remove_depend(before_label, after_label)
     }
 
     /// 设置 是否 是 最终节点
     #[inline]
     pub fn set_finish(
         &mut self,
-        node: impl Into<NodeLabel>,
+        label: impl Into<NodeLabel>,
         is_finish: bool,
     ) -> Result<(), GraphError> {
-        self.imp.set_finish(node, is_finish)
+        self.imp.set_finish(label, is_finish)
     }
 }
 
 /// 渲染图的 执行 相关
 impl RenderGraph {
     #[inline]
-    pub async fn build<A: 'static + AsyncRuntime + Send>(
-        &mut self,
-        rt: &A,
-    ) -> Result<(), GraphError> {
-        self.imp.build(rt).await
+    pub fn build(&mut self) -> Result<(), GraphError> {
+        self.imp.build()
     }
 
     /// 执行 渲染

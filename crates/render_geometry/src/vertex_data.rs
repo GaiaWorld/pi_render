@@ -1,9 +1,4 @@
-use std::{sync::Arc, borrow::BorrowMut};
-
-use bytemuck::Pod;
-use render_data_container::{TVertexBufferKindKey, TGeometryBufferID};
-use pi_share::Share;
-use wgpu::util::DeviceExt;
+use render_data_container::{TVertexDataKindKey, TGeometryBufferID};
 
 #[derive(Debug, Clone, Copy)]
 pub enum EVertexDataKind {
@@ -35,7 +30,7 @@ pub enum EVertexDataKind {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct VertexAttributeDesc<VDK: TVertexBufferKindKey> {
+pub struct VertexAttributeDesc<VDK: TVertexDataKindKey> {
     kind: VDK,
     location: usize,
 }

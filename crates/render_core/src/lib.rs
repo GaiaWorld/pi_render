@@ -12,8 +12,8 @@
 extern crate lazy_static;
 
 pub mod components;
+pub mod depend_graph;
 pub mod font;
-pub mod generic_graph;
 pub mod graph;
 pub mod rhi;
 
@@ -21,21 +21,23 @@ mod math;
 pub use math::*;
 
 use crate::components::view::render_window::{prepare_windows, RenderWindows};
-use graph::{graph::RenderGraph, GraphError};
+use graph::graph::RenderGraph;
 use log::trace;
 use pi_async::prelude::AsyncRuntime;
 use pi_ecs::{
     prelude::{world::WorldMut, StageBuilder, World},
     sys::system::IntoSystem,
 };
-use pi_share::Share;
 use rhi::{
     device::RenderDevice, options::RenderOptions, setup_render_context, texture::ScreenTexture,
     RenderQueue,
 };
 use std::{
     collections::HashMap,
-    sync::{atomic::{AtomicBool, AtomicU64, Ordering}, Arc},
+    sync::{
+        atomic::{AtomicBool, AtomicU64, Ordering},
+        Arc,
+    },
 };
 use thiserror::Error;
 use winit::window::Window;
@@ -88,12 +90,8 @@ where
     A: 'static + AsyncRuntime + Send,
 {
     let rg = world.get_resource_mut::<RenderGraph>().unwrap();
-    let device = world.get_resource::<RenderDevice>().unwrap();
-    let queue = world.get_resource::<RenderQueue>().unwrap();
-
-    let rt = world.get_resource::<RenderAsyncRuntime<A>>().unwrap();
-
-    rg.build(&rt.rt).await.unwrap();
+    
+    rg.build().unwrap();
 
     Ok(())
 }
@@ -168,6 +166,7 @@ lazy_static! {
     static ref FAQ_HANDLE: AtomicU64 = AtomicU64::new(0);
     static ref FAQ_MAP: RwLock<HashMap<u64, Box<dyn Fn() + Send + Sync + 'static>>> =
         RwLock::new(HashMap::new());
+    pub static ref DRAW_CB: RwLock<Option<Arc<dyn Fn() + Send + Sync + 'static>>> = RwLock::new(None);
 }
 
 pub fn request_animation_frame<F: Fn() + Send + Sync + 'static>(cb: F) -> u64 {

@@ -1,14 +1,14 @@
-//! 利用 Geniric图 实现 渲染图
+//! 利用 DependGraph 实现 渲染图
 use super::{
     param::{InParam, OutParam},
     RenderContext,
 };
-use crate::generic_graph::node::GenericNode;
+use crate::depend_graph::node::DependNode;
 use pi_futures::BoxFuture;
 use pi_share::{Share, ShareRefCell, ThreadSync};
 use wgpu::CommandEncoder;
 
-pub use crate::generic_graph::node::{NodeId, NodeLabel, ParamUsage};
+pub use crate::depend_graph::node::{NodeId, NodeLabel, ParamUsage};
 
 /// 渲染节点，给 外部 扩展 使用
 pub trait Node: 'static + ThreadSync {
@@ -21,7 +21,7 @@ pub trait Node: 'static + ThreadSync {
     /// 构建，当渲染图 构建时候，会调用一次
     /// 一般 用于 准备 渲染 资源的 创建
     fn build<'a>(
-        &'a self,
+        &'a mut self,
         _context: RenderContext,
         _usage: &'a ParamUsage,
     ) -> Option<BoxFuture<'a, Result<(), String>>> {
@@ -30,7 +30,7 @@ pub trait Node: 'static + ThreadSync {
 
     /// 执行，每帧会调用一次
     fn run<'a>(
-        &'a self,
+        &'a mut self,
         context: RenderContext,
         commands: ShareRefCell<CommandEncoder>,
         input: &'a Self::Input,
@@ -62,7 +62,7 @@ where
     }
 }
 
-impl<I, O, R> GenericNode for NodeImpl<I, O, R>
+impl<I, O, R> DependNode for NodeImpl<I, O, R>
 where
     I: InParam + Default,
     O: OutParam + Default + Clone,
@@ -73,19 +73,19 @@ where
     type Output = O;
 
     #[inline]
-    fn build<'a>(&'a self, usage: &'a ParamUsage) -> Option<BoxFuture<'a, Result<(), String>>> {
+    fn build<'a>(&'a mut self, usage: &'a ParamUsage) -> Option<BoxFuture<'a, Result<(), String>>> {
         self.node.build(self.context.clone(), usage)
     }
 
     #[inline]
     fn run<'a>(
-        &'a self,
+        &'a mut self,
         input: &'a Self::Input,
         usage: &'a ParamUsage,
     ) -> BoxFuture<'a, Result<Self::Output, String>> {
         let context = self.context.clone();
 
-        Box::pin( async move {
+        Box::pin(async move {
             // 每节点 一个 CommandEncoder
             let commands = self
                 .context
