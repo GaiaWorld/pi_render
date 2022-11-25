@@ -38,6 +38,15 @@ impl DynUniformBuffer {
 		}
 		
 	}
+	
+	#[inline]
+	pub fn alloc_binding_with_asbind<T: AsBind>(&mut self, bind: &T) -> BindOffset {
+		BindOffset{
+			offset: self.cache_buffer.lock().alloc_with_asbind::<T>(bind),
+			context: self.cache_buffer.clone()
+		}
+		
+	}
 
 	#[inline]
 	pub fn set_uniform<T: Uniform>(&mut self, binding_offset: &BindOffset, t: &T) {
@@ -117,6 +126,13 @@ pub trait Bind {
 	fn index() -> BindIndex;
 }
 
+pub trait AsBind {
+	fn min_size(&self) -> usize;
+
+	// 在bindings数组中的位置
+	fn index(&self) -> BindIndex;
+}
+
 pub trait Group {
 	fn id() -> GroupId;
 	fn create_layout(device: &RenderDevice, has_dynamic_offset: bool) -> BindGroupLayout;
@@ -156,6 +172,45 @@ impl DynBuffer {
 
 	pub fn alloc<T: Bind>(&mut self) -> u32 {
 		let count = ( T::min_size() as f32 / self.alignment as f32).ceil() as usize;
+
+		let mut iter = self.full_bits.iter_zeros();
+		let mut item = iter.next();
+
+		let len = self.full_bits.len();
+		loop {
+			let i = match item {
+				Some(i) => i,
+				None => self.full_bits.len(),
+			};
+			
+			let end = i + count;
+			let mut cur_end = end.min(len);
+
+			if self.full_bits[i..cur_end].not_any() {
+				self.full_bits[i..cur_end].fill(true);
+				while cur_end < end {
+					self.full_bits.push(true);
+					cur_end += 1;
+				}
+
+				// 设置结束标识
+				let l = self.end_bits.len();
+				if l < end {
+					self.end_bits.reserve(end - l);
+					unsafe { self.end_bits.set_len(end) };
+					self.end_bits[l..end - 1].fill(false);
+				}
+				self.end_bits.set(end - 1, true);
+
+				self.tail = self.tail.max((i + count) * self.alignment);
+				return (i * self.alignment) as u32;
+			}
+			item = iter.next();
+		}
+	}
+	
+	pub fn alloc_with_asbind<T: AsBind>(&mut self, bind: &T) -> u32 {
+		let count = ( bind.min_size() as f32 / self.alignment as f32).ceil() as usize;
 
 		let mut iter = self.full_bits.iter_zeros();
 		let mut item = iter.next();
