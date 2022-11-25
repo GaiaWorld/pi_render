@@ -16,9 +16,9 @@ members = ["crates/*"]
 
 [dependencies]
 render_core = { path = "crates/render_core" }
-render_material = { path = "crates/render_material" }
-render_geometry = { path = "crates/render_geometry" }
-render_data_container = { path = "crates/render_data_container" }
+# render_material = { path = "crates/render_material" }
+# render_geometry = { path = "crates/render_geometry" }
+# render_data_container = { path = "crates/render_data_container" }
 
 [dev-dependencies]
 pi_futures = "0.1"
