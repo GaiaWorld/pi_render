@@ -35,8 +35,6 @@ wgpu = "0.13"
 env_logger = "0.9"
 float-ord = "0.3"
 
-pi_ecs = { git = "https://github.com/GaiaWorld/pi_ecs.git" }
-
 render_derive = {path = "crates/render_derive"}
 
 [[example]]
@@ -49,10 +47,6 @@ path = "examples/clean/main.rs"
 
 [patch.crates-io]
 pi_assets={ path = "../pi_assets" }
-# pi_ecs = { path = "../pi_ecs" }
 
 # [patch."https://github.com/GaiaWorld/pi_hal"]
 # pi_hal = { path = "../pi_hal" }
-
-# [patch."https://github.com/GaiaWorld/pi_ecs"]
-# pi_ecs = { path = "../pi_ecs" }

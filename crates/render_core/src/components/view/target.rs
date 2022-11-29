@@ -1,7 +1,6 @@
 use crate::{
     rhi::texture::{TextureView},
 };
-use pi_ecs::prelude::World;
 use pi_slotmap::{new_key_type, SlotMap};
 
 new_key_type! {
@@ -12,12 +11,6 @@ new_key_type! {
 pub type TextureViews = SlotMap<TextureViewKey, Option<TextureView>>;
 
 pub type RenderTargets = SlotMap<RenderTargetKey, RenderTarget>;
-
-#[inline]
-pub fn insert_resources(world: &mut World) {
-    world.insert_resource(TextureViews::default());
-    world.insert_resource(RenderTargets::default());
-}
 
 #[derive(Clone, Default)]
 pub struct RenderTarget {

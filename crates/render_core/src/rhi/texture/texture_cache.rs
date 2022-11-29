@@ -1,6 +1,5 @@
 use super::{Texture, TextureView};
 use crate::rhi::device::RenderDevice;
-use pi_ecs::prelude::*;
 use pi_hash::XHashMap;
 use wgpu::{TextureDescriptor, TextureViewDescriptor};
 
@@ -90,9 +89,4 @@ impl TextureCache {
             textures.retain(|texture| texture.frames_since_last_use < 3);
         }
     }
-}
-
-/// Updates the [`TextureCache`] to only retains recently used textures.
-pub fn update_texture_cache_system(mut texture_cache: ResMut<TextureCache>) {
-    texture_cache.update();
 }

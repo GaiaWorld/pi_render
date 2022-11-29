@@ -5,13 +5,11 @@ use crate::{
         PresentMode, RenderInstance,
     },
 };
-use pi_ecs::prelude::{Res, ResMut, World, res::WriteRes};
 use pi_share::Share;
 use pi_slotmap::{new_key_type, SlotMap};
 use std::{ops::Deref, sync::Arc};
 use wgpu::TextureFormat;
 use winit::{dpi::PhysicalSize, window::Window};
-use crate::DRAW_CB;
 
 new_key_type! {
     pub struct RenderWindowKey;
@@ -38,31 +36,21 @@ impl RenderWindow {
     }
 }
 
-#[inline]
-pub fn insert_resources(world: &mut World) {
-    world.insert_resource(RenderWindows::default());
-}
-
-pub(crate) async fn prepare_windows<'w>(
-    device: Res<'w, RenderDevice>,
-    instance: Res<'w, RenderInstance>,
-    mut windows: ResMut<'w, RenderWindows>,
-    mut view: WriteRes<'w, ScreenTexture>,
+pub fn prepare_windows<'w>(
+    device: &RenderDevice,
+    instance: &RenderInstance,
+    mut windows: &mut RenderWindows,
+    mut view: Option<ScreenTexture>,
 ) -> std::io::Result<()> {
     for (_, window) in windows.iter_mut() {
-        // let view = views.get_mut(window.view);
-
-        // assert!(view.is_some());
-        // let view = view.unwrap();
-
-        let is_first = view.get().is_none();
+        let is_first = view.is_none();
         if is_first {
             let surface = unsafe { instance.create_surface(window.handle.deref()) };
             let surface = Share::new(surface);
-			view.write(ScreenTexture::with_surface(surface));
+			view = Some(ScreenTexture::with_surface(surface));
         }
 
-		let view = view.get_mut().unwrap();
+        let view = view.as_mut().unwrap();
 
         let PhysicalSize { width, height } = window.handle.inner_size();
         let config = wgpu::SurfaceConfiguration {
@@ -87,10 +75,6 @@ pub(crate) async fn prepare_windows<'w>(
 		// log::warn!("next_frame========================");
         // 每帧 都要 设置 新的 SuraceTexture
         let _ = view.next_frame(&device, &config);
-
-        if let Some(draw_cb) = DRAW_CB.read().as_ref(){
-            draw_cb();
-        }
     }
     Ok(())
 }

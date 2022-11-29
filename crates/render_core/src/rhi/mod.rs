@@ -20,10 +20,10 @@ use std::sync::Arc;
 use self::{device::RenderDevice, options::RenderOptions};
 use crate::rhi::options::RenderPriority;
 use log::{debug, warn};
-use pi_ecs::prelude::World;
 
 use pi_share::Share;
 pub use render_crevice::*;
+use wgpu::Instance;
 pub use wgpu::{
     util::BufferInitDescriptor,
     AddressMode,
@@ -127,12 +127,10 @@ pub type RenderQueue = Share<wgpu::Queue>;
 pub type RenderInstance = wgpu::Instance;
 
 /// 初始化 渲染 环境
-/// world 加入 Res: RenderInstance, RenderQueue, RenderDevice, RenderOptions, AdapterInfo
 pub async fn setup_render_context(
-    mut world: World,
     options: RenderOptions,
     window: Arc<winit::window::Window>,
-) {
+) -> (RenderInstance, RenderOptions, RenderDevice, RenderQueue, wgpu::AdapterInfo) {
     let backends = options.backends;
 
     let instance = wgpu::Instance::new(backends);
@@ -148,11 +146,7 @@ pub async fn setup_render_context(
     debug!("Configured wgpu adapter Limits: {:#?}", device.limits());
     debug!("Configured wgpu adapter Features: {:#?}", device.features());
 
-    world.insert_resource(instance);
-    world.insert_resource(options);
-    world.insert_resource(device);
-    world.insert_resource(queue);
-    world.insert_resource(adapter_info);
+    (instance, options, device, queue, adapter_info)
 }
 
 /// Initializes the renderer by retrieving and preparing the GPU instance, device and queue
