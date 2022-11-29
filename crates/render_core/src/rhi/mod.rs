@@ -125,12 +125,19 @@ pub use wgpu::{
 
 pub type RenderQueue = Share<wgpu::Queue>;
 pub type RenderInstance = wgpu::Instance;
+pub type AdapterInfo = wgpu::AdapterInfo;
 
 /// 初始化 渲染 环境
 pub async fn setup_render_context(
     options: RenderOptions,
     window: Arc<winit::window::Window>,
-) -> (RenderInstance, RenderOptions, RenderDevice, RenderQueue, wgpu::AdapterInfo) {
+) -> (
+    RenderInstance,
+    RenderOptions,
+    RenderDevice,
+    RenderQueue,
+    AdapterInfo,
+) {
     let backends = options.backends;
 
     let instance = wgpu::Instance::new(backends);
@@ -277,9 +284,9 @@ async fn initialize_renderer(
             max_compute_workgroups_per_dimension: limits
                 .max_compute_workgroups_per_dimension
                 .min(constrained_limits.max_compute_workgroups_per_dimension),
-			max_buffer_size: limits
-				.max_buffer_size
-				.min(constrained_limits.max_buffer_size),
+            max_buffer_size: limits
+                .max_buffer_size
+                .min(constrained_limits.max_buffer_size),
         };
     }
 
