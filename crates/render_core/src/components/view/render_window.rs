@@ -31,18 +31,18 @@ impl RenderWindow {
     }
 }
 
-pub fn prepare_windows<'w>(
+pub fn prepare_windows(
     device: &RenderDevice,
     instance: &RenderInstance,
-    mut windows: &mut RenderWindows,
-    mut view: Option<ScreenTexture>,
+    windows: &mut RenderWindows,
+    view: &mut Option<ScreenTexture>,
 ) -> std::io::Result<()> {
     for (_, window) in windows.iter_mut() {
         let is_first = view.is_none();
         if is_first {
             let surface = unsafe { instance.create_surface(window.handle.deref()) };
             let surface = Share::new(surface);
-            view = Some(ScreenTexture::with_surface(surface));
+            *view = Some(ScreenTexture::with_surface(surface));
         }
 
         let view = view.as_mut().unwrap();
@@ -53,7 +53,7 @@ pub fn prepare_windows<'w>(
             width,
             height,
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            present_mode: window.present_mode.clone(),
+            present_mode: window.present_mode,
             alpha_mode: wgpu::CompositeAlphaMode::Auto,
         };
 
@@ -67,9 +67,8 @@ pub fn prepare_windows<'w>(
             device.configure_surface(view.surface(), &config);
         }
 
-        // log::warn!("next_frame========================");
         // 每帧 都要 设置 新的 SuraceTexture
-        let _ = view.next_frame(&device, &config);
+        view.next_frame(device, &config);
     }
     Ok(())
 }
