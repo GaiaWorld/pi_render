@@ -27,4 +27,4 @@ naga = { version = "0.9.0", features = [
     "glsl-in",
     "wgsl-out",
 ], optional = true }
-wgpu = { version = "0.13", optional = true }
+wgpu = { version = "0.14", optional = true }

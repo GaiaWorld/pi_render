@@ -1,9 +1,7 @@
-use crate::{
-    rhi::{
-        device::RenderDevice,
-        texture::{PiRenderDefault, ScreenTexture},
-        PresentMode, RenderInstance,
-    },
+use crate::rhi::{
+    device::RenderDevice,
+    texture::{PiRenderDefault, ScreenTexture},
+    PresentMode, RenderInstance,
 };
 use pi_share::Share;
 use pi_slotmap::{new_key_type, SlotMap};
@@ -24,10 +22,7 @@ pub struct RenderWindow {
 }
 
 impl RenderWindow {
-    pub fn new(
-        handle: Arc<Window>,
-        present_mode: PresentMode,
-    ) -> Self {
+    pub fn new(handle: Arc<Window>, present_mode: PresentMode) -> Self {
         Self {
             handle,
             present_mode,
@@ -47,7 +42,7 @@ pub fn prepare_windows<'w>(
         if is_first {
             let surface = unsafe { instance.create_surface(window.handle.deref()) };
             let surface = Share::new(surface);
-			view = Some(ScreenTexture::with_surface(surface));
+            view = Some(ScreenTexture::with_surface(surface));
         }
 
         let view = view.as_mut().unwrap();
@@ -59,10 +54,10 @@ pub fn prepare_windows<'w>(
             height,
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             present_mode: window.present_mode.clone(),
+            alpha_mode: wgpu::CompositeAlphaMode::Auto,
         };
 
-        let is_size_changed =
-            width != window.last_size.width || height != window.last_size.height;
+        let is_size_changed = width != window.last_size.width || height != window.last_size.height;
         if is_size_changed {
             window.last_size.width = width;
             window.last_size.height = height;
@@ -72,7 +67,7 @@ pub fn prepare_windows<'w>(
             device.configure_surface(view.surface(), &config);
         }
 
-		// log::warn!("next_frame========================");
+        // log::warn!("next_frame========================");
         // 每帧 都要 设置 新的 SuraceTexture
         let _ = view.next_frame(&device, &config);
     }
