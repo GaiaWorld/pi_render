@@ -9,7 +9,7 @@ license = "MIT OR Apache-2.0"
 keywords = ["pi", "compile", "shader"]
 
 [dependencies]
-naga = { version = "0.9", features = [
+naga = { version = "0.10", features = [
     "glsl-in",
     "spv-in",
     "spv-out",

@@ -41,7 +41,7 @@ anyhow = "1.0"
 downcast-rs = "1.2"
 hex = "0.4"
 log = "0.4"
-naga = { version = "0.9", features = [
+naga = { version = "0.10", features = [
     "glsl-in",
     "spv-in",
     "spv-out",
