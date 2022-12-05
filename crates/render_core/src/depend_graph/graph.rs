@@ -18,19 +18,19 @@ use pi_async_graph::{async_graph, ExecNode, RunFactory, Runner};
 use pi_futures::BoxFuture;
 use pi_graph::{DirectedGraph, DirectedGraphNode, NGraph, NGraphBuilder};
 use pi_hash::{XHashMap, XHashSet};
-use pi_share::Share;
+use pi_share::{Share, ThreadSync};
 use pi_slotmap::SlotMap;
 use std::borrow::Cow;
 
 /// 依赖图
-pub struct DependGraph {
+pub struct DependGraph<Context: ThreadSync + 'static> {
     // ================== 拓扑信息
 
     // 名字 和 NodeId 映射
     node_names: XHashMap<Cow<'static, str>, NodeId>,
 
     // 所有 节点的 集合
-    nodes: SlotMap<NodeId, (String, NodeState)>,
+    nodes: SlotMap<NodeId, (String, NodeState<Context>)>,
 
     // 边 (before, after)
     edges: XHashMap<NodeId, NodeSlot>,
@@ -64,7 +64,7 @@ pub struct DependGraph {
     run_ng: Option<Share<NGraph<NodeId, ExecNode<EmptySyncRun, EmptySyncRun>>>>,
 }
 
-impl Default for DependGraph {
+impl<Context: ThreadSync + 'static> Default for DependGraph<Context> {
     fn default() -> Self {
         Self {
             node_names: XHashMap::default(),
@@ -88,7 +88,7 @@ impl Default for DependGraph {
 }
 
 /// 渲染图的 拓扑信息 相关 方法
-impl DependGraph {
+impl<Context: ThreadSync + 'static> DependGraph<Context> {
     /// 查 指定节点 的 前驱节点
     pub fn get_prev_ids(&self, id: NodeId) -> Option<&[NodeId]> {
         self.edges.get(&id).map(|v| v.prev_nodes.as_slice())
@@ -108,7 +108,7 @@ impl DependGraph {
     where
         I: InParam + Default,
         O: OutParam + Default + Clone,
-        R: DependNode<Input = I, Output = O>,
+        R: DependNode<Context, Input = I, Output = O>,
     {
         let name = name.into();
 
@@ -120,7 +120,7 @@ impl DependGraph {
         // 拓扑结构改变
         self.is_topo_dirty = true;
 
-        let node_state = NodeState::new(node);
+        let node_state = NodeState::<Context>::new(node);
 
         let node_id = self.nodes.insert((name.to_string(), node_state));
 
@@ -269,16 +269,16 @@ impl DependGraph {
 }
 
 /// 渲染图的 执行 相关
-impl DependGraph {
+impl<Context: ThreadSync + 'static> DependGraph<Context> {
     /// 构建图，不需要 运行时
-    pub fn build(&mut self) -> Result<(), GraphError> {
+    pub fn build(&mut self, context: &'static Context) -> Result<(), GraphError> {
         let sub_ng = match self.update_topo() {
             None => return Ok(()),
             Some(g) => g,
         };
 
         // 构建 run_ng，返回 构建图
-        self.create_run_ng(sub_ng)?;
+        self.create_run_ng(sub_ng, context)?;
 
         Ok(())
     }
@@ -323,7 +323,7 @@ impl DependGraph {
 
 // ================== 以下方法 仅供 crate 使用
 
-impl DependGraph {
+impl<Context: ThreadSync + 'static> DependGraph<Context> {
     /// 如果 finishes 节点数量 不等于1，返回 None，否则返回 ID
     #[inline]
     pub(crate) fn get_once_finsh_id(&mut self) -> Option<NodeId> {
@@ -383,7 +383,7 @@ impl DependGraph {
     }
 
     // 取 label 对应的 NodeState
-    fn get_node_state(&self, label: &NodeLabel) -> Result<&NodeState, GraphError> {
+    fn get_node_state(&self, label: &NodeLabel) -> Result<&NodeState<Context>, GraphError> {
         self.get_node_id(label).and_then(|id| {
             self.nodes
                 .get(id)
@@ -455,7 +455,11 @@ impl DependGraph {
 
     // 创建真正的 运行图
     // 返回 构建 的 执行图
-    fn create_run_ng(&mut self, sub_ng: NGraph<NodeId, NodeId>) -> Result<(), GraphError> {
+    fn create_run_ng(
+        &mut self,
+        sub_ng: NGraph<NodeId, NodeId>,
+        context: &'static Context,
+    ) -> Result<(), GraphError> {
         let mut build_builder =
             NGraphBuilder::<NodeId, ExecNode<EmptySyncRun, EmptySyncRun>>::new();
 
@@ -469,10 +473,10 @@ impl DependGraph {
             let n = self.get_node_state(&NodeLabel::from(*id)).unwrap();
             n.0.as_ref().borrow_mut().reset();
 
-            let node = self.create_run_node(*id)?;
+            let node = self.create_run_node(*id, context)?;
             run_builder = run_builder.node(*id, node);
 
-            let node = self.create_build_node(*id)?;
+            let node = self.create_build_node(*id, context)?;
             build_builder = build_builder.node(*id, node);
         }
 
@@ -527,6 +531,7 @@ impl DependGraph {
     fn create_build_node(
         &self,
         node_id: NodeId,
+        context: &'static Context,
     ) -> Result<ExecNode<EmptySyncRun, EmptySyncRun>, GraphError> {
         let n = self.get_node_state(&NodeLabel::Id(node_id));
         let node = n.unwrap().0.clone();
@@ -535,7 +540,7 @@ impl DependGraph {
         let f = move || -> BoxFuture<'static, std::io::Result<()>> {
             let node = node.clone();
             Box::pin(async move {
-                node.as_ref().borrow_mut().build().await.unwrap();
+                node.as_ref().borrow_mut().build(context).await.unwrap();
 
                 Ok(())
             })
@@ -548,6 +553,7 @@ impl DependGraph {
     fn create_run_node(
         &self,
         node_id: NodeId,
+        context: &'static Context,
     ) -> Result<ExecNode<EmptySyncRun, EmptySyncRun>, GraphError> {
         let n = self.get_node_state(&NodeLabel::Id(node_id));
         let node = n.unwrap().0.clone();
@@ -556,7 +562,7 @@ impl DependGraph {
         let f = move || -> BoxFuture<'static, std::io::Result<()>> {
             let node = node.clone();
             Box::pin(async move {
-                node.as_ref().borrow_mut().run().await.unwrap();
+                node.as_ref().borrow_mut().run(context).await.unwrap();
                 Ok(())
             })
         };

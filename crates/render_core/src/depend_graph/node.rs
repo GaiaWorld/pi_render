@@ -9,11 +9,9 @@
 //!     + ParamUsage 参数的用途
 //!
 use super::{
-    graph::DependGraph,
     param::{Assign, InParam, OutParam},
     GraphError,
 };
-use pi_async::rt::AsyncRuntime;
 use pi_futures::BoxFuture;
 use pi_hash::{XHashMap, XHashSet};
 use pi_share::{cell::TrustCell, Share, ThreadSync};
@@ -26,21 +24,19 @@ use std::{
 };
 
 /// 图节点，给 外部 扩展 使用
-pub trait DependNode: 'static + ThreadSync {
+pub trait DependNode<Context>: 'static + ThreadSync {
     /// 输入参数
     type Input: InParam + Default;
 
     /// 输出参数
     type Output: OutParam + Default + Clone;
 
-    /// 准备: 当依赖图 重新构建 之后，第一次调用run之前，会调用一次
-    /// 一般 用于 准备 渲染 资源的 创建
-    /// 如果 无 异步资源创建，可以返回 None
-    /// usage 判断 该节点的 输入输出的 用途
-    ///     + 判断 输入参数 是否 被前置节点 填充；
-    ///     + 判断 输出参数 是否 被后继节点 使用；
-    fn prepare<'a>(
+    /// 当 依赖图 拓扑结构改变时，第一次调用run之前，会调用一次
+    /// 目前，仅计划 给 框架 子图 使用
+    /// 外部使用人员 不用 管它
+    fn build<'a>(
         &'a mut self,
+        context: &'a Context,
         _usage: &'a ParamUsage,
     ) -> Option<BoxFuture<'a, Result<(), String>>> {
         None
@@ -55,19 +51,10 @@ pub trait DependNode: 'static + ThreadSync {
     /// usage 的 用法 见 build 方法
     fn run<'a>(
         &'a mut self,
+        context: &'a Context,
         input: &'a Self::Input,
         usage: &'a ParamUsage,
     ) -> BoxFuture<'a, Result<Self::Output, String>>;
-
-    /// 当 依赖图 拓扑结构改变时，第一次调用run之前，会调用一次
-    /// 目前，仅计划 给 框架 子图 使用
-    /// 外部使用人员 不用 管它
-    fn build<'a>(
-        &'a mut self,
-        _usage: &'a ParamUsage,
-    ) -> Option<BoxFuture<'a, Result<(), String>>> {
-        None
-    }
 }
 
 new_key_type! {
@@ -169,7 +156,7 @@ impl ParamUsage {
 }
 
 // 渲染节点，给 依赖图 内部 使用
-pub(crate) trait InternalNode: OutParam {
+pub(crate) trait InternalNode<Context: ThreadSync + 'static>: OutParam {
     // 当 sub_ng 改变后，需要调用
     fn reset(&mut self);
 
@@ -177,33 +164,35 @@ pub(crate) trait InternalNode: OutParam {
     fn inc_next_refs(&mut self);
 
     // 添加 前置节点
-    fn add_pre_node(&mut self, nodes: (NodeId, NodeState));
+    fn add_pre_node(&mut self, nodes: (NodeId, NodeState<Context>));
 
     // 每帧 后继的渲染节点 获取参数时候，需要调用 此函数
     fn dec_curr_ref(&mut self);
 
     // 构建，当依赖图 构建时候，会调用一次
     // 一般 用于 准备 渲染 资源的 创建
-    fn build<'a>(&'a mut self) -> BoxFuture<'a, Result<(), GraphError>>;
+    fn build<'a>(&'a mut self, context: &'a Context) -> BoxFuture<'a, Result<(), GraphError>>;
 
     // 执行依赖图
-    fn run<'a>(&'a mut self) -> BoxFuture<'a, Result<(), GraphError>>;
+    fn run<'a>(&'a mut self, context: &'a Context) -> BoxFuture<'a, Result<(), GraphError>>;
 }
 
 /// 链接 NodeInteral 和 DependNode 的 结构体
-pub(crate) struct DependNodeImpl<I, O, R>
+pub(crate) struct DependNodeImpl<I, O, R, Context>
 where
+    Context: ThreadSync + 'static,
     I: InParam + Default,
     O: OutParam + Default,
-    R: DependNode<Input = I, Output = O>,
+    R: DependNode<Context, Input = I, Output = O>,
 {
     node: R,
     input: I,
     output: O,
 
-    param_usage: ParamUsage,
+    context: std::marker::PhantomData<Context>,
 
-    pre_nodes: Vec<(NodeId, NodeState)>,
+    param_usage: ParamUsage,
+    pre_nodes: Vec<(NodeId, NodeState<Context>)>,
 
     // 该节点 的后继 节点数量
     // 当依赖图改变节点的拓扑关系后，需要调用一次
@@ -214,14 +203,16 @@ where
     curr_next_refs: AtomicI32,
 }
 
-impl<I, O, R> DependNodeImpl<I, O, R>
+impl<I, O, R, Context> DependNodeImpl<I, O, R, Context>
 where
+    Context: ThreadSync + 'static,
     I: InParam + Default,
     O: OutParam + Default,
-    R: DependNode<Input = I, Output = O>,
+    R: DependNode<Context, Input = I, Output = O>,
 {
     pub(crate) fn new(node: R) -> Self {
         Self {
+            context: Default::default(),
             node,
             pre_nodes: Default::default(),
             input: Default::default(),
@@ -235,11 +226,12 @@ where
     }
 }
 
-impl<I, O, R> OutParam for DependNodeImpl<I, O, R>
+impl<I, O, R, Context> OutParam for DependNodeImpl<I, O, R, Context>
 where
+    Context: ThreadSync + 'static,
     I: InParam + Default,
     O: OutParam + Default,
-    R: DependNode<Input = I, Output = O>,
+    R: DependNode<Context, Input = I, Output = O>,
 {
     fn can_fill(&self, set: &mut Option<&mut XHashSet<TypeId>>, ty: TypeId) -> bool {
         assert!(set.is_none());
@@ -253,11 +245,12 @@ where
     }
 }
 
-impl<I, O, R> InternalNode for DependNodeImpl<I, O, R>
+impl<I, O, R, Context> InternalNode<Context> for DependNodeImpl<I, O, R, Context>
 where
+    Context: ThreadSync + 'static,
     I: InParam + Default,
     O: OutParam + Default,
-    R: DependNode<Input = I, Output = O>,
+    R: DependNode<Context, Input = I, Output = O>,
 {
     fn reset(&mut self) {
         self.input = Default::default();
@@ -274,7 +267,7 @@ where
         self.total_next_refs += 1;
     }
 
-    fn add_pre_node(&mut self, node: (NodeId, NodeState)) {
+    fn add_pre_node(&mut self, node: (NodeId, NodeState<Context>)) {
         node.1 .0.as_ref().borrow_mut().inc_next_refs();
 
         {
@@ -301,16 +294,16 @@ where
         }
     }
 
-    fn build<'a>(&'a mut self) -> BoxFuture<'a, Result<(), GraphError>> {
+    fn build<'a>(&'a mut self, context: &'a Context) -> BoxFuture<'a, Result<(), GraphError>> {
         Box::pin(async move {
-            match self.node.build(&self.param_usage) {
+            match self.node.build(context, &self.param_usage) {
                 Some(f) => f.await.map_err(|e| GraphError::CustomBuildError(e)),
                 None => Ok(()),
             }
         })
     }
 
-    fn run<'a>(&'a mut self) -> BoxFuture<'a, Result<(), GraphError>> {
+    fn run<'a>(&'a mut self, context: &'a Context) -> BoxFuture<'a, Result<(), GraphError>> {
         Box::pin(async move {
             for (pre_id, pre_node) in &self.pre_nodes {
                 let p = pre_node.0.as_ref();
@@ -321,7 +314,7 @@ where
                 p.deref_mut().dec_curr_ref();
             }
 
-            let runner = self.node.run(&self.input, &self.param_usage);
+            let runner = self.node.run(context, &self.input, &self.param_usage);
 
             match runner.await {
                 Ok(output) => {
@@ -344,15 +337,22 @@ where
 }
 
 // 节点 状态
-#[derive(Clone)]
-pub(crate) struct NodeState(pub Share<TrustCell<dyn InternalNode>>);
+pub(crate) struct NodeState<Context: ThreadSync + 'static>(
+    pub Share<TrustCell<dyn InternalNode<Context>>>,
+);
 
-impl NodeState {
+impl<Context: ThreadSync + 'static> Clone for NodeState<Context> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+impl<Context: ThreadSync + 'static> NodeState<Context> {
     pub(crate) fn new<I, O, R>(node: R) -> Self
     where
         I: InParam + Default,
         O: OutParam + Default + Clone,
-        R: DependNode<Input = I, Output = O>,
+        R: DependNode<Context, Input = I, Output = O>,
     {
         let imp = DependNodeImpl::new(node);
 
