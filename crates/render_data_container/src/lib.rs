@@ -1,4 +1,5 @@
 use bytemuck::Pod;
+use pi_assets::asset::{Asset, Handle};
 use pi_share::Share;
 use pi_slotmap::DefaultKey;
 use wgpu::util::DeviceExt;
@@ -36,7 +37,7 @@ pub type Point3 = NPoint3<Number>;
 pub type Perspective3 = NPerspective3<Number>;
 
 
-pub trait FKey: Clone + Copy + PartialEq + Eq + PartialOrd + Ord + std::hash::Hash {}
+pub trait FKey: Clone + PartialEq + Eq + std::hash::Hash {}
 impl FKey for DefaultKey {}
 impl FKey for u8 {}
 impl FKey for u16 {}
@@ -59,7 +60,7 @@ pub trait FContainer<T: Clone, K: FKey> {
     fn get_mut(&mut self, key: &K) -> Option<&mut T>;
 }
 
-pub trait TextureID: Clone + Copy + PartialEq + Eq + PartialOrd + Ord + std::hash::Hash {}
+pub trait TextureID: Clone + PartialEq + Eq + std::hash::Hash {}
 impl TextureID for DefaultKey {}
 impl TextureID for u8 {}
 impl TextureID for u16 {}
@@ -79,7 +80,7 @@ pub trait TexturePool<TID: TextureID> {
     fn get(&self, key: TID) -> Option<& wgpu::TextureView>;
 }
 
-pub trait TMaterialKey: Clone + Copy + PartialEq + Eq + PartialOrd + Ord + std::hash::Hash {}
+pub trait TMaterialKey: Clone + PartialEq + Eq + std::hash::Hash {}
 impl TMaterialKey for DefaultKey {}
 impl TMaterialKey for u8 {}
 impl TMaterialKey for u16 {}
@@ -95,7 +96,7 @@ impl TMaterialKey for i128 {}
 impl TMaterialKey for isize {}
 impl TMaterialKey for &str {}
 
-pub trait TMaterialBlockKindKey: Clone + Copy + PartialEq + Eq + PartialOrd + Ord + std::hash::Hash {}
+pub trait TMaterialBlockKindKey: Clone + PartialEq + Eq + std::hash::Hash {}
 impl TMaterialBlockKindKey for DefaultKey {}
 impl TMaterialBlockKindKey for u8 {}
 impl TMaterialBlockKindKey for u16 {}
@@ -111,7 +112,7 @@ impl TMaterialBlockKindKey for i128 {}
 impl TMaterialBlockKindKey for isize {}
 impl TMaterialBlockKindKey for &str {}
 
-pub trait TVertexDataKindKey: Clone + Copy + PartialEq + Eq + PartialOrd + Ord + std::hash::Hash {}
+pub trait TVertexDataKindKey: Clone + PartialEq + Eq + std::hash::Hash {}
 impl TVertexDataKindKey for DefaultKey {}
 impl TVertexDataKindKey for u8 {}
 impl TVertexDataKindKey for u16 {}
@@ -127,7 +128,7 @@ impl TVertexDataKindKey for i128 {}
 impl TVertexDataKindKey for isize {}
 impl TVertexDataKindKey for &str {}
 
-pub trait TVertexBufferKindKey: Clone + Copy + PartialEq + Eq + PartialOrd + Ord + std::hash::Hash {}
+pub trait TVertexBufferKindKey: Clone + PartialEq + Eq + std::hash::Hash {}
 impl TVertexBufferKindKey for DefaultKey {}
 impl TVertexBufferKindKey for u8 {}
 impl TVertexBufferKindKey for u16 {}
@@ -143,21 +144,21 @@ impl TVertexBufferKindKey for i128 {}
 impl TVertexBufferKindKey for isize {}
 impl TVertexBufferKindKey for &str {}
 
-pub trait TGeometryBufferID: Clone + Copy + PartialEq + Eq + PartialOrd + Ord + std::hash::Hash {}
-impl TGeometryBufferID for DefaultKey {}
-impl TGeometryBufferID for u8 {}
-impl TGeometryBufferID for u16 {}
-impl TGeometryBufferID for u32 {}
-impl TGeometryBufferID for u64 {}
-impl TGeometryBufferID for usize {}
-impl TGeometryBufferID for u128 {}
-impl TGeometryBufferID for i8 {}
-impl TGeometryBufferID for i16 {}
-impl TGeometryBufferID for i32 {}
-impl TGeometryBufferID for i64 {}
-impl TGeometryBufferID for i128 {}
-impl TGeometryBufferID for isize {}
-impl TGeometryBufferID for &str {}
+pub trait TVertexBufferID: Clone + PartialEq + Eq + std::hash::Hash {}
+impl TVertexBufferID for DefaultKey {}
+impl TVertexBufferID for u8 {}
+impl TVertexBufferID for u16 {}
+impl TVertexBufferID for u32 {}
+impl TVertexBufferID for u64 {}
+impl TVertexBufferID for usize {}
+impl TVertexBufferID for u128 {}
+impl TVertexBufferID for i8 {}
+impl TVertexBufferID for i16 {}
+impl TVertexBufferID for i32 {}
+impl TVertexBufferID for i64 {}
+impl TVertexBufferID for i128 {}
+impl TVertexBufferID for isize {}
+impl TVertexBufferID for &str {}
 
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -168,18 +169,41 @@ pub enum EVertexDataFormat {
     F32,
     F64,
 }
+impl EVertexDataFormat {
+    pub fn size(&self) -> usize {
+        match self {
+            EVertexDataFormat::U8 => 1,
+            EVertexDataFormat::U16 => 2,
+            EVertexDataFormat::U32 => 4,
+            EVertexDataFormat::F32 => 4,
+            EVertexDataFormat::F64 => 8,
+        }
+    }
+}
 
-pub trait GeometryBufferPool<GBID: TGeometryBufferID> {
-    fn insert(&mut self, data: GeometryBuffer) -> GBID;
-    fn remove(&mut self, key: &GBID) -> Option<GeometryBuffer>;
-    fn get(&self, key: &GBID) -> Option<&GeometryBuffer>;
+pub trait VertexBufferPool<GBID: TVertexBufferID> {
+    fn insert(&mut self, key: GBID, data: VertexBuffer);
+    fn remove(&mut self, key: &GBID) -> Option<VertexBuffer>;
+    fn get(&self, key: &GBID) -> Option<&VertexBuffer>;
     fn get_size(&self, key: &GBID) -> usize;
-    fn get_mut(&mut self, key: &GBID) -> Option<&mut GeometryBuffer>;
+    fn get_mut(&mut self, key: &GBID) -> Option<&mut VertexBuffer>;
     fn get_buffer(&self, key: &GBID) -> Option<Share<&wgpu::Buffer>>;
 }
 
+pub trait TAttributeMeta {
+    fn format(&self) -> wgpu::VertexFormat;
+    fn offset(&self) -> wgpu::BufferAddress;
+    fn attribute(&self, shader_location: u32) -> wgpu::VertexAttribute {
+        wgpu::VertexAttribute {
+            format: self.format(),
+            offset: self.offset(),
+            shader_location,
+        }
+    }
+}
+
 #[derive(Debug)]
-pub struct GeometryBuffer {
+pub struct VertexBuffer {
     dirty: bool,
     kind: EVertexDataFormat,
     updateable: bool,
@@ -192,7 +216,7 @@ pub struct GeometryBuffer {
     _size: usize,
     buffer: Option<Share<wgpu::Buffer>>,
 }
-impl GeometryBuffer {
+impl VertexBuffer {
     pub fn new(updateable: bool, kind: EVertexDataFormat, as_indices: bool) -> Self {
         Self {
             dirty: true,
@@ -338,6 +362,35 @@ impl GeometryBuffer {
     pub fn size(&self) -> usize {
         self._size
     }
+}
+
+// For Asset
+pub type KeyVertexBuffer = pi_atom::Atom;
+impl Asset for VertexBuffer {
+    type Key = KeyVertexBuffer;
+    fn size(&self) -> usize {
+        self._size * self.kind.size()
+    }
+}
+
+pub trait TVertexbBufferMeta {
+    const DATA_FORMAT: EVertexDataFormat;
+    const STEP_MODE: wgpu::VertexStepMode;
+    fn size_per_vertex(&self) -> usize;
+    fn slot(&self) -> usize;
+    fn attributes(&self) -> &[wgpu::VertexAttribute];
+    fn layout<'a>(&'a self) -> wgpu::VertexBufferLayout<'a> {
+        wgpu::VertexBufferLayout {
+            array_stride: self.size_per_vertex() as wgpu::BufferAddress,
+            step_mode: Self::STEP_MODE,
+            attributes: self.attributes(),
+        }
+    }
+}
+
+pub trait TGeometry {
+    fn vertex_buffers(&self) -> Vec<&Handle<VertexBuffer>>;
+    fn vertex_layouts(&self) -> Vec<&wgpu::VertexBufferLayout>;
 }
 
 pub fn update<T: Clone + Copy + Pod>(pool: &mut Vec<T>, data: &[T], offset: usize) -> usize {

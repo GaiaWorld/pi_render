@@ -43,7 +43,7 @@ impl<MBKK> BindingData<MBKK>
         bind_offset: usize,
     ) {
         bind.uniforms.iter().for_each(|desc| {
-            self.uniform_kinds.push(desc.kind);
+            self.uniform_kinds.push(desc.kind.clone());
             self.uniform_formats.push(desc.format);
             self.uniform_offset.push(desc.byte_offset_in_bind);
         });

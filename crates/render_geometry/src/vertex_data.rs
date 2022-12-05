@@ -1,4 +1,4 @@
-use render_data_container::{TVertexDataKindKey, TGeometryBufferID};
+use render_data_container::{TVertexDataKindKey, TVertexBufferID};
 
 #[derive(Debug, Clone, Copy)]
 pub enum EVertexDataKind {
@@ -36,35 +36,35 @@ pub struct VertexAttributeDesc<VDK: TVertexDataKindKey> {
 }
 
 #[derive(Debug, Clone)]
-pub struct VertexBufferU8<GBID: TGeometryBufferID> {
+pub struct VertexBufferU8<GBID: TVertexBufferID> {
     pub data: GBID,
     pub offset: u32,
     pub size: u32,
 }
 
 #[derive(Debug, Clone)]
-pub struct VertexBufferU16<GBID: TGeometryBufferID> {
+pub struct VertexBufferU16<GBID: TVertexBufferID> {
     pub data: GBID,
     pub offset: u32,
     pub size: u32,
 }
 
 #[derive(Debug, Clone)]
-pub struct VertexBufferU32<GBID: TGeometryBufferID> {
+pub struct VertexBufferU32<GBID: TVertexBufferID> {
     pub data: GBID,
     pub offset: u32,
     pub size: u32,
 }
 
 #[derive(Debug, Clone)]
-pub struct VertexBufferF32<GBID: TGeometryBufferID> {
+pub struct VertexBufferF32<GBID: TVertexBufferID> {
     pub data: GBID,
     pub offset: u32,
     pub size: u32,
 }
 
 #[derive(Debug, Clone)]
-pub struct VertexBufferF64<GBID: TGeometryBufferID> {
+pub struct VertexBufferF64<GBID: TVertexBufferID> {
     pub data: GBID,
     pub offset: u32,
     pub size: u32,

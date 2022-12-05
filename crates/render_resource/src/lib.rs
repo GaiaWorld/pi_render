@@ -1,3 +1,4 @@
+use std::{hash::Hash, fmt::Debug};
 use pi_atom::Atom;
 use render_pipeline_key::pipeline_key::PipelineKey;
 use sampler::SamplerAssetKey;
@@ -7,6 +8,10 @@ pub mod bind_group;
 pub mod uniform_buffer;
 pub mod sampler;
 pub mod texture2d;
+
+pub trait AssetKey: Debug + Clone + Hash + PartialEq + Eq + PartialOrd + Ord {
+    
+}
 
 pub fn bind_group_entry_buffer(
     binding: u32,

@@ -1,6 +1,6 @@
 
 use std::hash::Hash;
-use render_data_container::{TGeometryBufferID, TVertexDataKindKey, GeometryBufferPool, EVertexDataFormat};
+use render_data_container::{TVertexBufferID, TVertexDataKindKey, VertexBufferPool, EVertexDataFormat};
 use pi_share::Share;
 use crate::error::EGeometryError;
 use crate::vertex_data::{VertexBufferU8, VertexBufferU16, VertexBufferU32, VertexBufferF32, VertexBufferF64};
@@ -26,25 +26,24 @@ use crate::vertex_data::{VertexBufferU8, VertexBufferU16, VertexBufferU32, Verte
 //     kind: VDK,
 // }
 
-pub trait VertexAttributeMeta {
-    const SLOT: u32;
-    const SIZE_PER_VERTEX: u32;
-    const FORMAT: EVertexDataFormat;
-    const STEP_MODE: wgpu::VertexStepMode;
-    fn layout<'a>(attributes: &'a [wgpu::VertexAttribute]) -> wgpu::VertexBufferLayout<'a> {
-        wgpu::VertexBufferLayout {
-            array_stride: Self::SIZE_PER_VERTEX as wgpu::BufferAddress,
-            step_mode: Self::STEP_MODE,
-            attributes,
-        }
-    }
-}
+// pub trait VertexBufferMeta {
+//     const SIZE_PER_VERTEX: u32;
+//     const DATA_FORMAT: EVertexDataFormat;
+//     const STEP_MODE: wgpu::VertexStepMode;
+//     fn layout<'a>(attributes: &'a [wgpu::VertexAttribute]) -> wgpu::VertexBufferLayout<'a> {
+//         wgpu::VertexBufferLayout {
+//             array_stride: Self::SIZE_PER_VERTEX as wgpu::BufferAddress,
+//             step_mode: Self::STEP_MODE,
+//             attributes,
+//         }
+//     }
+// }
 
-#[derive(Debug)]
-pub struct VertexAttributeBufferMeta<GBID: TGeometryBufferID> {
-    pub buffer_id: GBID,
-    pub start: usize,
-    pub end: usize,
-    pub data_bytes_size: usize,
-    pub data_count: usize,
-}
+// #[derive(Debug)]
+// pub struct VertexAttributeBufferMeta<GBID: TGeometryBufferID> {
+//     pub buffer_id: GBID,
+//     pub start: usize,
+//     pub end: usize,
+//     pub data_bytes_size: usize,
+//     pub data_count: usize,
+// }
