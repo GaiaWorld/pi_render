@@ -1,6 +1,6 @@
 use std::{hash::Hash, fmt::Debug};
 use pi_atom::Atom;
-use render_pipeline_key::pipeline_key::PipelineKey;
+use render_pipeline_key::pipeline_key::PipelineStateKey;
 use sampler::SamplerAssetKey;
 
 pub mod bind_group_layout;
@@ -44,7 +44,7 @@ pub struct ShaderEffectAssetKey {
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct RenderPipelineAssetKey {
     pub shader_effect: ShaderEffectAssetKey,
-    pub pipeline: PipelineKey,
+    pub pipeline: PipelineStateKey,
 }
 
 pub type BindGroupSet = u8;

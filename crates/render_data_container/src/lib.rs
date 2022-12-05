@@ -1,7 +1,10 @@
+use std::ops::Deref;
+
 use bytemuck::Pod;
 use pi_assets::asset::{Asset, Handle};
 use pi_share::Share;
 use pi_slotmap::DefaultKey;
+use render_core::rhi::pipeline::RenderPipeline;
 use wgpu::util::DeviceExt;
 
 use nalgebra::{RealField, Vector2 as NVector2, Vector3 as NVector3, Dim, SimdValue, Vector4 as NVector4, UnitQuaternion as NQuaternion, 
@@ -373,17 +376,16 @@ impl Asset for VertexBuffer {
     }
 }
 
-pub trait TVertexbBufferMeta {
+pub trait TVertexBufferMeta {
     const DATA_FORMAT: EVertexDataFormat;
     const STEP_MODE: wgpu::VertexStepMode;
-    fn size_per_vertex(&self) -> usize;
-    fn slot(&self) -> usize;
-    fn attributes(&self) -> &[wgpu::VertexAttribute];
-    fn layout<'a>(&'a self) -> wgpu::VertexBufferLayout<'a> {
+    fn size_per_vertex(&self) -> wgpu::BufferAddress;
+    // fn slot(&self) -> usize;
+    fn layout<'a,>(&'a self, attributes: &'a [wgpu::VertexAttribute]) -> wgpu::VertexBufferLayout<'a> {
         wgpu::VertexBufferLayout {
             array_stride: self.size_per_vertex() as wgpu::BufferAddress,
             step_mode: Self::STEP_MODE,
-            attributes: self.attributes(),
+            attributes,
         }
     }
 }
@@ -391,6 +393,26 @@ pub trait TVertexbBufferMeta {
 pub trait TGeometry {
     fn vertex_buffers(&self) -> Vec<&Handle<VertexBuffer>>;
     fn vertex_layouts(&self) -> Vec<&wgpu::VertexBufferLayout>;
+}
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct KeyRenderPipeline {
+    pub shader_key: &'static str,
+    pub state_key: render_pipeline_key::pipeline_key::PipelineStateKey,
+}
+
+/// A [`RenderPipeline`] represents a graphics pipeline and its stages (shaders), bindings and vertex buffers.
+///
+/// May be converted from and dereferences to a wgpu [`RenderPipeline`](wgpu::RenderPipeline).
+/// Can be created via [`RenderDevice::create_render_pipeline`](crate::renderer::RenderDevice::create_render_pipeline).
+#[derive(Debug)]
+pub struct ResRenderPipeline(pub RenderPipeline);
+impl Asset for ResRenderPipeline {
+    type Key = KeyRenderPipeline;
+
+    fn size(&self) -> usize {
+        256
+    }
 }
 
 pub fn update<T: Clone + Copy + Pod>(pool: &mut Vec<T>, data: &[T], offset: usize) -> usize {
