@@ -56,12 +56,12 @@ pub struct DependGraph<Context: ThreadSync + 'static> {
     // 运行 节点 build 方法的图，当切仅当 图 有所变化时候，每个节点会重新运行一次；
     // build_ng 如果为Some，这一帧会执行，紧接着 build_ng = None
     // build_ng 边 和 edges 的 (before, after) 相同
-    build_ng: Option<Share<NGraph<NodeId, ExecNode<EmptySyncRun, EmptySyncRun>>>>,
+    build_ng: Option<Share<NGraph<NodeId, ExecNode<Context, EmptySyncRun<Context>, EmptySyncRun<Context>>>>>,
 
     // 录制渲染指令的 异步执行图，用于 更新 GPU 资源
     // 当 渲染图 拓扑改变 或 finish 节点 改变后，会 重新 构建个 新的
     // run_ng边 和 edges 的 (before, after) 相同
-    run_ng: Option<Share<NGraph<NodeId, ExecNode<EmptySyncRun, EmptySyncRun>>>>,
+    run_ng: Option<Share<NGraph<NodeId, ExecNode<Context, EmptySyncRun<Context>, EmptySyncRun<Context>>>>>,
 }
 
 impl<Context: ThreadSync + 'static> Default for DependGraph<Context> {
@@ -271,14 +271,14 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
 /// 渲染图的 执行 相关
 impl<Context: ThreadSync + 'static> DependGraph<Context> {
     /// 构建图，不需要 运行时
-    pub fn build(&mut self, context: &'static Context) -> Result<(), GraphError> {
+    pub fn build(&mut self) -> Result<(), GraphError> {
         let sub_ng = match self.update_topo() {
             None => return Ok(()),
             Some(g) => g,
         };
 
         // 构建 run_ng，返回 构建图
-        self.create_run_ng(sub_ng, context)?;
+        self.create_run_ng(sub_ng)?;
 
         Ok(())
     }
@@ -287,11 +287,12 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
     pub async fn run<A: 'static + AsyncRuntime + Send>(
         &mut self,
         rt: &A,
+        context: &'static Context,
     ) -> Result<(), GraphError> {
         // 注 构建 ng 只运行一次
         match self.build_ng.take() {
             None => {}
-            Some(g) => match async_graph(rt.clone(), g.clone()).await {
+            Some(g) => match async_graph(rt.clone(), g.clone(), context).await {
                 Ok(_) => {}
                 Err(e) => {
                     let err = GraphError::RunNGraphError(format!("run_ng, {:?}", e));
@@ -308,7 +309,7 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
                 error!("{}", e);
                 Err(e)
             }
-            Some(ref g) => match async_graph(rt.clone(), g.clone()).await {
+            Some(ref g) => match async_graph(rt.clone(), g.clone(), context).await {
                 Ok(_) => Ok(()),
                 Err(e) => {
                     let err = GraphError::RunNGraphError(format!("run_ng, {:?}", e));
@@ -455,15 +456,12 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
 
     // 创建真正的 运行图
     // 返回 构建 的 执行图
-    fn create_run_ng(
-        &mut self,
-        sub_ng: NGraph<NodeId, NodeId>,
-        context: &'static Context,
-    ) -> Result<(), GraphError> {
+    fn create_run_ng(&mut self, sub_ng: NGraph<NodeId, NodeId>) -> Result<(), GraphError> {
         let mut build_builder =
-            NGraphBuilder::<NodeId, ExecNode<EmptySyncRun, EmptySyncRun>>::new();
+            NGraphBuilder::<NodeId, ExecNode<Context, EmptySyncRun<Context>, EmptySyncRun<Context>>>::new();
 
-        let mut run_builder = NGraphBuilder::<NodeId, ExecNode<EmptySyncRun, EmptySyncRun>>::new();
+        let mut run_builder =
+            NGraphBuilder::<NodeId, ExecNode<Context, EmptySyncRun<Context>, EmptySyncRun<Context>>>::new();
 
         let topo_ids = sub_ng.topological_sort();
 
@@ -473,10 +471,10 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
             let n = self.get_node_state(&NodeLabel::from(*id)).unwrap();
             n.0.as_ref().borrow_mut().reset();
 
-            let node = self.create_run_node(*id, context)?;
+            let node = self.create_run_node(*id)?;
             run_builder = run_builder.node(*id, node);
 
-            let node = self.create_build_node(*id, context)?;
+            let node = self.create_build_node(*id)?;
             build_builder = build_builder.node(*id, node);
         }
 
@@ -531,13 +529,12 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
     fn create_build_node(
         &self,
         node_id: NodeId,
-        context: &'static Context,
-    ) -> Result<ExecNode<EmptySyncRun, EmptySyncRun>, GraphError> {
+    ) -> Result<ExecNode<Context, EmptySyncRun<Context>, EmptySyncRun<Context>>, GraphError> {
         let n = self.get_node_state(&NodeLabel::Id(node_id));
         let node = n.unwrap().0.clone();
 
         // 该函数 会在 ng 图上，每帧每节点 执行一次
-        let f = move || -> BoxFuture<'static, std::io::Result<()>> {
+        let f = move |context: &'static Context| -> BoxFuture<'static, std::io::Result<()>> {
             let node = node.clone();
             Box::pin(async move {
                 node.as_ref().borrow_mut().build(context).await.unwrap();
@@ -553,13 +550,12 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
     fn create_run_node(
         &self,
         node_id: NodeId,
-        context: &'static Context,
-    ) -> Result<ExecNode<EmptySyncRun, EmptySyncRun>, GraphError> {
+    ) -> Result<ExecNode<Context, EmptySyncRun<Context>, EmptySyncRun<Context>>, GraphError> {
         let n = self.get_node_state(&NodeLabel::Id(node_id));
         let node = n.unwrap().0.clone();
 
         // 该函数 会在 ng 图上，每帧每节点 执行一次
-        let f = move || -> BoxFuture<'static, std::io::Result<()>> {
+        let f = move |context: &'static Context| -> BoxFuture<'static, std::io::Result<()>> {
             let node = node.clone();
             Box::pin(async move {
                 node.as_ref().borrow_mut().run(context).await.unwrap();
@@ -572,17 +568,17 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
 }
 
 // 渲染图 不需要 同步节点，故这里写个空方法
-struct EmptySyncRun;
+struct EmptySyncRun<Context: 'static + ThreadSync>(std::marker::PhantomData<Context>);
 
-impl Runner for EmptySyncRun {
-    fn run(self) {}
+impl<Context: 'static + ThreadSync> Runner<Context> for EmptySyncRun<Context> {
+    fn run(self, context: &'static Context) {}
 }
 
-impl RunFactory for EmptySyncRun {
-    type R = EmptySyncRun;
+impl<Context: 'static + ThreadSync> RunFactory<Context> for EmptySyncRun<Context> {
+    type R = EmptySyncRun<Context>;
 
     fn create(&self) -> Self::R {
-        EmptySyncRun
+        EmptySyncRun(Default::default())
     }
 }
 
