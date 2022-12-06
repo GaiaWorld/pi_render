@@ -611,7 +611,7 @@ fn merge_uniforms<'a: 'b, 'b>(
     fs_uniforms: &'b HashMap<(u32, u32), (&'a naga::Type, &'a Option<String>)>,
     types1: &naga::UniqueArena<naga::Type>,
     types2: &naga::UniqueArena<naga::Type>,
-) -> OrdMap<Tree<u32, OrdMap<Tree<(u32, usize), (&'b naga::Type, &'a Option<String>, UniformFrom)>>>> {
+) -> OrdMap<Tree<u32, OrdMap<Tree<(u32, usize), (naga::Type, &'a Option<String>, UniformFrom)>>>> {
     let mut r = HashMap::new();
     for (k, item) in vs_uniforms.iter() {
         match fs_uniforms.get(k) {
