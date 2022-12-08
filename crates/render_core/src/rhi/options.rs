@@ -9,6 +9,7 @@ pub enum RenderPriority {
 
 #[derive(Clone, Debug)]
 pub struct RenderOptions {
+    pub present_mode: wgpu::PresentMode,
     pub device_label: Option<Cow<'static, str>>,
     pub backends: wgpu::Backends,
     pub power_preference: wgpu::PowerPreference,
@@ -50,6 +51,7 @@ impl Default for RenderOptions {
         };
 
         Self {
+            present_mode: wgpu::PresentMode::Fifo,
             device_label: Default::default(),
             backends,
             power_preference: wgpu::PowerPreference::HighPerformance,
