@@ -32,14 +32,12 @@ pub trait DependNode<Context>: 'static + ThreadSync {
     type Output: OutParam + Default + Clone;
 
     /// 当 依赖图 拓扑结构改变时，第一次调用run之前，会调用一次
-    /// 目前，仅计划 给 框架 子图 使用
-    /// 外部使用人员 不用 管它
     fn build<'a>(
         &'a mut self,
-        context: &'a Context,
+        _context: &'a Context,
         _usage: &'a ParamUsage,
-    ) -> Option<BoxFuture<'a, Result<(), String>>> {
-        None
+    ) -> Result<(), String> {
+        Ok(())
     }
 
     /// 执行，每帧会调用一次
@@ -171,7 +169,7 @@ pub(crate) trait InternalNode<Context: ThreadSync + 'static>: OutParam {
 
     // 构建，当依赖图 构建时候，会调用一次
     // 一般 用于 准备 渲染 资源的 创建
-    fn build<'a>(&'a mut self, context: &'a Context) -> BoxFuture<'a, Result<(), GraphError>>;
+    fn build<'a>(&'a mut self, context: &'a Context) -> Result<(), GraphError>;
 
     // 执行依赖图
     fn run<'a>(&'a mut self, context: &'a Context) -> BoxFuture<'a, Result<(), GraphError>>;
@@ -294,13 +292,10 @@ where
         }
     }
 
-    fn build<'a>(&'a mut self, context: &'a Context) -> BoxFuture<'a, Result<(), GraphError>> {
-        Box::pin(async move {
-            match self.node.build(context, &self.param_usage) {
-                Some(f) => f.await.map_err(|e| GraphError::CustomBuildError(e)),
-                None => Ok(()),
-            }
-        })
+    fn build<'a>(&'a mut self, context: &'a Context) -> Result<(), GraphError> {
+        self.node
+            .build(context, &self.param_usage)
+            .map_err(|e| GraphError::CustomBuildError(e))
     }
 
     fn run<'a>(&'a mut self, context: &'a Context) -> BoxFuture<'a, Result<(), GraphError>> {

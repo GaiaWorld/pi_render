@@ -8,7 +8,7 @@
 //!
 
 use super::{
-    node::{DependNode, NodeId, NodeLabel, NodeState},
+    node::{DependNode, InternalNode, NodeId, NodeLabel, NodeState},
     param::{InParam, OutParam},
     GraphError,
 };
@@ -18,9 +18,9 @@ use pi_async_graph::{async_graph, ExecNode, RunFactory, Runner};
 use pi_futures::BoxFuture;
 use pi_graph::{DirectedGraph, DirectedGraphNode, NGraph, NGraphBuilder};
 use pi_hash::{XHashMap, XHashSet};
-use pi_share::{Share, ThreadSync};
+use pi_share::{cell::TrustCell, Share, ShareCell, ThreadSync};
 use pi_slotmap::SlotMap;
-use std::borrow::Cow;
+use std::{borrow::Cow, cell::RefCell, marker::PhantomData};
 
 /// 依赖图
 pub struct DependGraph<Context: ThreadSync + 'static> {
@@ -56,12 +56,16 @@ pub struct DependGraph<Context: ThreadSync + 'static> {
     // 运行 节点 build 方法的图，当切仅当 图 有所变化时候，每个节点会重新运行一次；
     // build_ng 如果为Some，这一帧会执行，紧接着 build_ng = None
     // build_ng 边 和 edges 的 (before, after) 相同
-    build_ng: Option<Share<NGraph<NodeId, ExecNode<Context, EmptySyncRun<Context>, EmptySyncRun<Context>>>>>,
+    build_ng: Option<
+        Share<NGraph<NodeId, ExecNode<Context, BuildSyncRun<Context>, BuildSyncRun<Context>>>>,
+    >,
 
     // 录制渲染指令的 异步执行图，用于 更新 GPU 资源
     // 当 渲染图 拓扑改变 或 finish 节点 改变后，会 重新 构建个 新的
     // run_ng边 和 edges 的 (before, after) 相同
-    run_ng: Option<Share<NGraph<NodeId, ExecNode<Context, EmptySyncRun<Context>, EmptySyncRun<Context>>>>>,
+    run_ng: Option<
+        Share<NGraph<NodeId, ExecNode<Context, BuildSyncRun<Context>, BuildSyncRun<Context>>>>,
+    >,
 }
 
 impl<Context: ThreadSync + 'static> Default for DependGraph<Context> {
@@ -457,11 +461,15 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
     // 创建真正的 运行图
     // 返回 构建 的 执行图
     fn create_run_ng(&mut self, sub_ng: NGraph<NodeId, NodeId>) -> Result<(), GraphError> {
-        let mut build_builder =
-            NGraphBuilder::<NodeId, ExecNode<Context, EmptySyncRun<Context>, EmptySyncRun<Context>>>::new();
+        let mut build_builder = NGraphBuilder::<
+            NodeId,
+            ExecNode<Context, BuildSyncRun<Context>, BuildSyncRun<Context>>,
+        >::new();
 
-        let mut run_builder =
-            NGraphBuilder::<NodeId, ExecNode<Context, EmptySyncRun<Context>, EmptySyncRun<Context>>>::new();
+        let mut run_builder = NGraphBuilder::<
+            NodeId,
+            ExecNode<Context, BuildSyncRun<Context>, BuildSyncRun<Context>>,
+        >::new();
 
         let topo_ids = sub_ng.topological_sort();
 
@@ -529,28 +537,21 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
     fn create_build_node(
         &self,
         node_id: NodeId,
-    ) -> Result<ExecNode<Context, EmptySyncRun<Context>, EmptySyncRun<Context>>, GraphError> {
+    ) -> Result<ExecNode<Context, BuildSyncRun<Context>, BuildSyncRun<Context>>, GraphError> {
         let n = self.get_node_state(&NodeLabel::Id(node_id));
         let node = n.unwrap().0.clone();
 
         // 该函数 会在 ng 图上，每帧每节点 执行一次
-        let f = move |context: &'static Context| -> BoxFuture<'static, std::io::Result<()>> {
-            let node = node.clone();
-            Box::pin(async move {
-                node.as_ref().borrow_mut().build(context).await.unwrap();
+        let f = BuildSyncRun::new(node);
 
-                Ok(())
-            })
-        };
-
-        Ok(ExecNode::Async(Box::new(f)))
+        Ok(ExecNode::Sync(f))
     }
 
     // 创建 渲染 节点
     fn create_run_node(
         &self,
         node_id: NodeId,
-    ) -> Result<ExecNode<Context, EmptySyncRun<Context>, EmptySyncRun<Context>>, GraphError> {
+    ) -> Result<ExecNode<Context, BuildSyncRun<Context>, BuildSyncRun<Context>>, GraphError> {
         let n = self.get_node_state(&NodeLabel::Id(node_id));
         let node = n.unwrap().0.clone();
 
@@ -567,18 +568,40 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
     }
 }
 
-// 渲染图 不需要 同步节点，故这里写个空方法
-struct EmptySyncRun<Context: 'static + ThreadSync>(std::marker::PhantomData<Context>);
-
-impl<Context: 'static + ThreadSync> Runner<Context> for EmptySyncRun<Context> {
-    fn run(self, context: &'static Context) {}
+struct BuildSyncRun<Context: 'static + ThreadSync> {
+    node: Share<ShareCell<dyn InternalNode<Context>>>,
+    _c: std::marker::PhantomData<Context>,
 }
 
-impl<Context: 'static + ThreadSync> RunFactory<Context> for EmptySyncRun<Context> {
-    type R = EmptySyncRun<Context>;
+impl<Context: 'static + ThreadSync> Clone for BuildSyncRun<Context> {
+    fn clone(&self) -> Self {
+        Self {
+            node: self.node.clone(),
+            _c: PhantomData,
+        }
+    }
+}
+
+impl<Context: 'static + ThreadSync> BuildSyncRun<Context> {
+    fn new(node: Share<ShareCell<dyn InternalNode<Context>>>) -> Self {
+        Self {
+            node,
+            _c: PhantomData,
+        }
+    }
+}
+
+impl<Context: 'static + ThreadSync> Runner<Context> for BuildSyncRun<Context> {
+    fn run(self, context: &'static Context) {
+        self.node.as_ref().borrow_mut().build(context).unwrap();
+    }
+}
+
+impl<Context: 'static + ThreadSync> RunFactory<Context> for BuildSyncRun<Context> {
+    type R = BuildSyncRun<Context>;
 
     fn create(&self) -> Self::R {
-        EmptySyncRun(Default::default())
+        self.clone()
     }
 }
 
@@ -620,11 +643,10 @@ impl NodeSlot {
         self.next_nodes
             .iter()
             .position(|value| *value == next)
-            .and_then(|index| {
+            .map(|index| {
                 self.next_nodes.swap_remove(index);
-                Some(())
             })
-            .or_else(|| None)
+            .or(None)
     }
 
     // 到 id 的节点 删除 prev 对应的 slot
@@ -633,10 +655,9 @@ impl NodeSlot {
         self.prev_nodes
             .iter()
             .position(|value| *value == prev)
-            .and_then(|index| {
+            .map(|index| {
                 self.prev_nodes.swap_remove(index);
-                Some(())
             })
-            .or_else(|| None)
+            .or(None)
     }
 }
