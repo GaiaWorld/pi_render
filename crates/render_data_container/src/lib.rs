@@ -1,10 +1,11 @@
-use std::ops::Deref;
+use std::{ops::{Deref, Range}, fmt::Debug};
 
 use bytemuck::Pod;
 use pi_assets::asset::{Asset, Handle};
 use pi_share::Share;
 use pi_slotmap::DefaultKey;
-use render_core::rhi::pipeline::RenderPipeline;
+use render_core::rhi::{pipeline::{RenderPipeline, VertexBufferLayout}, buffer::BufferSlice};
+use vertex_layout_key::KeyVertexLayouts;
 use wgpu::util::DeviceExt;
 
 use nalgebra::{RealField, Vector2 as NVector2, Vector3 as NVector3, Dim, SimdValue, Vector4 as NVector4, UnitQuaternion as NQuaternion, 
@@ -12,6 +13,8 @@ use nalgebra::{RealField, Vector2 as NVector2, Vector3 as NVector3, Dim, SimdVal
     Affine3 as NAffine3, Projective3 as NProjective3, Isometry3 as NIsometry3, Rotation3 as NRotation3,
     Matrix2 as NMatrix2, Point3 as NPoint3, Perspective3 as NPerspective3, Transform as NTransform
 };
+
+pub mod vertex_layout_key;
 
 pub type Number = f32;
 
@@ -184,6 +187,18 @@ impl EVertexDataFormat {
     }
 }
 
+pub trait IndexFormatBytes {
+    fn bytes(&self) -> wgpu::BufferAddress;
+}
+impl IndexFormatBytes for wgpu::IndexFormat {
+    fn bytes(&self) -> wgpu::BufferAddress {
+        match self {
+            wgpu::IndexFormat::Uint16 => 2,
+            wgpu::IndexFormat::Uint32 => 4,
+        }
+    }
+}
+
 pub trait VertexBufferPool<GBID: TVertexBufferID> {
     fn insert(&mut self, key: GBID, data: VertexBuffer);
     fn remove(&mut self, key: &GBID) -> Option<VertexBuffer>;
@@ -196,13 +211,18 @@ pub trait VertexBufferPool<GBID: TVertexBufferID> {
 pub trait TAttributeMeta {
     fn format(&self) -> wgpu::VertexFormat;
     fn offset(&self) -> wgpu::BufferAddress;
-    fn attribute(&self, shader_location: u32) -> wgpu::VertexAttribute {
+    fn shader_location(&self) -> u32;
+    fn attribute(&self) -> wgpu::VertexAttribute {
         wgpu::VertexAttribute {
             format: self.format(),
             offset: self.offset(),
-            shader_location,
+            shader_location: self.shader_location(),
         }
     }
+}
+
+pub trait TIndicesMeta {
+    fn format(&self) -> wgpu::IndexFormat;
 }
 
 #[derive(Debug)]
@@ -363,7 +383,7 @@ impl VertexBuffer {
         }
     }
     pub fn size(&self) -> usize {
-        self._size
+        self._size * self.kind.size()
     }
 }
 
@@ -380,6 +400,7 @@ pub trait TVertexBufferMeta {
     const DATA_FORMAT: EVertexDataFormat;
     const STEP_MODE: wgpu::VertexStepMode;
     fn size_per_vertex(&self) -> wgpu::BufferAddress;
+    fn number_per_vertex(&self) -> wgpu::BufferAddress;
     // fn slot(&self) -> usize;
     fn layout<'a,>(&'a self, attributes: &'a [wgpu::VertexAttribute]) -> wgpu::VertexBufferLayout<'a> {
         wgpu::VertexBufferLayout {
@@ -390,30 +411,97 @@ pub trait TVertexBufferMeta {
     }
 }
 
-pub trait TGeometry {
-    fn vertex_buffers(&self) -> Vec<&Handle<VertexBuffer>>;
-    fn vertex_layouts(&self) -> Vec<&wgpu::VertexBufferLayout>;
+#[derive(Clone)]
+pub struct RenderVertices {
+    pub slot: u32,
+    pub buffer: Handle<VertexBuffer>,
+    pub buffer_range: Option<Range<wgpu::BufferAddress>>,
+    pub size_per_value: wgpu::BufferAddress,
 }
-
-#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct KeyRenderPipeline {
-    pub shader_key: &'static str,
-    pub state_key: render_pipeline_key::pipeline_key::PipelineStateKey,
-}
-
-/// A [`RenderPipeline`] represents a graphics pipeline and its stages (shaders), bindings and vertex buffers.
-///
-/// May be converted from and dereferences to a wgpu [`RenderPipeline`](wgpu::RenderPipeline).
-/// Can be created via [`RenderDevice::create_render_pipeline`](crate::renderer::RenderDevice::create_render_pipeline).
-#[derive(Debug)]
-pub struct ResRenderPipeline(pub RenderPipeline);
-impl Asset for ResRenderPipeline {
-    type Key = KeyRenderPipeline;
-
-    fn size(&self) -> usize {
-        256
+impl RenderVertices {
+    pub fn value_range(&self) -> Range<u32> {
+        if let Some(range) = self.buffer_range.as_ref() {
+            let start = (range.start / self.size_per_value) as u32;
+            let end = (range.end / self.size_per_value) as u32;
+            Range { start, end }
+        } else {
+            let size = (self.buffer.size() as wgpu::BufferAddress / self.size_per_value) as u32;
+            Range { start: 0, end: size }
+        }
+    }
+    pub fn slice(&self) -> wgpu::BufferSlice {
+        if let Some(range) = self.buffer_range.clone() {
+            self.buffer.get_buffer().unwrap().slice(range)
+        } else {
+            self.buffer.get_buffer().unwrap().slice(..)
+        }
     }
 }
+impl PartialEq for RenderVertices {
+    fn eq(&self, other: &Self) -> bool {
+        self.slot == other.slot && self.buffer.key() == other.buffer.key() && self.buffer_range == other.buffer_range
+    }
+    fn ne(&self, other: &Self) -> bool {
+        !self.eq(other)
+    }
+}
+impl Eq for RenderVertices {
+    fn assert_receiver_is_total_eq(&self) {
+        
+    }
+}
+impl Debug for RenderVertices {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RenderVertices").field("slot", &self.slot).field("buffer", &self.buffer.key()).field("buffer_range", &self.buffer_range).field("size_per_value", &self.size_per_value).finish()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct RenderIndices {
+    pub buffer: Handle<VertexBuffer>,
+    pub buffer_range: Option<Range<wgpu::BufferAddress>>,
+    pub format: wgpu::IndexFormat,
+}
+impl RenderIndices {
+    pub fn value_range(&self) -> Range<u32> {
+        if let Some(range) = self.buffer_range.as_ref() {
+            let start = (range.start / self.format.bytes()) as u32;
+            let end = (range.end / self.format.bytes()) as u32;
+            Range { start, end }
+        } else {
+            let size = (self.buffer.size() as wgpu::BufferAddress / self.format.bytes()) as u32;
+            Range { start: 0, end: size }
+        }
+    }
+    pub fn slice(&self) -> wgpu::BufferSlice {
+        if let Some(range) = self.buffer_range.clone() {
+            self.buffer.get_buffer().unwrap().slice(range)
+        } else {
+            self.buffer.get_buffer().unwrap().slice(..)
+        }
+    }
+}
+impl PartialEq for RenderIndices {
+    fn eq(&self, other: &Self) -> bool {
+        self.buffer.key() == other.buffer.key() && self.buffer_range == other.buffer_range && self.format == other.format
+    }
+    fn ne(&self, other: &Self) -> bool {
+        !self.eq(other)
+    }
+}
+impl Eq for RenderIndices {
+    fn assert_receiver_is_total_eq(&self) {
+        
+    }
+}
+
+pub trait TRenderGeometry {
+    fn vertices(&self) -> Vec<RenderVertices>;
+    fn instances(&self) -> Vec<RenderVertices>;
+}
+
+pub type UniformValueBindKey = u128;
+pub type DefinesKey = u128;
 
 pub fn update<T: Clone + Copy + Pod>(pool: &mut Vec<T>, data: &[T], offset: usize) -> usize {
     let len = data.len();

@@ -29,6 +29,9 @@ pub struct SamplerDesc {
     pub border_color: Option<wgpu::SamplerBorderColor>,
 }
 impl SamplerDesc {
+    pub fn size(&self) -> usize {
+        20
+    }
     pub fn to_sampler_description(&self) -> wgpu::SamplerDescriptor {
         wgpu::SamplerDescriptor {
             label: None,
