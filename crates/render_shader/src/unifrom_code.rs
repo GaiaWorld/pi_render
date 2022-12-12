@@ -5,7 +5,12 @@ pub enum ErrorUniformSlot {
     NotFoundProperty
 }
 
+pub trait TUnifromShaderProperty {
+    fn tag(&self) -> &UniformPropertyName;
+}
+
 pub type UniformPropertyName = Atom;
+
 
 pub trait TTextureBindToShaderCode {
     fn vs_code(&self, set: u32, index: u32) -> String;
@@ -198,47 +203,71 @@ impl TBindGroupToShaderCode for MaterialTextureBindDesc {
 }
 
 #[derive(Debug, Clone)]
-pub struct MaterialValueBindDesc {
+pub struct MaterialValueBindDesc<
+    TMat4: TUnifromShaderProperty,
+    TMat2: TUnifromShaderProperty,
+    TVec4: TUnifromShaderProperty,
+    TVec2: TUnifromShaderProperty,
+    TFloat: TUnifromShaderProperty,
+    TInt: TUnifromShaderProperty,
+    TUint: TUnifromShaderProperty,
+> {
     pub set: u32,
     pub bind: u32,
     pub stage: wgpu::ShaderStages,
-    pub mat4_list: Vec<UniformPropertyName>,
-    pub mat2_list: Vec<UniformPropertyName>,
-    pub vec4_list: Vec<UniformPropertyName>,
-    pub vec2_list: Vec<UniformPropertyName>,
-    pub float_list: Vec<UniformPropertyName>,
-    pub int_list: Vec<UniformPropertyName>,
-    pub uint_list: Vec<UniformPropertyName>,
+    pub mat4_list: Vec<TMat4>,
+    pub mat2_list: Vec<TMat2>,
+    pub vec4_list: Vec<TVec4>,
+    pub vec2_list: Vec<TVec2>,
+    pub float_list: Vec<TFloat>,
+    pub int_list: Vec<TInt>,
+    pub uint_list: Vec<TUint>,
 }
-impl MaterialValueBindDesc {
+impl<
+    TMat4: TUnifromShaderProperty,
+    TMat2: TUnifromShaderProperty,
+    TVec4: TUnifromShaderProperty,
+    TVec2: TUnifromShaderProperty,
+    TFloat: TUnifromShaderProperty,
+    TInt: TUnifromShaderProperty,
+    TUint: TUnifromShaderProperty,
+> MaterialValueBindDesc<
+    TMat4,
+    TMat2,
+    TVec4,
+    TVec2,
+    TFloat,
+    TInt,
+    TUint,
+> {
     pub fn size(&self) -> usize {
         let mut size = 0;
         self.mat4_list.iter().for_each(|item| {
-            size += item.as_bytes().len();
+            size += item.tag().as_bytes().len();
         });
         
         self.mat2_list.iter().for_each(|item| {
-            size += item.as_bytes().len();
+            size += item.tag().as_bytes().len();
         });
         
         self.vec4_list.iter().for_each(|item| {
-            size += item.as_bytes().len();
+            size += item.tag().as_bytes().len();
         });
         
         self.vec2_list.iter().for_each(|item| {
-            size += item.as_bytes().len();
+            size += item.tag().as_bytes().len();
         });
         
         self.float_list.iter().for_each(|item| {
-            size += item.as_bytes().len();
+            size += item.tag().as_bytes().len();
         });
         
         self.int_list.iter().for_each(|item| {
-            size += item.as_bytes().len();
+            size += item.tag().as_bytes().len();
         });
         
         self.uint_list.iter().for_each(|item| {
-            size += item.as_bytes().len();
+            size += item.tag().as_bytes().len();
         });
 
         size
@@ -248,32 +277,32 @@ impl MaterialValueBindDesc {
 
         self.mat4_list.iter().for_each(|name| {
             result += "#";
-            result += name.as_str();
+            result += name.tag().as_str();
         });
         
         self.mat2_list.iter().for_each(|name| {
             result += "#";
-            result += name.as_str();
+            result += name.tag().as_str();
         });
 
         self.vec4_list.iter().for_each(|name| {
             result += "#";
-            result += name.as_str();
+            result += name.tag().as_str();
         });
 
         self.vec2_list.iter().for_each(|name| {
             result += "#";
-            result += name.as_str();
+            result += name.tag().as_str();
         });
 
         self.float_list.iter().for_each(|name| {
             result += "#";
-            result += name.as_str();
+            result += name.tag().as_str();
         });
 
         self.uint_list.iter().for_each(|name| {
             result += "#";
-            result += name.as_str();
+            result += name.tag().as_str();
         });
 
         result
@@ -289,25 +318,25 @@ impl MaterialValueBindDesc {
 
         self.mat4_list.iter().for_each(|name| {
             result += "mat4 ";
-            result += &name;
+            result += &name.tag();
             result += ";\r\n";
         });
         
         self.mat2_list.iter().for_each(|name| {
             result += "mat2 ";
-            result += &name;
+            result += &name.tag();
             result += ";\r\n";
         });
         
         self.vec4_list.iter().for_each(|name| {
             result += "vec4 ";
-            result += &name;
+            result += &name.tag();
             result += ";\r\n";
         });
         
         self.vec2_list.iter().for_each(|name| {
             result += "vec2 ";
-            result += &name;
+            result += &name.tag();
             result += ";\r\n";
         });
         let fill_vec2_count    = self.vec2_list.len() % 2;
@@ -319,19 +348,19 @@ impl MaterialValueBindDesc {
         
         self.float_list.iter().for_each(|name| {
             result += "float ";
-            result += &name;
+            result += &name.tag();
             result += ";\r\n";
         });
         
         self.int_list.iter().for_each(|name| {
             result += "int ";
-            result += &name;
+            result += &name.tag();
             result += ";\r\n";
         });
         
         self.uint_list.iter().for_each(|name| {
             result += "uint ";
-            result += &name;
+            result += &name.tag();
             result += ";\r\n";
         });
         let fill_int_count    = (self.float_list.len() + self.int_list.len() + self.uint_list.len()) % 4;
@@ -346,7 +375,23 @@ impl MaterialValueBindDesc {
         result
     }
 }
-impl TValueBindToShaderCode for MaterialValueBindDesc {
+impl<
+    TMat4: TUnifromShaderProperty,
+    TMat2: TUnifromShaderProperty,
+    TVec4: TUnifromShaderProperty,
+    TVec2: TUnifromShaderProperty,
+    TFloat: TUnifromShaderProperty,
+    TInt: TUnifromShaderProperty,
+    TUint: TUnifromShaderProperty,
+> TValueBindToShaderCode for MaterialValueBindDesc<
+    TMat4,
+    TMat2,
+    TVec4,
+    TVec2,
+    TFloat,
+    TInt,
+    TUint,
+> {
     fn vs_code(&self) -> String {
         if self.stage & wgpu::ShaderStages::VERTEX == wgpu::ShaderStages::VERTEX {
             self._code(self.set, self.bind)
@@ -371,8 +416,14 @@ mod test {
 
     use crate::unifrom_code::{TBindGroupToShaderCode, TValueBindToShaderCode};
 
-    use super::{MaterialTextureBindDesc, UniformTextureDesc, MaterialValueBindDesc};
+    use super::{MaterialTextureBindDesc, UniformTextureDesc, MaterialValueBindDesc, UniformPropertyName, TUnifromShaderProperty};
 
+    pub struct Uni(pub UniformPropertyName);
+    impl TUnifromShaderProperty for Uni {
+        fn tag(&self) -> &UniformPropertyName {
+            &self.0
+        }
+    }
 
     #[test]
     fn uniform_code() {
@@ -406,13 +457,13 @@ mod test {
             ],
         };
 
-        let valuedesc = MaterialValueBindDesc {
+        let valuedesc = MaterialValueBindDesc::<Uni, Uni, Uni, Uni, Uni, Uni, Uni> {
             set: 1,
             bind: 1,
             stage: wgpu::ShaderStages::VERTEX_FRAGMENT,
-            mat4_list: vec![Atom::from("emissiveMatrics")],
+            mat4_list: vec![Uni(Atom::from("emissiveMatrics"))],
             mat2_list: vec![],
-            vec4_list: vec![Atom::from("emissiveColor"), Atom::from("baseColor")],
+            vec4_list: vec![Uni(Atom::from("emissiveColor")), Uni(Atom::from("baseColor"))],
             vec2_list: vec![],
             float_list: vec![],
             int_list: vec![],

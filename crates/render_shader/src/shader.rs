@@ -7,17 +7,25 @@ use render_core::rhi::device::RenderDevice;
 use render_data_container::{UniformValueBindKey, vertex_layout_key::KeyVertexLayouts};
 use render_geometry::{vertex_data::{VertexBufferLayouts}, vertex_code::TVertexShaderCode};
 
-use crate::{block_code::{BlockCode, BlockCodeAtom}, varying_code::{Varyings, VaryingCode}, vs_begin_code::{AttributesRef, VSBeginCode}, skin_code::ESkinCode, unifrom_code::{MaterialValueBindDesc, MaterialTextureBindDesc, TBindGroupToShaderCode, TValueBindToShaderCode}, scene_about_code::ERenderTag};
+use crate::{block_code::{BlockCode, BlockCodeAtom}, varying_code::{Varyings, VaryingCode}, vs_begin_code::{AttributesRef, VSBeginCode}, skin_code::ESkinCode, unifrom_code::{MaterialValueBindDesc, MaterialTextureBindDesc, TBindGroupToShaderCode, TValueBindToShaderCode, TUnifromShaderProperty}, scene_about_code::ERenderTag};
 
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct KeyPreShader(pub Atom);
+pub struct KeyShaderEffect(pub Atom);
 
 /// 材质代码
 /// 
 #[derive(Debug, Clone)]
-pub struct PreShaderMeta {
-    pub uniforms: MaterialValueBindDesc,
+pub struct ShaderEffectMeta<
+    TMat4: TUnifromShaderProperty,
+    TMat2: TUnifromShaderProperty,
+    TVec4: TUnifromShaderProperty,
+    TVec2: TUnifromShaderProperty,
+    TFloat: TUnifromShaderProperty,
+    TInt: TUnifromShaderProperty,
+    TUint: TUnifromShaderProperty,
+> {
+    pub uniforms: MaterialValueBindDesc<TMat4, TMat2, TVec4, TVec2, TFloat, TInt, TUint, >,
     pub textures: Option<MaterialTextureBindDesc>,
     pub varyings: Varyings,
     /// 顶点代码片段
@@ -26,9 +34,18 @@ pub struct PreShaderMeta {
     fs: BlockCodeAtom,
     pub size: usize,
 }
-impl PreShaderMeta {
+
+impl<
+    TMat4: TUnifromShaderProperty,
+    TMat2: TUnifromShaderProperty,
+    TVec4: TUnifromShaderProperty,
+    TVec2: TUnifromShaderProperty,
+    TFloat: TUnifromShaderProperty,
+    TInt: TUnifromShaderProperty,
+    TUint: TUnifromShaderProperty,
+> ShaderEffectMeta<TMat4, TMat2, TVec4, TVec2, TFloat, TInt, TUint, > {
     pub fn new(
-        uniforms: MaterialValueBindDesc,
+        uniforms: MaterialValueBindDesc<TMat4, TMat2, TVec4, TVec2, TFloat, TInt, TUint, >,
         textures: Option<MaterialTextureBindDesc>,
         varyings: Varyings,
         vs: BlockCodeAtom,
@@ -145,32 +162,10 @@ impl PreShaderMeta {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct ResPreShaderMeta(pub Share<PreShaderMeta>);
-impl From<PreShaderMeta> for ResPreShaderMeta {
-    fn from(value: PreShaderMeta) -> Self {
-        ResPreShaderMeta(Share::new(value))
-    }
-}
-impl Deref for ResPreShaderMeta {
-    type Target = PreShaderMeta;
-
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-impl Asset for ResPreShaderMeta {
-    type Key = KeyPreShader;
-
-    fn size(&self) -> usize {
-        self.0.size
-    }
-}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct KeyShader {
-    pub shader: KeyPreShader,
+    pub shader: KeyShaderEffect,
     pub vs_layouts: KeyVertexLayouts,
     pub defines_key: u128,
     pub skin_key: ESkinCode,
@@ -185,10 +180,18 @@ pub struct ResShader {
     pub fs_point: &'static str,
 }
 impl ResShader {
-    pub fn build(
+    pub fn build<
+        TMat4: TUnifromShaderProperty,
+        TMat2: TUnifromShaderProperty,
+        TVec4: TUnifromShaderProperty,
+        TVec2: TUnifromShaderProperty,
+        TFloat: TUnifromShaderProperty,
+        TInt: TUnifromShaderProperty,
+        TUint: TUnifromShaderProperty,
+    >(
         device: &RenderDevice,
-        preshaderkey: &KeyPreShader,
-        preshader: &ResPreShaderMeta,
+        preshaderkey: &KeyShaderEffect,
+        preshader: &ShaderEffectMeta<TMat4, TMat2, TVec4, TVec2, TFloat, TInt, TUint, >,
         vertex_layouts: &VertexBufferLayouts,
         skin: &ESkinCode,
         scene_about: &ERenderTag,
@@ -255,9 +258,7 @@ mod test {
     use pi_atom::Atom;
     use render_geometry::vertex_data::{TVertexBufferDesc, VertexAttribute, EVertexDataKind, VertexBufferLayouts};
 
-    use crate::{unifrom_code::{MaterialValueBindDesc, MaterialTextureBindDesc, UniformTextureDesc}, shader::{ResShader, PreShaderMeta}, skin_code::ESkinCode, varying_code::Varying, vs_begin_code::AttributeRefCode, scene_about_code::ERenderTag};
-
-    use super::ResPreShaderMeta;
+    use crate::{unifrom_code::{MaterialValueBindDesc, MaterialTextureBindDesc, UniformTextureDesc, UniformPropertyName, TUnifromShaderProperty}, shader::{ResShader, ShaderEffectMeta}, skin_code::ESkinCode, varying_code::Varying, vs_begin_code::AttributeRefCode, scene_about_code::ERenderTag};
 
 
     #[derive(Debug)]
@@ -272,6 +273,13 @@ mod test {
 
         fn step_mode(&self) -> wgpu::VertexStepMode {
             self.step_mode
+        }
+    }
+
+    pub struct Uni(pub UniformPropertyName);
+    impl TUnifromShaderProperty for Uni {
+        fn tag(&self) -> &UniformPropertyName {
+            &self.0
         }
     }
 
@@ -292,14 +300,14 @@ mod test {
             }
         ];
 
-        let desc = PreShaderMeta::new(
+        let desc = ShaderEffectMeta::<Uni, Uni, Uni, Uni, Uni, Uni, Uni>::new(
             MaterialValueBindDesc {
                 set: 1,
                 bind: 1,
                 stage: wgpu::ShaderStages::VERTEX_FRAGMENT,
                 mat4_list: vec![],
                 mat2_list: vec![],
-                vec4_list: vec![Atom::from("emissive")],
+                vec4_list: vec![Uni(Atom::from("emissive"))],
                 vec2_list: vec![],
                 float_list: vec![],
                 int_list: vec![],
