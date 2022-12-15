@@ -240,6 +240,9 @@ impl<
     TInt,
     TUint,
 > {
+    pub fn none(set: u32, bind: u32, stage: wgpu::ShaderStages) -> Self {
+        Self { set, bind, stage, mat4_list: vec![], mat2_list: vec![], vec4_list: vec![], vec2_list: vec![], float_list: vec![], int_list: vec![], uint_list: vec![] }
+    }
     pub fn size(&self) -> usize {
         let mut size = 0;
         self.mat4_list.iter().for_each(|item| {

@@ -54,6 +54,15 @@ impl<
         let size = varyings.size() + vs.size() + fs.size();
         Self { uniforms, textures, varyings, vs, fs, size }
     }
+    pub fn uniform_count(&self) -> usize {
+        self.uniforms.mat4_list.len()
+        + self.uniforms.mat2_list.len()
+        + self.uniforms.vec4_list.len()
+        + self.uniforms.vec2_list.len()
+        + self.uniforms.float_list.len()
+        + self.uniforms.int_list.len()
+        + self.uniforms.uint_list.len()
+    }
     pub fn vs_blocks(
         &self,
         vertex_layouts: &VertexBufferLayouts,
@@ -90,10 +99,12 @@ impl<
         });
         
         // uniform value
-        result.push(BlockCode {
-            define: self.uniforms.vs_code(),
-            running: String::from(""),
-        });
+        if self.uniform_count() > 0 {
+            result.push(BlockCode {
+                define: self.uniforms.vs_code(),
+                running: String::from(""),
+            });
+        }
 
         // uniform tex
         if let Some(textures) = &self.textures {
@@ -130,11 +141,13 @@ impl<
         result.push(scene_about.fs_code());
         
         // uniform value
-        result.push(BlockCode {
-            define: self.uniforms.fs_code(),
-            running: String::from(""),
-        });
-                
+        if self.uniform_count() > 0 {
+            result.push(BlockCode {
+                define: self.uniforms.fs_code(),
+                running: String::from(""),
+            });
+        }
+
         // uniform tex
         if let Some(textures) = &self.textures {
             result.push(BlockCode {
@@ -151,7 +164,7 @@ impl<
 
         // fragment
         result.push(self.fs.to_block_code());
-        
+
         // EntryPoint
         result.push(BlockCode {
             define: String::from(""),

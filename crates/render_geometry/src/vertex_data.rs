@@ -50,6 +50,15 @@ pub enum EVertexDataKind {
     CustomVec3B            ,
     CustomVec2A            ,
     CustomVec2B            ,
+    InsWorldRow1           ,
+    InsWorldRow2           ,
+    InsWorldRow3           ,
+    InsWorldRow4           ,
+    InsColor               ,
+    InsTillOffset1         ,
+    InsTillOffset2         ,
+    InsCustomVec4A         ,
+    InsCustomVec4B         ,
 }
 impl TAsVertexLayoutsKey for EVertexDataKind {
     fn bytes_for_vertex_layouts_key(&self) -> u8 {
@@ -80,6 +89,15 @@ impl TAsVertexLayoutsKey for EVertexDataKind {
             EVertexDataKind::CustomVec3B            => 20,
             EVertexDataKind::CustomVec2A            => 21,
             EVertexDataKind::CustomVec2B            => 22,
+            EVertexDataKind::InsWorldRow1           => 23,
+            EVertexDataKind::InsWorldRow2           => 24,
+            EVertexDataKind::InsWorldRow3           => 25,
+            EVertexDataKind::InsWorldRow4           => 26,
+            EVertexDataKind::InsColor               => 27,
+            EVertexDataKind::InsTillOffset1         => 28,
+            EVertexDataKind::InsTillOffset2         => 29,
+            EVertexDataKind::InsCustomVec4A         => 30,
+            EVertexDataKind::InsCustomVec4B         => 31,
         }
     }
 }
@@ -109,6 +127,15 @@ impl EVertexDataKind {
             EVertexDataKind::CustomVec3B            => "A_CustomV3B",
             EVertexDataKind::CustomVec2A            => "A_CustomV2A",
             EVertexDataKind::CustomVec2B            => "A_CustomV2B",
+            EVertexDataKind::InsWorldRow1           => "A_INS_World1",
+            EVertexDataKind::InsWorldRow2           => "A_INS_World2",
+            EVertexDataKind::InsWorldRow3           => "A_INS_World3",
+            EVertexDataKind::InsWorldRow4           => "A_INS_World4",
+            EVertexDataKind::InsColor               => "A_INS_Color",
+            EVertexDataKind::InsTillOffset1         => "A_INS_TileOff1",
+            EVertexDataKind::InsTillOffset2         => "A_INS_TillOff2",
+            EVertexDataKind::InsCustomVec4A         => "A_INS_Vec4A",
+            EVertexDataKind::InsCustomVec4B         => "A_INS_Vec4B",
         }
     }
 }
