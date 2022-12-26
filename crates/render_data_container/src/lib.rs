@@ -1,7 +1,8 @@
-use std::{ops::{Deref, Range}, fmt::Debug};
+use std::{ops::{Deref, Range}, fmt::Debug, sync::Arc};
 
 use bytemuck::Pod;
 use pi_assets::asset::{Asset, Handle};
+use pi_atom::Atom;
 use pi_share::Share;
 use pi_slotmap::DefaultKey;
 use render_core::rhi::{pipeline::{RenderPipeline, VertexBufferLayout}, buffer::BufferSlice};
@@ -228,6 +229,7 @@ pub trait TIndicesMeta {
 #[derive(Debug)]
 pub struct VertexBuffer {
     dirty: bool,
+    resize: bool,
     kind: EVertexDataFormat,
     updateable: bool,
     as_indices: bool,
@@ -243,6 +245,7 @@ impl VertexBuffer {
     pub fn new(updateable: bool, kind: EVertexDataFormat, as_indices: bool) -> Self {
         Self {
             dirty: true,
+            resize: true,
             kind,
             as_indices,
             updateable,
@@ -270,8 +273,8 @@ impl VertexBuffer {
         }
     }
     pub fn update_buffer(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) {
-        match self.buffer.as_ref() {
-            Some(buffer) => {
+        if self.resize == false {
+            if let Some(buffer) = self.buffer.as_ref() {
                 if self.updateable && self.dirty {
                     match self.kind {
                         EVertexDataFormat::U8 => {
@@ -293,42 +296,46 @@ impl VertexBuffer {
 
                     self.dirty = false;
                 }
-            },
-            None => {
-                let usage = if self.as_indices { wgpu::BufferUsages::INDEX } else { wgpu::BufferUsages::VERTEX };
-                let usage = if self.updateable {
-                    usage | wgpu::BufferUsages::COPY_DST
-                } else {
-                    usage
-                };
-                self.buffer = match self.kind {
-                    EVertexDataFormat::U8 => {
-                        Some( Share::from(device.create_buffer_init( &wgpu::util::BufferInitDescriptor { label: None, contents: bytemuck::cast_slice(&self.u8), usage, } )) )
-                    },
-                    EVertexDataFormat::U16 => {
-                        println!("{:?}", self.u16);
-                        Some( Share::from(device.create_buffer_init( &wgpu::util::BufferInitDescriptor { label: None, contents: bytemuck::cast_slice(&self.u16), usage, } )) )
-                    },
-                    EVertexDataFormat::U32 => {
-                        Some( Share::from(device.create_buffer_init( &wgpu::util::BufferInitDescriptor { label: None, contents: bytemuck::cast_slice(&self.u32), usage, } )) )
-                    },
-                    EVertexDataFormat::F32 => {
-                        println!("{:?}", self.f32);
-                        Some( Share::from(device.create_buffer_init( &wgpu::util::BufferInitDescriptor { label: None, contents: bytemuck::cast_slice(&self.f32), usage, } )) )
-                    },
-                    EVertexDataFormat::F64 => {
-                        Some( Share::from(device.create_buffer_init( &wgpu::util::BufferInitDescriptor { label: None, contents: bytemuck::cast_slice(&self.f64), usage, } )) )
-                    },
-                }
-            },
+            }
+        } else {
+            let usage = if self.as_indices { wgpu::BufferUsages::INDEX } else { wgpu::BufferUsages::VERTEX };
+            let usage = if self.updateable {
+                usage | wgpu::BufferUsages::COPY_DST
+            } else {
+                usage
+            };
+            self.buffer = match self.kind {
+                EVertexDataFormat::U8 => {
+                    Some( Share::from(device.create_buffer_init( &wgpu::util::BufferInitDescriptor { label: None, contents: bytemuck::cast_slice(&self.u8), usage, } )) )
+                },
+                EVertexDataFormat::U16 => {
+                    println!("{:?}", self.u16);
+                    Some( Share::from(device.create_buffer_init( &wgpu::util::BufferInitDescriptor { label: None, contents: bytemuck::cast_slice(&self.u16), usage, } )) )
+                },
+                EVertexDataFormat::U32 => {
+                    Some( Share::from(device.create_buffer_init( &wgpu::util::BufferInitDescriptor { label: None, contents: bytemuck::cast_slice(&self.u32), usage, } )) )
+                },
+                EVertexDataFormat::F32 => {
+                    println!("{:?}", self.f32);
+                    Some( Share::from(device.create_buffer_init( &wgpu::util::BufferInitDescriptor { label: None, contents: bytemuck::cast_slice(&self.f32), usage, } )) )
+                },
+                EVertexDataFormat::F64 => {
+                    Some( Share::from(device.create_buffer_init( &wgpu::util::BufferInitDescriptor { label: None, contents: bytemuck::cast_slice(&self.f64), usage, } )) )
+                },
+            };
+            
+            self.dirty = false;
+            self.resize = false;
         }
     }
     pub fn uninstall_buffer(&mut self) {
         self.buffer = None;
     }
     pub fn update_u8(&mut self, data: &[u8], offset: usize) -> bool {
-        if self.updateable && self.kind == EVertexDataFormat::U8 {
-            self._size = update(&mut self.u8, data, offset);
+        if (self.updateable || self.buffer.is_none()) && self.kind == EVertexDataFormat::U8 {
+            let size = update(&mut self.u8, data, offset);
+            self.resize = size > self._size;
+            self._size = size;
             self.dirty = true;
     
             true
@@ -337,8 +344,10 @@ impl VertexBuffer {
         }
     }
     pub fn update_u16(&mut self, data: &[u16], offset: usize) -> bool {
-        if self.updateable && self.kind == EVertexDataFormat::U16 {
-            self._size = update(&mut self.u16, data, offset);
+        if (self.updateable || self.buffer.is_none()) && self.kind == EVertexDataFormat::U16 {
+            let size = update(&mut self.u16, data, offset);
+            self.resize = size > self._size;
+            self._size = size;
             self.dirty = true;
     
             true
@@ -347,8 +356,10 @@ impl VertexBuffer {
         }
     }
     pub fn update_u32(&mut self, data: &[u32], offset: usize) -> bool {
-        if self.updateable && self.kind == EVertexDataFormat::U32 {
-            self._size = update(&mut self.u32, data, offset);
+        if (self.updateable || self.buffer.is_none()) && self.kind == EVertexDataFormat::U32 {
+            let size = update(&mut self.u32, data, offset);
+            self.resize = size > self._size;
+            self._size = size;
             self.dirty = true;
     
             true
@@ -357,8 +368,10 @@ impl VertexBuffer {
         }
     }
     pub fn update_f32(&mut self, data: &[f32], offset: usize) -> bool {
-        if self.updateable && self.kind == EVertexDataFormat::F32 {
-            self._size = update(&mut self.f32, data, offset);
+        if (self.updateable || self.buffer.is_none()) && self.kind == EVertexDataFormat::F32 {
+            let size = update(&mut self.f32, data, offset);
+            self.resize = size > self._size;
+            self._size = size;
             self.dirty = true;
     
             true
@@ -367,8 +380,10 @@ impl VertexBuffer {
         }
     }
     pub fn update_f64(&mut self, data: &[f64], offset: usize) -> bool {
-        if self.updateable && self.kind == EVertexDataFormat::F64 {
-            self._size = update(&mut self.f64, data, offset);
+        if (self.updateable || self.buffer.is_none()) && self.kind == EVertexDataFormat::F64 {
+            let size = update(&mut self.f64, data, offset);
+            self.resize = size > self._size;
+            self._size = size;
             self.dirty = true;
     
             true
@@ -411,10 +426,30 @@ pub trait TVertexBufferMeta {
     }
 }
 
+#[derive(Debug, Clone)]
+pub enum VertexBufferUse {
+    Handle(Handle<VertexBuffer>),
+    Arc(Arc<VertexBuffer>, KeyVertexBuffer),
+}
+impl VertexBufferUse {
+    pub fn buffer(&self) -> &VertexBuffer {
+        match self {
+            VertexBufferUse::Handle(buffer) => buffer,
+            VertexBufferUse::Arc(buffer, _) => buffer,
+        }
+    }
+    pub fn key(&self) -> &KeyVertexBuffer {
+        match self {
+            VertexBufferUse::Handle(buffer) => buffer.key(),
+            VertexBufferUse::Arc(_, key) => key,
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct RenderVertices {
     pub slot: u32,
-    pub buffer: Handle<VertexBuffer>,
+    pub buffer: VertexBufferUse,
     pub buffer_range: Option<Range<wgpu::BufferAddress>>,
     pub size_per_value: wgpu::BufferAddress,
 }
@@ -425,15 +460,15 @@ impl RenderVertices {
             let end = (range.end / self.size_per_value) as u32;
             Range { start, end }
         } else {
-            let size = (self.buffer.size() as wgpu::BufferAddress / self.size_per_value) as u32;
+            let size = (self.buffer.buffer().size() as wgpu::BufferAddress / self.size_per_value) as u32;
             Range { start: 0, end: size }
         }
     }
     pub fn slice(&self) -> wgpu::BufferSlice {
         if let Some(range) = self.buffer_range.clone() {
-            self.buffer.get_buffer().unwrap().slice(range)
+            self.buffer.buffer().get_buffer().unwrap().slice(range)
         } else {
-            self.buffer.get_buffer().unwrap().slice(..)
+            self.buffer.buffer().get_buffer().unwrap().slice(..)
         }
     }
 }
@@ -458,7 +493,7 @@ impl Debug for RenderVertices {
 
 #[derive(Debug, Clone)]
 pub struct RenderIndices {
-    pub buffer: Handle<VertexBuffer>,
+    pub buffer: VertexBufferUse,
     pub buffer_range: Option<Range<wgpu::BufferAddress>>,
     pub format: wgpu::IndexFormat,
 }
@@ -469,15 +504,15 @@ impl RenderIndices {
             let end = (range.end / self.format.bytes()) as u32;
             Range { start, end }
         } else {
-            let size = (self.buffer.size() as wgpu::BufferAddress / self.format.bytes()) as u32;
+            let size = (self.buffer.buffer().size() as wgpu::BufferAddress / self.format.bytes()) as u32;
             Range { start: 0, end: size }
         }
     }
     pub fn slice(&self) -> wgpu::BufferSlice {
         if let Some(range) = self.buffer_range.clone() {
-            self.buffer.get_buffer().unwrap().slice(range)
+            self.buffer.buffer().get_buffer().unwrap().slice(range)
         } else {
-            self.buffer.get_buffer().unwrap().slice(..)
+            self.buffer.buffer().get_buffer().unwrap().slice(..)
         }
     }
 }

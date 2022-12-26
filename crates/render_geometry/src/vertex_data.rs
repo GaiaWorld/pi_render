@@ -3,18 +3,18 @@ use std::{mem::size_of, ops::{Deref, Range}};
 use pi_assets::asset::Asset;
 use pi_share::Share;
 use render_core::rhi::pipeline::VertexBufferLayout;
-use render_data_container::{TVertexDataKindKey, TVertexBufferID, vertex_layout_key::KeyVertexLayouts, KeyVertexBuffer};
+use render_data_container::{TVertexDataKindKey, TVertexBufferID, vertex_layout_key::{KeyVertexLayouts, KeyVertexLayout}, KeyVertexBuffer};
 
 use crate::{vertex_code::{TVertexShaderCode, TVertexFormatCode}, error::EGeometryError};
 
 pub const BYTES_VERTEX_DATA_KIND: u8 = 4;
 pub const BYTES_VERTEX_FORMAT: u8 = 5;
 pub const BYTES_VERTEX_BUFFER_STEP_MODE: u8 = 1;
-pub const MAX_VERTEX_ATTRIBUTE_ID: u8 = (KeyVertexLayouts::MAX / (BYTES_VERTEX_BUFFER_STEP_MODE + BYTES_VERTEX_DATA_KIND + BYTES_VERTEX_FORMAT) as KeyVertexLayouts) as u8;
+pub const MAX_VERTEX_ATTRIBUTE_ID: u8 = (KeyVertexLayout::MAX / (BYTES_VERTEX_BUFFER_STEP_MODE + BYTES_VERTEX_DATA_KIND + BYTES_VERTEX_FORMAT) as KeyVertexLayout) as u8;
 
 trait TAsVertexLayoutsKey {
     fn bytes_for_vertex_layouts_key(&self) -> u8;
-    fn as_vertex_layouts_key(&self) -> KeyVertexLayouts;
+    fn as_vertex_layouts_key(&self) -> KeyVertexLayout;
 }
 trait TVertexAttributeSize {
     fn attribute_bytes_size(&self) -> wgpu::BufferAddress ;
@@ -42,8 +42,6 @@ pub enum EVertexDataKind {
     UV4                    ,
     UV5                    ,
     UV6                    ,
-    UV7                    ,
-    UV8                    ,
     CustomVec4A            ,
     CustomVec4B            ,
     CustomVec3A            ,
@@ -59,12 +57,14 @@ pub enum EVertexDataKind {
     InsTillOffset2         ,
     InsCustomVec4A         ,
     InsCustomVec4B         ,
+    InsCustomUVec4A        ,
+    InsCustomIVec4B        ,
 }
 impl TAsVertexLayoutsKey for EVertexDataKind {
     fn bytes_for_vertex_layouts_key(&self) -> u8 {
         BYTES_VERTEX_DATA_KIND
     }
-    fn as_vertex_layouts_key(&self) -> KeyVertexLayouts {
+    fn as_vertex_layouts_key(&self) -> KeyVertexLayout {
         match self {
             EVertexDataKind::Position               => 00,
             EVertexDataKind::Position2D             => 01,
@@ -81,23 +81,23 @@ impl TAsVertexLayoutsKey for EVertexDataKind {
             EVertexDataKind::UV4                    => 12,
             EVertexDataKind::UV5                    => 13,
             EVertexDataKind::UV6                    => 14,
-            EVertexDataKind::UV7                    => 15,
-            EVertexDataKind::UV8                    => 16,
-            EVertexDataKind::CustomVec4A            => 17,
-            EVertexDataKind::CustomVec4B            => 18,
-            EVertexDataKind::CustomVec3A            => 19,
-            EVertexDataKind::CustomVec3B            => 20,
-            EVertexDataKind::CustomVec2A            => 21,
-            EVertexDataKind::CustomVec2B            => 22,
-            EVertexDataKind::InsWorldRow1           => 23,
-            EVertexDataKind::InsWorldRow2           => 24,
-            EVertexDataKind::InsWorldRow3           => 25,
-            EVertexDataKind::InsWorldRow4           => 26,
-            EVertexDataKind::InsColor               => 27,
-            EVertexDataKind::InsTillOffset1         => 28,
-            EVertexDataKind::InsTillOffset2         => 29,
-            EVertexDataKind::InsCustomVec4A         => 30,
-            EVertexDataKind::InsCustomVec4B         => 31,
+            EVertexDataKind::CustomVec4A            => 15,
+            EVertexDataKind::CustomVec4B            => 16,
+            EVertexDataKind::CustomVec3A            => 17,
+            EVertexDataKind::CustomVec3B            => 18,
+            EVertexDataKind::CustomVec2A            => 19,
+            EVertexDataKind::CustomVec2B            => 20,
+            EVertexDataKind::InsWorldRow1           => 21,
+            EVertexDataKind::InsWorldRow2           => 22,
+            EVertexDataKind::InsWorldRow3           => 23,
+            EVertexDataKind::InsWorldRow4           => 24,
+            EVertexDataKind::InsColor               => 25,
+            EVertexDataKind::InsTillOffset1         => 26,
+            EVertexDataKind::InsTillOffset2         => 27,
+            EVertexDataKind::InsCustomVec4A         => 28,
+            EVertexDataKind::InsCustomVec4B         => 29,
+            EVertexDataKind::InsCustomUVec4A        => 30,
+            EVertexDataKind::InsCustomIVec4B        => 31,
         }
     }
 }
@@ -119,8 +119,6 @@ impl EVertexDataKind {
             EVertexDataKind::UV4                    => "A_UV4",
             EVertexDataKind::UV5                    => "A_UV5",
             EVertexDataKind::UV6                    => "A_UV6",
-            EVertexDataKind::UV7                    => "A_UV7",
-            EVertexDataKind::UV8                    => "A_UV8",
             EVertexDataKind::CustomVec4A            => "A_CustomV4A",
             EVertexDataKind::CustomVec4B            => "A_CustomV4B",
             EVertexDataKind::CustomVec3A            => "A_CustomV3A",
@@ -136,6 +134,8 @@ impl EVertexDataKind {
             EVertexDataKind::InsTillOffset2         => "A_INS_TillOff2",
             EVertexDataKind::InsCustomVec4A         => "A_INS_Vec4A",
             EVertexDataKind::InsCustomVec4B         => "A_INS_Vec4B",
+            EVertexDataKind::InsCustomUVec4A        => "A_INS_UVec4A",
+            EVertexDataKind::InsCustomIVec4B        => "A_INS_IVec4B",
         }
     }
 }
@@ -187,7 +187,7 @@ impl TAsVertexLayoutsKey for wgpu::VertexFormat {
     fn bytes_for_vertex_layouts_key(&self) -> u8 {
         BYTES_VERTEX_FORMAT
     }
-    fn as_vertex_layouts_key(&self) -> KeyVertexLayouts {
+    fn as_vertex_layouts_key(&self) -> KeyVertexLayout {
         match self {
             wgpu::VertexFormat::Uint8x2     => 00,
             wgpu::VertexFormat::Uint8x4     => 01,
@@ -230,7 +230,7 @@ impl TAsVertexLayoutsKey for wgpu::VertexStepMode {
     fn bytes_for_vertex_layouts_key(&self) -> u8 {
         BYTES_VERTEX_BUFFER_STEP_MODE
     }
-    fn as_vertex_layouts_key(&self) -> KeyVertexLayouts {
+    fn as_vertex_layouts_key(&self) -> KeyVertexLayout {
         match self {
             wgpu::VertexStepMode::Vertex    => 0,
             wgpu::VertexStepMode::Instance  => 1,
@@ -239,11 +239,28 @@ impl TAsVertexLayoutsKey for wgpu::VertexStepMode {
 }
 
 pub struct VertexLayoutsKeyCalcolator {
-    pub key: KeyVertexLayouts,
+    pub key: KeyVertexLayout,
     pub use_bytes: u8,
+    pub key2: KeyVertexLayout,
+    pub use_bytes2: u8,
 }
 impl VertexLayoutsKeyCalcolator {
     pub const MAX_BYTES: u8 = 128;
+
+    pub fn isok(&self) -> bool {
+        self.use_bytes2 <= VertexLayoutsKeyCalcolator::MAX_BYTES
+    }
+    pub fn calc(&mut self, v: KeyVertexLayout, bytes: u8) {
+        if self.use_bytes < VertexLayoutsKeyCalcolator::MAX_BYTES {
+            let diff = KeyVertexLayout::pow(2, self.use_bytes as u32);
+            self.key += v * diff;
+            self.use_bytes += bytes;
+        } else if self.use_bytes2 < VertexLayoutsKeyCalcolator::MAX_BYTES {
+            let diff = KeyVertexLayout::pow(2, self.use_bytes2 as u32);
+            self.key2 += v * diff;
+            self.use_bytes2 += bytes;
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -253,18 +270,14 @@ pub struct VertexAttribute {
 }
 impl VertexAttribute {
     fn calc_key(&self, calcolator: &mut VertexLayoutsKeyCalcolator) {
-        if calcolator.use_bytes < VertexLayoutsKeyCalcolator::MAX_BYTES {
-            
-            let diff = KeyVertexLayouts::pow(2, calcolator.use_bytes as u32);
-            calcolator.key += self.kind.as_vertex_layouts_key() * diff;
-            calcolator.use_bytes += self.kind.bytes_for_vertex_layouts_key();
-
-            if calcolator.use_bytes < VertexLayoutsKeyCalcolator::MAX_BYTES {
-                let diff = KeyVertexLayouts::pow(2, calcolator.use_bytes as u32);
-                calcolator.key += self.format.as_vertex_layouts_key() * diff;
-                calcolator.use_bytes += self.format.bytes_for_vertex_layouts_key();
-            }
-        }
+        calcolator.calc(
+            self.kind.as_vertex_layouts_key(),
+            self.kind.bytes_for_vertex_layouts_key()
+        );
+        calcolator.calc(
+            self.format.as_vertex_layouts_key(),
+            self.format.bytes_for_vertex_layouts_key()
+        );
     }
 }
 impl TAsWgpuVertexAtribute for VertexAttribute {
@@ -290,22 +303,21 @@ pub trait TVertexBufferDesc {
     }
     fn step_mode(&self) -> wgpu::VertexStepMode;
     fn calc_key(&self, calcolator: &mut VertexLayoutsKeyCalcolator) {
-        if calcolator.use_bytes < VertexLayoutsKeyCalcolator::MAX_BYTES {
-            
-            let diff = KeyVertexLayouts::pow(2, calcolator.use_bytes as u32);
-            calcolator.key += self.step_mode().as_vertex_layouts_key() * diff;
-            calcolator.use_bytes += self.step_mode().bytes_for_vertex_layouts_key();
+        calcolator.calc(
+            self.step_mode().as_vertex_layouts_key(),
+            self.step_mode().bytes_for_vertex_layouts_key()
+        );
 
-            self.attributes().iter().for_each(|attribute| {
-                attribute.calc_key(calcolator);
-            });
-        }
+        self.attributes().iter().for_each(|attribute| {
+            attribute.calc_key(calcolator);
+        });
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct VertexBufferDesc {
     pub bufferkey: KeyVertexBuffer,
+    /// byte数据范围
     pub range: Option<Range<wgpu::BufferAddress>>,
     pub attributes: Vec<VertexAttribute>,
     pub step_mode: wgpu::VertexStepMode,
@@ -424,13 +436,13 @@ impl TVertexShaderCode for VertexBufferLayouts {
 }
 impl VertexBufferLayouts {
     pub fn calc_key<T: TVertexBufferDesc>(layouts: &Vec<T>) -> Result<KeyVertexLayouts, EGeometryError> {
-        let mut calcolator = VertexLayoutsKeyCalcolator { key: 0, use_bytes: 0 };
+        let mut calcolator = VertexLayoutsKeyCalcolator { key: 0, use_bytes: 0, key2: 0, use_bytes2: 0  };
         layouts.iter().for_each(|layout| {
             layout.calc_key(&mut calcolator);
         });
 
-        if calcolator.use_bytes <= VertexLayoutsKeyCalcolator::MAX_BYTES {
-            Ok(calcolator.key)
+        if calcolator.isok() {
+            Ok(KeyVertexLayouts(calcolator.key, calcolator.key2))
         } else {
             Err(EGeometryError::AttributesInfoTooMoreNotSupport)
         }
