@@ -315,20 +315,61 @@ pub trait TVertexBufferDesc {
 }
 
 #[derive(Debug, Clone)]
-pub struct VertexBufferDesc {
-    pub bufferkey: KeyVertexBuffer,
-    /// byte数据范围
-    pub range: Option<Range<wgpu::BufferAddress>>,
-    pub attributes: Vec<VertexAttribute>,
-    pub step_mode: wgpu::VertexStepMode,
+///
+/// 
+/// Range<wgpu::BufferAddress> : byte数据范围
+pub enum VertexBufferDesc {
+    InstanceWorldMatrix(KeyVertexBuffer, Option<Range<wgpu::BufferAddress>>, Vec<VertexAttribute>, wgpu::VertexStepMode),
+    Vertices(KeyVertexBuffer, Option<Range<wgpu::BufferAddress>>, Vec<VertexAttribute>, wgpu::VertexStepMode),
+}
+impl VertexBufferDesc {
+    pub fn instance_world_matrix() -> Self {
+        Self::InstanceWorldMatrix(
+            KeyVertexBuffer::from("NullIntanceWM"),
+            None,
+            vec![
+                VertexAttribute { kind: EVertexDataKind::InsWorldRow1, format: wgpu::VertexFormat::Float32x4 },
+                VertexAttribute { kind: EVertexDataKind::InsWorldRow2, format: wgpu::VertexFormat::Float32x4 },
+                VertexAttribute { kind: EVertexDataKind::InsWorldRow3, format: wgpu::VertexFormat::Float32x4 },
+                VertexAttribute { kind: EVertexDataKind::InsWorldRow4, format: wgpu::VertexFormat::Float32x4 },
+            ],
+            wgpu::VertexStepMode::Instance
+        )
+    }
+    pub fn vertices(bufferkey: KeyVertexBuffer, range: Option<Range<wgpu::BufferAddress>>, attributes: Vec<VertexAttribute>) -> Self {
+        Self::Vertices(
+            bufferkey,
+            range,
+            attributes,
+            wgpu::VertexStepMode::Vertex
+        )
+    }
+    pub fn bufferkey(&self) -> &KeyVertexBuffer {
+        match self {
+            VertexBufferDesc::InstanceWorldMatrix(key, _, _, _) => key,
+            VertexBufferDesc::Vertices(key, _, _, _) => key,
+        }
+    }
+    pub fn range(&self) -> &Option<Range<wgpu::BufferAddress>> {
+        match self {
+            VertexBufferDesc::InstanceWorldMatrix(_, range, _, _) => range,
+            VertexBufferDesc::Vertices(_, range, _, _) => range,
+        }
+    }
 }
 impl TVertexBufferDesc for VertexBufferDesc {
     fn attributes(&self) -> &Vec<VertexAttribute> {
-        &self.attributes
+        match self {
+            VertexBufferDesc::InstanceWorldMatrix(_, _, attrs, _) => attrs,
+            VertexBufferDesc::Vertices(_, _, attrs, _) => attrs,
+        }
     }
 
     fn step_mode(&self) -> wgpu::VertexStepMode {
-        self.step_mode
+        match self {
+            VertexBufferDesc::InstanceWorldMatrix(_, _, _, mode) => mode.clone(),
+            VertexBufferDesc::Vertices(_, _, _, mode) => mode.clone(),
+        }
     }
 }
 

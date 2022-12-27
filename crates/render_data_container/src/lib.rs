@@ -3,6 +3,7 @@ use std::{ops::{Deref, Range}, fmt::Debug, sync::Arc};
 use bytemuck::Pod;
 use pi_assets::asset::{Asset, Handle};
 use pi_atom::Atom;
+use pi_hash::XHashMap;
 use pi_share::Share;
 use pi_slotmap::DefaultKey;
 use render_core::rhi::{pipeline::{RenderPipeline, VertexBufferLayout}, buffer::BufferSlice};
@@ -173,6 +174,7 @@ pub enum EVertexDataFormat {
     U8,
     U16,
     U32,
+    I32,
     F32,
     F64,
 }
@@ -182,6 +184,7 @@ impl EVertexDataFormat {
             EVertexDataFormat::U8 => 1,
             EVertexDataFormat::U16 => 2,
             EVertexDataFormat::U32 => 4,
+            EVertexDataFormat::I32 => 4,
             EVertexDataFormat::F32 => 4,
             EVertexDataFormat::F64 => 8,
         }
@@ -200,13 +203,9 @@ impl IndexFormatBytes for wgpu::IndexFormat {
     }
 }
 
-pub trait VertexBufferPool<GBID: TVertexBufferID> {
-    fn insert(&mut self, key: GBID, data: VertexBuffer);
-    fn remove(&mut self, key: &GBID) -> Option<VertexBuffer>;
-    fn get(&self, key: &GBID) -> Option<&VertexBuffer>;
-    fn get_size(&self, key: &GBID) -> usize;
-    fn get_mut(&mut self, key: &GBID) -> Option<&mut VertexBuffer>;
-    fn get_buffer(&self, key: &GBID) -> Option<Share<&wgpu::Buffer>>;
+#[derive(Debug, Default)]
+pub struct VertexBufferPool {
+    pub map: XHashMap<KeyVertexBuffer, VertexBuffer>,
 }
 
 pub trait TAttributeMeta {
@@ -236,6 +235,7 @@ pub struct VertexBuffer {
     u8: Vec<u8>,
     u16: Vec<u16>,
     u32: Vec<u32>,
+    i32: Vec<i32>,
     f32: Vec<f32>,
     f64: Vec<f64>,
     _size: usize,
@@ -252,6 +252,7 @@ impl VertexBuffer {
             u8: vec![],
             u16: vec![],
             u32: vec![],
+            i32: vec![],
             f32: vec![],
             f64: vec![],
             _size: 0,
@@ -263,6 +264,7 @@ impl VertexBuffer {
             self.u8  = vec![];
             self.u16 = vec![];
             self.u32 = vec![];
+            self.i32 = vec![];
             self.f32 = vec![];
             self.f64 = vec![];
             self._size = 0;
@@ -285,6 +287,9 @@ impl VertexBuffer {
                         },
                         EVertexDataFormat::U32 => {
                             queue.write_buffer(buffer, 0, bytemuck::cast_slice(&self.u32))
+                        },
+                        EVertexDataFormat::I32 => {
+                            queue.write_buffer(buffer, 0, bytemuck::cast_slice(&self.i32))
                         },
                         EVertexDataFormat::F32 => {
                             queue.write_buffer(buffer, 0, bytemuck::cast_slice(&self.f32))
@@ -314,6 +319,9 @@ impl VertexBuffer {
                 },
                 EVertexDataFormat::U32 => {
                     Some( Share::from(device.create_buffer_init( &wgpu::util::BufferInitDescriptor { label: None, contents: bytemuck::cast_slice(&self.u32), usage, } )) )
+                },
+                EVertexDataFormat::I32 => {
+                    Some( Share::from(device.create_buffer_init( &wgpu::util::BufferInitDescriptor { label: None, contents: bytemuck::cast_slice(&self.i32), usage, } )) )
                 },
                 EVertexDataFormat::F32 => {
                     println!("{:?}", self.f32);
@@ -358,6 +366,18 @@ impl VertexBuffer {
     pub fn update_u32(&mut self, data: &[u32], offset: usize) -> bool {
         if (self.updateable || self.buffer.is_none()) && self.kind == EVertexDataFormat::U32 {
             let size = update(&mut self.u32, data, offset);
+            self.resize = size > self._size;
+            self._size = size;
+            self.dirty = true;
+    
+            true
+        } else {
+            false
+        }
+    }
+    pub fn update_i32(&mut self, data: &[i32], offset: usize) -> bool {
+        if (self.updateable || self.buffer.is_none()) && self.kind == EVertexDataFormat::I32 {
+            let size = update(&mut self.i32, data, offset);
             self.resize = size > self._size;
             self._size = size;
             self.dirty = true;
@@ -429,19 +449,19 @@ pub trait TVertexBufferMeta {
 #[derive(Debug, Clone)]
 pub enum VertexBufferUse {
     Handle(Handle<VertexBuffer>),
-    Arc(Arc<VertexBuffer>, KeyVertexBuffer),
+    Arc(KeyVertexBuffer),
 }
 impl VertexBufferUse {
-    pub fn buffer(&self) -> &VertexBuffer {
+    pub fn buffer<'a>(&'a self, pool: &'a VertexBufferPool) -> &'a VertexBuffer {
         match self {
             VertexBufferUse::Handle(buffer) => buffer,
-            VertexBufferUse::Arc(buffer, _) => buffer,
+            VertexBufferUse::Arc(key) => pool.map.get(key).unwrap(),
         }
     }
     pub fn key(&self) -> &KeyVertexBuffer {
         match self {
             VertexBufferUse::Handle(buffer) => buffer.key(),
-            VertexBufferUse::Arc(_, key) => key,
+            VertexBufferUse::Arc(key) => key,
         }
     }
 }
@@ -454,21 +474,21 @@ pub struct RenderVertices {
     pub size_per_value: wgpu::BufferAddress,
 }
 impl RenderVertices {
-    pub fn value_range(&self) -> Range<u32> {
+    pub fn value_range(&self, pool: &VertexBufferPool) -> Range<u32> {
         if let Some(range) = self.buffer_range.as_ref() {
             let start = (range.start / self.size_per_value) as u32;
             let end = (range.end / self.size_per_value) as u32;
             Range { start, end }
         } else {
-            let size = (self.buffer.buffer().size() as wgpu::BufferAddress / self.size_per_value) as u32;
+            let size = (self.buffer.buffer(pool).size() as wgpu::BufferAddress / self.size_per_value) as u32;
             Range { start: 0, end: size }
         }
     }
-    pub fn slice(&self) -> wgpu::BufferSlice {
+    pub fn slice<'a>(&'a self, pool: &'a VertexBufferPool) -> wgpu::BufferSlice {
         if let Some(range) = self.buffer_range.clone() {
-            self.buffer.buffer().get_buffer().unwrap().slice(range)
+            self.buffer.buffer(pool).get_buffer().unwrap().slice(range)
         } else {
-            self.buffer.buffer().get_buffer().unwrap().slice(..)
+            self.buffer.buffer(pool).get_buffer().unwrap().slice(..)
         }
     }
 }
@@ -498,21 +518,21 @@ pub struct RenderIndices {
     pub format: wgpu::IndexFormat,
 }
 impl RenderIndices {
-    pub fn value_range(&self) -> Range<u32> {
+    pub fn value_range(&self, pool: &VertexBufferPool) -> Range<u32> {
         if let Some(range) = self.buffer_range.as_ref() {
             let start = (range.start / self.format.bytes()) as u32;
             let end = (range.end / self.format.bytes()) as u32;
             Range { start, end }
         } else {
-            let size = (self.buffer.buffer().size() as wgpu::BufferAddress / self.format.bytes()) as u32;
+            let size = (self.buffer.buffer(pool).size() as wgpu::BufferAddress / self.format.bytes()) as u32;
             Range { start: 0, end: size }
         }
     }
-    pub fn slice(&self) -> wgpu::BufferSlice {
+    pub fn slice<'a>(&'a self, pool: &'a VertexBufferPool) -> wgpu::BufferSlice {
         if let Some(range) = self.buffer_range.clone() {
-            self.buffer.buffer().get_buffer().unwrap().slice(range)
+            self.buffer.buffer(pool).get_buffer().unwrap().slice(range)
         } else {
-            self.buffer.buffer().get_buffer().unwrap().slice(..)
+            self.buffer.buffer(pool).get_buffer().unwrap().slice(..)
         }
     }
 }
