@@ -18,9 +18,9 @@ use pi_async_graph::{async_graph, ExecNode, RunFactory, Runner};
 use pi_futures::BoxFuture;
 use pi_graph::{DirectedGraph, DirectedGraphNode, NGraph, NGraphBuilder};
 use pi_hash::{XHashMap, XHashSet};
-use pi_share::{cell::TrustCell, Share, ShareCell, ThreadSync};
+use pi_share::{Share, ShareCell, ThreadSync};
 use pi_slotmap::SlotMap;
-use std::{borrow::Cow, cell::RefCell, marker::PhantomData};
+use std::{borrow::Cow, marker::PhantomData};
 
 /// 依赖图
 pub struct DependGraph<Context: ThreadSync + 'static> {

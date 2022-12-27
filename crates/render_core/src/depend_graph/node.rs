@@ -14,7 +14,7 @@ use super::{
 };
 use pi_futures::BoxFuture;
 use pi_hash::{XHashMap, XHashSet};
-use pi_share::{cell::TrustCell, Share, ThreadSync};
+use pi_share::{Cell, Share, ThreadSync};
 use pi_slotmap::new_key_type;
 use std::{
     any::TypeId,
@@ -114,7 +114,7 @@ pub struct ParamUsage {
     pub(crate) input_map_fill: XHashMap<TypeId, Vec<NodeId>>,
 
     // 输出 用的到 的 类型
-    pub(crate) output_usage_set: Share<TrustCell<XHashSet<TypeId>>>,
+    pub(crate) output_usage_set: Share<Cell<XHashSet<TypeId>>>,
 }
 
 impl ParamUsage {
@@ -139,7 +139,7 @@ impl ParamUsage {
 impl Default for ParamUsage {
     fn default() -> Self {
         Self {
-            output_usage_set: Share::new(TrustCell::new(Default::default())),
+            output_usage_set: Share::new(Cell::new(Default::default())),
             input_map_fill: Default::default(),
         }
     }
@@ -333,7 +333,7 @@ where
 
 // 节点 状态
 pub(crate) struct NodeState<Context: ThreadSync + 'static>(
-    pub Share<TrustCell<dyn InternalNode<Context>>>,
+    pub Share<Cell<dyn InternalNode<Context>>>,
 );
 
 impl<Context: ThreadSync + 'static> Clone for NodeState<Context> {
@@ -351,7 +351,7 @@ impl<Context: ThreadSync + 'static> NodeState<Context> {
     {
         let imp = DependNodeImpl::new(node);
 
-        let imp = Share::new(TrustCell::new(imp));
+        let imp = Share::new(Cell::new(imp));
 
         Self(imp)
     }
