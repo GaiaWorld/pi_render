@@ -5,7 +5,7 @@ impl EInstanceCode {
     pub const NONE: u32 = 0;
     pub const BASE: u32 = 1;
     pub const COLOR: u32 = 2;
-    pub const TILL_SCALE_1: u32 = 4;
+    pub const TILL_OFF_1: u32 = 4;
     pub fn vs_running_code(&self) -> String {
         let mut result = String::from("");
 
@@ -18,7 +18,7 @@ impl EInstanceCode {
         if self.0 & Self::COLOR == Self::COLOR {
             result += Self::color().as_str();
         }
-        if self.0 & Self::TILL_SCALE_1 == Self::TILL_SCALE_1 {
+        if self.0 & Self::TILL_OFF_1 == Self::TILL_OFF_1 {
             result += Self::uv().as_str();
         }
 
@@ -41,7 +41,7 @@ impl EInstanceCode {
     }
     fn uv() -> String {
         String::from("
-        A_UV = A_UV * A_INS_TileOff1.xy + A_INS_TileOff1.zw;
+        A_UV = A_UV * A_INS_TillOff1.xy + A_INS_TillOff1.zw;
         ")
     }
 }
