@@ -36,7 +36,7 @@ impl EInstanceCode {
     }
     fn color() -> String {
         String::from("
-        A_COLOR = A_COLOR * A_INS_Color;
+        A_COLOR4 = A_COLOR4 * A_INS_Color;
         ")
     }
     fn uv() -> String {

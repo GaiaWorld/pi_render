@@ -75,7 +75,7 @@ impl<
         // EntryPoint
         result.push(BlockCode {
             define: String::from("#version 450\r\n"),
-            running: String::from("void main() {\r\n vec4 A_COLOR = vec4(1., 1., 1., 1.);\r\n"),
+            running: String::from("void main() {\r\n vec4 A_COLOR4 = vec4(1., 1., 1., 1.);\r\n"),
         });
         
         // attributes

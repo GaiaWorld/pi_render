@@ -106,7 +106,7 @@ impl EVertexDataKind {
         match self {
             EVertexDataKind::Position               => "A_POSITION",
             EVertexDataKind::Position2D             => "A_POSITION_2D",
-            EVertexDataKind::Color4                 => "A_COLOR",
+            EVertexDataKind::Color4                 => "A_COLOR4",
             EVertexDataKind::UV                     => "A_UV",
             EVertexDataKind::Normal                 => "A_NORMAL",
             EVertexDataKind::Tangent                => "A_TANGENT",
