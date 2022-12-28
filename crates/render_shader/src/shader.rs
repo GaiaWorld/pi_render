@@ -7,7 +7,7 @@ use render_core::rhi::device::RenderDevice;
 use render_data_container::{UniformValueBindKey, vertex_layout_key::KeyVertexLayouts};
 use render_geometry::{vertex_data::{VertexBufferLayouts}, vertex_code::TVertexShaderCode};
 
-use crate::{block_code::{BlockCode, BlockCodeAtom}, varying_code::{Varyings, VaryingCode}, vs_begin_code::{AttributesRef, VSBeginCode}, skin_code::ESkinCode, unifrom_code::{MaterialValueBindDesc, MaterialTextureBindDesc, TBindGroupToShaderCode, TValueBindToShaderCode, TUnifromShaderProperty}, scene_about_code::ERenderTag};
+use crate::{block_code::{BlockCode, BlockCodeAtom}, varying_code::{Varyings, VaryingCode}, vs_begin_code::{AttributesRef, VSBeginCode}, skin_code::ESkinCode, unifrom_code::{MaterialValueBindDesc, MaterialTextureBindDesc, TBindGroupToShaderCode, TValueBindToShaderCode, TUnifromShaderProperty}, scene_about_code::ERenderTag, instance_code::EInstanceCode};
 
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -66,6 +66,7 @@ impl<
     pub fn vs_blocks(
         &self,
         vertex_layouts: &VertexBufferLayouts,
+        instance: &EInstanceCode,
         skin: &ESkinCode,
         scene_about: &ERenderTag,
     ) -> String {
@@ -74,13 +75,19 @@ impl<
         // EntryPoint
         result.push(BlockCode {
             define: String::from("#version 450\r\n"),
-            running: String::from("void main() {\r\n"),
+            running: String::from("void main() {\r\n vec4 A_COLOR = vec4(1., 1., 1., 1.);\r\n"),
         });
         
         // attributes
         result.push(BlockCode {
             define: vertex_layouts.vs_defines_code(),
             running: vertex_layouts.vs_running_code(),
+        });
+        
+        // attributes
+        result.push(BlockCode {
+            define: String::from(""),
+            running: instance.vs_running_code(),
         });
 
         // SceneAbout
@@ -206,10 +213,11 @@ impl ResShader {
         preshaderkey: &KeyShaderEffect,
         preshader: &ShaderEffectMeta<TMat4, TMat2, TVec4, TVec2, TFloat, TInt, TUint, >,
         vertex_layouts: &VertexBufferLayouts,
+        instance: &EInstanceCode,
         skin: &ESkinCode,
         scene_about: &ERenderTag,
     ) -> Self {
-        let vs = preshader.vs_blocks(vertex_layouts, skin, scene_about);
+        let vs = preshader.vs_blocks(vertex_layouts, instance, skin, scene_about);
         let fs = preshader.fs_blocks(scene_about);
 
         println!("{}", vs);
@@ -271,7 +279,7 @@ mod test {
     use pi_atom::Atom;
     use render_geometry::vertex_data::{TVertexBufferDesc, VertexAttribute, EVertexDataKind, VertexBufferLayouts};
 
-    use crate::{unifrom_code::{MaterialValueBindDesc, MaterialTextureBindDesc, UniformTextureDesc, UniformPropertyName, TUnifromShaderProperty}, shader::{ResShader, ShaderEffectMeta}, skin_code::ESkinCode, varying_code::Varying, vs_begin_code::AttributeRefCode, scene_about_code::ERenderTag};
+    use crate::{unifrom_code::{MaterialValueBindDesc, MaterialTextureBindDesc, UniformTextureDesc, UniformPropertyName, TUnifromShaderProperty}, shader::{ResShader, ShaderEffectMeta}, skin_code::ESkinCode, varying_code::Varying, vs_begin_code::AttributeRefCode, scene_about_code::ERenderTag, instance_code::EInstanceCode};
 
 
     #[derive(Debug)]
@@ -381,6 +389,7 @@ gl_FragColor = vec4(baseColor.rgb, alpha);
 
         let vs = desc.vs_blocks(
             &reslayouts,
+            &EInstanceCode(EInstanceCode::NONE),
             &&ESkinCode::None,
             &ERenderTag::MainCamera
         );

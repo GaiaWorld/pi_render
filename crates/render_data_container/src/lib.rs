@@ -324,7 +324,6 @@ impl VertexBuffer {
                     Some( Share::from(device.create_buffer_init( &wgpu::util::BufferInitDescriptor { label: None, contents: bytemuck::cast_slice(&self.i32), usage, } )) )
                 },
                 EVertexDataFormat::F32 => {
-                    println!("{:?}", self.f32);
                     Some( Share::from(device.create_buffer_init( &wgpu::util::BufferInitDescriptor { label: None, contents: bytemuck::cast_slice(&self.f32), usage, } )) )
                 },
                 EVertexDataFormat::F64 => {

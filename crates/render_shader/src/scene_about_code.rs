@@ -43,7 +43,7 @@ layout(set = 0, binding = 1) uniform Time {
 };
 
 layout(set = 1, binding = 0) uniform Model {
-    mat4 PI_ObjectToWorld;
+    mat4 U_PI_ObjectToWorld;
     mat4 PI_WorldToObject;
 };
 "),

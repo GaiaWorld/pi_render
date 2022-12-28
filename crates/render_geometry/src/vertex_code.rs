@@ -33,7 +33,7 @@ impl TVertexFormatCode for wgpu::VertexFormat {
             wgpu::VertexFormat::Float16x2   => String::from(""),
             wgpu::VertexFormat::Float16x4   => String::from(""),
             wgpu::VertexFormat::Float32     => String::from("float"),
-            wgpu::VertexFormat::Float32x2   => String::from("vec4"),
+            wgpu::VertexFormat::Float32x2   => String::from("vec2"),
             wgpu::VertexFormat::Float32x3   => String::from("vec3"),
             wgpu::VertexFormat::Float32x4   => String::from("vec4"),
             wgpu::VertexFormat::Uint32      => String::from("uint"),

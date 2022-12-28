@@ -1,4 +1,4 @@
-use std::{mem::size_of, ops::{Deref, Range}};
+use std::{mem::{size_of, replace}, ops::{Deref, Range}};
 
 use pi_assets::asset::Asset;
 use pi_share::Share;
@@ -25,7 +25,7 @@ trait TAsWgpuVertexAtribute {
 
 ///
 /// 预留为支持 32 种顶点数据
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EVertexDataKind {
     Position               ,
     Position2D             ,
@@ -106,7 +106,7 @@ impl EVertexDataKind {
         match self {
             EVertexDataKind::Position               => "A_POSITION",
             EVertexDataKind::Position2D             => "A_POSITION_2D",
-            EVertexDataKind::Color4                 => "A_COLOR4",
+            EVertexDataKind::Color4                 => "A_COLOR",
             EVertexDataKind::UV                     => "A_UV",
             EVertexDataKind::Normal                 => "A_NORMAL",
             EVertexDataKind::Tangent                => "A_TANGENT",
@@ -130,7 +130,7 @@ impl EVertexDataKind {
             EVertexDataKind::InsWorldRow3           => "A_INS_World3",
             EVertexDataKind::InsWorldRow4           => "A_INS_World4",
             EVertexDataKind::InsColor               => "A_INS_Color",
-            EVertexDataKind::InsTillOffset1         => "A_INS_TileOff1",
+            EVertexDataKind::InsTillOffset1         => "A_INS_TillOff1",
             EVertexDataKind::InsTillOffset2         => "A_INS_TillOff2",
             EVertexDataKind::InsCustomVec4A         => "A_INS_Vec4A",
             EVertexDataKind::InsCustomVec4B         => "A_INS_Vec4B",
@@ -314,62 +314,91 @@ pub trait TVertexBufferDesc {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum EInstanceKind {
+    None,
+    WorldMatrix,
+    Color,
+    TillOffset,
+}
+
 #[derive(Debug, Clone)]
 ///
 /// 
 /// Range<wgpu::BufferAddress> : byte数据范围
-pub enum VertexBufferDesc {
-    InstanceWorldMatrix(KeyVertexBuffer, Option<Range<wgpu::BufferAddress>>, Vec<VertexAttribute>, wgpu::VertexStepMode),
-    Vertices(KeyVertexBuffer, Option<Range<wgpu::BufferAddress>>, Vec<VertexAttribute>, wgpu::VertexStepMode),
+pub struct  VertexBufferDesc {
+    key: KeyVertexBuffer,
+    range: Option<Range<wgpu::BufferAddress>>,
+    attrs: Vec<VertexAttribute>,
+    step_mode: wgpu::VertexStepMode,
+    kind: EInstanceKind,
 }
 impl VertexBufferDesc {
+    pub fn update_range(&mut self, value: Option<Range<wgpu::BufferAddress>>) {
+        let _ = replace(&mut self.range, value);
+    }
+    pub fn instance_tilloff() -> Self {
+        Self {
+            key: KeyVertexBuffer::from("NullIntanceTillOff"),
+            range: None,
+            attrs: vec![
+                VertexAttribute { kind: EVertexDataKind::InsTillOffset1, format: wgpu::VertexFormat::Float32x4 },
+            ],
+            step_mode: wgpu::VertexStepMode::Instance,
+            kind: EInstanceKind::TillOffset,
+        }
+    }
+    pub fn instance_color() -> Self {
+        Self {
+            key: KeyVertexBuffer::from("NullIntanceColor"),
+            range: None,
+            attrs: vec![
+                VertexAttribute { kind: EVertexDataKind::InsColor, format: wgpu::VertexFormat::Float32x4 },
+            ],
+            step_mode: wgpu::VertexStepMode::Instance,
+            kind: EInstanceKind::Color,
+        }
+    }
     pub fn instance_world_matrix() -> Self {
-        Self::InstanceWorldMatrix(
-            KeyVertexBuffer::from("NullIntanceWM"),
-            None,
-            vec![
+        Self {
+            key: KeyVertexBuffer::from("NullIntanceWM"),
+            range: None,
+            attrs: vec![
                 VertexAttribute { kind: EVertexDataKind::InsWorldRow1, format: wgpu::VertexFormat::Float32x4 },
                 VertexAttribute { kind: EVertexDataKind::InsWorldRow2, format: wgpu::VertexFormat::Float32x4 },
                 VertexAttribute { kind: EVertexDataKind::InsWorldRow3, format: wgpu::VertexFormat::Float32x4 },
                 VertexAttribute { kind: EVertexDataKind::InsWorldRow4, format: wgpu::VertexFormat::Float32x4 },
             ],
-            wgpu::VertexStepMode::Instance
-        )
+            step_mode: wgpu::VertexStepMode::Instance,
+            kind: EInstanceKind::WorldMatrix,
+        }
     }
-    pub fn vertices(bufferkey: KeyVertexBuffer, range: Option<Range<wgpu::BufferAddress>>, attributes: Vec<VertexAttribute>) -> Self {
-        Self::Vertices(
-            bufferkey,
+    pub fn vertices(bufferkey: KeyVertexBuffer, range: Option<Range<wgpu::BufferAddress>>, attrs: Vec<VertexAttribute>) -> Self {
+        Self {
+            key: bufferkey,
             range,
-            attributes,
-            wgpu::VertexStepMode::Vertex
-        )
+            attrs,
+            step_mode: wgpu::VertexStepMode::Vertex,
+            kind: EInstanceKind::None,
+        }
     }
     pub fn bufferkey(&self) -> &KeyVertexBuffer {
-        match self {
-            VertexBufferDesc::InstanceWorldMatrix(key, _, _, _) => key,
-            VertexBufferDesc::Vertices(key, _, _, _) => key,
-        }
+        &self.key
     }
     pub fn range(&self) -> &Option<Range<wgpu::BufferAddress>> {
-        match self {
-            VertexBufferDesc::InstanceWorldMatrix(_, range, _, _) => range,
-            VertexBufferDesc::Vertices(_, range, _, _) => range,
-        }
+        &self.range
+    }
+    pub fn instance_kind(&self) -> EInstanceKind {
+        self.kind
     }
 }
 impl TVertexBufferDesc for VertexBufferDesc {
     fn attributes(&self) -> &Vec<VertexAttribute> {
-        match self {
-            VertexBufferDesc::InstanceWorldMatrix(_, _, attrs, _) => attrs,
-            VertexBufferDesc::Vertices(_, _, attrs, _) => attrs,
-        }
+        &self.attrs
     }
 
     fn step_mode(&self) -> wgpu::VertexStepMode {
-        match self {
-            VertexBufferDesc::InstanceWorldMatrix(_, _, _, mode) => mode.clone(),
-            VertexBufferDesc::Vertices(_, _, _, mode) => mode.clone(),
-        }
+        self.step_mode
     }
 }
 
@@ -402,8 +431,11 @@ impl TVertexShaderCode for ResVertexBufferLayout {
         let mut result = String::from("");
         let mut index = 0;
         self.list.iter().for_each(|attribute| {
-            result += attribute.format.vs_code().as_str();
-            result += " ";
+            let kind = self.kinds.get(index).unwrap();
+            if *kind != EVertexDataKind::Color4 {
+                result += attribute.format.vs_code().as_str();
+                result += " ";
+            }
             result += self.kinds.get(index).unwrap().vs_code();
             result += " = V";
             result += self.kinds.get(index).unwrap().vs_code();
