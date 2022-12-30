@@ -1,8 +1,40 @@
 use pi_atom::Atom;
 use render_resource::sampler::SamplerDesc;
 
+use crate::shader_data_kind::AsShaderDataKind;
+
 pub enum ErrorUniformSlot {
     NotFoundProperty
+}
+
+pub enum UniformValueKind {
+    Mat4,
+    Mat2,
+    Vec4,
+    Vec2,
+    Float,
+    Int,
+    Uint,
+    TextureD1,
+    TextureD2,
+    TextureD3,
+}
+
+impl AsShaderDataKind for UniformValueKind {
+    fn code_kind(&self) -> String {
+        match self {
+            UniformValueKind::Mat4              => String::from("mat4"),
+            UniformValueKind::Mat2              => String::from("mat2"),
+            UniformValueKind::Vec4              => String::from("vec4"),
+            UniformValueKind::Vec2              => String::from("vec2"),
+            UniformValueKind::Float             => String::from("float"),
+            UniformValueKind::Int               => String::from("int"),
+            UniformValueKind::Uint              => String::from("uint"),
+            UniformValueKind::TextureD1         => String::from("texture2D"),
+            UniformValueKind::TextureD2         => String::from("texture2D"),
+            UniformValueKind::TextureD3         => String::from("textureCube"),
+        }
+    }
 }
 
 pub trait TUnifromShaderProperty {

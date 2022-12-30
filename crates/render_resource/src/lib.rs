@@ -8,6 +8,7 @@ pub mod bind_group;
 pub mod uniform_buffer;
 pub mod sampler;
 pub mod texture2d;
+pub mod data_texture2d;
 
 pub trait AssetKey: Debug + Clone + Hash + PartialEq + Eq + PartialOrd + Ord {
     

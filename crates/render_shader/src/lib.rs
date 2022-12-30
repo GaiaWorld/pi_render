@@ -9,3 +9,7 @@ pub mod unifrom_code;
 pub mod scene_about_code;
 pub mod light_about_code;
 pub mod instance_code;
+pub mod set_bind;
+pub mod shader_bind;
+pub mod shader_set;
+pub mod shader_data_kind;

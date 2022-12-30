@@ -7,7 +7,7 @@ use render_core::rhi::device::RenderDevice;
 use render_data_container::{UniformValueBindKey, vertex_layout_key::KeyVertexLayouts};
 use render_geometry::{vertex_data::{VertexBufferLayouts}, vertex_code::TVertexShaderCode};
 
-use crate::{block_code::{BlockCode, BlockCodeAtom}, varying_code::{Varyings, VaryingCode}, vs_begin_code::{AttributesRef, VSBeginCode}, skin_code::ESkinCode, unifrom_code::{MaterialValueBindDesc, MaterialTextureBindDesc, TBindGroupToShaderCode, TValueBindToShaderCode, TUnifromShaderProperty}, scene_about_code::ERenderTag, instance_code::EInstanceCode};
+use crate::{block_code::{BlockCode, BlockCodeAtom}, varying_code::{Varyings, VaryingCode}, vs_begin_code::{AttributesRef, VSBeginCode}, skin_code::ESkinCode, unifrom_code::{MaterialValueBindDesc, MaterialTextureBindDesc, TBindGroupToShaderCode, TValueBindToShaderCode, TUnifromShaderProperty}, instance_code::EInstanceCode, shader_set::{ShaderSetSceneAbout, ShaderSetModelAbout}};
 
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -67,8 +67,8 @@ impl<
         &self,
         vertex_layouts: &VertexBufferLayouts,
         instance: &EInstanceCode,
-        skin: &ESkinCode,
-        scene_about: &ERenderTag,
+        scene_about: &ShaderSetSceneAbout,
+        model_about: &ShaderSetModelAbout,
     ) -> String {
         let mut result = vec![];
 
@@ -91,12 +91,15 @@ impl<
         });
 
         // SceneAbout
-        result.push(scene_about.vs_code());
-
-        // skin
         result.push(BlockCode {
-            define: String::from(""),
-            running: skin.vs_begin_code(),
+            define: scene_about.define_code(),
+            running: scene_about.vs_running_code(),
+        });
+
+        // Model
+        result.push(BlockCode {
+            define: model_about.define_code(),
+            running: model_about.running_code(),
         });
 
         // attributes ref
@@ -134,7 +137,7 @@ impl<
     }
     pub fn fs_blocks(
         &self,
-        scene_about: &ERenderTag,
+        scene_about: &ShaderSetSceneAbout,
     ) -> String {
         let mut result = vec![];
 
@@ -143,9 +146,6 @@ impl<
             define: String::from("#version 450\r\n"),
             running: String::from("void main() {\r\n"),
         });
-
-        // SceneAbout
-        result.push(scene_about.fs_code());
         
         // uniform value
         if self.uniform_count() > 0 {
@@ -172,6 +172,12 @@ impl<
         // fragment
         result.push(self.fs.to_block_code());
 
+        // SceneAbout
+        result.push(BlockCode {
+            define: scene_about.define_code(),
+            running: scene_about.fs_running_code(),
+        });
+
         // EntryPoint
         result.push(BlockCode {
             define: String::from(""),
@@ -188,8 +194,8 @@ pub struct KeyShader {
     pub shader: KeyShaderEffect,
     pub vs_layouts: KeyVertexLayouts,
     pub defines_key: u128,
-    pub skin_key: ESkinCode,
-    pub render_tag: ERenderTag,
+    pub scene_about: ShaderSetSceneAbout,
+    pub model_about: ShaderSetModelAbout,
 }
 
 #[derive(Debug)]
@@ -214,10 +220,10 @@ impl ResShader {
         preshader: &ShaderEffectMeta<TMat4, TMat2, TVec4, TVec2, TFloat, TInt, TUint, >,
         vertex_layouts: &VertexBufferLayouts,
         instance: &EInstanceCode,
-        skin: &ESkinCode,
-        scene_about: &ERenderTag,
+        scene_about: &ShaderSetSceneAbout,
+        model_about: &ShaderSetModelAbout,
     ) -> Self {
-        let vs = preshader.vs_blocks(vertex_layouts, instance, skin, scene_about);
+        let vs = preshader.vs_blocks(vertex_layouts, instance, scene_about, model_about);
         let fs = preshader.fs_blocks(scene_about);
 
         println!("{}", vs);
@@ -279,7 +285,7 @@ mod test {
     use pi_atom::Atom;
     use render_geometry::vertex_data::{TVertexBufferDesc, VertexAttribute, EVertexDataKind, VertexBufferLayouts};
 
-    use crate::{unifrom_code::{MaterialValueBindDesc, MaterialTextureBindDesc, UniformTextureDesc, UniformPropertyName, TUnifromShaderProperty}, shader::{ResShader, ShaderEffectMeta}, skin_code::ESkinCode, varying_code::Varying, vs_begin_code::AttributeRefCode, scene_about_code::ERenderTag, instance_code::EInstanceCode};
+    use crate::{unifrom_code::{MaterialValueBindDesc, MaterialTextureBindDesc, UniformTextureDesc, UniformPropertyName, TUnifromShaderProperty}, shader::{ResShader, ShaderEffectMeta}, skin_code::ESkinCode, varying_code::Varying, vs_begin_code::AttributeRefCode, instance_code::EInstanceCode, shader_set::{ShaderSetSceneAbout, ShaderSetModelAbout}};
 
 
     #[derive(Debug)]
@@ -390,11 +396,11 @@ gl_FragColor = vec4(baseColor.rgb, alpha);
         let vs = desc.vs_blocks(
             &reslayouts,
             &EInstanceCode(EInstanceCode::NONE),
-            &&ESkinCode::None,
-            &ERenderTag::MainCamera
+            &ShaderSetSceneAbout::new(0, false, false, false, false),
+            &ShaderSetModelAbout::new(2, None)
         );
         let fs = desc.fs_blocks(
-            &ERenderTag::MainCamera
+            &ShaderSetSceneAbout::new(0, false, false, false, false),
         );
         println!("{}", vs);
         println!("{}", fs);
