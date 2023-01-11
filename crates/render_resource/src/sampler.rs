@@ -7,7 +7,7 @@ use render_core::rhi::{texture::Sampler, device::RenderDevice};
 
 pub type SamplerAssetKey = u64;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct SamplerDesc {
     /// How to deal with out of bounds accesses in the u (i.e. x) direction
     pub address_mode_u: wgpu::AddressMode,

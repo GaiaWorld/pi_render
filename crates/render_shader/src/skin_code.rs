@@ -28,7 +28,7 @@ impl ESkinBonesPerVertex {
             ESkinBonesPerVertex::One =>  {
                 String::from("
                 mat4 influence;
-                influence = readMatrixFromTex(_boneTex, sampler_boneTex, matricesIndices[0], bondTexSize.x, 0., bondTexSize.y)  * matricesWeights[0];
+                influence = readMatrixFromTex(_boneTex, sampler_boneTex, matricesIndices[0], bondTexSize.x, 0., bondTexSize.y);
                 PI_ObjectToWorld = PI_ObjectToWorld * influence; 
                 ")
             },
@@ -67,21 +67,21 @@ impl ESkinBonesPerVertex {
 pub enum ESkinCode {
     None,
     RowTexture(ESkinBonesPerVertex),
-    FramesTextureInstance(ESkinBonesPerVertex),
+    FramesTexture(ESkinBonesPerVertex),
 }
 impl ESkinCode {
     pub fn define_code(&self) -> String {
         match self {
             ESkinCode::None => String::from(""),
             ESkinCode::RowTexture(temp) => temp.define_code(),
-            ESkinCode::FramesTextureInstance(temp) => temp.define_code(),
+            ESkinCode::FramesTexture(temp) => temp.define_code(),
         }
     }
     pub fn running_code(&self) -> String {
         match self {
             ESkinCode::None => String::from(""),
             ESkinCode::RowTexture(temp) => temp.running_code(),
-            ESkinCode::FramesTextureInstance(temp) => temp.running_code(),
+            ESkinCode::FramesTexture(temp) => temp.running_code(),
         }
     }
 }

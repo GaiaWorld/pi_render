@@ -1,7 +1,7 @@
 use pi_atom::Atom;
 use render_resource::sampler::SamplerDesc;
 
-use crate::shader_data_kind::AsShaderDataKind;
+use crate::{shader_data_kind::AsShaderDataKind, shader_set::ShaderSetEffectAbout, shader_bind::ShaderBindEffectValue};
 
 pub enum ErrorUniformSlot {
     NotFoundProperty
@@ -45,16 +45,12 @@ pub type UniformPropertyName = Atom;
 
 
 pub trait TTextureBindToShaderCode {
-    fn vs_code(&self, set: u32, index: u32) -> String;
-    fn fs_code(&self, set: u32, index: u32) -> String;
+    fn vs_code(&self, set: u32, bind_off: u32, index: u32) -> String;
+    fn fs_code(&self, set: u32, bind_off: u32, index: u32) -> String;
 }
 pub trait TValueBindToShaderCode {
-    fn vs_code(&self) -> String;
-    fn fs_code(&self) -> String;
-}
-pub trait TBindGroupToShaderCode {
-    fn vs_code(&self) -> String;
-    fn fs_code(&self) -> String;
+    fn vs_code(&self, effect_about: &ShaderSetEffectAbout) -> String;
+    fn fs_code(&self, effect_about: &ShaderSetEffectAbout) -> String;
 }
 
 #[derive(Debug, Clone)]
@@ -83,14 +79,14 @@ impl UniformTextureDesc {
     pub fn size(&self) -> usize {
         self.slotname.as_bytes().len() + 1 + 1 + 1 + 1
     }
-    fn _code(&self, set: u32, index: u32) -> String {
+    fn _code(&self, set: u32, bind_off: u32, index: u32) -> String {
         let mut result = String::from("");
 
         // layout(set = 2, binding = 0) uniform texture2D _MainTex;
         result += "layout(set = ";
         result += set.to_string().as_str();
         result += ", binding = ";
-        result += (index * 2 + 0).to_string().as_str();
+        result += (index * 2 + 0 + bind_off).to_string().as_str();
         result += ") uniform texture2D ";
         result += self.slotname.as_str();
         result += ";\r\n";
@@ -98,7 +94,7 @@ impl UniformTextureDesc {
         result += "layout(set = ";
         result += set.to_string().as_str();
         result += ", binding = ";
-        result += (index * 2 + 1).to_string().as_str();
+        result += (index * 2 + 1 + bind_off).to_string().as_str();
         result += ") uniform sampler sampler";
         result += self.slotname.as_str();
         result += ";\r\n";
@@ -108,16 +104,16 @@ impl UniformTextureDesc {
 }
 
 impl TTextureBindToShaderCode for UniformTextureDesc {
-    fn vs_code(&self, set: u32, index: u32) -> String {
+    fn vs_code(&self, set: u32, bind_off: u32, index: u32) -> String {
         if self.stage & wgpu::ShaderStages::VERTEX == wgpu::ShaderStages::VERTEX {
-            self._code(set, index)
+            self._code(set, bind_off, index)
         } else {
             String::from("")
         }
     }
-    fn fs_code(&self, set: u32, index: u32) -> String {
+    fn fs_code(&self, set: u32, bind_off: u32, index: u32) -> String {
         if self.stage & wgpu::ShaderStages::FRAGMENT == wgpu::ShaderStages::FRAGMENT {
-            self._code(set, index)
+            self._code(set, bind_off, index)
         } else {
             String::from("")
         }
@@ -126,7 +122,6 @@ impl TTextureBindToShaderCode for UniformTextureDesc {
 
 #[derive(Debug, Clone)]
 pub struct MaterialTextureBindDesc {
-    pub set: u32,
     pub list: Vec<UniformTextureDesc>,
 }
 impl MaterialTextureBindDesc {
@@ -137,10 +132,6 @@ impl MaterialTextureBindDesc {
         });
 
         size
-    }
-
-    pub fn bind_group_set(&self) -> u32 {
-        self.set
     }
 
     pub fn query_slot(&self, name: &UniformPropertyName) -> Result<usize, ErrorUniformSlot> {
@@ -162,15 +153,13 @@ impl MaterialTextureBindDesc {
         }
     }
 
-    pub fn layout_entries(&self) -> Vec<wgpu::BindGroupLayoutEntry> {
-        let mut result = vec![];
-        
+    pub fn layout_entries(&self, effect_about: &ShaderSetEffectAbout, entries: &mut Vec<wgpu::BindGroupLayoutEntry>) {
         let mut i = 0;
         self.list.iter().for_each(|item| {
-            result.push(
+            entries.push(
                 wgpu::BindGroupLayoutEntry {
-                    binding: i * 2 + 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    binding: i * 2 + 0 + effect_about.tex_start_bind(),
+                    visibility: item.stage,
                     ty: wgpu::BindingType::Texture {
                         sample_type: item.tex_sampler_type,
                         view_dimension: item.dimension,
@@ -180,10 +169,10 @@ impl MaterialTextureBindDesc {
                 }
             );
             
-            result.push(
+            entries.push(
                 wgpu::BindGroupLayoutEntry {
-                    binding: i * 2 + 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    binding: i * 2 + 1 + effect_about.tex_start_bind(),
+                    visibility: item.stage,
                     ty: wgpu::BindingType::Sampler(item.sampler_binding_type),
                     count: None,
                 }
@@ -191,8 +180,6 @@ impl MaterialTextureBindDesc {
 
             i += 1;
         });
-        
-        result
     }
 
     pub fn label(&self) -> String {
@@ -205,14 +192,13 @@ impl MaterialTextureBindDesc {
 
         result
     }
-}
-impl TBindGroupToShaderCode for MaterialTextureBindDesc {
-    fn vs_code(&self) -> String {
+
+    pub fn vs_code(&self, effect_about: &ShaderSetEffectAbout) -> String {
         let mut result = String::from("");
 
         let mut index = 0;
         self.list.iter().for_each(|item| {
-            result += item.vs_code(self.set, index).as_str();
+            result += item.vs_code(effect_about.set(), effect_about.tex_start_bind(), index).as_str();
 
             index += 1;
         });
@@ -220,12 +206,12 @@ impl TBindGroupToShaderCode for MaterialTextureBindDesc {
         result
     }
 
-    fn fs_code(&self) -> String {
+    pub fn fs_code(&self, effect_about: &ShaderSetEffectAbout) -> String {
         let mut result = String::from("");
 
         let mut index = 0;
         self.list.iter().for_each(|item| {
-            result += item.fs_code(self.set, index).as_str();
+            result += item.fs_code(effect_about.set(), effect_about.tex_start_bind(), index).as_str();
 
             index += 1;
         });
@@ -244,8 +230,6 @@ pub struct MaterialValueBindDesc<
     TInt: TUnifromShaderProperty,
     TUint: TUnifromShaderProperty,
 > {
-    pub set: u32,
-    pub bind: u32,
     pub stage: wgpu::ShaderStages,
     pub mat4_list: Vec<TMat4>,
     pub mat2_list: Vec<TMat2>,
@@ -272,8 +256,8 @@ impl<
     TInt,
     TUint,
 > {
-    pub fn none(set: u32, bind: u32, stage: wgpu::ShaderStages) -> Self {
-        Self { set, bind, stage, mat4_list: vec![], mat2_list: vec![], vec4_list: vec![], vec2_list: vec![], float_list: vec![], int_list: vec![], uint_list: vec![] }
+    pub fn none(stage: wgpu::ShaderStages) -> Self {
+        Self { stage, mat4_list: vec![], mat2_list: vec![], vec4_list: vec![], vec2_list: vec![], float_list: vec![], int_list: vec![], uint_list: vec![] }
     }
     pub fn size(&self) -> usize {
         let mut size = 0;
@@ -427,17 +411,17 @@ impl<
     TInt,
     TUint,
 > {
-    fn vs_code(&self) -> String {
+    fn vs_code(&self, effect_about: &ShaderSetEffectAbout) -> String {
         if self.stage & wgpu::ShaderStages::VERTEX == wgpu::ShaderStages::VERTEX {
-            self._code(self.set, self.bind)
+            self._code(effect_about.set(), ShaderBindEffectValue::BIND)
         } else {
             String::from("")
         }
     }
 
-    fn fs_code(&self) -> String {
+    fn fs_code(&self, effect_about: &ShaderSetEffectAbout) -> String {
         if self.stage & wgpu::ShaderStages::FRAGMENT == wgpu::ShaderStages::FRAGMENT {
-            self._code(self.set, self.bind)
+            self._code(effect_about.set(), ShaderBindEffectValue::BIND)
         } else {
             String::from("")
         }
@@ -449,7 +433,7 @@ impl<
 mod test {
     use pi_atom::Atom;
 
-    use crate::unifrom_code::{TBindGroupToShaderCode, TValueBindToShaderCode};
+    use crate::{unifrom_code::{TValueBindToShaderCode}, shader_set::ShaderSetEffectAbout};
 
     use super::{MaterialTextureBindDesc, UniformTextureDesc, MaterialValueBindDesc, UniformPropertyName, TUnifromShaderProperty};
 
@@ -463,7 +447,6 @@ mod test {
     #[test]
     fn uniform_code() {
         let texdesc = MaterialTextureBindDesc {
-            set: 2,
             list: vec![
                 UniformTextureDesc { 
                     slotname: Atom::from("_EmissiveTex"), 
@@ -493,8 +476,6 @@ mod test {
         };
 
         let valuedesc = MaterialValueBindDesc::<Uni, Uni, Uni, Uni, Uni, Uni, Uni> {
-            set: 1,
-            bind: 1,
             stage: wgpu::ShaderStages::VERTEX_FRAGMENT,
             mat4_list: vec![Uni(Atom::from("emissiveMatrics"))],
             mat2_list: vec![],
@@ -505,13 +486,15 @@ mod test {
             uint_list: vec![],
         };
 
+        let effect_about: ShaderSetEffectAbout = ShaderSetEffectAbout::new(Atom::from("Test"), 2, 16 * 4 + 8 * 4, 3);
+
         println!("texdesc.vs_code ");
-        println!("{}", texdesc.vs_code());
+        println!("{}", texdesc.vs_code(&effect_about));
         println!("texdesc.fs_code ");
-        println!("{}", texdesc.fs_code());
+        println!("{}", texdesc.fs_code(&effect_about));
         println!("valuedesc.vs_code ");
-        println!("{}", valuedesc.vs_code());
+        println!("{}", valuedesc.vs_code(&effect_about));
         println!("valuedesc.fs_code ");
-        println!("{}", valuedesc.fs_code());
+        println!("{}", valuedesc.fs_code(&effect_about));
     }
 }

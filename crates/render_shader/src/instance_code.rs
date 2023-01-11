@@ -15,10 +15,10 @@ impl EInstanceCode {
         else {
             result += Self::base().as_str();
         }
-        if self.0 & Self::COLOR == Self::COLOR {
+        if (self.0 & Self::COLOR) == Self::COLOR {
             result += Self::color().as_str();
         }
-        if self.0 & Self::TILL_OFF_1 == Self::TILL_OFF_1 {
+        if (self.0 & Self::TILL_OFF_1) == Self::TILL_OFF_1 {
             result += Self::uv().as_str();
         }
 

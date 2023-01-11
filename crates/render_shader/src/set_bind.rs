@@ -24,8 +24,8 @@ pub enum EOtherAboutBind {
 pub struct ShaderSetBind;
 impl ShaderSetBind {
     pub const SET_SCENE_ABOUT: u32 = 0;
-    pub const SET_EFFECT_ABOUT: u32 = 1;
-    pub const SET_MODEL_ABOUT: u32 = 2;
+    pub const SET_MODEL_ABOUT: u32 = 1;
+    pub const SET_EFFECT_ABOUT: u32 = 2;
     pub const SET_OTHER: u32 = 3;
     // pub const 
     pub fn code_uniform(kind: &str, name: &str) -> String {

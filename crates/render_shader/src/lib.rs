@@ -13,3 +13,4 @@ pub mod set_bind;
 pub mod shader_bind;
 pub mod shader_set;
 pub mod shader_data_kind;
+pub mod buildin_var;

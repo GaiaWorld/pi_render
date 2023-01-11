@@ -5,9 +5,9 @@ use pi_share::Share;
 use render_core::rhi::pipeline::VertexBufferLayout;
 use render_data_container::{TVertexDataKindKey, TVertexBufferID, vertex_layout_key::{KeyVertexLayouts, KeyVertexLayout}, KeyVertexBuffer};
 
-use crate::{vertex_code::{TVertexShaderCode, TVertexFormatCode}, error::EGeometryError};
+use crate::{vertex_code::{TVertexShaderCode, TVertexFormatCode}, error::EGeometryError, buildin_var::ShaderVarVertices};
 
-pub const BYTES_VERTEX_DATA_KIND: u8 = 4;
+pub const BYTES_VERTEX_DATA_KIND: u8 = 8;
 pub const BYTES_VERTEX_FORMAT: u8 = 5;
 pub const BYTES_VERTEX_BUFFER_STEP_MODE: u8 = 1;
 pub const MAX_VERTEX_ATTRIBUTE_ID: u8 = (KeyVertexLayout::MAX / (BYTES_VERTEX_BUFFER_STEP_MODE + BYTES_VERTEX_DATA_KIND + BYTES_VERTEX_FORMAT) as KeyVertexLayout) as u8;
@@ -24,7 +24,7 @@ trait TAsWgpuVertexAtribute {
 }
 
 ///
-/// 预留为支持 32 种顶点数据
+/// 预留为支持 64 种顶点数据
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EVertexDataKind {
     Position               ,
@@ -59,6 +59,19 @@ pub enum EVertexDataKind {
     InsCustomVec4B         ,
     InsCustomUVec4A        ,
     InsCustomIVec4B        ,
+
+    MatricesIndices1       ,
+    MatricesWeights1       ,
+
+    MatricesIndices2       ,
+    MatricesWeights2       ,
+    MatricesIndicesExtra2  ,
+    MatricesWeightsExtra2  ,
+
+    MatricesIndices3       ,
+    MatricesWeights3       ,
+    MatricesIndicesExtra3  ,
+    MatricesWeightsExtra3  ,
 }
 impl TAsVertexLayoutsKey for EVertexDataKind {
     fn bytes_for_vertex_layouts_key(&self) -> u8 {
@@ -98,44 +111,110 @@ impl TAsVertexLayoutsKey for EVertexDataKind {
             EVertexDataKind::InsCustomVec4B         => 29,
             EVertexDataKind::InsCustomUVec4A        => 30,
             EVertexDataKind::InsCustomIVec4B        => 31,
+            EVertexDataKind::MatricesIndices1       => 32,
+            EVertexDataKind::MatricesWeights1       => 33,
+            EVertexDataKind::MatricesIndices2       => 34,
+            EVertexDataKind::MatricesWeights2       => 35,
+            EVertexDataKind::MatricesIndicesExtra2  => 36,
+            EVertexDataKind::MatricesWeightsExtra2  => 37,
+            EVertexDataKind::MatricesIndices3       => 38,
+            EVertexDataKind::MatricesWeights3       => 39,
+            EVertexDataKind::MatricesIndicesExtra3  => 40,
+            EVertexDataKind::MatricesWeightsExtra3  => 41,
         }
     }
 }
 impl EVertexDataKind {
     pub fn vs_code(&self) -> &str {
         match self {
-            EVertexDataKind::Position               => "A_POSITION",
-            EVertexDataKind::Position2D             => "A_POSITION_2D",
-            EVertexDataKind::Color4                 => "A_COLOR4",
-            EVertexDataKind::UV                     => "A_UV",
-            EVertexDataKind::Normal                 => "A_NORMAL",
-            EVertexDataKind::Tangent                => "A_TANGENT",
-            EVertexDataKind::MatricesIndices        => "A_JOINT_INC",
-            EVertexDataKind::MatricesWeights        => "A_JOINT_WEG",
-            EVertexDataKind::MatricesIndicesExtra   => "A_JOINT_INC_EX",
-            EVertexDataKind::MatricesWeightsExtra   => "A_JOINT_WEG_EX",
-            EVertexDataKind::UV2                    => "A_UV2",
-            EVertexDataKind::UV3                    => "A_UV3",
-            EVertexDataKind::UV4                    => "A_UV4",
-            EVertexDataKind::UV5                    => "A_UV5",
-            EVertexDataKind::UV6                    => "A_UV6",
-            EVertexDataKind::CustomVec4A            => "A_CustomV4A",
-            EVertexDataKind::CustomVec4B            => "A_CustomV4B",
-            EVertexDataKind::CustomVec3A            => "A_CustomV3A",
-            EVertexDataKind::CustomVec3B            => "A_CustomV3B",
-            EVertexDataKind::CustomVec2A            => "A_CustomV2A",
-            EVertexDataKind::CustomVec2B            => "A_CustomV2B",
-            EVertexDataKind::InsWorldRow1           => "A_INS_World1",
-            EVertexDataKind::InsWorldRow2           => "A_INS_World2",
-            EVertexDataKind::InsWorldRow3           => "A_INS_World3",
-            EVertexDataKind::InsWorldRow4           => "A_INS_World4",
-            EVertexDataKind::InsColor               => "A_INS_Color",
-            EVertexDataKind::InsTillOffset1         => "A_INS_TillOff1",
-            EVertexDataKind::InsTillOffset2         => "A_INS_TillOff2",
-            EVertexDataKind::InsCustomVec4A         => "A_INS_Vec4A",
-            EVertexDataKind::InsCustomVec4B         => "A_INS_Vec4B",
-            EVertexDataKind::InsCustomUVec4A        => "A_INS_UVec4A",
-            EVertexDataKind::InsCustomIVec4B        => "A_INS_IVec4B",
+            EVertexDataKind::Position               => ShaderVarVertices::POSITION                  ,
+            EVertexDataKind::Position2D             => ShaderVarVertices::POSITION2D                ,
+            EVertexDataKind::Color4                 => ShaderVarVertices::COLOR4                    ,
+            EVertexDataKind::UV                     => ShaderVarVertices::UV                        ,
+            EVertexDataKind::Normal                 => ShaderVarVertices::NORMAL                    ,
+            EVertexDataKind::Tangent                => ShaderVarVertices::TANGENT                   ,
+            EVertexDataKind::MatricesIndices        => ShaderVarVertices::MATRICES_INDICES          ,
+            EVertexDataKind::MatricesWeights        => ShaderVarVertices::MATRICES_WEIGHTS          ,
+            EVertexDataKind::MatricesIndicesExtra   => ShaderVarVertices::MATRICES_INDICES_EXTRA    ,
+            EVertexDataKind::MatricesWeightsExtra   => ShaderVarVertices::MATRICES_WEIGHTS_EXTRA    ,
+            EVertexDataKind::UV2                    => ShaderVarVertices::UV2                       ,
+            EVertexDataKind::UV3                    => ShaderVarVertices::UV3                       ,
+            EVertexDataKind::UV4                    => ShaderVarVertices::UV4                       ,
+            EVertexDataKind::UV5                    => ShaderVarVertices::UV5                       ,
+            EVertexDataKind::UV6                    => ShaderVarVertices::UV6                       ,
+            EVertexDataKind::CustomVec4A            => ShaderVarVertices::CUSTOM_VEC4_A             ,
+            EVertexDataKind::CustomVec4B            => ShaderVarVertices::CUSTOM_VEC4_B             ,
+            EVertexDataKind::CustomVec3A            => ShaderVarVertices::CUSTOM_VEC3_A             ,
+            EVertexDataKind::CustomVec3B            => ShaderVarVertices::CUSTOM_VEC3_B             ,
+            EVertexDataKind::CustomVec2A            => ShaderVarVertices::CUSTOM_VEC2_A             ,
+            EVertexDataKind::CustomVec2B            => ShaderVarVertices::CUSTOM_VEC2_B             ,
+            EVertexDataKind::InsWorldRow1           => ShaderVarVertices::INS_WORLD_ROW1            ,
+            EVertexDataKind::InsWorldRow2           => ShaderVarVertices::INS_WORLD_ROW2            ,
+            EVertexDataKind::InsWorldRow3           => ShaderVarVertices::INS_WORLD_ROW3            ,
+            EVertexDataKind::InsWorldRow4           => ShaderVarVertices::INS_WORLD_ROW4            ,
+            EVertexDataKind::InsColor               => ShaderVarVertices::INS_COLOR                 ,
+            EVertexDataKind::InsTillOffset1         => ShaderVarVertices::INS_TILL_OFFSET1          ,
+            EVertexDataKind::InsTillOffset2         => ShaderVarVertices::INS_TILL_OFFSET2          ,
+            EVertexDataKind::InsCustomVec4A         => ShaderVarVertices::INS_CUSTOM_VEC4_A         ,
+            EVertexDataKind::InsCustomVec4B         => ShaderVarVertices::INS_CUSTOM_VEC4_B         ,
+            EVertexDataKind::InsCustomUVec4A        => ShaderVarVertices::INS_CUSTOM_UVEC4_A        ,
+            EVertexDataKind::InsCustomIVec4B        => ShaderVarVertices::INS_CUSTOM_IVEC4_B        ,
+            EVertexDataKind::MatricesIndices1       => ShaderVarVertices::MATRICES_INDICES1         ,
+            EVertexDataKind::MatricesWeights1       => ShaderVarVertices::MATRICES_WEIGHTS1         ,
+            EVertexDataKind::MatricesIndices2       => ShaderVarVertices::MATRICES_INDICES2         ,
+            EVertexDataKind::MatricesWeights2       => ShaderVarVertices::MATRICES_WEIGHTS2         ,
+            EVertexDataKind::MatricesIndicesExtra2  => ShaderVarVertices::MATRICES_INDICES_EXTRA2   ,
+            EVertexDataKind::MatricesWeightsExtra2  => ShaderVarVertices::MATRICES_WEIGHTS_EXTRA2   ,
+            EVertexDataKind::MatricesIndices3       => ShaderVarVertices::MATRICES_INDICES3         ,
+            EVertexDataKind::MatricesWeights3       => ShaderVarVertices::MATRICES_WEIGHTS3         ,
+            EVertexDataKind::MatricesIndicesExtra3  => ShaderVarVertices::MATRICES_INDICES_EXTRA3   ,
+            EVertexDataKind::MatricesWeightsExtra3  => ShaderVarVertices::MATRICES_WEIGHTS_EXTRA3   ,
+        }
+    }
+    pub fn kind(&self) -> &str {
+        match self {
+            EVertexDataKind::Position               => "vec3",
+            EVertexDataKind::Position2D             => "vec2",
+            EVertexDataKind::Color4                 => "vec4",
+            EVertexDataKind::UV                     => "vec2",
+            EVertexDataKind::Normal                 => "vec3",
+            EVertexDataKind::Tangent                => "vec4",
+            EVertexDataKind::MatricesIndices        => "uvec4",
+            EVertexDataKind::MatricesWeights        => "vec4",
+            EVertexDataKind::MatricesIndicesExtra   => "uvec4",
+            EVertexDataKind::MatricesWeightsExtra   => "vec4",
+            EVertexDataKind::UV2                    => "vec2",
+            EVertexDataKind::UV3                    => "vec2",
+            EVertexDataKind::UV4                    => "vec2",
+            EVertexDataKind::UV5                    => "vec2",
+            EVertexDataKind::UV6                    => "vec2",
+            EVertexDataKind::CustomVec4A            => "vec4",
+            EVertexDataKind::CustomVec4B            => "vec4",
+            EVertexDataKind::CustomVec3A            => "vec3",
+            EVertexDataKind::CustomVec3B            => "vec3",
+            EVertexDataKind::CustomVec2A            => "vec2",
+            EVertexDataKind::CustomVec2B            => "vec2",
+            EVertexDataKind::InsWorldRow1           => "vec4",
+            EVertexDataKind::InsWorldRow2           => "vec4",
+            EVertexDataKind::InsWorldRow3           => "vec4",
+            EVertexDataKind::InsWorldRow4           => "vec4",
+            EVertexDataKind::InsColor               => "vec4",
+            EVertexDataKind::InsTillOffset1         => "vec4",
+            EVertexDataKind::InsTillOffset2         => "vec4",
+            EVertexDataKind::InsCustomVec4A         => "vec4",
+            EVertexDataKind::InsCustomVec4B         => "vec4",
+            EVertexDataKind::InsCustomUVec4A        => "uvec4",
+            EVertexDataKind::InsCustomIVec4B        => "ivec4",
+            EVertexDataKind::MatricesIndices1       => "uint",
+            EVertexDataKind::MatricesWeights1       => "float",
+            EVertexDataKind::MatricesIndices2       => "uvec2",
+            EVertexDataKind::MatricesWeights2       => "vec2",
+            EVertexDataKind::MatricesIndicesExtra2  => "uvec2",
+            EVertexDataKind::MatricesWeightsExtra2  => "vec2",
+            EVertexDataKind::MatricesIndices3       => "uvec3",
+            EVertexDataKind::MatricesWeights3       => "vec3",
+            EVertexDataKind::MatricesIndicesExtra3  => "uvec3",
+            EVertexDataKind::MatricesWeightsExtra3  => "vec3",
         }
     }
 }
@@ -273,10 +352,6 @@ impl VertexAttribute {
         calcolator.calc(
             self.kind.as_vertex_layouts_key(),
             self.kind.bytes_for_vertex_layouts_key()
-        );
-        calcolator.calc(
-            self.format.as_vertex_layouts_key(),
-            self.format.bytes_for_vertex_layouts_key()
         );
     }
 }
