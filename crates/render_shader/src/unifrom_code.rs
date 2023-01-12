@@ -11,6 +11,20 @@ pub trait TUnifromShaderProperty {
 
 pub type UniformPropertyName = Atom;
 
+// 默认为Atom实现
+impl TUnifromShaderProperty for Atom {
+	fn tag(&self) -> &UniformPropertyName {
+		self
+	}
+}
+
+// // 
+// impl TUnifromShaderProperty for (Atom, Vec<f32>) {
+// 	fn tag(&self) -> &UniformPropertyName {
+// 		self
+// 	}
+// }
+
 
 pub trait TTextureBindToShaderCode {
     fn vs_code(&self, set: u32, index: u32) -> String;

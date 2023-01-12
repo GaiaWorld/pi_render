@@ -14,6 +14,7 @@ pub mod pipeline;
 pub mod shader;
 pub mod texture;
 pub mod uniform_vec;
+pub mod draw_obj;
 
 use std::sync::Arc;
 
