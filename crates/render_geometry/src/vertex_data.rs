@@ -1,4 +1,4 @@
-use std::{mem::{size_of, replace}, ops::{Deref, Range}};
+use std::{mem::{size_of, replace}, ops::{Deref, Range}, fmt::Debug};
 
 use pi_assets::asset::Asset;
 use pi_share::Share;
@@ -317,6 +317,7 @@ impl TAsVertexLayoutsKey for wgpu::VertexStepMode {
     }
 }
 
+#[derive(Debug)]
 pub struct VertexLayoutsKeyCalcolator {
     pub key: KeyVertexLayout,
     pub use_bytes: u8,
@@ -365,7 +366,7 @@ impl TAsWgpuVertexAtribute for VertexAttribute {
     }
 }
 
-pub trait TVertexBufferDesc {
+pub trait TVertexBufferDesc: Debug {
     fn attributes(&self) -> &Vec<VertexAttribute>;
     fn stride(&self) -> wgpu::BufferAddress {
         
@@ -507,7 +508,7 @@ impl TVertexShaderCode for ResVertexBufferLayout {
         let mut index = 0;
         self.list.iter().for_each(|attribute| {
             let kind = self.kinds.get(index).unwrap();
-            if *kind != EVertexDataKind::Color4 {
+            if *kind != EVertexDataKind::Color4 && *kind != EVertexDataKind::Normal {
                 result += attribute.format.vs_code().as_str();
                 result += " ";
             }
@@ -590,6 +591,9 @@ impl VertexBufferLayouts {
         });
 
         if calcolator.isok() {
+            println!(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
+            println!("{:?}", calcolator);
+            println!("{:?}", layouts);
             Ok(KeyVertexLayouts(calcolator.key, calcolator.key2))
         } else {
             Err(EGeometryError::AttributesInfoTooMoreNotSupport)
@@ -674,7 +678,8 @@ mod vertex_code_test {
             TestVertexBufferDesc {
                 attributes: vec![
                     VertexAttribute { kind: super::EVertexDataKind::Position, format: wgpu::VertexFormat::Float32x3 },
-                    VertexAttribute { kind: super::EVertexDataKind::Normal, format: wgpu::VertexFormat::Float32x3 }
+                    VertexAttribute { kind: super::EVertexDataKind::Normal, format: wgpu::VertexFormat::Float32x3 },
+                    VertexAttribute { kind: super::EVertexDataKind::UV, format: wgpu::VertexFormat::Float32x2 }
                 ],
                 step_mode: wgpu::VertexStepMode::Vertex,
             },

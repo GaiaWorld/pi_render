@@ -76,7 +76,7 @@ impl<
         // EntryPoint
         result.push(BlockCode {
             define: String::from("#version 450\r\n"),
-            running: String::from("void main() {\r\n vec4 A_COLOR4 = vec4(1., 1., 1., 1.);\r\n"),
+            running: String::from("void main() {\r\nvec4 A_COLOR4 = vec4(1., 1., 1., 1.);\r\nvec3 A_NORMAL = vec3(0., 1., 0.);\r\n"),
         });
         
         // attributes
@@ -228,6 +228,8 @@ impl ResShader {
     ) -> Self {
         let vs = preshader.vs_blocks(vertex_layouts, instance, scene_about, model_about, effect_about);
         let fs = preshader.fs_blocks(scene_about, effect_about);
+
+        println!(">>>>>>>>>>>> Shader");
 
         let root_dir = std::env::current_dir().unwrap();
         let file_name = "temp.vert";

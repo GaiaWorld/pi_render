@@ -359,10 +359,8 @@ impl<
             result += ";\r\n";
         });
         let fill_vec2_count    = self.vec2_list.len() % 2;
-        for i in 0..fill_vec2_count {
-            result += "vec2 _placeholder_vec2_";
-            result += &i.to_string();
-            result += ";\r\n";
+        if fill_vec2_count > 0 {
+            result += "vec2 _placeholder_vec2_0;\r\n";
         }
         
         self.float_list.iter().for_each(|name| {
@@ -383,10 +381,12 @@ impl<
             result += ";\r\n";
         });
         let fill_int_count    = (self.float_list.len() + self.int_list.len() + self.uint_list.len()) % 4;
-        for i in 0..fill_int_count {
-            result += "uint _placeholder_int_";
-            result += &i.to_string();
-            result += ";\r\n";
+        if fill_int_count > 0 {
+            for i in fill_int_count..4 {
+                result += "uint _placeholder_int_";
+                result += &i.to_string();
+                result += ";\r\n";
+            }
         }
 
         result += "};\r\n";
