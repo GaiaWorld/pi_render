@@ -137,7 +137,6 @@ impl Parser {
             let file = read(shader_path.path());
             if let Ok(bytes) = file {
 				let shader_code = String::from_utf8(bytes.to_vec()).unwrap();
-				println!("path=================={:?}", shader_path);
 				let _ = self.parse_shader_slice_code(shader_code, &shader_path.path(), stage,  &mut built_temp);
             }
 			Some(path)
@@ -200,7 +199,6 @@ impl Parser {
 					continue;
 				}
 			}
-			// println!("pppp============={:?}", &Path::new(i).to_path_buf());
 			// let shader_id = built_temp.path_map_id.get(&Path::new(i).to_path_buf()).unwrap().clone();
 			self.build_shader(
 				i.clone(),
@@ -239,8 +237,8 @@ impl Parser {
 			&mut XHashSet::default(),
 		)?;
 
-		let vs_module = built_temp.built_map.get(&vs_shader_id).unwrap();
-		let fs_module = built_temp.built_map.get(&fs_shader_id).unwrap();
+		// let vs_module = built_temp.built_map.get(&vs_shader_id).unwrap();
+		// let fs_module = built_temp.built_map.get(&fs_shader_id).unwrap();
 		let vs_bindings_list = built_temp.bindings.get(&vs_shader_id).unwrap();
 		let fs_bindings_list = built_temp.bindings.get(&fs_shader_id).unwrap();
 		let vs_bindings = vs_bindings_list
@@ -264,19 +262,16 @@ impl Parser {
 		let fs_slice = built_temp.built_slice.get(&fs_shader_id).unwrap();
 
 		let vs_compile_result = compile_uniform(
-			vs_module, 
 			&vs_bindings,
 			&inputs,
 			vs_slice,
 		)?;
 		let share_compile_result = compile_uniform(
-			vs_module, 
 			&share_bindings,
 			&inputs,
 			vs_slice,
 		)?;
 		let fs_compile_result = compile_uniform(
-			fs_module, 
 			&fs_bindings,
 			&Vec::default(),
 			fs_slice,
@@ -478,10 +473,8 @@ impl Parser {
 		let shader_slice = built_temp.built_slice.get(&shader_id).unwrap();
 		let extension = slice.path.extension().unwrap();
 
-		println!("p=================={:?}, {:?}", extension, slice.path);
 		if extension != "vert" && extension != "frag" {
 			let uniform_code = compile_uniform(
-				module, 
 				&bindings,
 				&inputs,
 				shader_slice,
@@ -512,7 +505,6 @@ impl Parser {
 				uniform_code.codes.join(",\n"),
 				slice.defines.iter().map(|r| {format!(r#"Atom::from("{}")"#, r)}).collect::<Vec<String>>().join(",")
 			);
-			println!("p=================={:?}, {:?}, {:?}", extension, slice.path, compile_result);
 			let path = slice.path.to_string_lossy().to_string();
 			result.shader_result.push((path[0..path.len() - 5].to_string() + ".rs", compile_result));
 		}
@@ -613,7 +605,6 @@ impl Parser {
                 }
 				defines.pop();
             } else if let Some(cap) = SHADER_PROCESSOR.layout_struct_regex.captures(line) {
-				println!("!!!!!!!!!!!!!!================={:?}, {:?}", line, path);
 				default_value = "".to_string();
 				uniform_scopes.push(true);
 				last_code.push_str(line);
@@ -651,9 +642,7 @@ impl Parser {
 				last_code.push_str(line);
 				last_code.push_str("\n");
 			} else if uniform_scopes.len() > 0 {
-				println!("lin================={:?}, {:?}", line, path);
 				if let Some(cap) = SHADER_PROCESSOR.default_value_regex.captures(line){
-					println!("default===================!!!");
 					// 默认值
 					default_value = cap.get(1).unwrap().as_str().to_string();
 				} else {
@@ -719,6 +708,7 @@ impl Parser {
 		let module = parser
 			.parse(&front::glsl::Options::from(ShaderStage::Vertex), &*last_code)
 			.map_err(CompileShaderError::GlslParse1)?;
+		// println!("module======={:?}", module);
 		build_temp.built_map.insert(id.clone(), Arc::new(module));
 
 		let slice = ShaderSlice { 
@@ -737,7 +727,6 @@ impl Parser {
 			binding_defines,
 			defines: define_list,
 		};
-		println!("built_slice!!!==========={:?}, {:?}", path, slice);
 		build_temp.built_slice.insert(id.clone(), slice);
 		Ok(())
 	}
@@ -996,12 +985,11 @@ pub enum CompileShaderError {
 
 /// 提取shader中的uniform， 定义和实现对应的rust数据结构
 fn compile_uniform(
-	module: &Module, 
 	bindings: &XHashMap<UniformSlot, (BindingType, String)>,
 	inputs: &Vec<BindingLocation>,
 	code_slice: &ShaderSlice,
 ) -> Result<UniformCode, CompileShaderError> {
-	println!("module: {:?}", module);
+	// println!("module: {:?}", module);
 
 	let mut out_code = Vec::new();
 	let mut entrys = Vec::new();
@@ -2052,7 +2040,6 @@ fn get_bindings(module: &Module, binding_excludes: &XHashMap<UniformSlot, (Shade
 			if binding_excludes.contains_key(&UniformSlot::new(group, binding)) {
 				continue;
 			}
-			println!("zzzz!!=========={:?}, {:?}", UniformSlot::new(group, binding), binding_excludes.keys());
             match uniforms.entry(UniformSlot::new(group, binding)) {
                 Entry::Vacant(r) => {
 					let mut binding_type = match get_binding_types(ty, &module.types, &module.constants) {
@@ -2067,7 +2054,6 @@ fn get_bindings(module: &Module, binding_excludes: &XHashMap<UniformSlot, (Shade
 						Some(r) => r.clone(),
 						None => ty.name.clone().unwrap(),
 					};
-					println!("name======{:?}, {:?}, {:?}", item.1.name, ty.name, name);
                     r.insert((binding_type, name));
                 }
                 Entry::Occupied(_r) => panic!("Uniform setting binding repeated: {:?}", ty.name),

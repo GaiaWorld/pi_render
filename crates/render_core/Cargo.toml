@@ -79,3 +79,4 @@ parking_lot = "0.11"
 
 [dev-dependencies]
 bytemuck = { version = "1.4", features = ["derive"] }
+render_derive={path="../render_derive"}

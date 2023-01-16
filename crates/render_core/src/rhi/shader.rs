@@ -56,6 +56,7 @@ pub trait WriteBuffer {
     // 将自身写入buffer缓冲区，假定buffer的容量足够，否则崩溃
     fn write_into(&self, index: u32, buffer: &mut [u8]);
     fn byte_len(&self) -> u32;
+    fn offset(&self) -> u32;
 }
 
 /// shader的元信息描述

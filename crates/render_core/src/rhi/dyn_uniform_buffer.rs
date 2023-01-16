@@ -1,13 +1,10 @@
-use std::{
-    fmt::Debug,
-    mem::transmute,
-    ops::{Deref, Range},
-};
+use std::{fmt::Debug, ops::Range};
 
 use bitvec::vec::BitVec;
-use derive_deref_rs::Deref;
 use pi_map::vecmap::VecMap;
 use pi_share::{Share, ShareMutex};
+use smallvec::{smallvec, SmallVec};
+use thiserror::Error;
 use wgpu::{util::BufferInitDescriptor, BufferUsages};
 
 use super::{
@@ -15,138 +12,40 @@ use super::{
     bind_group_layout::BindGroupLayout,
     buffer::Buffer,
     device::RenderDevice,
-    shader::{BindLayout, BufferSize, Uniform, WriteBuffer},
+    shader::{BindLayout, Uniform, WriteBuffer},
     RenderQueue,
 };
-
-/// 用于管理bingdgroup中的buffer
+/// 用于管理一类bindgroup分配的buffer
 /// 这些bindgroup需要满足如下要求：
 /// * binggroup中的所有binding都是buffer类型
 /// * 该group中的所有binding的buffer都通过本管理器分配
-pub struct DynGroupBuffersMgr {
-    buffers: Vec<DynGroupBuffers>,
-    alignment: u32,
-    limit_size: u32,
-}
-
-impl DynGroupBuffersMgr {
-    /// 创建DynGroupBuffersMgr
-    pub fn new(alignment: u32, limit_size: u32) -> Self {
-        Self {
-            buffers: Vec::with_capacity(1),
-            alignment,
-            limit_size,
-        }
-    }
-    /// 为一类bindgroup添加buffer分配
-    /// 相同布局的bindgroup可以多次添加，这取决于外部需要将该布局的bindgroup如何分类
-    /// # example
-    /// 通常按更新频率将bindgroup分类，可以将某类型的bindgroup分为两类：可变Buffer、不可变Buffer。
-    /// 是的大部分情况下，不可变buffer无须更新到显卡， 可变buffer更新时，有不至于更新的数据量过大
-    /// ```
-    /// let mut buffer_mgr = DynGroupBuffersMgr::new(16, 256);
-    /// // 同一种bindgroup， 可以添加不可变的buffer分配器和可变的buffer分配器，甚至更多类型的分配器
-    /// let imut_index = buffer_mgr.add_for_bind_group(None, ...);
-    /// let mut_index = buffer_mgr.add_for_bind_group(None, ...);
-    /// ```
-    pub fn add_for_bind_group(
-        &mut self,
-        label: Option<String>,
-        entrys: Vec<wgpu::BindGroupLayoutEntry>,
-    ) -> Result<GroupBufferIndex, String> {
-        let buffer = DynGroupBuffers::new(label, self.alignment, self.limit_size, entrys)?;
-        self.buffers.push(buffer);
-        Ok(GroupBufferIndex(self.buffers.len() - 1))
-    }
-
-    /// 将buffer更新到wgpu，将扩容了buffer的bindgroup重新创建
-    pub fn write_buffer(&mut self, device: &RenderDevice, queue: &RenderQueue) {
-        for b in self.buffers.iter_mut() {
-            b.write_buffer(device, queue);
-        }
-    }
-
-    /// 取到某种类型的buffer分配器
-    pub fn get(&self, index: GroupBufferIndex) -> Option<DynGroupBuffersEntry> {
-        if index.0 >= self.buffers.len() {
-            return None;
-        }
-        Some(self.index(index))
-    }
-    /// 取到某种类型的buffer分配器
-    /// 如果不存在，将panic
-    pub fn index(&self, index: GroupBufferIndex) -> DynGroupBuffersEntry {
-        DynGroupBuffersEntry {
-            buffer: &self.buffers[index.0],
-            index,
-        }
-    }
-}
-
-/// 某种bindgrop的buffer分配器的索引
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct GroupBufferIndex(usize);
-
-/// buffer分配器 + 其在DynGroupBuffersMgr中的索引
-pub struct DynGroupBuffersEntry<'a> {
-    buffer: &'a DynGroupBuffers,
-    index: GroupBufferIndex,
-}
-
-impl<'a> DynGroupBuffersEntry<'a> {
-    /// 分配buffer
-    #[inline]
-    pub fn alloc(&self) -> DynBufferIndex {
-        let mut r = self.buffer.alloc();
-        r.group_index = self.index.clone();
-        r
-    }
-}
-
-impl<'a> Deref for DynGroupBuffersEntry<'a> {
-    type Target = DynGroupBuffers;
-
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        self.buffer
-    }
-}
-
-/// 用于管理一个bindgroup分配的buffer
-pub struct DynGroupBuffers {
-    buffers: Share<ShareMutex<Buffers>>,
+///
+pub struct GroupAlloter {
+    buffers: Share<GroupBuffer>,
     info: DynGroupBufferInfo,
 }
 
-/// 可变buffer的索引
-pub struct DynBufferIndex {
-    pub buffer_offset: Vec<u32>,
-    buffer_index: usize,
-    buffers: Share<ShareMutex<Buffers>>,
-    group_index: GroupBufferIndex,
-}
-
-impl Debug for DynBufferIndex {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("DynBufferIndex")
-            .field("buffer_offset", &self.buffer_offset)
-            .field("buffer_index", &self.buffer_index)
-            .field("group_index", &self.group_index)
-            .finish()
-    }
-}
-
-impl DynGroupBuffers {
+impl GroupAlloter {
+    /// 相同布局的bindgroup可以多次添加，这取决于外部需要将该布局的bindgroup如何分类
+    /// # example
+    /// 通常按更新频率将bindgroup分类，可以将某类型的bindgroup分为两类：可变Buffer、不可变Buffer。
+    /// 大部分情况下，不可变buffer无须更新到wgpu， 可变buffer更新时，又不至于更新的数据量过大
+    /// ```
+    /// // 同一种bindgroup， 可以添加不可变的buffer分配器和可变的buffer分配器，甚至更多类型的分配器
+    /// let imut_index = GroupBufferMgr::new(...);
+    /// let mut_index = GroupBufferMgr::new(...);
+    /// ```
     pub fn new(
         label: Option<String>,
-        alignment: u32,
+        min_alignment: u32,
         limit_size: u32,
+        init_size: Option<u32>, // 单位： 字节
         entrys: Vec<wgpu::BindGroupLayoutEntry>,
-    ) -> Result<Self, String> {
+    ) -> Result<Self, DynBufferError> {
         let mut binding_offset_map = VecMap::with_capacity(entrys.len());
-        let mut buffer0 = Vec::with_capacity(1);
+        // let mut buffer0 = Vec::with_capacity(1);
         let mut binding_size_list = Vec::with_capacity(entrys.len());
-        let (mut max_size_binding_index, mut max_size) = (0, 0);
+        let mut max_size = 0;
         for (i, entry) in entrys.iter().enumerate() {
             if let wgpu::BindingType::Buffer {
                 min_binding_size, ..
@@ -154,46 +53,49 @@ impl DynGroupBuffers {
             {
                 match min_binding_size {
                     Some(r) => {
-                        let size = (entry.count.map_or(1, |r| r.get()) * r.get() as u32) as usize;
-                        buffer0.push(DynBindingBuffer::new(label.clone(), alignment, size));
-                        if size > max_size {
-                            max_size = size;
-                            max_size_binding_index = i;
+                        let mut size = entry.count.map_or(1, |r| r.get()) * r.get() as u32;
+                        // 对齐
+                        let remain = size % min_alignment;
+                        if remain > 0 {
+                            size += min_alignment - remain;
                         }
-                        binding_size_list.push(size);
+
+                        if size as usize > max_size {
+                            max_size = size as usize;
+                        }
+                        binding_size_list.push(size as u32);
                         binding_offset_map.insert(entry.binding as usize, i);
                         // 是否需要对齐？TODO
                         // block_size += r.get() as u32 * count;
                     }
-                    None => {
-                        return Err(
-                            "DynUniformBuffers init fail, min_binding_size is none ".to_string()
-                        )
-                    }
+                    None => return Err(DynBufferError::MissMinSize),
                 }
             } else {
-                return Err("".to_string());
+                return Err(DynBufferError::NotNuffer(format!("{:?}", &entry.ty)));
             }
         }
         let (layout_label, group_label) = match &label {
             Some(r) => (Some(r.clone() + " layout"), Some(r.clone() + " group")),
             None => (None, None),
         };
+        let limit_count = (limit_size as usize) / max_size;
+        let init_size = match init_size {
+            Some(init_size) => init_size as usize / max_size,
+            None => 6400 / max_size,
+        };
+        let buffer_maps = BufferMaps::new(init_size, binding_size_list.as_slice());
 
-        Ok(DynGroupBuffers {
-            buffers: Share::new(ShareMutex::new(Buffers {
-                values: vec![buffer0],
+        Ok(GroupAlloter {
+            buffers: Share::new(GroupBuffer {
+                values: smallvec![buffer_maps],
                 lately_use_buffer: 0,
-            })),
+                binding_offset_map,
+                mutex: ShareMutex::new(()),
+            }),
             info: DynGroupBufferInfo {
                 entrys,
                 layout: None,
-                bind_groups: VecMap::new(),
-                binding_offset_map,
-                // block_size: block_size,
-                max_size_binding_index,
-                limit_size,
-                alignment,
+                limit_count,
                 binding_size_list,
                 label,
                 layout_label,
@@ -202,102 +104,63 @@ impl DynGroupBuffers {
         })
     }
 
-    #[inline]
-    pub fn alloc(&self) -> DynBufferIndex {
+    /// 为bindgroup分配索引
+    pub fn alloc(&self) -> BufferGroup {
         // 寻找一个可以分配的buffer
+        fn alloc(context: &GroupAlloter) -> (usize, usize) {
+            // SAFE: 这里转为可变，立即解锁，保证alloc在多线程下不冲突
+            let buffers =
+                unsafe { &mut *(Share::as_ptr(&context.buffers) as usize as *mut GroupBuffer) };
+            let _lock = buffers.mutex.lock();
 
-        fn find_or_create_buffers<'a, 'b>(
-            buffers: &'a mut Vec<Vec<DynBindingBuffer>>,
-            info: &'b DynGroupBufferInfo,
-        ) -> (usize, &'a mut Vec<DynBindingBuffer>) {
-            // 绕过生命周期误报，应该是编译器bug，这里先绕过
-            let buff11: &'a mut Vec<Vec<DynBindingBuffer>> =
-                unsafe { transmute(&mut *buffers as *mut Vec<Vec<DynBindingBuffer>>) };
+            let info = &context.info;
+
+            // 如果最近分配过的buffer已经超出内存限制，则创建或找到一个有剩余空间的buffer
+            if let Some(r) = buffers.values[buffers.lately_use_buffer].alloc() {
+                return (r, buffers.lately_use_buffer);
+            }
 
             // 找到一个存在空闲位置的buffer组
-            for (index, buffer) in buff11.iter_mut().enumerate() {
-                let buffer1 = &mut buffer[info.max_size_binding_index];
-
-                if buffer1.len() + buffer1.block_size() < info.limit_size as usize {
-                    return (index, buffer);
+            for (index, buffer) in buffers.values.iter_mut().enumerate() {
+                if let Some(r) = buffer.alloc() {
+                    buffers.lately_use_buffer = index;
+                    (r, index);
                 }
             }
 
+            let next_count = info
+                .limit_count
+                .min(buffers.values.last().unwrap().len() * 2);
+
             // 如果未找到，则创建新的
-            let mut buffer = Vec::with_capacity(info.binding_size_list.len());
-            for i in info.binding_size_list.iter() {
-                buffer.push(DynBindingBuffer::new(
-                    info.label.clone(),
-                    info.alignment,
-                    *i,
-                ));
-            }
-            buffers.push(buffer);
-            let last_index = buffers.len() - 1;
-            (last_index, &mut buffers[last_index])
-        }
+            // let mut buffer = Vec::with_capacity(info.binding_size_list.len());
 
-        let mut buffer_lock = self.buffers.lock();
-        let buffer_lock = &mut *buffer_lock;
-        let info = &self.info;
+            buffers.lately_use_buffer = context.buffers.values.len();
+            let mut buffer_maps = BufferMaps::new(next_count, info.binding_size_list.as_slice());
+            let alloc_index = buffer_maps.alloc().unwrap();
+            buffers.values.push(buffer_maps);
 
-        // 如果最近分配过的buffer已经超出内存限制，则创建或找到一个有剩余空间的buffer
-        let mut buffers = &mut buffer_lock.values[buffer_lock.lately_use_buffer];
-        if !buffers[info.max_size_binding_index].check_limit(info.limit_size) {
-            let r = find_or_create_buffers(&mut buffer_lock.values, info);
-            buffer_lock.lately_use_buffer = r.0;
-            buffers = r.1;
+            (alloc_index, context.buffers.lately_use_buffer)
         }
-
-        // 分配
-        let mut offsets = Vec::new();
-        for buffer in buffers.iter_mut() {
-            offsets.push(buffer.alloc());
-        }
+        let (alloc_index, lately_use_buffer) = alloc(self);
 
         // 返回分配的索引
-        DynBufferIndex {
-            buffer_offset: offsets,
-            buffer_index: buffer_lock.lately_use_buffer,
-            buffers: self.buffers.clone(),
-            group_index: GroupBufferIndex(0),
+        BufferGroup {
+            index: alloc_index,
+            bindings_index: lately_use_buffer,
+            context: self.buffers.clone(),
+            group_offsets: self.buffers.values[lately_use_buffer].group_offsets.clone(),
         }
-    }
-
-    /// 设置uniform
-    #[inline]
-    pub fn set_uniform<T: Uniform>(
-        &mut self,
-        binding_offset: &DynBufferIndex,
-        t: &T,
-    ) -> Result<(), String> {
-        self.update_buffer(binding_offset, t, T::Binding::binding())
-    }
-
-    /// 更新buffer
-    pub fn update_buffer<T: WriteBuffer>(
-        &self,
-        binding_offset: &DynBufferIndex,
-        t: &T,
-        binding: u32,
-    ) -> Result<(), String> {
-        // 指针不等，无法更新
-        if !Share::ptr_eq(&binding_offset.buffers, &self.buffers) {
-            return Err("".to_string());
-        }
-        let offset = match self.info.binding_offset_map.get(binding as usize) {
-            Some(r) => *r,
-            None => return Err("".to_string()),
-        };
-        let mut buffer_lock = self.buffers.lock();
-        buffer_lock.values[binding_offset.buffer_index][offset]
-            .set_uniform::<T>(binding_offset.buffer_offset[offset], t);
-        Ok(())
     }
 
     /// 写入buffer到现存，返回是否重新创建了buffer
     pub fn write_buffer(&mut self, device: &RenderDevice, queue: &RenderQueue) {
-        let mut buffer_lock = self.buffers.lock();
+        // SAFE
+        let buffer_lock =
+            unsafe { &mut *(Share::as_ptr(&self.buffers) as usize as *mut GroupBuffer) };
+        let _lock = self.buffers.mutex.lock();
+
+        let buffer_lock = &mut *buffer_lock;
         if let None = self.info.layout {
             let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 label: match &self.info.layout_label {
@@ -309,312 +172,476 @@ impl DynGroupBuffers {
             self.info.layout = Some(layout);
         }
         let layout = self.info.layout.as_ref().unwrap();
-        for (i, buffers) in buffer_lock.values.iter_mut().enumerate() {
-            let mut buffer_is_expand = false;
-            for buffer in buffers.iter_mut() {
-                buffer_is_expand = buffer.write_buffer(device, queue) || buffer_is_expand;
-            }
-
-            // 如果有buffer扩容，则重新创建bindgroup
-            if buffer_is_expand {
-                let mut entries = Vec::new();
-                for (i, entry) in self.info.entrys.iter().enumerate() {
-                    let buffer = buffers[i].buffer().unwrap();
-                    entries.push(wgpu::BindGroupEntry {
-                        binding: entry.binding,
-                        resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                            buffer,
-                            offset: 0,
-                            size: std::num::NonZeroU64::new(self.info.binding_size_list[i] as u64),
-                        }),
-                    })
-                }
-                self.info.bind_groups.insert(
-                    i,
-                    device.create_bind_group(&wgpu::BindGroupDescriptor {
-                        layout,
-                        entries: entries.as_slice(),
-                        label: match &self.info.group_label {
-                            Some(r) => Some(r.as_str()),
-                            None => None,
-                        },
-                    }),
-                );
-            }
+        for buffers in buffer_lock.values.iter_mut() {
+            buffers.write_buffer(device, queue, &self.info, layout);
         }
     }
 }
 
-pub struct DynBindingBuffer {
-    cache_buffer: DynBuffer,
-    buffer: Option<Buffer>,
-    old_len: usize,
-    block_size: usize,
-    label: Option<String>,
+/// group索引
+pub struct BufferGroup {
+    index: usize,
+    bindings_index: usize,
+    context: Share<GroupBuffer>,
+    group_offsets: Share<GroupOffsets>,
 }
 
-impl DynBindingBuffer {
-    pub fn new(label: Option<String>, alignment: u32, block_size: usize) -> Self {
+impl BufferGroup {
+    pub fn get_group(&self) -> OffsetGroup {
+        debug_assert!(self.group_offsets.bind_group.is_some());
+        OffsetGroup {
+            bind_group: self.group_offsets.bind_group.as_ref().unwrap(),
+            offsets: self.group_offsets.offsets.get_offsets(self.index),
+        }
+    }
+
+    /// 设置uniform
+    #[inline]
+    pub fn set_uniform<T: Uniform>(&mut self, t: &T) -> Result<(), DynBufferError> {
+        self.update_buffer(t, T::Binding::binding())
+    }
+
+    /// 更新buffer
+    pub fn update_buffer<T: WriteBuffer>(
+        &mut self,
+        t: &T,
+        binding: u32,
+    ) -> Result<(), DynBufferError> {
+        // SAFE:此处更新一个bindgroup自身的bufer区域，而不会在该区域以外的地方写入， 并且buffer是不扩容的，因此安全
+        let context = unsafe { &mut *(Share::as_ptr(&self.context) as usize as *mut GroupBuffer) };
+        let index = match context.binding_offset_map.get(binding as usize) {
+            Some(r) => *r,
+            None => return Err(DynBufferError::BindingNotFind(binding)),
+        };
+        let buffers = &mut context.values[self.bindings_index];
+        let offset = buffers.group_offsets.offsets.get_offsets(self.index)[index];
+        context.values[self.bindings_index].fill(index, offset, t);
+        Ok(())
+    }
+}
+
+impl Drop for BufferGroup {
+    fn drop(&mut self) {
+        let _lock = self.context.mutex.lock();
+        let context = unsafe { &mut *(Share::as_ptr(&self.context) as usize as *mut GroupBuffer) };
+        context.values[self.bindings_index].de_alloc(self.index);
+    }
+}
+
+impl Debug for BufferGroup {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DynBufferIndex")
+            .field("buffer_offset", &self.index)
+            .field("buffer_index", &self.bindings_index)
+            .finish()
+    }
+}
+
+pub struct OffsetGroup<'a> {
+    pub bind_group: &'a BindGroup,
+    pub offsets: &'a [u32],
+}
+
+struct BufferOffsets {
+    values: Vec<u32>,
+    item_size: usize,
+}
+
+impl BufferOffsets {
+    fn new(block_size: &[u32], count: usize) -> Self {
+        let mut values = Vec::with_capacity(count);
+        for i in 0..count {
+            for size in block_size.iter() {
+                values.push(size * i as u32);
+            }
+        }
         Self {
-            cache_buffer: DynBuffer::new(alignment),
+            values,
+            item_size: block_size.len(),
+        }
+    }
+
+    fn get_offsets(&self, index: usize) -> &[u32] {
+        let start = index * self.item_size;
+        &self.values[start..start + self.item_size]
+    }
+}
+
+/// buffer映射
+/// 内存buffer到wgpu buffer的映射
+pub struct BufferMap {
+    cache_buffer: BufferCache,
+    buffer: Option<Buffer>,
+}
+
+impl BufferMap {
+    pub fn new(len: usize) -> Self {
+        Self {
+            cache_buffer: BufferCache::new(len),
             buffer: None,
-            old_len: 0,
-            block_size,
-            label,
+            // old_len: 0,
+            // block_size,
         }
     }
 
     #[inline]
-    pub fn buffer(&self) -> Option<&Buffer> {
+    pub fn wgpu_buffer(&self) -> Option<&Buffer> {
         self.buffer.as_ref()
     }
 
-    #[inline]
-    pub fn alloc(&mut self) -> u32 {
-        self.cache_buffer.alloc_with_size(self.block_size)
-    }
-
-    // #[inline]
-    // pub fn alloc_with_size(&mut self, bind: usize) -> u32 {
-    //     self.cache_buffer.alloc_with_size(bind)
-    // }
-
-    #[inline]
-    pub fn set_uniform<T: WriteBuffer>(&mut self, binding_offset: u32, t: &T) {
-        self.cache_buffer.full::<T>(binding_offset, t);
-    }
-
     /// 写入buffer到现存，返回是否重新创建了buffer
-    pub fn write_buffer(&mut self, device: &RenderDevice, queue: &RenderQueue) -> bool {
+    pub fn write_buffer(
+        &mut self,
+        device: &RenderDevice,
+        queue: &RenderQueue,
+        label: &Option<String>,
+    ) -> bool {
         // 什么也没改变， 直接返回
         if self.cache_buffer.change_range.len() == 0 {
             return false;
         }
 
-        let size = self.cache_buffer.buffer().len();
+        let r = match &self.buffer {
+            Some(buffer) => {
+                queue.write_buffer(
+                    buffer,
+                    self.cache_buffer.change_range.start as u64,
+                    &self.cache_buffer.buffer()[self.cache_buffer.change_range.start as usize
+                        ..self.cache_buffer.change_range.end as usize],
+                );
 
-        if self.old_len < size {
-            self.buffer = Some(device.create_buffer_with_data(&BufferInitDescriptor {
-                label: self.label.as_deref(),
-                usage: BufferUsages::COPY_DST | BufferUsages::UNIFORM,
-                contents: self.cache_buffer.buffer(),
-            }));
-            self.old_len = size;
-            self.cache_buffer.change_range = 0..0;
-            return true;
-        } else if let Some(buffer) = &self.buffer {
-            queue.write_buffer(
-                buffer,
-                self.cache_buffer.change_range.start as u64,
-                &self.cache_buffer.buffer()[self.cache_buffer.change_range.start as usize
-                    ..self.cache_buffer.change_range.end as usize],
-            );
-            self.cache_buffer.change_range = 0..0;
-        }
-        false
-    }
-
-    pub fn capacity(&self) -> usize {
-        self.old_len
-    }
-
-    // 当前buffer的长度
-    pub fn len(&self) -> usize {
-        self.cache_buffer.tail
-    }
-
-    pub fn block_size(&self) -> usize {
-        self.block_size
-    }
-
-    fn check_limit(&self, limit: u32) -> bool {
-        !(self.block_size + self.len() > limit as usize)
+                false
+            }
+            None => {
+                self.buffer = Some(device.create_buffer_with_data(&BufferInitDescriptor {
+                    label: label.as_deref(),
+                    usage: BufferUsages::COPY_DST | BufferUsages::UNIFORM,
+                    contents: self.cache_buffer.buffer(),
+                }));
+                // self.old_len = size;
+                true
+            }
+        };
+        self.cache_buffer.change_range = 0..0;
+        r
     }
 }
 
-struct Buffers {
-    values: Vec<Vec<DynBindingBuffer>>,
+struct GroupBuffer {
+    mutex: ShareMutex<()>,
+    values: SmallVec<[BufferMaps; 1]>,
     // 最近使用的buffer索引（在buffers字段中的索引）
     lately_use_buffer: usize,
+    // entry中描述的多个bingding将作为整体，分配一个块， 每个bingding在该块中，会对应一个偏移，该偏移存储在binding_offset_map中（VecMap的key为entry的binding值）
+    binding_offset_map: VecMap<usize>,
+}
+
+struct BufferMaps {
+    values: Vec<BufferMap>,
+    occupied_mark: BitVec,
+    group_offsets: Share<GroupOffsets>,
+}
+
+impl BufferMaps {
+    fn new(count: usize, block_size_list: &[u32]) -> Self {
+        let mut occupied_mark = BitVec::with_capacity(count);
+        unsafe { occupied_mark.set_len(count) };
+        occupied_mark[0..count].fill(false);
+
+        let mut buffers = Vec::with_capacity(block_size_list.len());
+
+        for i in block_size_list.iter() {
+            buffers.push(BufferMap::new(*i as usize * count));
+        }
+        Self {
+            values: buffers,
+            occupied_mark,
+            group_offsets: Share::new(GroupOffsets {
+                bind_group: None,
+                offsets: BufferOffsets::new(block_size_list, count),
+            }),
+        }
+    }
+    /// 分配
+    #[inline]
+    fn alloc(&mut self) -> Option<usize> {
+        let r = self.occupied_mark.first_zero();
+        if let Some(r) = r {
+            self.occupied_mark.set(r, true);
+        }
+        r
+    }
+
+    /// 移除分配
+    pub fn de_alloc(&mut self, i: usize) {
+        self.occupied_mark.set(i, false);
+    }
+
+    #[inline]
+    fn fill<T: WriteBuffer>(&mut self, binding: usize, offset: u32, value: &T) {
+        self.values[binding].cache_buffer.full(offset, value);
+    }
+
+    #[inline]
+    fn len(&self) -> usize {
+        self.occupied_mark.len() as usize
+    }
+
+    #[inline]
+    fn write_buffer(
+        &mut self,
+        device: &RenderDevice,
+        queue: &RenderQueue,
+        info: &DynGroupBufferInfo,
+        layout: &BindGroupLayout,
+    ) {
+        let mut buffer_is_create = false;
+        for i in self.values.iter_mut() {
+            buffer_is_create = i.write_buffer(device, queue, &info.label) || buffer_is_create;
+        }
+
+        // 如果有buffer扩容，则重新创建bindgroup
+        if buffer_is_create {
+            let mut entries = Vec::new();
+            for (i, entry) in info.entrys.iter().enumerate() {
+                let buffer = self.values[i].wgpu_buffer().unwrap();
+                entries.push(wgpu::BindGroupEntry {
+                    binding: entry.binding,
+                    resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                        buffer,
+                        offset: 0,
+                        size: std::num::NonZeroU64::new(info.binding_size_list[i] as u64),
+                    }),
+                })
+            }
+            // 只有此处会写入，其他地方不会写入。 此处应该是安全的？
+            let group =
+                unsafe { &mut *(Share::as_ptr(&self.group_offsets) as usize as *mut GroupOffsets) };
+            group.bind_group = Some(device.create_bind_group(&wgpu::BindGroupDescriptor {
+                layout,
+                entries: entries.as_slice(),
+                label: match &info.group_label {
+                    Some(r) => Some(r.as_str()),
+                    None => None,
+                },
+            }));
+        }
+    }
+}
+// Option<BindGroup>
+struct GroupOffsets {
+    bind_group: Option<BindGroup>,
+    offsets: BufferOffsets,
 }
 
 struct DynGroupBufferInfo {
     entrys: Vec<wgpu::BindGroupLayoutEntry>,
-    bind_groups: VecMap<BindGroup>,
     layout: Option<BindGroupLayout>,
     // 每个元素表示一组buffer, 一组buffer对应一个bindgroup
     // 占用内存最大的bingding的索引（以此索引中的buffer的内存来判断是否超过内存限制）
-    max_size_binding_index: usize,
-    // entry中描述的多个bingding将作为整体，分配一个块， 每个bingding在该块中，会对应一个偏移，该偏移存储在binding_offset_map中（VecMap的key为entry的binding值）
-    binding_offset_map: VecMap<usize>,
-    binding_size_list: Vec<usize>,
-    alignment: u32,
+    // max_size_binding_index: usize,
+    limit_count: usize,
+    binding_size_list: Vec<u32>,
     // 每个buffer的限制长度
-    limit_size: u32,
     label: Option<String>,
     layout_label: Option<String>,
     group_label: Option<String>,
 }
 
+/// buffer分配器
+///指定从一个大的buffer中分配一个区域
 #[derive(Debug)]
-pub struct BindOffset {
-    offset: u32,
-    context: Share<ShareMutex<DynBuffer>>,
-}
-
-impl std::ops::Deref for BindOffset {
-    type Target = u32;
-
-    fn deref(&self) -> &Self::Target {
-        &self.offset
-    }
-}
-
-impl Drop for BindOffset {
-    fn drop(&mut self) {
-        self.context.lock().remove(self.offset);
-    }
-}
-
-#[derive(Clone, Copy, Deref)]
-pub struct BindIndex(usize);
-
-impl BindIndex {
-    pub fn new(index: usize) -> Self {
-        Self(index)
-    }
-}
-
-pub type GroupId = u32;
-
-pub type BindId = u32;
-
-pub trait AsBind {
-    fn min_size(&self) -> usize;
-
-    // 在bindings数组中的位置
-    fn index(&self) -> BindIndex;
-}
-
-pub trait Group {
-    fn id() -> GroupId;
-    fn create_layout(device: &RenderDevice, has_dynamic_offset: bool) -> BindGroupLayout;
-}
-
-pub trait BufferGroup {
-    fn create_bind_group(
-        device: &RenderDevice,
-        layout: &BindGroupLayout,
-        buffer: &Buffer,
-    ) -> BindGroup;
-}
-
-#[derive(Debug)]
-pub struct DynBuffer {
-    tail: usize,
+struct BufferCache {
     buffer: Vec<u8>,
-    alignment: usize,
-
-    full_bits: BitVec, // 填充位标识
-    end_bits: BitVec,  // 结束索引
-
     change_range: Range<u32>, // 修改范围
 }
 
-impl DynBuffer {
+impl BufferCache {
     #[inline]
-    pub fn buffer(&self) -> &[u8] {
-        self.buffer.as_slice()
-    }
-
-    #[inline]
-    pub fn new(alignment: u32) -> Self {
+    pub fn new(len: usize) -> Self {
+        let mut buffer = Vec::with_capacity(len);
+        unsafe { buffer.set_len(len) };
         Self {
-            buffer: Vec::default(),
-            alignment: alignment as usize,
-            full_bits: BitVec::default(),
-            end_bits: BitVec::default(),
-            tail: 0,
+            buffer,
             change_range: 0..0,
         }
     }
 
-    pub fn alloc<T: BufferSize>(&mut self) -> u32 {
-        self.alloc_with_size((T::min_size() as f32 / self.alignment as f32).ceil() as usize)
-    }
-
-    pub fn alloc_with_size(&mut self, bind: usize) -> u32 {
-        let count = (bind as f32 / self.alignment as f32).ceil() as usize;
-
-        let mut iter = self.full_bits.iter_zeros();
-        let mut item = iter.next();
-
-        let len = self.full_bits.len();
-        loop {
-            let i = match item {
-                Some(i) => i,
-                None => self.full_bits.len(),
-            };
-
-            let end = i + count;
-            let mut cur_end = end.min(len);
-
-            if self.full_bits[i..cur_end].not_any() {
-                self.full_bits[i..cur_end].fill(true);
-                while cur_end < end {
-                    self.full_bits.push(true);
-                    cur_end += 1;
-                }
-
-                // 设置结束标识
-                let l = self.end_bits.len();
-                if l < end {
-                    self.end_bits.reserve(end - l);
-                    unsafe { self.end_bits.set_len(end) };
-                    self.end_bits[l..end - 1].fill(false);
-                }
-                self.end_bits.set(end - 1, true);
-
-                self.tail = self.tail.max((i + count) * self.alignment);
-                return (i * self.alignment) as u32;
-            }
-            item = iter.next();
-        }
-    }
-
-    /// 移除buffer分配
-    pub fn remove(&mut self, mut i: u32) {
-        i = i / self.alignment as u32;
-        let len = self.end_bits.len();
-        while (i as usize) < len {
-            self.full_bits.set(i as usize, false);
-            i = i + 1;
-            if unsafe { self.end_bits.replace_unchecked((i - 1) as usize, false) } {
-                return;
-            }
-        }
-    }
-
+    /// 在已分配位置上填充buffer
     pub fn full<T: WriteBuffer>(&mut self, index: u32, t: &T) {
-        if self.buffer.len() < self.tail {
-            self.buffer.reserve(self.tail - self.buffer.len());
-            unsafe { self.buffer.set_len(self.tail) }
-        }
+        debug_assert!(self.buffer.len() >= (index + t.byte_len()) as usize);
 
         t.write_into(index, self.buffer.as_mut_slice());
 
         // 设置数据变化范围
-        let end = index + t.byte_len();
+        let start = index + t.offset();
+        let end = start + t.byte_len();
         if self.change_range.len() == 0 {
-            self.change_range.start = index;
+            self.change_range.start = start;
             self.change_range.end = end;
+            println!(
+                "full1======{:?}, {:?}",
+                self.change_range,
+                bytemuck::cast_slice::<_, f32>(&self.buffer)
+            );
             return;
         }
-        if self.change_range.start > index {
-            self.change_range.start = index;
+        if self.change_range.start > start {
+            self.change_range.start = start;
         }
         if self.change_range.end < end {
             self.change_range.end = end;
         }
+
+        println!(
+            "full======{:?}, {:?}, {}, {:?}",
+            self.change_range,
+            start,
+            end,
+            bytemuck::cast_slice::<_, f32>(&self.buffer),
+        );
+    }
+
+    #[inline]
+    pub fn buffer(&self) -> &[u8] {
+        self.buffer.as_slice()
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum DynBufferError {
+    #[error("binding is not exist: {0:?}")]
+    BindingNotFind(u32),
+    #[error("min_binding_size is miss")]
+    MissMinSize,
+    #[error("entry must be of type buffer, actual: {0:?}")]
+    NotNuffer(String),
+    // #[error("import key is not exist: {0:?}")]
+    // ImportNotFind(ShaderImport),
+
+    // #[error("var type is not support: {0:?}")]
+    // TypeNotSupport(String),
+
+    // #[error("validation var fail, expect: {0:?}, actual is: {1:?}")]
+    // ValidationVarFail(String, String),
+
+    // #[error("invalid import path: {0:?}")]
+    // InvalidImportPath(String),
+
+    // #[error(transparent)]
+    // WgslParse(#[from] naga::front::wgsl::ParseError),
+
+    // #[error("GLSL Parse Error: {0:?}")]
+    // GlslParse(Vec<naga::front::glsl::Error>),
+
+    // #[error(transparent)]
+    // SpirVParse(#[from] naga::front::spv::Error),
+
+    // #[error(transparent)]
+    // Validation(#[from] naga::WithSpan<naga::valid::ValidationError>),
+
+    // #[error(transparent)]
+    // WgslParse1(#[from] pi_naga::front::wgsl::ParseError),
+
+    // #[error("GLSL Parse Error: {0:?}")]
+    // GlslParse1(Vec<pi_naga::front::glsl::Error>),
+
+    // #[error(transparent)]
+    // SpirVParse1(#[from] pi_naga::front::spv::Error),
+
+    // #[error(transparent)]
+    // Validation1(#[from] pi_naga::WithSpan<naga::valid::ValidationError>),
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{self as pi_render, rhi::dyn_uniform_buffer::GroupAlloter};
+    use render_derive::{BindLayout, BindingType, BufferSize, Uniform};
+
+    #[derive(BindLayout, BufferSize, BindingType)]
+    #[layout(set(0), binding(0))]
+    #[min_size(144)]
+    #[uniformbuffer]
+    pub struct CameraMatrixBind;
+
+    #[derive(Uniform)]
+    #[uniform(offset(0), len(64), bind(CameraMatrixBind))]
+    pub struct ProjectUniform<'a>(pub &'a [f32]);
+
+    #[derive(Uniform)]
+    #[uniform(offset(64), len(64), bind(CameraMatrixBind))]
+    pub struct ViewUniform<'a>(pub &'a [f32]);
+
+    #[derive(BindLayout, BufferSize, BindingType)]
+    #[layout(set(0), binding(1))]
+    #[min_size(32)]
+    #[uniformbuffer]
+    pub struct ColorMaterialBind;
+
+    #[derive(Uniform)]
+    #[uniform(offset(0), len(16), bind(ColorMaterialBind))]
+    pub struct Color<'a>(pub &'a [f32]);
+
+    #[derive(Uniform)]
+    #[uniform(offset(16), len(16), bind(ColorMaterialBind))]
+    pub struct Color1<'a>(pub &'a [f32]);
+
+    #[test]
+    fn test() {
+        let group_alloter = GroupAlloter::new(
+            None,
+            64,
+            64 * 1024 * 1024,
+            Some(64 * 10),
+            vec![
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: true,
+                        min_binding_size: wgpu::BufferSize::new(128),
+                    },
+                    count: None, // TODO
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: true,
+                        min_binding_size: wgpu::BufferSize::new(32),
+                    },
+                    count: None, // TODO
+                },
+            ],
+        )
+        .unwrap();
+
+        let mut r = group_alloter.alloc();
+        r.set_uniform(&ProjectUniform(&[
+            1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0,
+        ]))
+        .unwrap();
+        r.set_uniform(&ViewUniform(&[
+            11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 110.0, 111.0, 112.0, 113.0,
+            114.0, 115.0, 116.0,
+        ]))
+        .unwrap();
+        r.set_uniform(&Color(&[21.0, 22.0, 23.0, 24.0])).unwrap();
+        r.set_uniform(&Color1(&[31.0, 32.0, 33.0, 34.0])).unwrap();
+
+        let mut r = group_alloter.alloc();
+        r.set_uniform(&ProjectUniform(&[
+            1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0,
+        ]))
+        .unwrap();
+        r.set_uniform(&ViewUniform(&[
+            11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 110.0, 111.0, 112.0, 113.0,
+            114.0, 115.0, 116.0,
+        ]))
+        .unwrap();
+        r.set_uniform(&Color(&[21.0, 22.0, 23.0, 24.0])).unwrap();
+        r.set_uniform(&Color1(&[31.0, 32.0, 33.0, 34.0])).unwrap();
     }
 }

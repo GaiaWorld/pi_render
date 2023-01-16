@@ -144,6 +144,11 @@ pub fn derive_uniform(input: TokenStream) -> TokenStream {
                 fn byte_len(&self) -> u32 {
                     #len
                 }
+
+                #[inline]
+                fn offset(&self) -> u32 {
+                    #offset
+                }
             }
             impl #impl_generics pi_render::rhi::shader::Uniform for #name #ty_generics #where_clause {
                 type Binding = #bind;
