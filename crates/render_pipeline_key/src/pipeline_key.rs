@@ -51,14 +51,14 @@ const USE_BYTE_UNCLIPPED_DEPTH: u8 = 1; // 62
 /// depth_stencil conservative 对应占位字节数
 const USE_BYTE_CONSERVATIVE: u8 = 1; // 63
 
-pub type PipelineKey = u128;
+pub type PipelineStateKey = u128;
 
-pub struct PipelineKeyCalcolator {
-    pub key: PipelineKey,
+pub struct PipelineStateKeyCalcolator {
+    pub key: PipelineStateKey,
     pub use_bytes: u8,
 }
 
-impl PipelineKeyCalcolator {
+impl PipelineStateKeyCalcolator {
     pub fn new() -> Self {
         Self { key: 0, use_bytes: 0 }
     }
@@ -67,7 +67,7 @@ impl PipelineKeyCalcolator {
 /// * `depth_stencil_bias_mode` DepthStencilState.bias 的设置 由外部定义一定数量的设置模板, 该值即为模板标识
 /// * `depth_stencil_bias_modes_use_bite` DepthStencilState.bias 的设置 由外部定义一定数量的设置模板, 该值即描述模板数量的数值可以用多少个字节表达
 pub fn gen_pipeline_key(
-    calcolator: &mut PipelineKeyCalcolator,
+    calcolator: &mut PipelineStateKeyCalcolator,
     primitive: &wgpu::PrimitiveState,
     depth_stencil: &Option<wgpu::DepthStencilState>,
     depth_stencil_bias_mode: u8,
@@ -78,7 +78,7 @@ pub fn gen_pipeline_key(
 }
 
 pub fn gen_pipeline_primitive_key(
-    calcolator: &mut PipelineKeyCalcolator,
+    calcolator: &mut PipelineStateKeyCalcolator,
     primitive: &wgpu::PrimitiveState,
 ) {
     gen_pipeline_primitive_topology_key(&primitive.topology, USE_BYTE_TOPOLOGY, calcolator);
@@ -91,7 +91,7 @@ pub fn gen_pipeline_primitive_key(
 }
 
 pub fn gen_pipeline_depth_stencil_key(
-    calcolator: &mut PipelineKeyCalcolator,
+    calcolator: &mut PipelineStateKeyCalcolator,
     depth_stencil: &Option<wgpu::DepthStencilState>,
     depth_stencil_bias_mode: u8,
     depth_stencil_bias_modes_use_bite: u8,
@@ -139,9 +139,9 @@ pub fn gen_pipeline_depth_stencil_key(
 pub fn gen_pipeline_primitive_topology_key(
     topology: &wgpu::PrimitiveTopology,
     use_byte: u8,
-    calcolator: &mut PipelineKeyCalcolator,
+    calcolator: &mut PipelineStateKeyCalcolator,
 ) {
-    let diff = PipelineKey::pow(2, calcolator.use_bytes as u32);
+    let diff = PipelineStateKey::pow(2, calcolator.use_bytes as u32);
     calcolator.key += match topology {
         wgpu::PrimitiveTopology::PointList => 0 * diff,
         wgpu::PrimitiveTopology::LineList => 1 * diff,
@@ -156,9 +156,9 @@ pub fn gen_pipeline_primitive_topology_key(
 pub fn gen_pipeline_primitive_cull_mode_key(
     cull_mode: &Option<wgpu::Face>,
     use_byte: u8,
-    calcolator: &mut PipelineKeyCalcolator,
+    calcolator: &mut PipelineStateKeyCalcolator,
 ) {
-    let diff = PipelineKey::pow(2, calcolator.use_bytes as u32);
+    let diff = PipelineStateKey::pow(2, calcolator.use_bytes as u32);
     calcolator.key += match cull_mode {
         Some(mode) => match mode {
             wgpu::Face::Front => 1 * diff,
@@ -175,9 +175,9 @@ pub fn gen_pipeline_primitive_cull_mode_key(
 pub fn gen_pipeline_primitive_polygon_key(
     polygon: &wgpu::PolygonMode,
     use_byte: u8,
-    calcolator: &mut PipelineKeyCalcolator,
+    calcolator: &mut PipelineStateKeyCalcolator,
 ) {
-    let diff = PipelineKey::pow(2, calcolator.use_bytes as u32);
+    let diff = PipelineStateKey::pow(2, calcolator.use_bytes as u32);
     calcolator.key += match polygon {
         wgpu::PolygonMode::Fill => 0 * diff,
         wgpu::PolygonMode::Line => 1 * diff,
@@ -190,9 +190,9 @@ pub fn gen_pipeline_primitive_polygon_key(
 pub fn gen_pipeline_primitive_index_format_key(
     strip_index_format: &Option<wgpu::IndexFormat>,
     use_byte: u8,
-    calcolator: &mut PipelineKeyCalcolator,
+    calcolator: &mut PipelineStateKeyCalcolator,
 ) {
-    let diff = PipelineKey::pow(2, calcolator.use_bytes as u32);
+    let diff = PipelineStateKey::pow(2, calcolator.use_bytes as u32);
     calcolator.key += match strip_index_format {
         Some(format) => match format {
             wgpu::IndexFormat::Uint16 => {
@@ -213,9 +213,9 @@ pub fn gen_pipeline_primitive_index_format_key(
 pub fn gen_pipeline_primitive_front_face_key(
     front_face: &wgpu::FrontFace,
     use_byte: u8,
-    calcolator: &mut PipelineKeyCalcolator,
+    calcolator: &mut PipelineStateKeyCalcolator,
 ) {
-    let diff = PipelineKey::pow(2, calcolator.use_bytes as u32);
+    let diff = PipelineStateKey::pow(2, calcolator.use_bytes as u32);
     calcolator.key += match front_face {
         wgpu::FrontFace::Ccw => 0 * diff,
         wgpu::FrontFace::Cw => 1 * diff,
@@ -227,9 +227,9 @@ pub fn gen_pipeline_primitive_front_face_key(
 pub fn gen_pipeline_depth_stencil_format_key(
     value: &wgpu::TextureFormat,
     use_byte: u8,
-    calcolator: &mut PipelineKeyCalcolator,
+    calcolator: &mut PipelineStateKeyCalcolator,
 ) {
-    let diff = PipelineKey::pow(2, calcolator.use_bytes as u32);
+    let diff = PipelineStateKey::pow(2, calcolator.use_bytes as u32);
     calcolator.key += match value {
         wgpu::TextureFormat::Depth32Float => 1 * diff,
         wgpu::TextureFormat::Depth24Plus => 2 * diff,
@@ -243,10 +243,10 @@ pub fn gen_pipeline_depth_stencil_format_key(
 pub fn gen_pipeline_read_write_mask_key(
     value: usize,
     use_byte: u8,
-    calcolator: &mut PipelineKeyCalcolator,
+    calcolator: &mut PipelineStateKeyCalcolator,
 ) {
-    let diff = PipelineKey::pow(2, calcolator.use_bytes as u32);
-    let r = (value & 0b0000_0000_0000_0000_0000_0000_1111_1111) as PipelineKey;
+    let diff = PipelineStateKey::pow(2, calcolator.use_bytes as u32);
+    let r = (value & 0b0000_0000_0000_0000_0000_0000_1111_1111) as PipelineStateKey;
     calcolator.key += r * diff;
 
     calcolator.use_bytes += use_byte;
@@ -256,10 +256,10 @@ pub fn gen_pipeline_read_write_mask_key(
 pub fn gen_pipeline_depth_stencil_bias_key(
     value: u8,
     use_byte: u8,
-    calcolator: &mut PipelineKeyCalcolator,
+    calcolator: &mut PipelineStateKeyCalcolator,
 ) {
-    let diff = PipelineKey::pow(2, calcolator.use_bytes as u32);
-    let r = value as PipelineKey;
+    let diff = PipelineStateKey::pow(2, calcolator.use_bytes as u32);
+    let r = value as PipelineStateKey;
     calcolator.key += r * diff;
 
     calcolator.use_bytes += use_byte;
@@ -268,9 +268,9 @@ pub fn gen_pipeline_depth_stencil_bias_key(
 pub fn gen_pipeline_compare_function_value_key(
     value: &wgpu::CompareFunction,
     use_byte: u8,
-    calcolator: &mut PipelineKeyCalcolator,
+    calcolator: &mut PipelineStateKeyCalcolator,
 ) {
-    let diff = PipelineKey::pow(2, calcolator.use_bytes as u32);
+    let diff = PipelineStateKey::pow(2, calcolator.use_bytes as u32);
     calcolator.key += match value {
         wgpu::CompareFunction::Never => 0 * diff,
         wgpu::CompareFunction::Less => 1 * diff,
@@ -288,9 +288,9 @@ pub fn gen_pipeline_compare_function_value_key(
 pub fn gen_pipeline_stencil_operation_value_key(
     value: &wgpu::StencilOperation,
     use_byte: u8,
-    calcolator: &mut PipelineKeyCalcolator,
+    calcolator: &mut PipelineStateKeyCalcolator,
 ) {
-    let diff = PipelineKey::pow(2, calcolator.use_bytes as u32);
+    let diff = PipelineStateKey::pow(2, calcolator.use_bytes as u32);
     calcolator.key += match value {
         wgpu::StencilOperation::Keep => 0 * diff,
         wgpu::StencilOperation::Zero => 1 * diff,
@@ -308,9 +308,9 @@ pub fn gen_pipeline_stencil_operation_value_key(
 pub fn gen_pipeline_bool_value_key(
     value: &bool,
     use_byte: u8,
-    calcolator: &mut PipelineKeyCalcolator,
+    calcolator: &mut PipelineStateKeyCalcolator,
 ) {
-    let diff = PipelineKey::pow(2, calcolator.use_bytes as u32);
+    let diff = PipelineStateKey::pow(2, calcolator.use_bytes as u32);
     calcolator.key += match value {
         true => 0 * diff,
         false => 1 * diff,

@@ -1,4 +1,4 @@
-use super::pipeline_key::PipelineKeyCalcolator;
+use super::pipeline_key::PipelineStateKeyCalcolator;
 
 pub fn create_target(
     format: wgpu::TextureFormat,
@@ -21,7 +21,7 @@ pub fn create_default_target() -> wgpu::ColorTargetState {
 }
 
 pub fn gen_fragment_state_key(
-    calcolator: &mut PipelineKeyCalcolator,
+    calcolator: &mut PipelineStateKeyCalcolator,
     target: &wgpu::ColorTargetState,
 ) {
     gen_texture_foramt(target.format, USE_BYTE_TEXTURE_FORMAT, calcolator);
@@ -57,7 +57,7 @@ pub const USE_BYTE_COLOR_WRITES: u8 = 3;
 pub fn gen_texture_foramt(
     value: wgpu::TextureFormat,
     use_byte: u8,
-    calcolator: &mut PipelineKeyCalcolator,
+    calcolator: &mut PipelineStateKeyCalcolator,
 ) {
     let diff = u128::pow(2, calcolator.use_bytes as u32);
 
@@ -117,7 +117,7 @@ pub fn gen_texture_foramt(
 pub fn gen_blend_factor(
     factor: wgpu::BlendFactor,
     use_byte: u8,
-    calcolator: &mut PipelineKeyCalcolator,
+    calcolator: &mut PipelineStateKeyCalcolator,
 ) {
     let diff = u128::pow(2, calcolator.use_bytes as u32);
     calcolator.key += match factor {
@@ -142,7 +142,7 @@ pub fn gen_blend_factor(
 pub fn gen_blend_operation(
     value: wgpu::BlendOperation,
     use_byte: u8,
-    calcolator: &mut PipelineKeyCalcolator,
+    calcolator: &mut PipelineStateKeyCalcolator,
 ) {
     let diff = u128::pow(2, calcolator.use_bytes as u32);
     calcolator.key += match value {
@@ -159,7 +159,7 @@ pub fn gen_blend_operation(
 pub fn gen_color_writes(
     value: wgpu::ColorWrites,
     use_byte: u8,
-    calcolator: &mut PipelineKeyCalcolator,
+    calcolator: &mut PipelineStateKeyCalcolator,
 ) {
     let diff = u128::pow(2, calcolator.use_bytes as u32);
     calcolator.key += if value == wgpu::ColorWrites::RED {

@@ -9,15 +9,18 @@ license = "MIT OR Apache-2.0"
 keywords = ["pi", "compile", "shader"]
 
 [dependencies]
-naga = { version = "0.10", features = [
-    "glsl-in",
-    "spv-in",
-    "spv-out",
-    "wgsl-in",
-    "wgsl-out",
-]}
+pi_naga = { git="https://github.com/GaiaWorld/pi_naga.git", features=["glsl-in", "wgsl-in", "spv-in"]}
+naga="0.9"
 thiserror = "1.0"
 Inflector = "0.11"
 pi_ordmap = "0.2"
+pi_atom = "0.2"
 log = "0.4"
-pi_render = { path = "../render_core", package="render_core" }
+regex = "1.5"
+once_cell = "1.4" # TODO: replace once_cell with std equivalent if/when this lands: https://github.com/rust-lang/rfcs/pull/2788
+render_core = { path = "../render_core"}
+pi_hash = "0.1"
+
+[dev-dependencies]
+pi_hash = "0.1"
+

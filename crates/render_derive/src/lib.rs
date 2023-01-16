@@ -1,14 +1,48 @@
 mod enum_variant_meta;
 mod modules;
+mod shader_meta;
+
+use std::{collections::HashMap, error::Error, path::Path, str::FromStr};
 
 use proc_macro::TokenStream;
-use proc_macro2::TokenStream as TokenStream2;
+use proc_macro2::{Ident, TokenStream as TokenStream2};
 use quote::quote;
-use syn::{Data, DataStruct, DeriveInput, Field, Fields};
+use syn::{
+    bracketed,
+    ext::IdentExt,
+    parenthesized,
+    parse::{Parse, ParseStream},
+    parse_macro_input,
+    token::Comma,
+    Data, DataStruct, DeriveInput, Field, Fields,
+};
 
 #[proc_macro_derive(EnumVariantMeta)]
 pub fn derive_enum_variant_meta(input: TokenStream) -> TokenStream {
     enum_variant_meta::derive_enum_variant_meta(input)
+}
+
+#[proc_macro_derive(BindLayout, attributes(layout))]
+pub fn derive_bind_layout(input: TokenStream) -> TokenStream {
+    shader_meta::derive_bind_layout(input)
+}
+
+#[proc_macro_derive(
+    BindingType,
+    attributes(uniformbuffer, storagebuffer, texture, sampler, storagetexture)
+)]
+pub fn derive_binding_type(input: TokenStream) -> TokenStream {
+    shader_meta::derive_binding_type(input)
+}
+
+#[proc_macro_derive(Uniform, attributes(uniform))]
+pub fn derive_uniform(input: TokenStream) -> TokenStream {
+    shader_meta::derive_uniform(input)
+}
+
+#[proc_macro_derive(BufferSize, attributes(min_size))]
+pub fn derive_buffer_size(input: TokenStream) -> TokenStream {
+    shader_meta::derive_buffer_size(input)
 }
 
 #[proc_macro_derive(NodeParam, attributes(field_slots))]
@@ -92,7 +126,7 @@ pub fn derive_node_param(input: TokenStream) -> TokenStream {
                 quote! {
                     let t = std::any::TypeId::of::<#ty>();
                     // ("Output field {:?}, type = {:}", stringify!(#name), stringify!(#ty));
-                    
+
                     if field_set.contains(&t) {
                         panic!("Output field {:?}, type = {:}", stringify!(#name), stringify!(#ty));
                     }
@@ -197,7 +231,7 @@ pub fn derive_node_param(input: TokenStream) -> TokenStream {
                         if map.get(&ty).is_some() {
                             // 输入 类型 不能 相同
                             panic!("derive NodeParam: input type same, type = {:?}", ty);
-                        }                        
+                        }
                         map.insert(ty, vec![pre_id]);
                     }
                     r

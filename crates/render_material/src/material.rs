@@ -1,7 +1,7 @@
 use std::hash::Hash;
 use render_core::rhi::{bind_group::BindGroup, dyn_uniform_buffer::BindOffset};
 use render_data_container::{TVertexDataKindKey, TMaterialBlockKindKey, TextureID, TexturePool, GeometryBufferPool, TGeometryBufferID, EVertexDataFormat, calc_uniform_size};
-use render_geometry::{geometry::{VertexAttributeMeta}};
+use render_geometry::{geometry::{VertexBufferMeta}};
 use render_data_container::{Matrix, Vector2, Vector4, Matrix2, Color4};
 
 use crate::{
@@ -843,7 +843,7 @@ impl UniformBindGroupAbout {
         let mut uniform_descs = vec![];
         descs.iter().for_each(|desc| {
             if desc.bind == bind {
-                uniform_descs.push(*desc);
+                uniform_descs.push(desc.clone());
                 visibility = visibility | desc.visibility;
             }
         });
@@ -919,14 +919,14 @@ impl<MBKK> Material<MBKK>
             self.bind_datas.push(bind_data);
 
             binding.uniforms.iter().for_each(|uniform| {
-                uniforms.push(UniformBindKindIndex { kind: uniform.kind, index: index  });
+                uniforms.push(UniformBindKindIndex { kind: uniform.kind.clone(), index: index  });
             });
         });
 
         uniforms.sort();
         uniforms.iter().for_each(|uniform| {
             self.uniform_bind_indexs.push(uniform.index);
-            self.uniform_kinds.push(uniform.kind);
+            self.uniform_kinds.push(uniform.kind.clone());
         });
     }
 

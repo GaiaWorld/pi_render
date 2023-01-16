@@ -1,0 +1,34 @@
+[package]
+name = "test_shader"
+version = "0.1.0"
+authors = ["moyy <myy412001799@gmail.com>"]
+edition = "2021"
+description = "Render for PI Engine"
+repository = "https://github.com/GaiaWorld/pi_render"
+license = "MIT OR Apache-2.0"
+keywords = ["pi", "render"]
+
+[dependencies]
+pi_render = {path = "../render_core", package="render_core"}
+pi_atom={version="0.2", features = ["serde"]}
+render_derive = {path="../render_derive"}
+render_compile = {path="../render_compile"}
+wgpu = { version = "0.13", features = ["spirv", "glsl", "webgl"] }
+pi_map="0.1"
+bytemuck = { version = "1.4", features = ["derive"] }
+cargo-manifest = "0.2.6"
+cargo_metadat = {version="0.15", package="cargo_metadata"}
+render_macro_utils={path = "../render_macro_utils"}
+lazy_static = "1.4"
+pi_hash="0.1"
+
+[build-dependencies]
+render_compile = {path="../render_compile"}
+naga = { version = "0.9", features = [
+    "glsl-in",
+    "spv-in",
+    "spv-out",
+    "wgsl-in",
+    "wgsl-out",
+] }
+

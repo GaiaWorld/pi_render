@@ -1,0 +1,3 @@
+max_width = 150 # 每行的最大宽度
+blank_lines_upper_bound = 2 # 可以在项目之间放置的最大空行数。如果找到超过此数量的连续空行，则将它们修剪下来以匹配此整数。
+fn_single_line = true # 将单个表达式函数放在一行上

@@ -12,8 +12,13 @@ keywords = ["scene data container"]
 nalgebra = "0.30"
 pi_slotmap = "0.1"
 pi_share = "0.4"
+pi_assets = "0.10"
+pi_hash = "0.1"
+pi_atom = { version="0.2", features = ["serde"] }
 bytemuck = { version = "1.4", features = ["derive"] }
 wgpu = { version = "0.14", features = ["spirv", "glsl"] }
+
 render_core = { path = "../render_core" }
+render_pipeline_key = { path = "../render_pipeline_key" }
 
 # [[example]]

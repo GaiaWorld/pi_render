@@ -1,13 +1,534 @@
-use pi_futures::BoxFuture;
+use bytemuck::NoUninit;
+use derive_deref_rs::Deref;
 use naga::{back::wgsl::WriterFlags, valid::ModuleInfo, Module};
 use once_cell::sync::Lazy;
+use pi_atom::Atom;
+use pi_futures::BoxFuture;
 use pi_hash::{XHashMap, XHashSet};
+use pi_map::vecmap::VecMap;
 use pi_share::Share;
 use regex::Regex;
-use std::{borrow::Cow, ops::Deref, path::PathBuf};
+use std::{
+    borrow::Cow,
+    num::NonZeroU32,
+    ops::Deref,
+    path::{Path, PathBuf},
+};
 use thiserror::Error;
 use uuid::Uuid;
 use wgpu::{util::make_spirv, ShaderModuleDescriptor, ShaderSource};
+
+/// 绑定类型，Binding类型应该实现该trait
+/// 之所以没与BindLayout合并为位一个trait， 是考虑BindLayout可能手动实现，当可能不需要BindingType（这个需求不确实是否存在，如果不存在，考虑合并，TODO）
+pub trait BindingType: BindLayout {
+    fn binding_type() -> wgpu::BindingType;
+}
+
+/// 定义AsLayoutEntry，可以创建wgpu::BindGroupLayoutEntry
+pub trait AsLayoutEntry {
+    fn as_layout_entry(visibility: wgpu::ShaderStages) -> wgpu::BindGroupLayoutEntry;
+}
+
+/// 实现了BindingType的的类型，默认实现AsLayoutEntry
+impl<T: BindingType> AsLayoutEntry for T {
+    fn as_layout_entry(visibility: wgpu::ShaderStages) -> wgpu::BindGroupLayoutEntry {
+        wgpu::BindGroupLayoutEntry {
+            binding: Self::binding(),
+            visibility,
+            ty: Self::binding_type(),
+            count: Self::count(), // TODO
+        }
+    }
+}
+
+/// BufferSize, 每个buffer类型的Binding应该实现该trait
+pub trait BufferSize {
+    fn min_size() -> usize;
+}
+
+/// 每个unifrom（不是指binding， 而是binding中的某个属性， 特值buffer类型的属性）
+pub trait Uniform: WriteBuffer {
+    type Binding: BindingType;
+}
+
+/// 每个unifrom（不是指binding， 而是binding中的某个属性， 特值buffer类型的属性）
+pub trait WriteBuffer {
+    // 将自身写入buffer缓冲区，假定buffer的容量足够，否则崩溃
+    fn write_into(&self, index: u32, buffer: &mut [u8]);
+    fn byte_len(&self) -> u32;
+    fn offset(&self) -> u32;
+}
+
+/// shader的元信息描述
+/// 根据该结构体，可还原出shader代码
+#[derive(Debug, Clone, Default)]
+pub struct ShaderMeta {
+    /// binding描述
+    pub bindings: ShaderBinding,
+    /// 定义了Varying变量
+    pub varyings: ShaderVarying,
+    /// 定义了输入变量
+    pub ins: ShaderInput,
+    /// 定义了输出变量
+    pub outs: ShaderOutput,
+    /// 顶点代码片段
+    pub vs: BlockCodeAtom,
+    /// 像素代码片段
+    pub fs: BlockCodeAtom,
+}
+
+impl ShaderMeta {
+    pub fn to_code(&self, defines: &XHashSet<Atom>, visibility: wgpu::ShaderStages) -> String {
+        let mut code = String::new();
+        self.bindings.to_code(&mut code, defines, visibility);
+        if visibility & wgpu::ShaderStages::VERTEX == wgpu::ShaderStages::VERTEX {
+            self.ins.to_code(&mut code, defines);
+            self.varyings.to_code(&mut code, defines, "out");
+            self.vs.to_code(&mut code, defines);
+        } else {
+            self.varyings.to_code(&mut code, defines, "in");
+            self.outs.to_code(&mut code, defines);
+            self.fs.to_code(&mut code, defines);
+        }
+
+        code
+    }
+
+    pub fn add_binding_entry(
+        &mut self,
+        group: usize,
+        value: (wgpu::BindGroupLayoutEntry, BindingExpandDescList),
+    ) {
+        let bindings = &mut self.bindings;
+        let (bind_group_entry, buffer_uniform_expand, bingding_offset) =
+            match bindings.bind_group_entrys.get_mut(group) {
+                Some(r) => (
+                    r,
+                    &mut bindings.buffer_uniform_expands[group],
+                    &mut bindings.bingding_offsets[group],
+                ),
+                None => {
+                    bindings.bind_group_entrys.insert(group, Vec::new());
+                    bindings.buffer_uniform_expands.insert(group, Vec::new());
+                    bindings.bingding_offsets.insert(group, VecMap::new());
+                    (
+                        &mut bindings.bind_group_entrys[group],
+                        &mut bindings.buffer_uniform_expands[group],
+                        &mut bindings.bingding_offsets[group],
+                    )
+                }
+            };
+        let binding = value.0.binding;
+        bind_group_entry.push(value.0);
+        buffer_uniform_expand.push(value.1);
+
+        bingding_offset.insert(binding as usize, bind_group_entry.len() - 1);
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct ShaderBinding {
+    /// layout entry 描述
+    pub bind_group_entrys: VecMap<Vec<wgpu::BindGroupLayoutEntry>>,
+    /// 除了glsl本省能描述的binding的属性外，pi_render扩展了一些其他的属性
+    /// 包括： bingding名称，如果是buffer类型，还包含buffer的默认值、buffer的类型
+    pub buffer_uniform_expands: VecMap<Vec<BindingExpandDescList>>,
+    /// 用于索引Binding在goup的binding数组中的位置
+    pub bingding_offsets: VecMap<VecMap<usize>>,
+}
+
+impl ShaderBinding {
+    /// 转换为shader代码（数组， TODO）
+    pub fn to_code(
+        &self,
+        code: &mut String,
+        defines: &XHashSet<Atom>,
+        visibility: wgpu::ShaderStages,
+    ) {
+        for (set, entrys) in self.bind_group_entrys.iter().enumerate() {
+            if let Some(entrys) = entrys {
+                for (binding_index, entry) in entrys.iter().enumerate() {
+                    if entry.visibility & visibility == visibility {
+                        let expand = &self.buffer_uniform_expands[set][binding_index];
+                        if !check_defined(&expand.defines, defines) || expand.list.len() == 0 {
+                            continue;
+                        }
+
+                        let set = set.to_string();
+                        let binding = entry.binding.to_string();
+                        code.push_str("layout(set=");
+                        code.push_str(set.as_str());
+                        code.push_str(",binding=");
+                        code.push_str(binding.as_str());
+
+                        match entry.ty {
+                            wgpu::BindingType::Buffer { .. } => {
+                                code.push_str(") uniform M_");
+                                code.push_str(set.as_str());
+                                code.push_str("_");
+                                code.push_str(binding.as_str());
+                                code.push_str("{\n");
+                                for desc in expand.list.iter() {
+                                    if let Some(r) = desc.buffer_expand.as_ref() {
+                                        r.ty.to_code(code);
+                                        code.push_str(" ");
+                                        code.push_str(&desc.name);
+                                        code.push_str(";\n");
+                                    }
+                                }
+                                code.push_str("};\n");
+                            }
+                            wgpu::BindingType::Sampler(_) => {
+                                let desc = &expand.list[0];
+                                code.push_str(") sampler ");
+                                code.push_str(&desc.name);
+                                code.push_str(";\n");
+                            }
+                            wgpu::BindingType::Texture {
+                                sample_type,
+                                view_dimension,
+                                multisampled,
+                            } => {
+                                let dimension_to_string = || match view_dimension {
+                                    wgpu::TextureViewDimension::D1 => "1D",
+                                    wgpu::TextureViewDimension::D2 => "2D",
+                                    wgpu::TextureViewDimension::D2Array => "2DArray",
+                                    wgpu::TextureViewDimension::Cube => "Cube",
+                                    wgpu::TextureViewDimension::CubeArray => "CubeArray",
+                                    wgpu::TextureViewDimension::D3 => "3D",
+                                };
+                                let sample_type_to_string = || match sample_type {
+                                    wgpu::TextureSampleType::Float { .. } => "",
+                                    wgpu::TextureSampleType::Depth => "", // TODO
+                                    wgpu::TextureSampleType::Sint => "i",
+                                    wgpu::TextureSampleType::Uint => "u",
+                                };
+                                let desc = &expand.list[0];
+                                code.push_str(")");
+                                code.push_str(sample_type_to_string());
+                                code.push_str("texture");
+                                code.push_str(dimension_to_string());
+                                if multisampled {
+                                    code.push_str("MS ");
+                                } else {
+                                    code.push_str(" ");
+                                }
+                                code.push_str(&desc.name);
+                                // 数组，TODO
+                                code.push_str(";\n");
+                            }
+                            // wgpu::BindingType::StorageTexture {
+                            //     access,
+                            //     format,
+                            //     view_dimension,
+                            // }
+                            _ => todo!(),
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// shader输入
+#[derive(Debug, Clone, Default)]
+pub struct ShaderInput(pub Vec<InOut>);
+impl ShaderInput {
+    pub fn to_code(&self, code: &mut String, defines: &XHashSet<Atom>) {
+        inout_to_code(code, defines, "in", &self.0);
+    }
+}
+
+/// shader输出
+#[derive(Debug, Clone, Default)]
+pub struct ShaderOutput(pub Vec<InOut>);
+impl ShaderOutput {
+    pub fn to_code(&self, code: &mut String, defines: &XHashSet<Atom>) {
+        inout_to_code(code, defines, "out", &self.0);
+    }
+}
+
+/// shaderVarying
+#[derive(Debug, Clone, Default, Deref)]
+pub struct ShaderVarying(pub Vec<InOut>);
+
+impl ShaderVarying {
+    pub fn to_code(&self, code: &mut String, defines: &XHashSet<Atom>, ty: &str) {
+        inout_to_code(code, defines, ty, &self.0);
+    }
+}
+
+#[inline]
+fn inout_to_code(code: &mut String, defines: &XHashSet<Atom>, ty: &str, list: &Vec<InOut>) {
+    for in_out in list.iter() {
+        in_out.to_code(code, &defines, ty);
+    }
+}
+
+/// 每个binding应该实现该trait
+pub trait BindLayout {
+    // 在bindings的索引
+    fn binding() -> u32;
+    fn set() -> u32;
+    // 该值为Some, 一定是数组
+    fn count() -> Option<NonZeroU32>;
+}
+
+/// 描述binding的其他信息
+/// 除了wgpu在创建布局时需要wgpu::BindGroupLayoutEntry信息外，shader中的binding还包含其他信息：
+/// * bingding的宏开关
+/// * bingding内每个属性的名称，如果是buffer类型的属性，还包含buffer的默认值、类型、数组长度（可选）
+#[derive(Debug, Clone)]
+pub struct BindingExpandDescList {
+    pub list: Vec<BindingExpandDesc>,
+    pub defines: Vec<Define>, //通过defines开关bingding
+                              // storage, TODO
+}
+
+impl BindingExpandDescList {
+    pub fn new(list: Vec<BindingExpandDesc>, defines: Vec<Define>) -> Self {
+        Self { list, defines }
+    }
+}
+
+/// binding中每个属性的描述
+#[derive(Debug, Clone)]
+pub struct BindingExpandDesc {
+    /// 不是buffer类型的binding，该值为None
+    pub buffer_expand: Option<BufferBindingExpandDesc>,
+    /// bingding的名称
+    pub name: Atom,
+}
+
+impl BindingExpandDesc {
+    /// 创建一个buffer类型的描述
+    #[inline]
+    pub fn new_buffer<T: NoUninit>(
+        name: &str,
+        d: &[T],
+        ty: TypeKind,
+        size: TypeSize,
+        len: ArrayLen,
+    ) -> Self {
+        BindingExpandDesc {
+            buffer_expand: Some(BufferBindingExpandDesc {
+                default_value: Vec::from(bytemuck::cast_slice::<_, u8>(d)),
+                ty: BufferType { ty, size, len },
+            }),
+            name: Atom::from(name),
+        }
+    }
+
+    /// 创建纹理类型的描述
+    #[inline]
+    pub fn new_texture(name: &str) -> Self {
+        BindingExpandDesc {
+            buffer_expand: None,
+            name: Atom::from(name),
+        }
+    }
+
+    /// 创建Sampler类型的描述
+    #[inline]
+    pub fn new_sampler(name: &str) -> Self {
+        BindingExpandDesc {
+            buffer_expand: None,
+            name: Atom::from(name),
+        }
+    }
+}
+
+/// bingding中， buffer类型的属性描述
+#[derive(Debug, Clone)]
+pub struct BufferBindingExpandDesc {
+    pub default_value: Vec<u8>,
+    pub ty: BufferType,
+}
+
+/// Buffer的类型
+#[derive(Debug, Clone)]
+pub struct BufferType {
+    pub ty: TypeKind,
+    pub size: TypeSize,
+    pub len: ArrayLen,
+}
+
+impl BufferType {
+    pub fn to_code(&self, code: &mut String) {
+        match self.size {
+            TypeSize::Mat { rows, columns } => {
+                if rows == columns {
+                    code.push_str("mat");
+                    code.push_str(rows.to_string().as_str());
+                } else {
+                    code.push_str("mat");
+                    code.push_str(columns.to_string().as_str());
+                    code.push_str("x");
+                    code.push_str(rows.to_string().as_str());
+                }
+            }
+            TypeSize::Vec(dim) => {
+                match self.ty {
+                    TypeKind::Float => (),
+                    TypeKind::Sint => code.push_str("i"),
+                    TypeKind::Uint => code.push_str("u"),
+                }
+                code.push_str("vec");
+                code.push_str(dim.to_string().as_str());
+            }
+            TypeSize::Scalar => match self.ty {
+                TypeKind::Float => code.push_str("float"),
+                TypeKind::Sint => code.push_str("int"),
+                TypeKind::Uint => code.push_str("uint"),
+            },
+        }
+    }
+}
+
+/// kind
+#[derive(Debug, Clone)]
+pub enum TypeKind {
+    Float,
+    Sint,
+    Uint,
+}
+
+#[derive(Debug, Clone)]
+pub enum TypeSize {
+    Mat { rows: u8, columns: u8 },
+    Vec(u8),
+    Scalar,
+}
+
+#[derive(Debug, Clone)]
+pub enum ArrayLen {
+    Constant(usize),
+    Dynamic,
+    None, // 不是数组
+}
+
+/// 输入输出描述
+#[derive(Debug, Clone)]
+pub struct InOut {
+    pub location: u32,
+    pub name: Atom,
+    pub format: Atom,
+    //#ifdef xxx
+    pub defines: Vec<Define>,
+}
+
+fn check_defined(define_require: &Vec<Define>, defines: &XHashSet<Atom>) -> bool {
+    if define_require.len() > 0 {
+        for d in define_require.iter() {
+            if defines.contains(&d.name) ^ d.is {
+                return false;
+            }
+        }
+    }
+    true
+}
+
+impl InOut {
+    /// * ty--in、out
+    pub fn to_code(&self, code: &mut String, defines: &XHashSet<Atom>, ty: &str) {
+        if !check_defined(&self.defines, defines) {
+            return;
+        }
+
+        code.push_str("layout(location=");
+        code.push_str(self.location.to_string().as_str());
+        code.push_str(")");
+        code.push_str(ty);
+        code.push_str(" ");
+        code.push_str(self.format.as_str());
+        code.push_str(" ");
+        code.push_str(self.name.as_str());
+        code.push_str(";\n");
+    }
+
+    pub fn new(name: &str, format: &str, location: u32, defines: Vec<Define>) -> Self {
+        Self {
+            name: Atom::from(name),
+            format: Atom::from(format),
+            location,
+            defines,
+        }
+    }
+}
+
+/// 宏开关
+#[derive(Debug, Clone)]
+pub struct Define {
+    /// 为true时， 表示“name”代表的宏是否被定义
+    /// 为false时， 表示“name”代表的宏是否未被定义
+    pub is: bool,
+    pub name: Atom,
+}
+
+impl Define {
+    pub fn new(is: bool, name: Atom) -> Define {
+        Define { is, name }
+    }
+}
+
+/// 代码片段
+#[derive(Debug, Clone, Default)]
+pub struct BlockCodeAtom {
+    /// 声明代码
+    pub define: Vec<CodeSlice>,
+    /// 运行代码
+    pub running: Vec<CodeSlice>,
+}
+impl BlockCodeAtom {
+    pub fn to_code(&self, code: &mut String, defines: &XHashSet<Atom>) {
+        for c in self.define.iter() {
+            c.to_code(code, defines)
+        }
+        code.push_str("void main(){\n");
+        for c in self.running.iter() {
+            c.to_code(code, defines)
+        }
+        code.push_str("}\n");
+    }
+}
+
+/// 代码片段
+#[derive(Debug, Clone, Default)]
+pub struct CodeSlice {
+    /// 代码
+    pub code: Atom,
+    /// #ifdef
+    pub defines: Vec<Define>,
+}
+
+impl CodeSlice {
+    pub fn to_code(&self, code: &mut String, defines: &XHashSet<Atom>) {
+        if !check_defined(&self.defines, defines) {
+            return;
+        }
+        code.push_str(self.code.as_str());
+        code.push_str("\n");
+    }
+
+    pub fn push_defines_front(mut self, extends: &[Define]) -> Self {
+        self.defines = merge_defines(&self.defines, extends);
+        self
+    }
+}
+
+// 合并defines
+pub fn merge_defines(pre: &[Define], next: &[Define]) -> Vec<Define> {
+    let mut r = Vec::with_capacity(pre.len() + next.len());
+    r.extend_from_slice(pre);
+    r.extend_from_slice(next);
+    r
+}
+
+// pub struct BufferView<'a> {
+//     pub buffer: &'a wgpu::Buffer,
+//     pub offset: u32,
+// }
 
 #[derive(Copy, Clone, Hash, Eq, PartialEq, Debug)]
 pub struct ShaderId(Uuid);
@@ -41,7 +562,7 @@ pub enum ShaderReflectError {
 pub struct Shader {
     id: ShaderId,
     source: Source,
-    import_path: Option<ShaderImport>,
+    import: Option<ShaderImport>,
     imports: Vec<ShaderImport>,
 }
 
@@ -50,11 +571,15 @@ impl Shader {
     /// 注：wgsl 不需要指定 是哪个 stage 的 shader，因为里面有标识符指定
     pub fn from_wgsl(source: impl Into<Cow<'static, str>>) -> Shader {
         let source = source.into();
+        let ShaderImports {
+            imports,
+            import_path,
+        } = SHADER_IMPORT_PROCESSOR.get_imports_from_str(&source);
         Shader {
             id: ShaderId::new(),
-            imports: SHADER_IMPORT_PROCESSOR.get_imports_from_str(&source),
+            imports,
+            import: import_path,
             source: Source::Wgsl(source),
-            import_path: None,
         }
     }
 
@@ -62,12 +587,15 @@ impl Shader {
     /// 需要指定 stage: vs, fs, cs
     pub fn from_glsl(source: impl Into<Cow<'static, str>>, stage: naga::ShaderStage) -> Shader {
         let source = source.into();
-
+        let ShaderImports {
+            imports,
+            import_path,
+        } = SHADER_IMPORT_PROCESSOR.get_imports_from_str(&source);
         Shader {
             id: ShaderId::new(),
-            imports: SHADER_IMPORT_PROCESSOR.get_imports_from_str(&source),
+            imports,
+            import: import_path,
             source: Source::Glsl(source, stage),
-            import_path: None,
         }
     }
 
@@ -75,9 +603,9 @@ impl Shader {
     pub fn from_spirv(source: impl Into<Cow<'static, [u8]>>) -> Shader {
         Shader {
             id: ShaderId::new(),
-            imports: Vec::new(),
+            imports: Vec::default(),
+            import: None,
             source: Source::SpirV(source.into()),
-            import_path: None,
         }
     }
 
@@ -85,9 +613,13 @@ impl Shader {
         self.id
     }
 
+    pub fn source(&self) -> &Source {
+        &self.source
+    }
+
     /// 设置 #import
     pub fn set_import_path<P: Into<String>>(&mut self, import_path: P) {
-        self.import_path = Some(ShaderImport::Custom(import_path.into()));
+        self.import = Some(ShaderImport::Custom(import_path.into()));
     }
 
     /// 用 import-path，返回自身
@@ -98,7 +630,7 @@ impl Shader {
 
     #[inline]
     pub fn import_path(&self) -> Option<&ShaderImport> {
-        self.import_path.as_ref()
+        self.import.as_ref()
     }
 
     /// 返回迭代器
@@ -249,7 +781,7 @@ pub fn load_shader(
         // 根据后缀名判断 是 那种类型
         let ext = path.extension().unwrap().to_str().unwrap();
 
-        let mut shader = match ext {
+        let shader = match ext {
             "spv" => Shader::from_spirv(bytes.to_vec()),
             "wgsl" => Shader::from_wgsl(String::from_utf8(bytes.to_vec()).unwrap()),
             "vert" => Shader::from_glsl(
@@ -263,7 +795,7 @@ pub fn load_shader(
             _ => panic!("unhandled extension: {}", ext),
         };
 
-        shader.import_path = Some(ShaderImport::Path(path.to_string_lossy().to_string()));
+        // shader.imports.import_path = Some(ShaderImport::Path(path.to_string_lossy().to_string()));
 
         Ok(shader)
     })
@@ -291,6 +823,9 @@ pub enum ProcessShaderError {
 
     #[error("The shader import {0:?} does not match the source file type. Support for this might be added in the future.")]
     MismatchedImportFormat(ShaderImport),
+
+    #[error("load fail: {0:?}.")]
+    LoadFail(PathBuf),
 }
 
 /// 预处理器：#import
@@ -299,6 +834,8 @@ pub struct ShaderImportProcessor {
     import_asset_path_regex: Regex,
     /// 定制 识别 #import ...
     import_custom_path_regex: Regex,
+    /// 定制 识别 #define_import_path ...
+    define_import_path_regex: Regex,
 }
 
 /// 每一条 #import 信息
@@ -314,39 +851,51 @@ impl Default for ShaderImportProcessor {
     fn default() -> Self {
         Self {
             // #import "..."
-            import_asset_path_regex: Regex::new(r#"^\s*#\s*import\s*"(.+)""#).unwrap(),
+            import_asset_path_regex: Regex::new(r#"^\s*#\s*import\s*"([a-zA-Z0-9_:]+)""#).unwrap(),
             // #import ...
-            import_custom_path_regex: Regex::new(r"^\s*#\s*import\s*(.+)").unwrap(),
+            import_custom_path_regex: Regex::new(r"^\s*#\s*import\s*([a-zA-Z0-9_:]+)").unwrap(),
+            // #define_import_path ...
+            define_import_path_regex: Regex::new(r"^\s*#\s*define_import_path\s+([a-zA-Z0-9_:]+)")
+                .unwrap(),
         }
     }
 }
 
+#[derive(Default, Debug, Clone)]
+pub struct ShaderImports {
+    imports: Vec<ShaderImport>,
+    import_path: Option<ShaderImport>,
+}
+
 impl ShaderImportProcessor {
-    /// 取一个Shader所有的 #import 后面的部分
-    pub fn get_imports(&self, shader: &Shader) -> Vec<ShaderImport> {
+    pub fn get_imports(&self, shader: &Shader) -> ShaderImports {
         match &shader.source {
             Source::Wgsl(source) => self.get_imports_from_str(source),
             Source::Glsl(source, _stage) => self.get_imports_from_str(source),
-            Source::SpirV(_source) => Vec::new(), // 二进制 文件 无法做预处理
+            Source::SpirV(_source) => ShaderImports::default(),
         }
     }
 
-    /// 从 string 取 #import 后面的部分
-    pub fn get_imports_from_str(&self, shader: &str) -> Vec<ShaderImport> {
-        let mut imports = Vec::new();
-
-        // 扫描 每一行 匹配 #import ***，将 *** 构造 ShaderImport 扔到 Vec
+    pub fn get_imports_from_str(&self, shader: &str) -> ShaderImports {
+        let mut shader_imports = ShaderImports::default();
         for line in shader.lines() {
             if let Some(cap) = self.import_asset_path_regex.captures(line) {
                 let import = cap.get(1).unwrap();
-                imports.push(ShaderImport::Path(import.as_str().to_string()));
+                shader_imports
+                    .imports
+                    .push(ShaderImport::Path(import.as_str().to_string()));
             } else if let Some(cap) = self.import_custom_path_regex.captures(line) {
                 let import = cap.get(1).unwrap();
-                imports.push(ShaderImport::Custom(import.as_str().to_string()));
+                shader_imports
+                    .imports
+                    .push(ShaderImport::Custom(import.as_str().to_string()));
+            } else if let Some(cap) = self.define_import_path_regex.captures(line) {
+                let path = cap.get(1).unwrap();
+                shader_imports.import_path = Some(ShaderImport::Custom(path.as_str().to_string()));
             }
         }
 
-        imports
+        shader_imports
     }
 }
 
@@ -354,37 +903,97 @@ pub static SHADER_IMPORT_PROCESSOR: Lazy<ShaderImportProcessor> =
     Lazy::new(ShaderImportProcessor::default);
 
 /// 预处理器：#ifdef, #ifndef, #else #endif
-pub struct ShaderProcessor {
+pub struct ShaderProcessor<L: CodeLoader> {
     ifdef_regex: Regex,
     ifndef_regex: Regex,
     else_regex: Regex,
     endif_regex: Regex,
+    default_value_regex: Regex,
+    loader: L,
 }
 
-impl Default for ShaderProcessor {
+impl Default for ShaderProcessor<CodeLoaderEmptyImpl> {
     fn default() -> Self {
         Self {
             ifdef_regex: Regex::new(r"^\s*#\s*ifdef\s*([\w|\d|_]+)").unwrap(),
             ifndef_regex: Regex::new(r"^\s*#\s*ifndef\s*([\w|\d|_]+)").unwrap(),
             else_regex: Regex::new(r"^\s*#\s*else").unwrap(),
             endif_regex: Regex::new(r"^\s*#\s*endif").unwrap(),
+            default_value_regex: Regex::new(r#"^\s*@default\s*\(\s*([0-9.,\s]+)\)"#).unwrap(),
+            loader: CodeLoaderEmptyImpl,
         }
     }
 }
 
-impl ShaderProcessor {
+impl<L: CodeLoader> ShaderProcessor<L> {
+    pub fn new(l: L) -> Self {
+        Self {
+            ifdef_regex: Regex::new(r"^\s*#\s*ifdef\s*([\w|\d|_]+)").unwrap(),
+            ifndef_regex: Regex::new(r"^\s*#\s*ifndef\s*([\w|\d|_]+)").unwrap(),
+            else_regex: Regex::new(r"^\s*#\s*else").unwrap(),
+            endif_regex: Regex::new(r"^\s*#\s*endif").unwrap(),
+            default_value_regex: Regex::new(r#"^\s*@default\s*\(\s*([0-9.,\s]+)\)"#).unwrap(),
+            loader: l,
+        }
+    }
+}
+
+pub trait Defineds {
+    fn contains(&self, value: &str) -> bool;
+    fn is_empty(&self) -> bool;
+}
+
+impl Defineds for XHashSet<String> {
+    fn contains(&self, value: &str) -> bool {
+        self.contains(value)
+    }
+
+    fn is_empty(&self) -> bool {
+        self.is_empty()
+    }
+}
+
+/// 开启所有Defineds
+pub struct AllDefineds;
+impl Defineds for AllDefineds {
+    fn contains(&self, _value: &str) -> bool {
+        true
+    }
+
+    fn is_empty(&self) -> bool {
+        false
+    }
+}
+
+pub trait CodeLoader {
+    fn load(&self, path: &PathBuf) -> Result<Vec<u8>, ProcessShaderError>;
+}
+
+pub struct CodeLoaderEmptyImpl;
+impl CodeLoader for CodeLoaderEmptyImpl {
+    fn load(&self, path: &PathBuf) -> Result<Vec<u8>, ProcessShaderError> {
+        Err(ProcessShaderError::LoadFail(path.clone()))
+    }
+}
+
+#[derive(Default)]
+pub struct ShaderCodeMgr {
+    pub shaders: XHashMap<ShaderId, (Shader, Option<String>)>,
+    pub import_shaders: XHashMap<ShaderImport, ShaderId>,
+}
+
+impl<L: CodeLoader> ShaderProcessor<L> {
     /// 执行 替换 文本的 预处理
     /// shader: 文本
     /// shader_defs: 预处理 宏
     /// import_shaders: 提供给 该shader找的 import 的 其他 Shader
-    pub fn process(
+    pub fn process<D: Defineds>(
         &self,
         id: &ShaderId,
-        shader_defs: &XHashSet<String>,
-        shaders: &XHashMap<ShaderId, Shader>,
-        import_shaders: &XHashMap<ShaderImport, ShaderId>,
+        shader_defs: &D,
+        shader_mgr: &mut ShaderCodeMgr,
     ) -> Result<ProcessedShader, ProcessShaderError> {
-        let shader = shaders.get(id).unwrap();
+        let (shader, _path) = shader_mgr.shaders.get(id).unwrap().clone();
         let shader_str = match &shader.source {
             Source::Wgsl(source) => source.deref(),
             Source::Glsl(source, _stage) => source.deref(),
@@ -433,30 +1042,27 @@ impl ShaderProcessor {
                 .captures(line)
             {
                 // 遇到 #import "..." 语句
-                let import = ShaderImport::Path(cap.get(1).unwrap().as_str().to_string());
+                let import_path = cap.get(1).unwrap().as_str();
+                // let import_path = match &path {
+                //     Some(p) => import_path.to_string(),
+                //     None => cap.get(1).unwrap().as_str().to_string(),
+                // };
+                let import = ShaderImport::Path(import_path.to_string());
 
-                self.apply_import(
-                    id,
-                    shader_defs,
-                    shaders,
-                    import_shaders,
-                    &import,
-                    &mut final_string,
-                )?;
+                self.apply_import(id, shader_defs, shader_mgr, &import, &mut final_string)?;
             } else if let Some(cap) = SHADER_IMPORT_PROCESSOR
                 .import_custom_path_regex
                 .captures(line)
             {
                 // 遇到 #import ... 语句
                 let import = ShaderImport::Custom(cap.get(1).unwrap().as_str().to_string());
-                self.apply_import(
-                    id,
-                    shader_defs,
-                    shaders,
-                    import_shaders,
-                    &import,
-                    &mut final_string,
-                )?;
+                self.apply_import(id, shader_defs, shader_mgr, &import, &mut final_string)?;
+            } else if SHADER_IMPORT_PROCESSOR
+                .define_import_path_regex
+                .is_match(line)
+                || self.default_value_regex.is_match(line)
+            {
+                // ignore import path lines
             } else if *scopes.last().unwrap() {
                 final_string.push_str(line);
                 final_string.push('\n');
@@ -479,23 +1085,53 @@ impl ShaderProcessor {
     }
 
     // 处理 #import
-    fn apply_import(
+    pub fn apply_import<D: Defineds>(
         &self,
         id: &ShaderId,
-        shader_defs: &XHashSet<String>,
-        shaders: &XHashMap<ShaderId, Shader>,
-        import_shaders: &XHashMap<ShaderImport, ShaderId>,
+        shader_defs: &D,
+        shader_mgr: &mut ShaderCodeMgr,
         import: &ShaderImport,
         final_string: &mut String,
     ) -> Result<(), ProcessShaderError> {
-        let imported_shader = import_shaders
-            .get(import)
-            .ok_or_else(|| ProcessShaderError::UnresolvedImport(import.clone()))?;
+        let imported_shader = match shader_mgr.import_shaders.get(import) {
+            Some(r) => r.clone(),
+            None => {
+                if let ShaderImport::Path(p) = import {
+                    let path = Path::new(p);
+                    let suffix = path
+                        .extension()
+                        .ok_or_else(|| ProcessShaderError::UnresolvedImport(import.clone()))?;
+                    let path = PathBuf::from(path);
+                    let suffix = suffix.to_str().unwrap();
+                    let code = self.loader.load(&path)?;
+                    let shader = match suffix {
+                        "spv" => Shader::from_spirv(code),
+                        "wgsl" => Shader::from_wgsl(String::from_utf8(code).unwrap()),
+                        // NOTE: naga::ShaderStage::Vertex 随便写的，好像没有影响？
+                        "glsl" => Shader::from_glsl(
+                            String::from_utf8(code).unwrap(),
+                            naga::ShaderStage::Vertex,
+                        ),
+                        _ => return Err(ProcessShaderError::LoadFail(path)),
+                    };
+                    let id = shader.id();
+                    shader_mgr.shaders.insert(id, (shader, Some(p.clone())));
+                    shader_mgr.import_shaders.insert(import.clone(), id);
+                    id
+                } else {
+                    return Err(ProcessShaderError::UnresolvedImport(import.clone()));
+                }
+            }
+        };
+        // let imported_shader = shader_mgr.import_shaders
+        //     .get(import)
+        // 	.map(|r| {r.clone()})
+        //     .ok_or_else(|| {
 
-        let imported_processed =
-            self.process(imported_shader, shader_defs, shaders, import_shaders)?;
+        // 	})?;
+        let imported_processed = self.process(&imported_shader, shader_defs, shader_mgr)?;
 
-        let shader = shaders.get(id).unwrap();
+        let (shader, _path) = shader_mgr.shaders.get(id).unwrap();
 
         match &shader.source {
             Source::Wgsl(_) => {
@@ -521,9 +1157,72 @@ impl ShaderProcessor {
     }
 }
 
+// fn relative_path(mut file_path: &str, mut dir: &str) -> String {
+//     let (file_path_len, dir_len) = (file_path.len(), dir.len());
+//     if file_path_len == 0 {
+//         return "".to_string();
+//     }
+//     // 不以 . 开头，就是绝对路径，直接返回
+//     // 目录为空字符串，直接返回
+//     if &file_path[0..1] != "." || dir.len() == 0 {
+//         return file_path.to_string();
+//     }
+
+//     let (mut i, mut j) = (0, dir_len as isize - 1);
+
+//     // 最后一个字符不是/，就代表dir不是目录，需要定位到目录
+//     if j >= 0 && &dir[j as usize..dir_len] != "/" {
+//         j = dir.rfind("/").map_or(-1, |r| r as isize);
+//     }
+
+//     while i < file_path_len {
+//         if &file_path[i..i + 1] != "." {
+//             break;
+//         }
+//         if let Some(r) = file_path.get(i + 1..i + 2) {
+//             // ./的情况
+//             if r == "/" {
+//                 i += 2;
+//                 break;
+//             }
+//         }
+
+//         if let Some(r) = file_path.get(i + 1..i + 3) {
+//             // ./的情况
+//             if r != "./" {
+//                 break;
+//             }
+//         }
+//         // ../的情况
+//         i += 3;
+
+//         if j > 0 {
+//             j = dir[0..j as usize].rfind("/").map_or(-1, |r| r as isize);
+//         } else {
+//             j = -1;
+//         }
+//     }
+
+//     if i > 0 {
+//         file_path = &file_path[i..file_path_len];
+//     };
+
+//     if j < 0 {
+//         return file_path.to_string();
+//     }
+
+//     if j < dir_len as isize - 1 {
+//         dir = &dir[0..(j + 1) as usize];
+//     }
+
+//     return dir.to_string() + file_path;
+// }
+
 #[cfg(test)]
 mod tests {
-    use crate::rhi::shader::{ProcessShaderError, Shader, ShaderImport, ShaderProcessor};
+    use crate::rhi::shader::{
+        ProcessShaderError, Shader, ShaderCodeMgr, ShaderImport, ShaderProcessor,
+    };
     use naga::ShaderStage;
     use pi_hash::{XHashMap, XHashSet};
 
@@ -691,14 +1390,21 @@ fn vertex(
         let shader = Shader::from_wgsl(WGSL);
         let id = shader.id();
         let mut shaders = XHashMap::default();
-        shaders.insert(shader.id(), shader);
+        shaders.insert(shader.id(), (shader, None));
 
         let mut shader_defs = XHashSet::default();
         shader_defs.insert("TEXTURE".to_string());
 
         let processor = ShaderProcessor::default();
         let result = processor
-            .process(&id, &shader_defs, &shaders, &XHashMap::default())
+            .process(
+                &id,
+                &shader_defs,
+                &mut ShaderCodeMgr {
+                    shaders,
+                    import_shaders: XHashMap::default(),
+                },
+            )
             .unwrap();
         assert_eq!(result.get_wgsl_source().unwrap(), EXPECTED);
     }
@@ -734,11 +1440,18 @@ fn vertex(
         let shader = Shader::from_wgsl(WGSL);
         let id = shader.id();
         let mut shaders = XHashMap::default();
-        shaders.insert(shader.id(), shader);
+        shaders.insert(shader.id(), (shader, None));
 
         let processor = ShaderProcessor::default();
         let result = processor
-            .process(&id, &XHashSet::default(), &shaders, &XHashMap::default())
+            .process(
+                &id,
+                &XHashSet::default(),
+                &mut ShaderCodeMgr {
+                    shaders,
+                    import_shaders: XHashMap::default(),
+                },
+            )
             .unwrap();
         assert_eq!(result.get_wgsl_source().unwrap(), EXPECTED);
     }
@@ -777,11 +1490,18 @@ fn vertex(
         let shader = Shader::from_wgsl(WGSL_ELSE);
         let id = shader.id();
         let mut shaders = XHashMap::default();
-        shaders.insert(shader.id(), shader);
+        shaders.insert(shader.id(), (shader, None));
 
         let processor = ShaderProcessor::default();
         let result = processor
-            .process(&id, &XHashSet::default(), &shaders, &XHashMap::default())
+            .process(
+                &id,
+                &XHashSet::default(),
+                &mut ShaderCodeMgr {
+                    shaders,
+                    import_shaders: XHashMap::default(),
+                },
+            )
             .unwrap();
         assert_eq!(result.get_wgsl_source().unwrap(), EXPECTED);
     }
@@ -796,10 +1516,17 @@ fn vertex(
         let shader = Shader::from_wgsl(INPUT);
         let id = shader.id();
         let mut shaders = XHashMap::default();
-        shaders.insert(shader.id(), shader);
+        shaders.insert(shader.id(), (shader, None));
 
         let processor = ShaderProcessor::default();
-        let result = processor.process(&id, &XHashSet::default(), &shaders, &XHashMap::default());
+        let result = processor.process(
+            &id,
+            &XHashSet::default(),
+            &mut ShaderCodeMgr {
+                shaders,
+                import_shaders: XHashMap::default(),
+            },
+        );
         assert_eq!(result, Err(ProcessShaderError::NotEnoughEndIfs));
     }
 
@@ -813,10 +1540,17 @@ fn vertex(
         let shader = Shader::from_wgsl(INPUT);
         let id = shader.id();
         let mut shaders = XHashMap::default();
-        shaders.insert(shader.id(), shader);
+        shaders.insert(shader.id(), (shader, None));
 
         let processor = ShaderProcessor::default();
-        let result = processor.process(&id, &XHashSet::default(), &shaders, &XHashMap::default());
+        let result = processor.process(
+            &id,
+            &XHashSet::default(),
+            &mut ShaderCodeMgr {
+                shaders,
+                import_shaders: XHashMap::default(),
+            },
+        );
         assert_eq!(result, Err(ProcessShaderError::TooManyEndIfs));
     }
 
@@ -831,11 +1565,18 @@ fn foo() { }
         let shader = Shader::from_wgsl(INPUT);
         let id = shader.id();
         let mut shaders = XHashMap::default();
-        shaders.insert(shader.id(), shader);
+        shaders.insert(shader.id(), (shader, None));
 
         let processor = ShaderProcessor::default();
         let result = processor
-            .process(&id, &XHashSet::default(), &shaders, &XHashMap::default())
+            .process(
+                &id,
+                &XHashSet::default(),
+                &mut ShaderCodeMgr {
+                    shaders,
+                    import_shaders: XHashMap::default(),
+                },
+            )
             .unwrap();
         assert_eq!(result.get_wgsl_source().unwrap(), INPUT);
     }
@@ -864,15 +1605,22 @@ fn bar() { }
 
         let import_shader = Shader::from_wgsl(FOO);
         import_shaders.insert(ShaderImport::Custom("FOO".to_string()), import_shader.id());
-        shaders.insert(import_shader.id(), import_shader);
+        shaders.insert(import_shader.id(), (import_shader, None));
 
         let shader = Shader::from_wgsl(INPUT);
         let id = shader.id();
-        shaders.insert(shader.id(), shader);
+        shaders.insert(shader.id(), (shader, None));
 
         let shader_defs = XHashSet::default();
         let result = processor
-            .process(&id, &shader_defs, &shaders, &import_shaders)
+            .process(
+                &id,
+                &shader_defs,
+                &mut ShaderCodeMgr {
+                    shaders,
+                    import_shaders,
+                },
+            )
             .unwrap();
         assert_eq!(result.get_wgsl_source().unwrap(), EXPECTED);
     }
@@ -900,14 +1648,21 @@ void bar() { }
 
         let foo = Shader::from_glsl(FOO, ShaderStage::Vertex);
         import_shaders.insert(ShaderImport::Custom("FOO".to_string()), foo.id());
-        shaders.insert(foo.id(), foo);
+        shaders.insert(foo.id(), (foo, None));
 
         let shader = Shader::from_glsl(INPUT, ShaderStage::Vertex);
         let id = shader.id();
-        shaders.insert(shader.id(), shader);
+        shaders.insert(shader.id(), (shader, None));
 
         let result = processor
-            .process(&id, &XHashSet::default(), &shaders, &import_shaders)
+            .process(
+                &id,
+                &XHashSet::default(),
+                &mut ShaderCodeMgr {
+                    shaders,
+                    import_shaders,
+                },
+            )
             .unwrap();
         assert_eq!(result.get_glsl_source().unwrap(), EXPECTED);
     }
@@ -944,14 +1699,21 @@ fn vertex(
 
         let shader = Shader::from_wgsl(WGSL_NESTED_IFDEF);
         let id = shader.id();
-        shaders.insert(shader.id(), shader);
+        shaders.insert(shader.id(), (shader, None));
 
         let mut shader_defs = XHashSet::default();
         shader_defs.insert("TEXTURE".to_string());
 
         let processor = ShaderProcessor::default();
         let result = processor
-            .process(&id, &shader_defs, &shaders, &XHashMap::default())
+            .process(
+                &id,
+                &shader_defs,
+                &mut ShaderCodeMgr {
+                    shaders,
+                    import_shaders: XHashMap::default(),
+                },
+            )
             .unwrap();
         assert_eq!(result.get_wgsl_source().unwrap(), EXPECTED);
     }
@@ -990,14 +1752,21 @@ fn vertex(
 
         let shader = Shader::from_wgsl(WGSL_NESTED_IFDEF_ELSE);
         let id = shader.id();
-        shaders.insert(shader.id(), shader);
+        shaders.insert(shader.id(), (shader, None));
 
         let mut shader_defs = XHashSet::default();
         shader_defs.insert("TEXTURE".to_string());
 
         let processor = ShaderProcessor::default();
         let result = processor
-            .process(&id, &shader_defs, &shaders, &XHashMap::default())
+            .process(
+                &id,
+                &shader_defs,
+                &mut ShaderCodeMgr {
+                    shaders,
+                    import_shaders: XHashMap::default(),
+                },
+            )
             .unwrap();
         assert_eq!(result.get_wgsl_source().unwrap(), EXPECTED);
     }
@@ -1034,11 +1803,18 @@ fn vertex(
 
         let shader = Shader::from_wgsl(WGSL_NESTED_IFDEF);
         let id = shader.id();
-        shaders.insert(shader.id(), shader);
+        shaders.insert(shader.id(), (shader, None));
 
         let processor = ShaderProcessor::default();
         let result = processor
-            .process(&id, &XHashSet::default(), &shaders, &XHashMap::default())
+            .process(
+                &id,
+                &XHashSet::default(),
+                &mut ShaderCodeMgr {
+                    shaders,
+                    import_shaders: XHashMap::default(),
+                },
+            )
             .unwrap();
         assert_eq!(result.get_wgsl_source().unwrap(), EXPECTED);
     }
@@ -1075,11 +1851,18 @@ fn vertex(
 
         let shader = Shader::from_wgsl(WGSL_NESTED_IFDEF_ELSE);
         let id = shader.id();
-        shaders.insert(shader.id(), shader);
+        shaders.insert(shader.id(), (shader, None));
 
         let processor = ShaderProcessor::default();
         let result = processor
-            .process(&id, &XHashSet::default(), &shaders, &XHashMap::default())
+            .process(
+                &id,
+                &XHashSet::default(),
+                &mut ShaderCodeMgr {
+                    shaders,
+                    import_shaders: XHashMap::default(),
+                },
+            )
             .unwrap();
         assert_eq!(result.get_wgsl_source().unwrap(), EXPECTED);
     }
@@ -1116,14 +1899,21 @@ fn vertex(
 
         let shader = Shader::from_wgsl(WGSL_NESTED_IFDEF);
         let id = shader.id();
-        shaders.insert(shader.id(), shader);
+        shaders.insert(shader.id(), (shader, None));
 
         let mut shader_defs = XHashSet::default();
         shader_defs.insert("ATTRIBUTE".to_string());
 
         let processor = ShaderProcessor::default();
         let result = processor
-            .process(&id, &shader_defs, &shaders, &XHashMap::default())
+            .process(
+                &id,
+                &shader_defs,
+                &mut ShaderCodeMgr {
+                    shaders,
+                    import_shaders: XHashMap::default(),
+                },
+            )
             .unwrap();
         assert_eq!(result.get_wgsl_source().unwrap(), EXPECTED);
     }
@@ -1166,11 +1956,18 @@ fn vertex(
 
         let shader = Shader::from_wgsl(WGSL_NESTED_IFDEF);
         let id = shader.id();
-        shaders.insert(shader.id(), shader);
+        shaders.insert(shader.id(), (shader, None));
 
         let processor = ShaderProcessor::default();
         let result = processor
-            .process(&id, &shader_defs, &shaders, &XHashMap::default())
+            .process(
+                &id,
+                &shader_defs,
+                &mut ShaderCodeMgr {
+                    shaders,
+                    import_shaders: XHashMap::default(),
+                },
+            )
             .unwrap();
         assert_eq!(result.get_wgsl_source().unwrap(), EXPECTED);
     }
@@ -1212,15 +2009,22 @@ fn in_main_present() { }
         let mut shaders = XHashMap::default();
         let shader = Shader::from_wgsl(INPUT);
         let id = shader.id();
-        shaders.insert(shader.id(), shader);
+        shaders.insert(shader.id(), (shader, None));
 
         let foo = Shader::from_wgsl(FOO);
         let mut import_shaders = XHashMap::default();
         import_shaders.insert(ShaderImport::Path("libs/foo".to_string()), foo.id());
-        shaders.insert(foo.id(), foo);
+        shaders.insert(foo.id(), (foo, None));
 
         let result = processor
-            .process(&id, &shader_defs, &shaders, &import_shaders)
+            .process(
+                &id,
+                &shader_defs,
+                &mut ShaderCodeMgr {
+                    shaders,
+                    import_shaders,
+                },
+            )
             .unwrap();
         assert_eq!(result.get_wgsl_source().unwrap(), EXPECTED);
     }
@@ -1259,25 +2063,39 @@ fn in_main() { }
         let mut shaders = XHashMap::default();
         let shader = Shader::from_wgsl(INPUT);
         let id = shader.id();
-        shaders.insert(shader.id(), shader);
+        shaders.insert(shader.id(), (shader, None));
 
         let mut import_shaders = XHashMap::default();
 
         let bar = Shader::from_wgsl(BAR);
         import_shaders.insert(ShaderImport::Custom("BAR".to_string()), bar.id());
-        shaders.insert(bar.id(), bar);
+        shaders.insert(bar.id(), (bar, None));
 
         let foo = Shader::from_wgsl(FOO);
         import_shaders.insert(ShaderImport::Custom("FOO".to_string()), foo.id());
-        shaders.insert(foo.id(), foo);
+        shaders.insert(foo.id(), (foo, None));
 
         let mut shader_defs = XHashSet::default();
         shader_defs.insert("DEEP".to_string());
 
         let result = processor
-            .process(&id, &shader_defs, &shaders, &import_shaders)
+            .process(
+                &id,
+                &shader_defs,
+                &mut ShaderCodeMgr {
+                    shaders,
+                    import_shaders,
+                },
+            )
             .unwrap();
         let _r = result.get_wgsl_source().unwrap();
         assert_eq!(result.get_wgsl_source().unwrap(), EXPECTED);
     }
 }
+
+// #[test]
+// fn test_relative_path() {
+//     println!("{:?}", relative_path("./aa", "xx/src"));
+//     println!("{:?}", relative_path("../aa", "xx/src"));
+//     println!("{:?}", relative_path("../../aa", "xx/src/src1/src2"));
+// }

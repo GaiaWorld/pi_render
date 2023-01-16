@@ -1,6 +1,7 @@
 
 use std::num::NonZeroU8;
 
+use pi_assets::asset::{Handle, Asset};
 use pi_hash::XHashMap;
 use render_core::rhi::{texture::Sampler, device::RenderDevice};
 
@@ -28,6 +29,9 @@ pub struct SamplerDesc {
     pub border_color: Option<wgpu::SamplerBorderColor>,
 }
 impl SamplerDesc {
+    pub fn size(&self) -> usize {
+        20
+    }
     pub fn to_sampler_description(&self) -> wgpu::SamplerDescriptor {
         wgpu::SamplerDescriptor {
             label: None,
@@ -247,5 +251,15 @@ impl SamplerPool {
         };
     
         calcolator.use_bytes += use_byte;
+    }
+}
+
+pub struct AssetSampler(pub wgpu::Sampler);
+
+impl Asset for AssetSampler {
+    type Key = SamplerAssetKey;
+
+    fn size(&self) -> usize {
+        128
     }
 }
