@@ -1,14 +1,15 @@
 use pi_assets::asset::Handle;
 use pi_map::vecmap::VecMap;
 use wgpu::RenderPass;
+use crate::rhi::shader::BindLayout;
 
 use super::{
     asset::RenderRes, bind_group::BindGroup, buffer::Buffer, dyn_uniform_buffer::BufferGroup,
-    pipeline::RenderPipeline,
+    pipeline::RenderPipeline, shader::Uniform,
 };
 
 /// 渲染对象
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct DrawState {
     // 一个 Pipeleine
     pub pipeline: Option<Handle<RenderRes<RenderPipeline>>>,
@@ -27,13 +28,17 @@ pub struct DrawState {
 pub struct Groups(VecMap<DrawGroup>);
 
 impl Groups {
+	pub fn set_uniform<T: Uniform>(&mut self, value: &T) {
+		self.0[T::Binding::set() as usize].set_uniform(value);
+    }
+
     #[inline]
     pub fn get_group(&self, group_id: u32) -> Option<&DrawGroup> {
         self.0.get(group_id as usize)
     }
 
-    pub fn insert_group(&mut self, group_id: u32, value: DrawGroup) {
-        self.0.insert(group_id as usize, value);
+    pub fn insert_group<T: Into<DrawGroup>>(&mut self, group_id: u32, value: T) {
+        self.0.insert(group_id as usize, value.into());
     }
 
     #[inline]
@@ -49,6 +54,13 @@ pub enum DrawGroup {
 }
 
 impl DrawGroup {
+	pub fn set_uniform<T: Uniform>(&mut self, value: &T) {
+        let _ = match self {
+            DrawGroup::Offset(group) => group.set_uniform(value),
+            DrawGroup::Independ(_group) => todo!(),
+        };
+    }
+
     pub fn draw<'w, 'a>(&'a self, rpass: &'w mut RenderPass<'a>, i: u32) {
         match self {
             DrawGroup::Offset(index) => {

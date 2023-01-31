@@ -1,9 +1,10 @@
 use std::path::Path;
 
-use render_compile::{Parser, ProgramDesc};
+use render_compile::{CompileShaderError, Parser, ProgramDesc};
 
 #[test]
-fn test() {
+fn test() -> Result<(), CompileShaderError> {
+    std::env::set_current_dir("E:\\pi_render_master\\crates\\render_compile_test");
     // println!("cargo:rerun-if-changed=src/shaders/");
     let mut parser = Parser::default();
     std::fs::write("build_error.text", "zzzzzzz").unwrap();
@@ -11,29 +12,23 @@ fn test() {
     let r = parser
         .push_gen_path(&["src/shaders/"])
         .push_program(vec![ProgramDesc::new("src/shaders/test.vert", "src/shaders/test.frag", "src/shaders/aa")])
-        .parse();
-    match r {
-        Ok(r) => {
-            for shader in r.shader_result.iter() {
-                std::fs::write(&shader.0, &shader.1).unwrap();
-            }
-
-            let mods = r.to_mod();
-            for (dir, mods) in mods.iter() {
-                std::fs::write(
-                    Path::new(dir).join("mod.rs"),
-                    mods.iter()
-                        .map(|r| "pub mod ".to_string() + r.as_str() + ";")
-                        .collect::<Vec<String>>()
-                        .join("\n"),
-                )
-                .unwrap()
-            }
-        }
-        Err(e) => {
-            panic!("e============={:?}", e);
-        }
+        .parse()?;
+    for shader in r.shader_result.iter() {
+        std::fs::write(&shader.0, &shader.1).unwrap();
     }
+
+    let mods = r.to_mod();
+    for (dir, mods) in mods.iter() {
+        std::fs::write(
+            Path::new(dir).join("mod.rs"),
+            mods.iter()
+                .map(|r| "pub mod ".to_string() + r.as_str() + ";")
+                .collect::<Vec<String>>()
+                .join("\n"),
+        )
+        .unwrap()
+    }
+    Ok(())
     // for item in sharder_infos.iter() {
     // 	render_compile::compile_and_out(
     // 		item[0],

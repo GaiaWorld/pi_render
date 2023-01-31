@@ -27,6 +27,11 @@ pub fn derive_bind_layout(input: TokenStream) -> TokenStream {
     shader_meta::derive_bind_layout(input)
 }
 
+#[proc_macro_derive(Input, attributes(location))]
+pub fn derive_input(input: TokenStream) -> TokenStream {
+    shader_meta::derive_input(input)
+}
+
 #[proc_macro_derive(
     BindingType,
     attributes(uniformbuffer, storagebuffer, texture, sampler, storagetexture)

@@ -1,8 +1,6 @@
 
-			use pi_render::rhi::shader::{BindingExpandDesc, TypeKind, TypeSize, ArrayLen, ShaderMeta, CodeSlice, BlockCodeAtom, InOut, AsLayoutEntry, Define, merge_defines, BindingExpandDescList,  ShaderVarying, ShaderInput, ShaderOutput};
-			use render_derive::{BindLayout, BufferSize, Uniform, BindingType};
-			use pi_atom::Atom;
-			use pi_map::vecmap::VecMap;
+			use pi_render::rhi::shader::{ShaderMeta, CodeSlice, BlockCodeAtom, InOut, Define,  ShaderVarying, ShaderInput, ShaderOutput, ShaderProgram, TypeKind,ArrayLen,AsLayoutEntry,BindingExpandDescList,merge_defines,TypeSize,BindingExpandDesc};
+			use render_derive::{Uniform,BufferSize,Input,BindLayout,BindingType};
 			
 			
 					#[derive(BindLayout, BufferSize, BindingType)]
@@ -13,7 +11,7 @@
 				
 
 						#[derive(Uniform)]
-						#[span(offset(0), len(64))]
+						#[uniform(offset(0), len(64), bind(ColorMaterial1Bind))]
 						pub struct World1Uniform<'a>(pub &'a[f32]);
 					
 			
@@ -25,50 +23,61 @@
 				
 
 						#[derive(Uniform)]
-						#[span(offset(0), len(64))]
+						#[uniform(offset(0), len(64), bind(ColorMaterialBind))]
 						pub struct WorldUniform<'a>(pub &'a[f32]);
 					
 
 						#[derive(Uniform)]
-						#[span(offset(64), len(16))]
+						#[uniform(offset(64), len(16), bind(ColorMaterialBind))]
 						pub struct ColorUniform<'a>(pub &'a[f32]);
 					
 
 						#[derive(Uniform)]
-						#[span(offset(80), len(12))]
+						#[uniform(offset(80), len(12), bind(ColorMaterialBind))]
 						pub struct Patch10Uniform<'a>(pub &'a[f32]);
 					
 
 						#[derive(Uniform)]
-						#[span(offset(92), len(4))]
+						#[uniform(offset(92), len(4), bind(ColorMaterialBind))]
 						pub struct DepthUniform<'a>(pub &'a[f32]);
 					
+			
+				#[derive(Input)]
+				#[location(0)]
+				pub struct PositionVert;
+			
+
+				#[derive(Input)]
+				#[location(1)]
+				pub struct ColorVert;
+			
 
 			pub struct ProgramMeta;
-			impl ProgramMeta {
-				pub fn create_meta() -> pi_render::rhi::shader::ShaderMeta {
+			impl ShaderProgram for ProgramMeta {
+				fn create_meta() -> pi_render::rhi::shader::ShaderMeta {
 					let mut meta_ = ShaderMeta::default();
-					let defines: &[Define] = &[];
+					meta_.name = std::any::type_name::<Self>().to_string();
+					let _defines: &[Define] = &[];
 					let meta = &mut meta_;
 					let visibility = wgpu::ShaderStages::VERTEX;
 					
-					super::camera::push_meta(meta, visibility, &[Define::new(true, VS_DEFINE[1].clone())]);
+					super::camera1::push_meta(meta, visibility, &[Define::new(true, BBB_DEFINE.clone())]);
 					let visibility = wgpu::ShaderStages::FRAGMENT;
 
 					
-					meta.add_binding_entry(1, (
-						ColorMaterial1Bind::as_layout_entry(visibility),
+					_meta.add_binding_entry(1, (
+						ColorMaterial1Bind::as_layout_entry(_visibility),
 						BindingExpandDescList::new(vec![
 						BindingExpandDesc::new_buffer::<f32>("world1", &[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],  TypeKind::Float, TypeSize::Mat{rows: 4, columns: 4}, ArrayLen::None)
-					], merge_defines(defines, &[Define::new(true, FS_DEFINE[0].clone())]))
+					], merge_defines(_defines, &[Define::new(true, FFF_DEFINE.clone())]))
 					));
 				
 					
 					let visibility = wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT;
 
 					
-					meta.add_binding_entry(1, (
-						ColorMaterialBind::as_layout_entry(visibility),
+					_meta.add_binding_entry(1, (
+						ColorMaterialBind::as_layout_entry(_visibility),
 						BindingExpandDescList::new(vec![
 						BindingExpandDesc::new_buffer::<f32>("world", &[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],  TypeKind::Float, TypeSize::Mat{rows: 4, columns: 4}, ArrayLen::None)
 					,
@@ -77,7 +86,7 @@
 						BindingExpandDesc::new_buffer::<f32>("PATCH__1_0", &[0.0,0.0,0.0],  TypeKind::Float, TypeSize::Vec(3), ArrayLen::None)
 					,
 						BindingExpandDesc::new_buffer::<f32>("depth", &[0.0],  TypeKind::Float, TypeSize::Scalar, ArrayLen::None)
-					], merge_defines(defines, &[Define::new(true, VS_DEFINE[2].clone())]))
+					], merge_defines(_defines, &[Define::new(true, CCC_DEFINE.clone())]))
 					));
 				
 					
@@ -92,7 +101,7 @@
 						
 				InOut::new("position", "vec2", 0, vec![])
 			,
-				InOut::new("color", "vec2", 1, vec![Define::new(true, VS_DEFINE[0].clone())])
+				InOut::new("color", "vec2", 1, vec![Define::new(true, AAA_DEFINE.clone())])
 			
 					]);
 					meta.outs = ShaderOutput(vec![
@@ -103,45 +112,49 @@
 					meta_
 				}
 			}
-			fn push_vs_code(codes: &mut BlockCodeAtom) {
-				let defines: &[Define] = &[];
-				codes.define.push(VS_CODE[0].clone().push_defines_front(defines));
-super::camera::push_code(codes, merge_defines(defines, &[Define::new(true, VS_DEFINE[1].clone())]).as_slice());
-codes.running.push(VS_CODE[1].clone().push_defines_front(defines));
-codes.running.push(VS_CODE[2].clone().push_defines_front(defines));
-codes.define.push(VS_CODE[3].clone().push_defines_front(defines));
+			fn push_vs_code(_codes: &mut BlockCodeAtom) {
+				let _defines: &[Define] = &[];
+				_codes.define.push(VS_CODE[0].clone().push_defines_front(_defines));
+super::camera1::push_code(codes, merge_defines(_defines, &[Define::new(true, BBB_DEFINE.clone())]).as_slice());
+_codes.running.push(VS_CODE[1].clone().push_defines_front(_defines));
+_codes.running.push(VS_CODE[2].clone().push_defines_front(_defines));
+_codes.define.push(VS_CODE[3].clone().push_defines_front(_defines));
 			}
 
-			fn push_fs_code(codes: &mut BlockCodeAtom) {
-				let defines: &[Define] = &[];
-				codes.define.push(FS_CODE[0].clone().push_defines_front(defines));
-codes.running.push(FS_CODE[1].clone().push_defines_front(defines));
-codes.running.push(FS_CODE[2].clone().push_defines_front(defines));
+			fn push_fs_code(_codes: &mut BlockCodeAtom) {
+				let _defines: &[Define] = &[];
+				_codes.define.push(FS_CODE[0].clone().push_defines_front(_defines));
+_codes.running.push(FS_CODE[1].clone().push_defines_front(_defines));
+_codes.running.push(FS_CODE[2].clone().push_defines_front(_defines));
 			}
 
 			lazy_static! {
-				static ref VS_CODE: Vec<CodeSlice> = vec![CodeSlice{code:Atom::from("#version 450
+				static ref VS_CODE: Vec<CodeSlice> = vec![CodeSlice{code:pi_atom::Atom::from("#version 450
 "), defines: vec![]},
-CodeSlice{code:Atom::from("	vVertexPosition=position;
-"), defines: vec![Define::new(true, VS_DEFINE[3].clone())]},
-CodeSlice{code:Atom::from("	gl_Position=project*view*world*vec4(position.x,position.y,1.,1.);
+CodeSlice{code:pi_atom::Atom::from("	vVertexPosition=position;
+"), defines: vec![Define::new(true, DD_DEFINE.clone())]},
+CodeSlice{code:pi_atom::Atom::from("	gl_Position=project*view*world*vec4(position.x,position.y,1.,1.);
 	gl_Position.z=depth/60000.+.2;
 "), defines: vec![]},
-CodeSlice{code:Atom::from("void main1(){
+CodeSlice{code:pi_atom::Atom::from("void main1(){
 
 	gl_Position.z=depth/60000.+.2+bb;
 
 }
 "), defines: vec![]}];
-				static ref FS_CODE: Vec<CodeSlice> = vec![CodeSlice{code:Atom::from("#version 450
+				static ref FS_CODE: Vec<CodeSlice> = vec![CodeSlice{code:pi_atom::Atom::from("#version 450
 
 precision highp float;
 "), defines: vec![]},
-CodeSlice{code:Atom::from("	vec4 c=color.rgba;
+CodeSlice{code:pi_atom::Atom::from("	vec4 c=color.rgba;
 "), defines: vec![]},
-CodeSlice{code:Atom::from("	o_Target=c;
-"), defines: vec![Define::new(true, FS_DEFINE[1].clone())]}];
-				static ref VS_DEFINE: Vec<Atom> = vec![Atom::from("AAA"),Atom::from("BBB"),Atom::from("CCC"),Atom::from("DD")];
-				static ref FS_DEFINE: Vec<Atom> = vec![Atom::from("FFF"),Atom::from("GGG")];
+CodeSlice{code:pi_atom::Atom::from("	o_Target=c;
+"), defines: vec![Define::new(true, GGG_DEFINE.clone())]}];
+				pub static ref CCC_DEFINE: pi_atom::Atom = pi_atom::Atom::from("CCC");
+pub static ref GGG_DEFINE: pi_atom::Atom = pi_atom::Atom::from("GGG");
+pub static ref AAA_DEFINE: pi_atom::Atom = pi_atom::Atom::from("AAA");
+pub static ref FFF_DEFINE: pi_atom::Atom = pi_atom::Atom::from("FFF");
+pub static ref BBB_DEFINE: pi_atom::Atom = pi_atom::Atom::from("BBB");
+pub static ref DD_DEFINE: pi_atom::Atom = pi_atom::Atom::from("DD");
 			}
 		

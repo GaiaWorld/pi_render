@@ -14,6 +14,7 @@ webgl = ["render_core/webgl"]
 [workspace]
 members = ["crates/*"]
 
+
 [dependencies]
 render_core = { path = "crates/render_core" }
 # render_material = { path = "crates/render_material" }
@@ -47,6 +48,7 @@ path = "examples/clean/main.rs"
 
 [patch.crates-io]
 pi_assets={ path = "../pi_assets" }
+pi_map = { path = "../pi_map" }
 
 # [patch."https://github.com/GaiaWorld/pi_hal"]
 # pi_hal = { path = "../pi_hal" }

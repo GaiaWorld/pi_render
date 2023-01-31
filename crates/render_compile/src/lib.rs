@@ -117,10 +117,10 @@ impl Parser {
 		let mut built_temp = BuildTemp::default();
 		// 加载所有需要使用的shader，存储在shader_mar中
 		let mut visited_path = XHashMap::default();
-		let mut cb = |shader_path: &DirEntry| -> Option<String> {
+		let mut cb = |shader_path: &DirEntry| -> Result<Option<String>, CompileShaderError> {
 			// 去重
 			match visited_path.get(&shader_path.path()) {
-				Some(_r) => return None,
+				Some(_r) => return Ok(None),
 				None => visited_path.insert(shader_path.path(), true),
 			};
 
@@ -129,28 +129,31 @@ impl Parser {
 					"vert" => (shader_path.path().to_string_lossy().to_string(), ShaderStage::Vertex),
 					"frag" => (shader_path.path().to_string_lossy().to_string(), ShaderStage::Fragment),
 					"glsl" => (shader_path.path().to_string_lossy().to_string(), ShaderStage::Compute),
-					_ => return None,
+					_ => return Ok(None),
 				}
 			} else {
-				return None;
+				return Ok(None);
 			};
+			println!("zzzzzzzzzz:{:?}", shader_path);
             let file = read(shader_path.path());
             if let Ok(bytes) = file {
 				let shader_code = String::from_utf8(bytes.to_vec()).unwrap();
-				let _ = self.parse_shader_slice_code(shader_code, &shader_path.path(), stage,  &mut built_temp);
+				let _ = self.parse_shader_slice_code(shader_code, &shader_path.path(), stage,  &mut built_temp)?;
             }
-			Some(path)
+			Ok(Some(path))
         };
 
 		let mut gen_paths = XHashSet::default();
 		for path in self.gen_paths.iter() {
-			file::visit_dirs(path, &mut |shader_path: &DirEntry| {
-				if let Some(_) = cb(shader_path) {
+			file::visit_dirs(path, &mut |shader_path: &DirEntry| -> Result<(), CompileShaderError> {
+				if let Some(_) = cb(shader_path)? {
 					gen_paths.insert(Atom::from(shader_path.path().to_string_lossy().to_string()));
 				}
-			}).unwrap();
+				Ok(())
+			})?;
 		}
 
+		println!("=====built_temp{:?}, \ngen_paths: {:?}", built_temp.built_slice.keys(), gen_paths);
 		// 
 		for i in self.vert_frag_groups.iter() {
 			// CompileShaderError
@@ -261,20 +264,29 @@ impl Parser {
 		let vs_slice = built_temp.built_slice.get(&vs_shader_id).unwrap();
 		let fs_slice = built_temp.built_slice.get(&fs_shader_id).unwrap();
 
+		let mut render_derive = XHashSet::default();
+		let mut shader_import = XHashSet::default();
+
 		let vs_compile_result = compile_uniform(
 			&vs_bindings,
 			&inputs,
 			vs_slice,
+			&mut render_derive,
+			&mut shader_import,
 		)?;
 		let share_compile_result = compile_uniform(
 			&share_bindings,
 			&inputs,
 			vs_slice,
+			&mut render_derive,
+			&mut shader_import,
 		)?;
 		let fs_compile_result = compile_uniform(
 			&fs_bindings,
 			&Vec::default(),
 			fs_slice,
+			&mut render_derive,
+			&mut shader_import,
 		)?;
 		// format!("Define::new({}, {}[{}])", r.0, define_name, r.1 ) 
 		// push_meta.push(format!("{}::push_meta(meta, visibility, defines.clone().extend_from_slice(&[{}])));", path, defines));
@@ -287,9 +299,9 @@ impl Parser {
 			.iter()
 			.filter(|r| {!fs_imports.contains(*r)})
 			.map(|r| {
-				let defines = r.1.iter().map(|r| {format!("Define::new({}, VS_DEFINE[{}].clone())", r.0, r.1 )}).collect::<Vec<String>>().join(",");
+				let defines = r.1.iter().map(|r| {format!("Define::new({}, {}_DEFINE.clone())", r.0, r.1)}).collect::<Vec<String>>().join(",");
 				if let ShaderImport::Path(path) = &r.0 {
-					format!("{}::push_meta(meta, visibility, &[{}]);", path, defines)
+					format!("{}::push_meta(_meta, _visibility, &[{}]);", path, defines)
 				} else {
 					"".to_string()
 				}
@@ -299,9 +311,9 @@ impl Parser {
 			.iter()
 			.filter(|r| {!vs_imports.contains(*r)})
 			.map(|r| {
-				let defines = r.1.iter().map(|r| {format!("Define::new({}, FS_DEFINE[{}].clone())", r.0, r.1 )}).collect::<Vec<String>>().join(",");
+				let defines = r.1.iter().map(|r| {format!("Define::new({}, {}_DEFINE.clone())", r.0, r.1 )}).collect::<Vec<String>>().join(",");
 				if let ShaderImport::Path(path) = &r.0 {
-					format!("{}::push_meta(meta, visibility, &[{}]);", path, defines)
+					format!("{}::push_meta(_meta, _visibility, &[{}]);", path, defines)
 				} else {
 					"".to_string()
 				}
@@ -311,9 +323,9 @@ impl Parser {
 			.iter()
 			.filter(|r| {fs_imports.contains(*r)})
 			.map(|r| {
-				let defines = r.1.iter().map(|r| {format!("Define::new({}, VS_DEFINE[{}].clone())", r.0, r.1 )}).collect::<Vec<String>>().join(",");
+				let defines = r.1.iter().map(|r| {format!("Define::new({}, {}_DEFINE.clone())", r.0, r.1 )}).collect::<Vec<String>>().join(",");
 				if let ShaderImport::Path(path) = &r.0 {
-					format!("{}::push_meta(meta, visibility, &[{}]);", path, defines)
+					format!("{}::push_meta(_meta, _visibility, &[{}]);", path, defines)
 				} else {
 					"".to_string()
 				}
@@ -321,17 +333,17 @@ impl Parser {
 			.collect::<Vec<String>>();
 
 		let vs_visibility = if vs_compile_result.entrys.len() > 0 || vs_import.len() > 0 {
-			"let visibility = wgpu::ShaderStages::VERTEX;"
+			"let _visibility = wgpu::ShaderStages::VERTEX;"
 		} else {
 			""
 		};
 		let fs_visibility = if fs_compile_result.entrys.len() > 0  || fs_import.len() > 0{
-			"let visibility = wgpu::ShaderStages::FRAGMENT;\n"
+			"let _visibility = wgpu::ShaderStages::FRAGMENT;\n"
 		} else {
 			""
 		};
 		let share_visibility = if share_compile_result.entrys.len() > 0 || share_import.len() > 0 {
-			"let visibility = wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT;\n"
+			"let _visibility = wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT;\n"
 		} else {
 			""
 		};
@@ -339,20 +351,30 @@ impl Parser {
 		let mut varing_list = Vec::new();
 		let mut in_list = Vec::new();
 		let mut out_list = Vec::new();
+		// 定义输入
+		let mut in_defines_list = Vec::new();
+
+		if vs_slice.in_list.len() > 0 {
+			render_derive.insert("Input");
+		}
+		for InOut {name,ty, location, defines } in vs_slice.in_list.iter() {
+			in_list.push(format!(r#"
+				InOut::new("{}", "{}", {}, vec![{}])
+			"#,
+				name, ty, location, defines.iter().map(|r| {format!(r#"Define::new({}, {}_DEFINE.clone())"#, r.0, r.1)}).collect::<Vec<String>>().join(",")
+			));
+			in_defines_list.push(format!("
+				#[derive(Input)]
+				#[location({})]
+				pub struct {}Vert;
+			", location, name.to_class_case()));
+		}
 
 		for InOut {name,ty, location, defines } in vs_slice.out_list.iter() {
 			varing_list.push(format!(r#"
 				InOut::new("{}", "{}", {}, vec![{}])
 			"#,
-				name, ty, location, defines.iter().map(|r| {format!(r#"Define::new({}, VS_DEFINE[{}].clone()))"#, r.0, r.1)}).collect::<Vec<String>>().join(",")
-			));
-		}
-
-		for InOut {name,ty, location, defines } in vs_slice.in_list.iter() {
-			in_list.push(format!(r#"
-				InOut::new("{}", "{}", {}, vec![{}])
-			"#,
-				name, ty, location, defines.iter().map(|r| {format!(r#"Define::new({}, VS_DEFINE[{}].clone())"#, r.0, r.1)}).collect::<Vec<String>>().join(",")
+				name, ty, location, defines.iter().map(|r| {format!(r#"Define::new({}, {}_DEFINE.clone())"#, r.0, r.1)}).collect::<Vec<String>>().join(",")
 			));
 		}
 
@@ -360,25 +382,32 @@ impl Parser {
 			out_list.push(format!(r#"
 				InOut::new("{}", "{}", {}, vec![{}])
 			"#,
-				name, ty, location,  defines.iter().map(|r| {format!(r#"Define::new({}, FS_DEFINE[{}].clone())"#, r.0, r.1)}).collect::<Vec<String>>().join(",")
+				name, ty, location,  defines.iter().map(|r| {format!(r#"Define::new({}, {}_DEFINE.clone())"#, r.0, r.1)}).collect::<Vec<String>>().join(",")
 			));
 		}
+
+		let mut defines = vs_slice.defines.clone();
+		defines.extend(fs_slice.defines.clone().into_iter());
+
+		let defines_static = defines.iter().map(|r| {
+			format!(r#"pub static ref {}_DEFINE: pi_atom::Atom = pi_atom::Atom::from("{}");"#, r, r) 
+		}).collect::<Vec<String>>();
 		
 		let out_str = format!(r#"
-			use pi_render::rhi::shader::{{BindingExpandDesc, TypeKind, TypeSize, ArrayLen, ShaderMeta, CodeSlice, BlockCodeAtom, InOut, AsLayoutEntry, Define, merge_defines, BindingExpandDescList,  ShaderVarying, ShaderInput, ShaderOutput}};
-			use render_derive::{{BindLayout, BufferSize, Uniform, BindingType}};
-			use pi_atom::Atom;
-			use pi_map::vecmap::VecMap;
+			use pi_render::rhi::shader::{{ShaderMeta, CodeSlice, BlockCodeAtom, InOut, Define,  ShaderVarying, ShaderInput, ShaderOutput, ShaderProgram, {}}};
+			use render_derive::{{{}}};
+			{}
 			{}
 			{}
 			{}
 
 			pub struct ProgramMeta;
-			impl ProgramMeta {{
-				pub fn create_meta() -> pi_render::rhi::shader::ShaderMeta {{
-					let mut meta_ = ShaderMeta::default();
-					let defines: &[Define] = &[];
-					let meta = &mut meta_;
+			impl ShaderProgram for ProgramMeta {{
+				fn create_meta() -> pi_render::rhi::shader::ShaderMeta {{
+					let mut meta = ShaderMeta::default();
+					meta.name = std::any::type_name::<Self>().to_string();
+					let _defines: &[Define] = &[];
+					let _meta = &mut meta;
 					{}
 					{}
 					{}
@@ -399,29 +428,31 @@ impl Parser {
 					meta.outs = ShaderOutput(vec![
 						{}
 					]);
-					meta_
+					meta
 				}}
 			}}
-			fn push_vs_code(codes: &mut BlockCodeAtom) {{
-				let defines: &[Define] = &[];
+			fn push_vs_code(_codes: &mut BlockCodeAtom) {{
+				let _defines: &[Define] = &[];
 				{}
 			}}
 
-			fn push_fs_code(codes: &mut BlockCodeAtom) {{
-				let defines: &[Define] = &[];
+			fn push_fs_code(_codes: &mut BlockCodeAtom) {{
+				let _defines: &[Define] = &[];
 				{}
 			}}
 
 			lazy_static! {{
 				static ref VS_CODE: Vec<CodeSlice> = vec![{}];
 				static ref FS_CODE: Vec<CodeSlice> = vec![{}];
-				static ref VS_DEFINE: Vec<Atom> = vec![{}];
-				static ref FS_DEFINE: Vec<Atom> = vec![{}];
+				{}
 			}}
 		"#, 
+			shader_import.into_iter().collect::<Vec<&'static str>>().join(","),
+			render_derive.into_iter().collect::<Vec<&'static str>>().join(","),
 			vs_compile_result.out_code,
 			fs_compile_result.out_code,
 			share_compile_result.out_code,
+			in_defines_list.join("\n"),
 
 			vs_visibility,
 			vs_compile_result.entrys.join("\n"),
@@ -438,8 +469,7 @@ impl Parser {
 			fs_compile_result.push_code.join("\n"),
 			vs_compile_result.codes.join(",\n"),
 			fs_compile_result.codes.join(",\n"),
-			vs_slice.defines.iter().map(|r| {format!(r#"Atom::from("{}")"#, r)}).collect::<Vec<String>>().join(","),
-			fs_slice.defines.iter().map(|r| {format!(r#"Atom::from("{}")"#, r)}).collect::<Vec<String>>().join(",")
+			defines_static.join("\n"),
 		);
 		result.shader_result.push((
 			vert_path_str[0..vert_path_str.len() - 5].to_string() + ".rs", 
@@ -465,6 +495,7 @@ impl Parser {
 		} else {
 			import_set.insert(shader_id.clone());
 		}
+		println!("shader==========={:?}, {:?}", shader_id, built_temp.built_slice.keys());
 		
 		let slice = built_temp.built_slice.get(&shader_id).unwrap();
 		let module = built_temp.built_map.get(&shader_id).unwrap();
@@ -473,37 +504,43 @@ impl Parser {
 		let shader_slice = built_temp.built_slice.get(&shader_id).unwrap();
 		let extension = slice.path.extension().unwrap();
 
+		let mut render_derive = XHashSet::default();
+		let mut shader_import = XHashSet::default();
+
 		if extension != "vert" && extension != "frag" {
 			let uniform_code = compile_uniform(
 				&bindings,
 				&inputs,
 				shader_slice,
+				&mut render_derive,
+				&mut shader_import,
 			)?;
 			let compile_result =format!(r#"
-				use pi_render::rhi::shader::{{ ShaderMeta, CodeSlice, BlockCodeAtom, BindingExpandDesc, TypeKind, ArrayLen, TypeSize, AsLayoutEntry, Define, merge_defines, BindingExpandDescList}};
-				use render_derive::{{BindLayout, BufferSize, Uniform, BindingType}};
-				use pi_atom::Atom;
+				use pi_render::rhi::shader::{{ ShaderMeta, CodeSlice, BlockCodeAtom, Define, {}}};
+				use render_derive::{{{}}};
 				{}
-				pub fn push_meta(meta: &mut ShaderMeta, visibility: wgpu::ShaderStages, defines: &[Define]) {{
+				pub fn push_meta(_meta: &mut ShaderMeta, _visibility: wgpu::ShaderStages, _defines: &[Define]) {{
 					{}
 					{}
 				}}
 
-				pub fn push_code(codes: &mut BlockCodeAtom, defines: &[Define]) {{
+				pub fn push_code(_codes: &mut BlockCodeAtom, _defines: &[Define]) {{
 					{}
 				}}
 
 				lazy_static! {{
 					static ref CODE: Vec<CodeSlice> = vec![{}];
-					static ref DEFINE: Vec<Atom> = vec![{}];
+					{}
 				}}
 			"#, 
+				shader_import.into_iter().collect::<Vec<&'static str>>().join(","),
+				render_derive.into_iter().collect::<Vec<&'static str>>().join(","),
 				uniform_code.out_code,
 				uniform_code.entrys.join("\n"),
 				uniform_code.push_meta.join("\n"),
 				uniform_code.push_code.join("\n"),
 				uniform_code.codes.join(",\n"),
-				slice.defines.iter().map(|r| {format!(r#"Atom::from("{}")"#, r)}).collect::<Vec<String>>().join(",")
+				slice.defines.iter().map(|r| {format!(r#"pub static ref {}_DEFINE: pi_atom::Atom = pi_atom::Atom::from("{}");"#, r, r)}).collect::<Vec<String>>().join("\n")
 			);
 			let path = slice.path.to_string_lossy().to_string();
 			result.shader_result.push((path[0..path.len() - 5].to_string() + ".rs", compile_result));
@@ -548,13 +585,13 @@ impl Parser {
 		let mut last_code = String::new();
 
 		let mut default_map = XHashMap::default();
-		let mut binding_defines:  XHashMap<UniformSlot, Vec<(bool, usize)>> = XHashMap::default();
-		let mut define_list: Vec<String> = Vec::new();
+		let mut binding_defines:  XHashMap<UniformSlot, Vec<(bool, String)>> = XHashMap::default();
+		let mut define_list: XHashSet<String> = XHashSet::default();
 		let mut define_set: XHashSet<String> = XHashSet::default();
 
 
 		// let mut slice_map = XHashMap::default();
-		let push_code = |run_code_list: &mut Vec<Code>, run_string: &mut String, cmd_list: &mut Vec<String>, defines: &Vec<(bool, usize)>| {
+		let push_code = |run_code_list: &mut Vec<Code>, run_string: &mut String, cmd_list: &mut Vec<String>, defines: &Vec<(bool, String)>| {
 			let run_string = replace(run_string, "".to_string());
 			run_code_list.push(Code {content: CodeItem::Code {run_code: run_string, other_code: cmd_list.join("\n") }, defines: defines.clone()});
 			cmd_list.clear();
@@ -571,19 +608,19 @@ impl Parser {
                 // 将 shader_defs 是否 含 该 def 的结果 加到 scopes 中
 				if !define_set.contains(&def) {
 					define_set.insert(def.clone());
-					define_list.push(def.clone());
+					define_list.insert(def.clone());
 				}
                 scopes.push(*scopes.last().unwrap());
-				defines.push((true, define_list.len() - 1));
+				defines.push((true, def.clone()));
 			} else if let Some(cap) = SHADER_PROCESSOR.ifndef_regex.captures(line) {
 				push_code(&mut run_code_list, &mut run_string, &mut cmd_list, &defines);
                 // #ifndef 就将结果 取反，然后加到 scopes中
                 let def = cap.get(1).unwrap().as_str().to_string();
 				if !define_set.contains(&def) {
 					define_set.insert(def.clone());
-					define_list.push(def.clone());
+					define_list.insert(def.clone());
 				}
-				defines.push((false, define_list.len() - 1));
+				defines.push((false, def.clone()));
                 scopes.push(*scopes.last().unwrap());
             } else if SHADER_PROCESSOR.else_regex.is_match(line) {
 				push_code(&mut run_code_list, &mut run_string, &mut cmd_list, &defines);
@@ -708,7 +745,7 @@ impl Parser {
 		let module = parser
 			.parse(&front::glsl::Options::from(ShaderStage::Vertex), &*last_code)
 			.map_err(CompileShaderError::GlslParse1)?;
-		// println!("module======={:?}", module);
+		println!("id: {:?},module======={:?}", id, module);
 		build_temp.built_map.insert(id.clone(), Arc::new(module));
 
 		let slice = ShaderSlice { 
@@ -769,17 +806,18 @@ pub struct ShaderSlice {
 	// source: Cow<'static, str>,
 	stage: ShaderStageTy,
 	path: PathBuf,
-	imports: Vec<(ShaderImport,Vec<(bool, usize)>)>,
-	binding_defines: XHashMap<UniformSlot, Vec<(bool, usize)>>,
+	imports: Vec<(ShaderImport,Vec<(bool, String)>)>,
+	binding_defines: XHashMap<UniformSlot, Vec<(bool, String)>>,
 
 	// 宏
-	defines: Vec<String>,
+	defines: XHashSet<String>,
+	
 }
 
 #[derive(Debug, Clone)]
 pub struct Code {
 	content: CodeItem,
-	defines: Vec<(bool, usize)>
+	defines: Vec<(bool, String)>
 }
 
 #[derive(Debug, Clone)]
@@ -793,7 +831,7 @@ pub struct InOut {
 	name: String,
 	ty: String,
 	location: u32,
-	defines: Vec<(bool, usize)>,
+	defines: Vec<(bool, String)>,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -928,6 +966,9 @@ impl PasreResult {
 
 #[derive(Error, Debug)]
 pub enum CompileShaderError {
+	#[error(transparent)]
+	IoError(#[from] std::io::Error),
+
 	#[error("shader is not exist: {0:?}")]
     ShaderNotExist(Atom),
 
@@ -944,28 +985,28 @@ pub enum CompileShaderError {
 	InvalidImportPath(String),
 
 	#[error(transparent)]
-    WgslParse(#[from] naga::front::wgsl::ParseError),
+    WgslParse(#[from] pi_naga::front::wgsl::ParseError),
 
 	#[error("GLSL Parse Error: {0:?}")]
-    GlslParse(Vec<naga::front::glsl::Error>),
+    GlslParse(Vec<pi_naga::front::glsl::Error>),
 
     #[error(transparent)]
-    SpirVParse(#[from] naga::front::spv::Error),
+    SpirVParse(#[from] pi_naga::front::spv::Error),
 
     #[error(transparent)]
-    Validation(#[from] naga::WithSpan<naga::valid::ValidationError>),
+    Validation(#[from] pi_naga::WithSpan<pi_naga::valid::ValidationError>),
 
-	#[error(transparent)]
-    WgslParse1(#[from] pi_naga::front::wgsl::ParseError),
+	// #[error(transparent)]
+    // WgslParse1(#[from] pi_naga::front::wgsl::ParseError),
 
 	#[error("GLSL Parse Error: {0:?}")]
     GlslParse1(Vec<pi_naga::front::glsl::Error>),
 
-    #[error(transparent)]
-    SpirVParse1(#[from] pi_naga::front::spv::Error),
+    // #[error(transparent)]
+    // SpirVParse1(#[from] pi_naga::front::spv::Error),
 
-    #[error(transparent)]
-    Validation1(#[from] pi_naga::WithSpan<naga::valid::ValidationError>),
+    // #[error(transparent)]
+    // Validation1(#[from] pi_naga::WithSpan<pi_naga::valid::ValidationError>),
 }
 
 // pub struct BuildInVarProcessor {
@@ -988,6 +1029,8 @@ fn compile_uniform(
 	bindings: &XHashMap<UniformSlot, (BindingType, String)>,
 	inputs: &Vec<BindingLocation>,
 	code_slice: &ShaderSlice,
+	render_derive: &mut XHashSet<&'static str>,
+	shader_import: &mut XHashSet<&'static str>,
 ) -> Result<UniformCode, CompileShaderError> {
 	// println!("module: {:?}", module);
 
@@ -995,10 +1038,10 @@ fn compile_uniform(
 	let mut entrys = Vec::new();
 	parse_input(&mut out_code, inputs);
 
-	let (code_name, define_name) = match code_slice.stage {
-		ShaderStageTy::Vert => ("VS_CODE", "VS_DEFINE"),
-		ShaderStageTy::Frag => ("FS_CODE", "FS_DEFINE"),
-		ShaderStageTy::Compute => ("CODE", "DEFINE"),
+	let code_name = match code_slice.stage {
+		ShaderStageTy::Vert => "VS_CODE",
+		ShaderStageTy::Frag => "FS_CODE",
+		ShaderStageTy::Compute => "CODE",
 	}; 
 
 	// 定义binding类型、uniform类型， 
@@ -1006,13 +1049,14 @@ fn compile_uniform(
 	// 为uniform实现Uniform tarit
 	for (slot, (binding_type, binding_name)) in bindings.iter(){
 		let bind_class_case_name = binding_name.to_class_case();
-		let defines = code_slice.binding_defines.get(slot).map_or("".to_string(), |r| {r.iter().map(|r| {format!(r#"Define::new({}, {}[{}].clone())"#, r.0, define_name, r.1)}).collect::<Vec<String>>().join(",")});
+		let defines = code_slice.binding_defines.get(slot).map_or("".to_string(), |r| {r.iter().map(|r| {format!(r#"Define::new({}, {}_DEFINE.clone())"#, r.0, r.1)}).collect::<Vec<String>>().join(",")});
 
 		match binding_type {
 			BindingType::Buffer(buffer_binding) => {
 				let alignment_size = buffer_binding.alignment_size;
 				let mut uniform_expand = Vec::new();
 				for m in buffer_binding.merbers.iter() {
+					shader_import.insert("TypeSize");
 					let size = match m.ty {
 						VarType::Mat => format!("TypeSize::Mat{{rows: {}, columns: {}}}", m.size/(m.span/4), m.span/4),
 						VarType::Vector => format!("TypeSize::Vec({})", m.size),
@@ -1036,12 +1080,19 @@ fn compile_uniform(
 							v.join(",")
 						},
 					};
+					shader_import.insert("BindingExpandDesc");
+					shader_import.insert("TypeKind");
+					shader_import.insert("ArrayLen");
 					uniform_expand.push(format!(r#"
 						BindingExpandDesc::new_buffer::<{}>("{}", &[{}],  TypeKind::{}, {}, ArrayLen::{:?})
 					"#, kind, m.name, default_value, kind_to_ty(&m.kind),  size, m.arr_len
 					));
 				}
 
+				
+				render_derive.insert("BindLayout");
+				render_derive.insert("BufferSize");
+				render_derive.insert("BindingType");
 				// 定义BindLayout， 实现BufferSize
 				out_code.push(format!("
 					#[derive(BindLayout, BufferSize, BindingType)]
@@ -1051,18 +1102,24 @@ fn compile_uniform(
 					pub struct {}Bind; // storagebuffer: TODO
 				", slot.group, slot.binding, arr_len_str(&buffer_binding.arr_len), alignment_size, bind_class_case_name));
 
+				shader_import.insert("AsLayoutEntry");
+				shader_import.insert("BindingExpandDescList");
+				shader_import.insert("merge_defines");
 				// 为Bind实现binding_type
 				entrys.push(format!("
-					meta.add_binding_entry({}, (
-						{}Bind::as_layout_entry(visibility),
-						BindingExpandDescList::new(vec![{}], merge_defines(defines, &[{}]))
+					_meta.add_binding_entry({}, (
+						{}Bind::as_layout_entry(_visibility),
+						BindingExpandDescList::new(vec![{}], merge_defines(_defines, &[{}]))
 					));
 				", slot.group, bind_class_case_name, uniform_expand.join(","), defines));
 				// uniform_expand.push(format!("
 								
 				// 			", kind, default_value, ty, m.name
 				// 			));
-
+				
+				if buffer_binding.merbers.len() > 0 {
+					render_derive.insert("Uniform");
+				}
 				// 实现Uniform
 				for buffer_member in buffer_binding.merbers.iter() {
 					let ty = get_type(buffer_member.kind);
@@ -1107,19 +1164,25 @@ fn compile_uniform(
 				// } else if key.to_string() == "multi" {
 				// 	self.multi = true;
 				// } else if key.to_string() == "dim" {
-
+				
+				render_derive.insert("BindLayout");
+				render_derive.insert("BindingType");
 				out_code.push(format!("
 					#[derive(BindLayout, BindingType)]
 					#[layout(set({}), binding({}){})]
 					#[texture(dim({}), multi({}), kind({}))]
 					pub struct {}Bind; // storagetexture: TODO
 				", slot.group, slot.binding, arr_len_str(&len), dim, multi, sample_type, bind_class_case_name));
-
+				
+				shader_import.insert("AsLayoutEntry");
+				shader_import.insert("BindingExpandDescList");
+				shader_import.insert("merge_defines");
+				shader_import.insert("BindingExpandDesc");
 				// 为Bind实现binding_type
 				entrys.push(format!(r#"
-					meta.add_binding_entry({}, (
-							{}Bind::as_layout_entry(visibility), 
-							BindingExpandDescList::new(vec![BindingExpandDesc::new_texture("{}")], merge_defines(defines, &[{}]))));
+					_meta.add_binding_entry({}, (
+							{}Bind::as_layout_entry(_visibility), 
+							BindingExpandDescList::new(vec![BindingExpandDesc::new_texture("{}")], merge_defines(_defines, &[{}]))));
 				"#, slot.group, bind_class_case_name, binding_name, defines));
 			}, 
 
@@ -1129,14 +1192,20 @@ fn compile_uniform(
 				} else {
 					"Filtering"
 				};
+				render_derive.insert("BindLayout");
+				render_derive.insert("BindingType");
 				out_code.push(format!("
 					#[derive(BindLayout, BindingType)]
 					#[layout(set({}), binding({}){})]
 					#[sampler({})]
 					pub struct {}Bind;
 				", slot.group, slot.binding, arr_len_str(&len), filtering, bind_class_case_name));
+				shader_import.insert("AsLayoutEntry");
+				shader_import.insert("BindingExpandDescList");
+				shader_import.insert("merge_defines");
+				shader_import.insert("BindingExpandDesc");
 				entrys.push(format!(r#"
-					meta.add_binding_entry({}, ({}Bind::as_layout_entry(visibility), BindingExpandDescList::new(vec![BindingExpandDesc::new_sampler("{}")], merge_defines(defines, &[{}]))));
+					_meta.add_binding_entry({}, ({}Bind::as_layout_entry(_visibility), BindingExpandDescList::new(vec![BindingExpandDesc::new_sampler("{}")], merge_defines(_defines, &[{}]))));
 				"#, slot.group, bind_class_case_name, binding_name, defines));
 
 			},
@@ -1149,24 +1218,25 @@ fn compile_uniform(
 	let mut j = 0;
 
 	for code in code_slice.code.iter() {
-		let defines = code.defines.iter().map(|r| {format!("Define::new({}, {}[{}].clone())", r.0, define_name, r.1 )}).collect::<Vec<String>>().join(",");
+		let defines = code.defines.iter().map(|r| {format!("Define::new({}, {}_DEFINE.clone())", r.0, r.1 )}).collect::<Vec<String>>().join(",");
 		match &code.content {
 			CodeItem::Code{run_code, other_code} => {
 				if run_code.as_str() != "" {
-					codes.push(format!(r#"CodeSlice{{code:Atom::from("{}"), defines: vec![{}]}}"#, &run_code, defines));
-					push_code.push(format!("codes.running.push({}[{}].clone().push_defines_front(defines));", code_name, j));
+					codes.push(format!(r#"CodeSlice{{code:pi_atom::Atom::from("{}"), defines: vec![{}]}}"#, &run_code, defines));
+					push_code.push(format!("_codes.running.push({}[{}].clone().push_defines_front(_defines));", code_name, j));
 					j += 1;
 				}
 				if other_code.as_str() != "" {
-					codes.push(format!(r#"CodeSlice{{code:Atom::from("{}"), defines: vec![{}]}}"#, &other_code, defines));
-					push_code.push(format!("codes.define.push({}[{}].clone().push_defines_front(defines));", code_name, j));
+					codes.push(format!(r#"CodeSlice{{code:pi_atom::Atom::from("{}"), defines: vec![{}]}}"#, &other_code, defines));
+					push_code.push(format!("_codes.define.push({}[{}].clone().push_defines_front(_defines));", code_name, j));
 					j += 1;
 				}
 			},
 			CodeItem::Import(path) => {
 				if let ShaderImport::Path(path) = path {
-					push_code.push(format!("{}::push_code(codes, merge_defines(defines, &[{}]).as_slice());", path, defines));
-					push_meta.push(format!("{}::push_meta(meta, visibility, merge_defines(defines, &[{}]).as_slice()));", path, defines));
+					shader_import.insert("merge_defines");
+					push_code.push(format!("{}::push_code(_codes, merge_defines(_defines, &[{}]).as_slice());", path, defines));
+					push_meta.push(format!("{}::push_meta(_meta, _visibility, merge_defines(_defines, &[{}]).as_slice()));", path, defines));
 				}
 			},
 		}
@@ -2320,6 +2390,23 @@ layout(set=0, binding=0) uniform texture2DMS depth;
 
 void main() {
 	gl_Position.z = depth/60000.0 + depth1.x;
+}
+				"#);
+	println!("modle================={:?}, \nmodle================={:?}", modlue, parser);
+}
+
+#[test]
+fn test_type() {
+
+	let mut parser = pi_naga::front::glsl::Parser::default();
+	let modlue = parser
+				.parse(&pi_naga::front::glsl::Options::from(pi_naga::ShaderStage::Vertex), r#"
+#version 450
+float dd;
+int dd1;
+
+void main() {
+	gl_Position.z = dd1;
 }
 				"#);
 	println!("modle================={:?}, \nmodle================={:?}", modlue, parser);

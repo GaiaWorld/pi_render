@@ -65,6 +65,45 @@ pub fn derive_bind_layout(input: TokenStream) -> TokenStream {
     }
 }
 
+pub fn derive_input(input: TokenStream) -> TokenStream {
+    let ast: DeriveInput = syn::parse(input).unwrap();
+    let name = &ast.ident;
+    let (impl_generics, ty_generics, where_clause) = ast.generics.split_for_impl();
+    let mut location = None;
+    // let mut entry = None;
+    for attr in ast.attrs.iter() {
+        // pub pound_token: Token![#],
+        // pub style: AttrStyle,
+        // pub bracket_token: token::Bracket,
+        // pub path: Path,
+        // pub tokens: TokenStream,
+        let t = attr.tokens.to_string();
+        let t = TokenStream::from_str(t.as_str()).unwrap();
+        if attr.path.segments[0].ident == "location" {
+            location = Some(parse_macro_input!(t as Input));
+        }
+    }
+    let location = match location {
+        Some(r) => r,
+        _ => panic!("lost 'set' or 'binding'"),
+    };
+
+    if let Some(location) = location.location {
+        // let a = Kind::Depth;
+        let gen = quote! {
+            impl #impl_generics pi_render::rhi::shader::Input for #name #ty_generics #where_clause {
+                #[inline]
+                fn location() -> u32 {
+                    #location
+                }
+            }
+        };
+        gen.into()
+    } else {
+        panic!("lost 'set' or 'bind'")
+    }
+}
+
 pub fn derive_binding_type(input: TokenStream) -> TokenStream {
     let ast: DeriveInput = syn::parse(input).unwrap();
     let name = &ast.ident;
@@ -208,12 +247,12 @@ impl ToTokens for BindType {
             BindType::UniformBuffer => tokens.extend(quote! {wgpu::BindingType::Buffer {
                 ty: wgpu::BufferBindingType::Uniform,
                 has_dynamic_offset: true, // 默认为true， 可修改
-                min_binding_size: wgpu::BufferSize::new(144),
+                min_binding_size: wgpu::BufferSize::new(<Self as pi_render::rhi::shader::BufferSize>::min_size() as u64),
             }}),
             BindType::StorageBuffer => tokens.extend(quote! {wgpu::BindingType::Buffer {
                 ty: wgpu::BufferBindingType::Storage{true},
                 has_dynamic_offset: true, // 默认为true， 可修改
-                min_binding_size: wgpu::BufferSize::new(Self::min_size()),
+                min_binding_size: wgpu::BufferSize::new(<Self as pi_render::rhi::shader::BufferSize>::min_size() as u64),
             }}),
             BindType::Tetxure(r) => r.to_tokens(tokens),
             BindType::Sampler(r) => r.to_tokens(tokens),
@@ -242,7 +281,6 @@ impl ToTokens for Sampler {
 
 impl Parse for Sampler {
     fn parse(input: ParseStream) -> Result<Self, syn::Error> {
-        let mut desc = TextureDesc::default();
         let content;
         parenthesized!(content in input);
 
@@ -418,5 +456,21 @@ fn set_uniform(layout: &mut UniformSpan, key: Ident, tokens: proc_macro2::TokenS
         layout.len = Some(tokens);
     } else if key.to_string() == "bind" {
         layout.bind = Some(tokens);
+    }
+}
+
+#[derive(Default)]
+struct Input {
+    location: Option<proc_macro2::TokenStream>,
+}
+
+impl Parse for Input {
+    fn parse(input: ParseStream) -> Result<Self, syn::Error> {
+        let content;
+        parenthesized!(content in input);
+
+        let tokens: proc_macro2::TokenStream = content.parse()?;
+
+        Ok(Input {location: Some(tokens)})
     }
 }

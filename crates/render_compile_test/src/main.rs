@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate lazy_static;
 
-pub mod shaders;
+// pub mod shaders;
 pub mod test_shader;
 
 
@@ -10,28 +10,28 @@ use pi_atom::Atom;
 use pi_hash::XHashSet;
 use std::{env, path::PathBuf};
 
-#[test]
-fn test11() {
-    let meta = shaders::test::ProgramMeta::create_meta();
+// #[test]
+// fn test11() {
+//     let meta = shaders::test::ProgramMeta::create_meta();
 
-    let mut vs_defines = XHashSet::default();
-    vs_defines.extend(
-        vec![
-            Atom::from("AAA"),
-            Atom::from("BBB"),
-            Atom::from("CCC"),
-            Atom::from("DD"),
-            Atom::from("EEE"),
-            Atom::from("FFF"),
-            Atom::from("GGG"),
-            Atom::from("FFF"),
-        ]
-        .into_iter(),
-    );
+//     let mut vs_defines = XHashSet::default();
+//     vs_defines.extend(
+//         vec![
+//             Atom::from("AAA"),
+//             Atom::from("BBB"),
+//             Atom::from("CCC"),
+//             Atom::from("DD"),
+//             Atom::from("EEE"),
+//             Atom::from("FFF"),
+//             Atom::from("GGG"),
+//             Atom::from("FFF"),
+//         ]
+//         .into_iter(),
+//     );
 
-    std::fs::write("output.vert", meta.to_code(&vs_defines, wgpu::ShaderStages::VERTEX));
-    std::fs::write("output.frag", meta.to_code(&vs_defines, wgpu::ShaderStages::FRAGMENT));
-}
+//     std::fs::write("output.vert", meta.to_code(&vs_defines, wgpu::ShaderStages::VERTEX));
+//     std::fs::write("output.frag", meta.to_code(&vs_defines, wgpu::ShaderStages::FRAGMENT));
+// }
 
 pub struct RenderManifest {
     manifest: Manifest,

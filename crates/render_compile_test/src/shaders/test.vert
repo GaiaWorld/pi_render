@@ -9,7 +9,7 @@ layout(location=1)in vec2 color;// 输入位置
 layout(location=0)out vec2 vVertexPosition;// 输出位置
 
 #ifdef BBB
-#import super::camera
+#import super::camera1
 #endif
 
 #ifdef CCC

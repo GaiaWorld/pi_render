@@ -13,7 +13,7 @@ use super::{
     buffer::Buffer,
     device::RenderDevice,
     shader::{BindLayout, Uniform, WriteBuffer},
-    RenderQueue,
+    RenderQueue, draw_obj::DrawGroup,
 };
 /// 用于管理一类bindgroup分配的buffer
 /// 这些bindgroup需要满足如下要求：
@@ -41,7 +41,9 @@ impl GroupAlloter {
         limit_size: u32,
         init_size: Option<u32>, // 单位： 字节
         entrys: Vec<wgpu::BindGroupLayoutEntry>,
+		layout: Share<BindGroupLayout>,
     ) -> Result<Self, DynBufferError> {
+		println!("======={:?}", layout);
         let mut binding_offset_map = VecMap::with_capacity(entrys.len());
         // let mut buffer0 = Vec::with_capacity(1);
         let mut binding_size_list = Vec::with_capacity(entrys.len());
@@ -94,7 +96,7 @@ impl GroupAlloter {
             }),
             info: DynGroupBufferInfo {
                 entrys,
-                layout: None,
+                layout,
                 limit_count,
                 binding_size_list,
                 label,
@@ -154,26 +156,28 @@ impl GroupAlloter {
     }
 
     /// 写入buffer到现存，返回是否重新创建了buffer
-    pub fn write_buffer(&mut self, device: &RenderDevice, queue: &RenderQueue) {
+    pub fn write_buffer(&self, device: &RenderDevice, queue: &RenderQueue) {
         // SAFE
+		let this =
+            unsafe { &mut *(self as *const Self as usize as *mut Self) };
         let buffer_lock =
             unsafe { &mut *(Share::as_ptr(&self.buffers) as usize as *mut GroupBuffer) };
         let _lock = self.buffers.mutex.lock();
 
         let buffer_lock = &mut *buffer_lock;
-        if let None = self.info.layout {
-            let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                label: match &self.info.layout_label {
-                    Some(r) => Some(r.as_str()),
-                    None => None,
-                },
-                entries: self.info.entrys.as_slice(),
-            });
-            self.info.layout = Some(layout);
-        }
-        let layout = self.info.layout.as_ref().unwrap();
+        // if let None = self.info.layout {
+        //     let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        //         label: match &self.info.layout_label {
+        //             Some(r) => Some(r.as_str()),
+        //             None => None,
+        //         },
+        //         entries: self.info.entrys.as_slice(),
+        //     });
+        //     this.info.layout = Some(layout);
+        // }
+        // let layout = this.info.layout.as_ref().unwrap();
         for buffers in buffer_lock.values.iter_mut() {
-            buffers.write_buffer(device, queue, &self.info, layout);
+            buffers.write_buffer(device, queue, &this.info, &this.info.layout);
         }
     }
 }
@@ -184,6 +188,13 @@ pub struct BufferGroup {
     bindings_index: usize,
     context: Share<GroupBuffer>,
     group_offsets: Share<GroupOffsets>,
+}
+
+impl Into<DrawGroup> for BufferGroup {
+	#[inline]
+    fn into(self) -> DrawGroup {
+        DrawGroup::Offset(self)
+    }
 }
 
 impl BufferGroup {
@@ -436,7 +447,7 @@ struct GroupOffsets {
 
 struct DynGroupBufferInfo {
     entrys: Vec<wgpu::BindGroupLayoutEntry>,
-    layout: Option<BindGroupLayout>,
+    layout: Share<BindGroupLayout>,
     // 每个元素表示一组buffer, 一组buffer对应一个bindgroup
     // 占用内存最大的bingding的索引（以此索引中的buffer的内存来判断是否超过内存限制）
     // max_size_binding_index: usize,
@@ -479,11 +490,11 @@ impl BufferCache {
         if self.change_range.len() == 0 {
             self.change_range.start = start;
             self.change_range.end = end;
-            println!(
-                "full1======{:?}, {:?}",
-                self.change_range,
-                bytemuck::cast_slice::<_, f32>(&self.buffer)
-            );
+            // println!(
+            //     "full1======{:?}, {:?}",
+            //     self.change_range,
+            //     bytemuck::cast_slice::<_, f32>(&self.buffer)
+            // );
             return;
         }
         if self.change_range.start > start {
@@ -493,13 +504,13 @@ impl BufferCache {
             self.change_range.end = end;
         }
 
-        println!(
-            "full======{:?}, {:?}, {}, {:?}",
-            self.change_range,
-            start,
-            end,
-            bytemuck::cast_slice::<_, f32>(&self.buffer),
-        );
+        // println!(
+        //     "full======{:?}, {:?}, {}, {:?}",
+        //     self.change_range,
+        //     start,
+        //     end,
+        //     bytemuck::cast_slice::<_, f32>(&self.buffer),
+        // );
     }
 
     #[inline]
@@ -555,7 +566,7 @@ pub enum DynBufferError {
 
 #[cfg(test)]
 mod test {
-    use crate::{self as pi_render, rhi::dyn_uniform_buffer::GroupAlloter};
+    use crate::{self as pi_render, rhi::{dyn_uniform_buffer::GroupAlloter, shader::BufferSize}};
     use render_derive::{BindLayout, BindingType, BufferSize, Uniform};
 
     #[derive(BindLayout, BufferSize, BindingType)]

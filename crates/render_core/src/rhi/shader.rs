@@ -18,6 +18,21 @@ use thiserror::Error;
 use uuid::Uuid;
 use wgpu::{util::make_spirv, ShaderModuleDescriptor, ShaderSource};
 
+pub trait Input {
+    fn location() -> u32;
+}
+
+
+/// 每个binding应该实现该trait
+pub trait BindLayout {
+    // 在bindings的索引
+    fn binding() -> u32;
+    fn set() -> u32;
+    // 该值为Some, 一定是数组
+    fn count() -> Option<NonZeroU32>;
+}
+
+
 /// 绑定类型，Binding类型应该实现该trait
 /// 之所以没与BindLayout合并为位一个trait， 是考虑BindLayout可能手动实现，当可能不需要BindingType（这个需求不确实是否存在，如果不存在，考虑合并，TODO）
 pub trait BindingType: BindLayout {
@@ -59,9 +74,14 @@ pub trait WriteBuffer {
     fn offset(&self) -> u32;
 }
 
+pub trait ShaderProgram: Send + Sync + 'static {
+	fn create_meta() -> ShaderMeta;
+}
+
+
 /// shader的元信息描述
 /// 根据该结构体，可还原出shader代码
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Hash)]
 pub struct ShaderMeta {
     /// binding描述
     pub bindings: ShaderBinding,
@@ -75,20 +95,25 @@ pub struct ShaderMeta {
     pub vs: BlockCodeAtom,
     /// 像素代码片段
     pub fs: BlockCodeAtom,
+
+	pub name: String,
 }
 
 impl ShaderMeta {
     pub fn to_code(&self, defines: &XHashSet<Atom>, visibility: wgpu::ShaderStages) -> String {
         let mut code = String::new();
-        self.bindings.to_code(&mut code, defines, visibility);
         if visibility & wgpu::ShaderStages::VERTEX == wgpu::ShaderStages::VERTEX {
+			self.vs.to_define_code(&mut code, defines);
             self.ins.to_code(&mut code, defines);
             self.varyings.to_code(&mut code, defines, "out");
-            self.vs.to_code(&mut code, defines);
+			self.bindings.to_code(&mut code, defines, visibility);
+            self.vs.to_running_code(&mut code, defines);
         } else {
+			self.fs.to_define_code(&mut code, defines);
             self.varyings.to_code(&mut code, defines, "in");
             self.outs.to_code(&mut code, defines);
-            self.fs.to_code(&mut code, defines);
+			self.bindings.to_code(&mut code, defines, visibility);
+            self.fs.to_running_code(&mut code, defines);
         }
 
         code
@@ -126,7 +151,7 @@ impl ShaderMeta {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Hash)]
 pub struct ShaderBinding {
     /// layout entry 描述
     pub bind_group_entrys: VecMap<Vec<wgpu::BindGroupLayoutEntry>>,
@@ -180,7 +205,7 @@ impl ShaderBinding {
                             }
                             wgpu::BindingType::Sampler(_) => {
                                 let desc = &expand.list[0];
-                                code.push_str(") sampler ");
+                                code.push_str(") uniform sampler ");
                                 code.push_str(&desc.name);
                                 code.push_str(";\n");
                             }
@@ -206,7 +231,7 @@ impl ShaderBinding {
                                 let desc = &expand.list[0];
                                 code.push_str(")");
                                 code.push_str(sample_type_to_string());
-                                code.push_str("texture");
+                                code.push_str("uniform texture");
                                 code.push_str(dimension_to_string());
                                 if multisampled {
                                     code.push_str("MS ");
@@ -232,7 +257,7 @@ impl ShaderBinding {
 }
 
 /// shader输入
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Hash)]
 pub struct ShaderInput(pub Vec<InOut>);
 impl ShaderInput {
     pub fn to_code(&self, code: &mut String, defines: &XHashSet<Atom>) {
@@ -241,7 +266,7 @@ impl ShaderInput {
 }
 
 /// shader输出
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Hash)]
 pub struct ShaderOutput(pub Vec<InOut>);
 impl ShaderOutput {
     pub fn to_code(&self, code: &mut String, defines: &XHashSet<Atom>) {
@@ -250,7 +275,7 @@ impl ShaderOutput {
 }
 
 /// shaderVarying
-#[derive(Debug, Clone, Default, Deref)]
+#[derive(Debug, Clone, Default, Deref, Hash)]
 pub struct ShaderVarying(pub Vec<InOut>);
 
 impl ShaderVarying {
@@ -266,20 +291,11 @@ fn inout_to_code(code: &mut String, defines: &XHashSet<Atom>, ty: &str, list: &V
     }
 }
 
-/// 每个binding应该实现该trait
-pub trait BindLayout {
-    // 在bindings的索引
-    fn binding() -> u32;
-    fn set() -> u32;
-    // 该值为Some, 一定是数组
-    fn count() -> Option<NonZeroU32>;
-}
-
 /// 描述binding的其他信息
 /// 除了wgpu在创建布局时需要wgpu::BindGroupLayoutEntry信息外，shader中的binding还包含其他信息：
 /// * bingding的宏开关
 /// * bingding内每个属性的名称，如果是buffer类型的属性，还包含buffer的默认值、类型、数组长度（可选）
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash)]
 pub struct BindingExpandDescList {
     pub list: Vec<BindingExpandDesc>,
     pub defines: Vec<Define>, //通过defines开关bingding
@@ -293,7 +309,7 @@ impl BindingExpandDescList {
 }
 
 /// binding中每个属性的描述
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash)]
 pub struct BindingExpandDesc {
     /// 不是buffer类型的binding，该值为None
     pub buffer_expand: Option<BufferBindingExpandDesc>,
@@ -340,14 +356,14 @@ impl BindingExpandDesc {
 }
 
 /// bingding中， buffer类型的属性描述
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash)]
 pub struct BufferBindingExpandDesc {
     pub default_value: Vec<u8>,
     pub ty: BufferType,
 }
 
 /// Buffer的类型
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash)]
 pub struct BufferType {
     pub ty: TypeKind,
     pub size: TypeSize,
@@ -387,21 +403,21 @@ impl BufferType {
 }
 
 /// kind
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash)]
 pub enum TypeKind {
     Float,
     Sint,
     Uint,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash)]
 pub enum TypeSize {
     Mat { rows: u8, columns: u8 },
     Vec(u8),
     Scalar,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash)]
 pub enum ArrayLen {
     Constant(usize),
     Dynamic,
@@ -409,7 +425,7 @@ pub enum ArrayLen {
 }
 
 /// 输入输出描述
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash)]
 pub struct InOut {
     pub location: u32,
     pub name: Atom,
@@ -458,7 +474,7 @@ impl InOut {
 }
 
 /// 宏开关
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash)]
 pub struct Define {
     /// 为true时， 表示“name”代表的宏是否被定义
     /// 为false时， 表示“name”代表的宏是否未被定义
@@ -473,7 +489,7 @@ impl Define {
 }
 
 /// 代码片段
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Hash)]
 pub struct BlockCodeAtom {
     /// 声明代码
     pub define: Vec<CodeSlice>,
@@ -481,11 +497,15 @@ pub struct BlockCodeAtom {
     pub running: Vec<CodeSlice>,
 }
 impl BlockCodeAtom {
-    pub fn to_code(&self, code: &mut String, defines: &XHashSet<Atom>) {
+	pub fn to_define_code(&self, code: &mut String, defines: &XHashSet<Atom>) {
         for c in self.define.iter() {
             c.to_code(code, defines)
         }
-        code.push_str("void main(){\n");
+       
+    }
+
+    pub fn to_running_code(&self, code: &mut String, defines: &XHashSet<Atom>) {
+		code.push_str("void main(){\n");
         for c in self.running.iter() {
             c.to_code(code, defines)
         }
@@ -494,7 +514,7 @@ impl BlockCodeAtom {
 }
 
 /// 代码片段
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Hash)]
 pub struct CodeSlice {
     /// 代码
     pub code: Atom,
