@@ -26,22 +26,22 @@ impl EInstanceCode {
     }
     fn none() -> String {
         String::from("
-        mat4 PI_ObjectToWorld = U_PI_ObjectToWorld;
+    mat4 PI_ObjectToWorld = U_PI_ObjectToWorld;
         ")
     }
     fn base() -> String {
         String::from("
-        mat4 PI_ObjectToWorld = U_PI_ObjectToWorld * mat4(A_INS_World1, A_INS_World2, A_INS_World3, A_INS_World4); 
+    mat4 PI_ObjectToWorld = U_PI_ObjectToWorld * mat4(A_INS_World1, A_INS_World2, A_INS_World3, A_INS_World4); 
         ")
     }
     fn color() -> String {
         String::from("
-        A_COLOR4 = A_COLOR4 * A_INS_Color;
+    A_COLOR4 = A_COLOR4 * A_INS_Color;
         ")
     }
     fn uv() -> String {
         String::from("
-        A_UV = A_UV * A_INS_TillOff1.xy + A_INS_TillOff1.zw;
+    A_UV = A_UV * A_INS_TillOff1.xy + A_INS_TillOff1.zw;
         ")
     }
 }

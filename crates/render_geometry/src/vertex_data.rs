@@ -205,7 +205,7 @@ impl EVertexDataKind {
             EVertexDataKind::InsCustomVec4B         => "vec4",
             EVertexDataKind::InsCustomUVec4A        => "uvec4",
             EVertexDataKind::InsCustomIVec4B        => "ivec4",
-            EVertexDataKind::MatricesIndices1       => "uint",
+            EVertexDataKind::MatricesIndices1       => "uvec2",
             EVertexDataKind::MatricesWeights1       => "float",
             EVertexDataKind::MatricesIndices2       => "uvec2",
             EVertexDataKind::MatricesWeights2       => "vec2",
@@ -591,9 +591,6 @@ impl VertexBufferLayouts {
         });
 
         if calcolator.isok() {
-            println!(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
-            println!("{:?}", calcolator);
-            println!("{:?}", layouts);
             Ok(KeyVertexLayouts(calcolator.key, calcolator.key2))
         } else {
             Err(EGeometryError::AttributesInfoTooMoreNotSupport)

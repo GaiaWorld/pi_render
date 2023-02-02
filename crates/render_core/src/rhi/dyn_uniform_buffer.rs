@@ -61,7 +61,7 @@ impl DynUniformBuffer {
         if self.capacity < size {
             self.buffer = Some(device.create_buffer_with_data(&BufferInitDescriptor {
                 label: self.label.as_deref(),
-                usage: BufferUsages::COPY_DST | BufferUsages::UNIFORM,
+                usage: BufferUsages::COPY_DST | BufferUsages::UNIFORM | BufferUsages::STORAGE,
                 contents: self.cache_buffer.lock().buffer(),
             }));
             self.capacity = size;

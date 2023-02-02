@@ -1,6 +1,6 @@
 use std::num::NonZeroU32;
 
-use render_core::rhi::{texture::Texture, device::RenderDevice, RenderQueue};
+use render_core::rhi::{texture::{Texture, TextureView}, device::RenderDevice, RenderQueue};
 
 #[derive(Debug, Clone, Copy)]
 pub enum EDataTextureFormat {
@@ -11,7 +11,7 @@ pub enum EDataTextureFormat {
 
 pub struct DataTexture2D {
     tex: Texture,
-    buff: Vec<u8>,
+    view: TextureView,
     size: wgpu::Extent3d,
     bytes_per_pixel: u32,
     kind: EDataTextureFormat,
@@ -21,7 +21,7 @@ impl DataTexture2D {
         let tex = device.create_texture(&wgpu::TextureDescriptor {
             label: None,
             size,
-            mip_level_count: 0,
+            mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format,
@@ -30,8 +30,18 @@ impl DataTexture2D {
 
         Texture::from(tex)
     }
-    pub fn data(&self) -> &[u8] {
-        &self.buff
+    pub fn size(&self) -> wgpu::Extent3d {
+        self.size.clone()
+    }
+    pub fn create_data(&self) -> Vec<u8> {
+        let channel = 4;
+        let byte_per_channel = 4;
+        let bytes_per_pixel = channel * byte_per_channel;
+
+        vec![0; (self.size.width * self.size.height * bytes_per_pixel) as usize]
+    }
+    pub fn texture_view(&self) -> &wgpu::TextureView {
+        &self.view
     }
     pub fn kind(&self) -> EDataTextureFormat {
         self.kind
@@ -49,11 +59,23 @@ impl DataTexture2D {
         col = col * pixel_block_col;
         col = if col < width { col + pixel_block_col } else { col };
 
-        let size = wgpu::Extent3d { width: col, height, depth_or_array_layers: 0 };
+        let size = wgpu::Extent3d { width: col, height, depth_or_array_layers: 1 };
+
+        let tex = Self::new_tex(device, size, wgpu::TextureFormat::Rgba32Float, wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::TEXTURE_BINDING);
+        let view = tex.create_view(&wgpu::TextureViewDescriptor {
+            label: None,
+            format: Some(wgpu::TextureFormat::Rgba32Float),
+            dimension: Some(wgpu::TextureViewDimension::D2),
+            aspect: wgpu::TextureAspect::All,
+            base_mip_level: 0,
+            mip_level_count: NonZeroU32::new(1),
+            base_array_layer: 0,
+            array_layer_count: NonZeroU32::new(1),
+        });
 
         Self {
-            tex: Self::new_tex(device, size, wgpu::TextureFormat::Rgba32Float, wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::TEXTURE_BINDING),
-            buff: vec![0; (col * width * bytes_per_pixel) as usize],
+            tex,
+            view,
             size,
             kind: EDataTextureFormat::RgbaF32,
             bytes_per_pixel,
@@ -71,9 +93,21 @@ impl DataTexture2D {
 
         let size = wgpu::Extent3d { width: col, height, depth_or_array_layers: 0 };
 
+        let tex = Self::new_tex(device, size, wgpu::TextureFormat::Rgba8Unorm, wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::TEXTURE_BINDING);
+        let view = tex.create_view(&wgpu::TextureViewDescriptor {
+            label: None,
+            format: Some(wgpu::TextureFormat::Rgba8Unorm),
+            dimension: Some(wgpu::TextureViewDimension::D2),
+            aspect: wgpu::TextureAspect::All,
+            base_mip_level: 0,
+            mip_level_count: NonZeroU32::new(1),
+            base_array_layer: 0,
+            array_layer_count: NonZeroU32::new(0),
+        });
+
         Self {
-            tex: Self::new_tex(device, size, wgpu::TextureFormat::Rgba8Unorm, wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::TEXTURE_BINDING),
-            buff: vec![0; (col * width * bytes_per_pixel) as usize],
+            tex,
+            view,
             size,
             kind: EDataTextureFormat::RgbaU8,
             bytes_per_pixel,
@@ -90,28 +124,40 @@ impl DataTexture2D {
         col = if col < width { col + pixel_block_col } else { col };
 
         let size = wgpu::Extent3d { width: col, height, depth_or_array_layers: 0 };
+        let tex = Self::new_tex(device, size, wgpu::TextureFormat::Rgba16Uint, wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::TEXTURE_BINDING);
+        let view = tex.create_view(&wgpu::TextureViewDescriptor {
+            label: None,
+            format: Some(wgpu::TextureFormat::Rgba16Uint),
+            dimension: Some(wgpu::TextureViewDimension::D2),
+            aspect: wgpu::TextureAspect::All,
+            base_mip_level: 0,
+            mip_level_count: NonZeroU32::new(1),
+            base_array_layer: 0,
+            array_layer_count: NonZeroU32::new(0),
+        });
 
         Self {
-            tex: Self::new_tex(device, size, wgpu::TextureFormat::Rgba16Uint, wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::TEXTURE_BINDING),
-            buff: vec![0; (col * width * bytes_per_pixel) as usize],
+            tex,
+            view,
             size,
             kind: EDataTextureFormat::RgbaU16,
             bytes_per_pixel,
         }
     }
 
-    pub fn update_row(&mut self, row_index: u32, data: &[u8]) {
-        let data_len = data.len();
+    pub fn update_row(&self, row_index: u32, row_data: &[u8], buff: &mut Vec<u8>) {
+        let data_len = row_data.len();
         let row_len = (self.size.width * self.bytes_per_pixel) as usize;
 
         let update_len = data_len.min(row_len);
 
         let start = row_index as usize * row_len;
         let end = start + update_len;
-        self.buff[start..end].clone_from_slice(&data[0..update_len]);
+        println!(">>>>>> {}, {}, {}", start, end, update_len);
+        buff[start..end].clone_from_slice(&row_data[0..update_len]);
     }
 
-    pub fn update_texture(&self, queue: &RenderQueue) {
+    pub fn update_texture(&self, queue: &RenderQueue, data: &[u8]) {
         let texture = wgpu::ImageCopyTexture {
             texture: &self.tex,
             mip_level: 0,
@@ -121,7 +167,7 @@ impl DataTexture2D {
 
         let bytes_per_row = NonZeroU32::new(self.size.width * self.bytes_per_pixel);
         let rows_per_image = NonZeroU32::new(self.size.height);
-        let data_layout = wgpu::ImageDataLayout { offset: 1, bytes_per_row, rows_per_image };
-        queue.write_texture(texture, self.data(), data_layout, self.size);
+        let data_layout = wgpu::ImageDataLayout { offset: 0, bytes_per_row, rows_per_image };
+        queue.write_texture(texture, data, data_layout, self.size);
     }
 }

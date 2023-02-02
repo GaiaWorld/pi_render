@@ -1,10 +1,10 @@
-use std::{num::NonZeroU64, hash::Hash};
+use std::{num::NonZeroU64, hash::Hash, sync::Arc};
 
 use pi_atom::Atom;
 use render_core::rhi::{dyn_uniform_buffer::{AsBind}, bind_group::BindGroup, asset::TextureRes, texture::Sampler, device::RenderDevice};
 use render_resource::uniform_buffer::RenderDynUniformBuffer;
 
-use crate::{set_bind::ShaderSetBind, skin_code::ESkinCode, shader_bind::{ShaderBindSceneAboutCamera, ShaderBindSceneAboutTime, ShaderBindSceneAboutFog, ShaderBindModelAboutMatrix, ShaderBindEffectValue, ShaderBindModelAboutSkin}, shader::ShaderEffectMeta, unifrom_code::TUnifromShaderProperty, buildin_var::ShaderVarUniform};
+use crate::{set_bind::ShaderSetBind, skin_code::{ESkinCode, EBoneCount}, shader_bind::{ShaderBindSceneAboutCamera, ShaderBindSceneAboutTime, ShaderBindSceneAboutFog, ShaderBindModelAboutMatrix, ShaderBindEffectValue, ShaderBindModelAboutSkin}, shader::ShaderEffectMeta, unifrom_code::TUnifromShaderProperty, buildin_var::ShaderVarUniform};
 
 
 pub trait ShaderSet {
@@ -275,42 +275,42 @@ impl ShaderSetSceneAboutBindOffset {
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ShaderSetModelAbout {
     set: u32,
-    skin: Option<ESkinCode>,
+    skin: ESkinCode,
     bind_matrix: u32,
-    bind_bone_size: u32,
+    bind_bone_info: u32,
     bind_bone_texture: u32,
     bind_bone_sampler: u32,
 }
 impl ShaderSetModelAbout {
-    pub fn new(set: u32, skin: Option<ESkinCode>) -> Self {
+    pub fn new(set: u32, skin: ESkinCode) -> Self {
         let mut bind = 0;
 
         let bind_matrix = bind;
         bind += 1;
 
-        let (bind_bone_size, bind_bone_texture, bind_bone_sampler) = if let Some(skin) = &skin {
-            match skin {
-                ESkinCode::None => {
-                    (u32::MAX, u32::MAX, u32::MAX)
-                },
-                ESkinCode::RowTexture(_) => {
-                    let result = bind; bind += 3;
-                    (result, result + 1, result + 2)
-                },
-                ESkinCode::FramesTexture(_) => {
-                    let result = bind; bind += 3;
-                    (result, result + 1, result + 2)
-                },
-            }
-        } else {
-            (u32::MAX, u32::MAX, u32::MAX)
+        let (bind_bone_size, bind_bone_texture, bind_bone_sampler) = match skin {
+            ESkinCode::None => {
+                (u32::MAX, u32::MAX, u32::MAX)
+            },
+            ESkinCode::UBO(_, _) => {
+                let result = bind; bind += 1;
+                (result, u32::MAX, u32::MAX)
+            },
+            ESkinCode::RowTexture(_) => {
+                let result = bind; bind += 3;
+                (result, result + 1, result + 2)
+            },
+            ESkinCode::FramesTexture(_) => {
+                let result = bind; bind += 3;
+                (result, result + 1, result + 2)
+            },
         };
 
         Self { 
             set,
             skin,
             bind_matrix,
-            bind_bone_size,
+            bind_bone_info: bind_bone_size,
             bind_bone_texture,
             bind_bone_sampler
         }
@@ -322,7 +322,7 @@ impl ShaderSetModelAbout {
         self.bind_matrix
     }
     pub fn bind_bone_size(&self) -> u32 {
-        self.bind_bone_size
+        self.bind_bone_info
     }
     pub fn bind_bone_texture(&self) -> u32 {
         self.bind_bone_texture
@@ -339,54 +339,38 @@ impl ShaderSetModelAbout {
         result += ShaderSetBind::code_uniform("mat4", ShaderVarUniform::_WORLD_MATRIX_INV).as_str();
         result += "};\r\n";
 
-        if let Some(skin) = &self.skin {
-            match skin {
-                ESkinCode::None => {
-                    
-                },
-                ESkinCode::RowTexture(_) => {
-                    result += ShaderSetBind::code_set_bind_head(self.set, self.bind_bone_size).as_str();
-                    result += " Bone {\r\n";
-                    result += ShaderSetBind::code_uniform("vec4", ShaderVarUniform::BONE_TEX_SIZE).as_str();
-                    result += "};\r\n";
-                    
-                    result += ShaderSetBind::code_set_bind_texture2d(self.set, self.bind_bone_texture, ShaderVarUniform::BONE_TEX).as_str();
-        
-                    result += ShaderSetBind::code_set_bind_sampler(self.set, self.bind_bone_sampler, ShaderVarUniform::BONE_TEX).as_str();
+        match self.skin {
+            ESkinCode::None => {
+                
+            },
+            ESkinCode::UBO(_, bone) => {
+                result += ShaderSetBind::code_set_bind_head(self.set, self.bind_bone_info).as_str();
+                result += " Bone {\r\n";
+                result += ShaderSetBind::code_uniform_array("mat4", ShaderVarUniform::BONE_MATRICES, bone.count()).as_str();
+                result += "};\r\n";
 
-                    result += skin.define_code().as_str();
-                },
-                ESkinCode::FramesTexture(_) => {
-                    result += ShaderSetBind::code_set_bind_head(self.set, self.bind_bone_size).as_str();
-                    result += " Bone {\r\n";
-                    result += ShaderSetBind::code_uniform("vec4", ShaderVarUniform::BONE_TEX_SIZE).as_str();
-                    result += "};\r\n";
-                    
-                    result += ShaderSetBind::code_set_bind_texture2d(self.set, self.bind_bone_texture, ShaderVarUniform::BONE_TEX).as_str();
-        
-                    result += ShaderSetBind::code_set_bind_sampler(self.set, self.bind_bone_sampler, ShaderVarUniform::BONE_TEX).as_str();
-                    
-                    result += skin.define_code().as_str();
-                },
-            }
+                result += self.skin.define_code().as_str();
+            },
+            _ => {
+
+                result += ShaderSetBind::code_set_bind_head(self.set, self.bind_bone_info).as_str();
+                result += " Bone {\r\n";
+                result += ShaderSetBind::code_uniform("vec4", ShaderVarUniform::BONE_TEX_SIZE).as_str();
+                result += "};\r\n";
+                
+                result += ShaderSetBind::code_set_bind_texture2d(self.set, self.bind_bone_texture, ShaderVarUniform::BONE_TEX).as_str();
+    
+                result += ShaderSetBind::code_set_bind_sampler(self.set, self.bind_bone_sampler, ShaderVarUniform::BONE_TEX).as_str();
+
+                result += self.skin.define_code().as_str();
+            },
         }
 
         result
     }
     
     pub fn running_code(&self) -> String {
-        match &self.skin {
-            Some(skin) => match skin {
-                ESkinCode::None => String::from(""),
-                ESkinCode::RowTexture(_) => {
-                    skin.running_code()
-                },
-                ESkinCode::FramesTexture(_) => {
-                    skin.running_code()
-                },
-            },
-            None => String::from(""),
-        }
+        self.skin.running_code()
    }
 
     pub fn layout_entries(&self) -> Vec<wgpu::BindGroupLayoutEntry> {
@@ -394,15 +378,16 @@ impl ShaderSetModelAbout {
             ShaderBindModelAboutMatrix::layout_entry(self.bind_matrix)
         ];
 
-        if let Some(skin) = &self.skin {
-            match skin {
-                ESkinCode::None => todo!(),
-                ESkinCode::RowTexture(_) => {
-                    ShaderBindModelAboutSkin::layout_entry(&mut result, self.bind_bone_size, self.bind_bone_texture, self.bind_bone_sampler);
-                },
-                ESkinCode::FramesTexture(_) => {
-                    ShaderBindModelAboutSkin::layout_entry(&mut result, self.bind_bone_size, self.bind_bone_texture, self.bind_bone_sampler);
-                }
+        match &self.skin {
+            ESkinCode::None => {},
+            ESkinCode::UBO(_, bone) => {
+                ShaderBindModelAboutSkin::layout_entry_ubo(&mut result, self.bind_bone_info, bone);
+            },
+            ESkinCode::RowTexture(_) => {
+                ShaderBindModelAboutSkin::layout_entry_tex(&mut result, self.bind_bone_info, self.bind_bone_texture, self.bind_bone_sampler);
+            },
+            ESkinCode::FramesTexture(_) => {
+                ShaderBindModelAboutSkin::layout_entry_tex(&mut result, self.bind_bone_info, self.bind_bone_texture, self.bind_bone_sampler);
             }
         }
 
@@ -412,7 +397,7 @@ impl ShaderSetModelAbout {
     pub fn bind_group_entries<'a>(
         &'a self,
         dynbuffer: &'a RenderDynUniformBuffer,
-        textures: Option<&'a TextureRes>,
+        textures: Option<&'a wgpu::TextureView>,
         samplers: Option<&'a Sampler>,
     ) -> Vec<wgpu::BindGroupEntry> {
         let mut entries: Vec<wgpu::BindGroupEntry> = vec![
@@ -427,62 +412,46 @@ impl ShaderSetModelAbout {
         ];
 
 
-        if let Some(skin) = &self.skin {
-            match skin {
-                ESkinCode::None => todo!(),
-                ESkinCode::RowTexture(_) => {
-                    entries.push(
-                        wgpu::BindGroupEntry {
-                            binding: self.bind_bone_size,
-                            resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                                buffer: dynbuffer.buffer().unwrap(),
-                                offset: 0,
-                                size: NonZeroU64::new(ShaderBindModelAboutSkin::TOTAL_SIZE),
-                            }),
-                        }
-                    );
+        match &self.skin {
+            ESkinCode::None => {},
+            ESkinCode::UBO(_, bone) => {
+                entries.push(
+                    wgpu::BindGroupEntry {
+                        binding: self.bind_bone_info,
+                        resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                            buffer: dynbuffer.buffer().unwrap(),
+                            offset: 0,
+                            size: NonZeroU64::new(bone.use_bytes() as wgpu::BufferAddress),
+                        }),
+                    }
+                );
+            },
+            _ => {
+                entries.push(
+                    wgpu::BindGroupEntry {
+                        binding: self.bind_bone_info,
+                        resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                            buffer: dynbuffer.buffer().unwrap(),
+                            offset: 0,
+                            size: NonZeroU64::new(ShaderBindModelAboutSkin::TOTAL_SIZE),
+                        }),
+                    }
+                );
 
-                    entries.push(
-                        wgpu::BindGroupEntry {
-                            binding: self.bind_bone_texture,
-                            resource: wgpu::BindingResource::TextureView(&textures.unwrap().texture_view),
-                        }
-                    );
-                    
-                    entries.push(
-                        wgpu::BindGroupEntry {
-                            binding: self.bind_bone_sampler,
-                            resource: wgpu::BindingResource::Sampler(samplers.unwrap()),
-                        }
-                    );
-                },
-                ESkinCode::FramesTexture(_) => {
-                    entries.push(
-                        wgpu::BindGroupEntry {
-                            binding: self.bind_bone_size,
-                            resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                                buffer: dynbuffer.buffer().unwrap(),
-                                offset: 0,
-                                size: NonZeroU64::new(ShaderBindModelAboutSkin::TOTAL_SIZE as wgpu::BufferAddress),
-                            }),
-                        }
-                    );
-
-                    entries.push(
-                        wgpu::BindGroupEntry {
-                            binding: self.bind_bone_texture,
-                            resource: wgpu::BindingResource::TextureView(&textures.unwrap().texture_view),
-                        }
-                    );
-                    
-                    entries.push(
-                        wgpu::BindGroupEntry {
-                            binding: self.bind_bone_sampler,
-                            resource: wgpu::BindingResource::Sampler(samplers.unwrap()),
-                        }
-                    );
-                },
-            }
+                entries.push(
+                    wgpu::BindGroupEntry {
+                        binding: self.bind_bone_texture,
+                        resource: wgpu::BindingResource::TextureView(textures.unwrap()),
+                    }
+                );
+                
+                entries.push(
+                    wgpu::BindGroupEntry {
+                        binding: self.bind_bone_sampler,
+                        resource: wgpu::BindingResource::Sampler(samplers.unwrap()),
+                    }
+                );
+            },
         }
 
         entries
@@ -492,9 +461,10 @@ impl ShaderSetModelAbout {
         "ModelAbout"
     }
 
-    pub fn bind_offset(&self, dynbuffer: &mut render_resource::uniform_buffer::RenderDynUniformBuffer) -> ShaderSetModelAboutBindOffset {
+    pub fn bind_offset(&self, dynbuffer: &mut render_resource::uniform_buffer::RenderDynUniformBuffer, skin: Option<Arc<ShaderBindModelAboutSkin>>) -> ShaderSetModelAboutBindOffset {
         ShaderSetModelAboutBindOffset {
             matrix: ShaderBindModelAboutMatrix::new(self.bind_matrix, dynbuffer),
+            skin,
         }
     }
 }
@@ -502,6 +472,7 @@ impl ShaderSetModelAbout {
 #[derive(Debug)]
 pub struct ShaderSetModelAboutBindOffset {
     pub(crate) matrix: ShaderBindModelAboutMatrix,
+    pub(crate) skin: Option<Arc<ShaderBindModelAboutSkin>>,
 }
 impl ShaderSetModelAboutBindOffset {
     pub fn get(&self) -> Vec<u32> {
@@ -509,11 +480,19 @@ impl ShaderSetModelAboutBindOffset {
             self.matrix.offset()
         ];
 
+        if let Some(skin) = &self.skin {
+            skin.offset(&mut result);
+        }
+
         result
     }
 
     pub fn matrix(&self) -> &ShaderBindModelAboutMatrix {
         &self.matrix
+    }
+    
+    pub fn skin(&self) -> Option<Arc<ShaderBindModelAboutSkin>> {
+        self.skin.clone()
     }
 }
 

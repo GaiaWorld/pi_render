@@ -31,12 +31,24 @@ impl ShaderSetBind {
     pub fn code_uniform(kind: &str, name: &str) -> String {
         String::from(kind) + " " + name + ";\r\n"
     }
+    pub fn code_uniform_array(kind: &str, name: &str, num: u32) -> String {
+        String::from(kind) + " " + name + "[" + num.to_string().as_str() + "]" + ";\r\n"
+    }
     pub fn code_set_bind_head(set: u32, bind: u32) -> String {
         let mut result = String::from("layout(set = ");
         result += set.to_string().as_str();
         result += ", binding = ";
         result += bind.to_string().as_str();
         result += ") uniform ";
+
+        result
+    }
+    pub fn code_set_bind_readonly_buffer(set: u32, bind: u32) -> String {
+        let mut result = String::from("layout(set = ");
+        result += set.to_string().as_str();
+        result += ", binding = ";
+        result += bind.to_string().as_str();
+        result += ") readonly buffer ";
 
         result
     }

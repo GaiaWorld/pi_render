@@ -1,8 +1,8 @@
-use std::{num::NonZeroU64, ops::Deref};
+use std::{num::{NonZeroU64, NonZeroU32}, ops::Deref, sync::Arc};
 
 use render_core::rhi::{dyn_uniform_buffer::{BindOffset, AsBind}};
 
-use crate::{shader::ShaderEffectMeta, unifrom_code::TUnifromShaderProperty};
+use crate::{shader::ShaderEffectMeta, unifrom_code::TUnifromShaderProperty, skin_code::EBoneCount, shader_set::{ShaderSetModelAboutBindOffset, ShaderSetModelAbout}};
 
 
 pub trait ShaderBind {
@@ -209,23 +209,12 @@ impl ShaderBindModelAboutMatrix {
     }
 }
 
+/// 数据从 Skeleton 创建, 以 Arc 数据拷贝到 ModelBind
 #[derive(Debug)]
 pub enum ShaderBindModelAboutSkin {
-    RowTexture(u32, BindOffset),
-    FramesTexture(u32, BindOffset),
-}
-impl AsBind for ShaderBindModelAboutSkin {
-    fn min_size(&self) -> usize {
-        Self::TOTAL_SIZE as usize
-    }
-
-    fn index(&self) -> render_core::rhi::dyn_uniform_buffer::BindIndex {
-        match self {
-            ShaderBindModelAboutSkin::RowTexture(bind, _) => render_core::rhi::dyn_uniform_buffer::BindIndex::new(*bind as usize),
-            ShaderBindModelAboutSkin::FramesTexture(bind, _) => render_core::rhi::dyn_uniform_buffer::BindIndex::new(*bind as usize),
-        }
-        
-    }
+    UBO(BindOffset, EBoneCount),
+    RowTexture(BindOffset),
+    FramesTexture(BindOffset),
 }
 impl ShaderBindModelAboutSkin {
 
@@ -233,7 +222,16 @@ impl ShaderBindModelAboutSkin {
 
     pub const TOTAL_SIZE:                   wgpu::BufferAddress = 0 + 4 * 4;
 
-    pub fn layout_entry(entries: &mut Vec<wgpu::BindGroupLayoutEntry>, bind_info: u32, bind_tex: u32, bind_sampler: u32, ) {
+    pub fn layout_entry_ubo(entries: &mut Vec<wgpu::BindGroupLayoutEntry>, bind_info: u32, bone: &EBoneCount) {
+        entries.push(wgpu::BindGroupLayoutEntry {
+            binding: bind_info,
+            visibility: wgpu::ShaderStages ::VERTEX,
+            ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: true, min_binding_size: NonZeroU64::new(bone.use_bytes() as wgpu::BufferAddress) },
+            count: None,
+        });
+    }
+
+    pub fn layout_entry_tex(entries: &mut Vec<wgpu::BindGroupLayoutEntry>, bind_info: u32, bind_tex: u32, bind_sampler: u32, ) {
         entries.push(wgpu::BindGroupLayoutEntry {
             binding: bind_info,
             visibility: wgpu::ShaderStages ::VERTEX,
@@ -254,29 +252,46 @@ impl ShaderBindModelAboutSkin {
         });
     }
 
-    pub fn new_row(bind: u32, dynbuffer: &mut render_resource::uniform_buffer::RenderDynUniformBuffer) -> Self {
-        let temp = ShaderBindTemp(bind, Self::TOTAL_SIZE);
+    pub fn new_ubo(bone_count: EBoneCount, dynbuffer: &mut render_resource::uniform_buffer::RenderDynUniformBuffer) -> Self {
+        let temp = ShaderBindTemp(0, bone_count.use_bytes() as wgpu::BufferAddress );
         let bind_offset = dynbuffer.alloc_binding_with_asbind(&temp);
-        Self::RowTexture(bind, bind_offset)
+        Self::UBO(bind_offset, bone_count)
     }
 
-    pub fn new_frames(bind: u32, dynbuffer: &mut render_resource::uniform_buffer::RenderDynUniformBuffer) -> Self {
-        let temp = ShaderBindTemp(bind, Self::TOTAL_SIZE);
+    pub fn new_row(dynbuffer: &mut render_resource::uniform_buffer::RenderDynUniformBuffer) -> Self {
+        let temp = ShaderBindTemp(0, Self::TOTAL_SIZE);
         let bind_offset = dynbuffer.alloc_binding_with_asbind(&temp);
-        Self::FramesTexture(bind, bind_offset)
+        Self::RowTexture(bind_offset)
+    }
+
+    pub fn new_frames(dynbuffer: &mut render_resource::uniform_buffer::RenderDynUniformBuffer) -> Self {
+        let temp = ShaderBindTemp(0, Self::TOTAL_SIZE);
+        let bind_offset = dynbuffer.alloc_binding_with_asbind(&temp);
+        Self::FramesTexture(bind_offset)
     }
 
     pub fn bind_offset(&self) -> &BindOffset {
         match self {
-            ShaderBindModelAboutSkin::RowTexture(_, bind_offset) => bind_offset,
-            ShaderBindModelAboutSkin::FramesTexture(_, bind_offset) => bind_offset,
+            ShaderBindModelAboutSkin::UBO(bind_offset, _) => bind_offset,
+            ShaderBindModelAboutSkin::RowTexture(bind_offset) => bind_offset,
+            ShaderBindModelAboutSkin::FramesTexture(bind_offset) => bind_offset,
         }
     }
 
-    pub fn offset(&self) -> u32 {
+    pub fn offset(&self, result: &mut Vec<u32>) {
         match self {
-            ShaderBindModelAboutSkin::RowTexture(_, bind_offset) => *bind_offset.deref(),
-            ShaderBindModelAboutSkin::FramesTexture(_, bind_offset) => *bind_offset.deref(),
+            ShaderBindModelAboutSkin::UBO(bind_offset, bone) => {
+                let mut temp = *bind_offset.deref();
+
+                // for i in 0..bone.count() {
+                //     result.push(temp);
+                //     temp += 16 * 4;
+                // }
+                
+                result.push(temp);
+            },
+            ShaderBindModelAboutSkin::RowTexture(bind_offset) => result.push(*bind_offset.deref()),
+            ShaderBindModelAboutSkin::FramesTexture(bind_offset) => result.push(*bind_offset.deref()),
         }
     }
 }
@@ -349,8 +364,10 @@ impl ShaderBindEffectValue {
         let uint_count      = uniforms.uint_list.len() as u8;
         let align_bytes     = 16;
         
-        let fill_vec2_count    = vec2_count % 2;
-        let fill_int_count     = (float_count + int_count + uint_count) % 4;
+        let mut fill_vec2_count    = vec2_count % 2;
+        fill_vec2_count = if fill_vec2_count == 0 { 0 } else { 2 - fill_vec2_count };
+        let mut fill_int_count     = (float_count + int_count + uint_count) % 4;
+        fill_int_count = if fill_int_count == 0 { 0 } else { 4 - fill_int_count };
 
         let mut total_size = 0;
 

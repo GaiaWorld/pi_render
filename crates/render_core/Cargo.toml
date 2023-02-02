@@ -65,6 +65,7 @@ guillotiere = { version = "0.6" }
 smallvec = "1.8"
 lazy_static = "1.4"
 pi_atom = "0.2"
+bytemuck = { version = "1.4", features = ["derive"] }
 
 pi_ecs = { git = "https://github.com/GaiaWorld/pi_ecs.git" }
 pi_hal = { git = "https://github.com/GaiaWorld/pi_hal.git" }

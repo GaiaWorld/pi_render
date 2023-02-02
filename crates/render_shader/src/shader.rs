@@ -294,7 +294,7 @@ mod test {
     use pi_atom::Atom;
     use render_geometry::vertex_data::{TVertexBufferDesc, VertexAttribute, EVertexDataKind, VertexBufferLayouts};
 
-    use crate::{unifrom_code::{MaterialValueBindDesc, MaterialTextureBindDesc, UniformTextureDesc, UniformPropertyName, TUnifromShaderProperty}, shader::{ResShader, ShaderEffectMeta}, skin_code::ESkinCode, varying_code::Varying, vs_begin_code::AttributeRefCode, instance_code::EInstanceCode, shader_set::{ShaderSetSceneAbout, ShaderSetModelAbout, ShaderSetEffectAbout}};
+    use crate::{unifrom_code::{MaterialValueBindDesc, MaterialTextureBindDesc, UniformTextureDesc, UniformPropertyName, TUnifromShaderProperty}, shader::{ResShader, ShaderEffectMeta}, skin_code::{ESkinCode, EBoneCount}, varying_code::Varying, vs_begin_code::AttributeRefCode, instance_code::EInstanceCode, shader_set::{ShaderSetSceneAbout, ShaderSetModelAbout, ShaderSetEffectAbout}};
 
 
     #[derive(Debug)]
@@ -404,7 +404,7 @@ gl_FragColor = vec4(baseColor.rgb, alpha);
             &reslayouts,
             &EInstanceCode(EInstanceCode::NONE),
             &ShaderSetSceneAbout::new(0, false, false, false, false),
-            &ShaderSetModelAbout::new(1, None),
+            &ShaderSetModelAbout::new(1, ESkinCode::None),
             &ShaderSetEffectAbout::new(Atom::from("Test"), 2, 4 * 4, 0)
         );
         let fs = desc.fs_blocks(

@@ -19,6 +19,7 @@ impl ShaderVarUniform {
     pub(crate) const _WORLD_MATRIX      : &'static str = "U_PI_ObjectToWorld"   ;
     pub(crate) const _WORLD_MATRIX_INV  : &'static str = "U_PI_WorldToObject"   ;
     
+    pub const BONE_MATRICES             : &'static str = "boneMatrices"         ;
     pub const BONE_TEX_SIZE             : &'static str = "bondTexSize"          ;
     pub const BONE_TEX                  : &'static str = "_boneTex"             ;
 }
