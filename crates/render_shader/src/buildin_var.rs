@@ -14,9 +14,8 @@ impl ShaderVarUniform {
     pub const FOG_PARAM                 : &'static str = "PI_FogParam"          ;
 
     pub const WORLD_MATRIX              : &'static str = "PI_ObjectToWorld"     ;
-    pub const WORLD_MATRIX_INV          : &'static str = "PI_WorldToObject"     ;
-
     pub(crate) const _WORLD_MATRIX      : &'static str = "U_PI_ObjectToWorld"   ;
+    pub const WORLD_MATRIX_INV          : &'static str = "PI_WorldToObject"     ;
     pub(crate) const _WORLD_MATRIX_INV  : &'static str = "U_PI_WorldToObject"   ;
     
     pub const BONE_MATRICES             : &'static str = "boneMatrices"         ;
