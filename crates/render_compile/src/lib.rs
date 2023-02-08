@@ -2185,7 +2185,7 @@ fn sort_and_alignment(layout_info: &mut LayoutInfo, set: u32, binding: u32) {
 				(patch/4, VarType::Vector, offset)
 			};
 			layout_info.merbers.push(LayoutInfo { 
-				name: "PATCH__".to_string() + set.to_string().as_str() + "_" + binding.to_string().as_str(), 
+				name: "PATCH_".to_string() + set.to_string().as_str() + "_" + binding.to_string().as_str(), 
 				alignment: alignment as u32, 
 				size: size, 
 				width: 4, 

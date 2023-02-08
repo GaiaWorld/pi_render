@@ -192,6 +192,7 @@ impl ShaderBinding {
                                 code.push_str(set.as_str());
                                 code.push_str("_");
                                 code.push_str(binding.as_str());
+								code.push_str("_M"); // 名字以数字结尾，naga存在bug，添加_M后缀先绕过
                                 code.push_str("{\n");
                                 for desc in expand.list.iter() {
                                     if let Some(r) = desc.buffer_expand.as_ref() {
