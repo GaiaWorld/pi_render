@@ -48,7 +48,6 @@ path = "examples/clean/main.rs"
 
 [patch.crates-io]
 pi_assets={ path = "../pi_assets" }
-pi_map = { path = "../pi_map" }
 
 # [patch."https://github.com/GaiaWorld/pi_hal"]
 # pi_hal = { path = "../pi_hal" }
