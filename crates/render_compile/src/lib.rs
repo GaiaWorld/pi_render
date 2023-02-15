@@ -399,7 +399,7 @@ impl Parser {
 		defines.extend(fs_slice.defines.clone().into_iter());
 
 		let defines_static = defines.iter().map(|r| {
-			format!(r#"pub static ref {}_DEFINE: pi_atom::Atom = pi_atom::Atom::from("{}");"#, r, r) 
+			format!(r#"pub static ref {r}_DEFINE: pi_atom::Atom = pi_atom::Atom::from("{r}");"#) 
 		}).collect::<Vec<String>>();
 		
 		let out_str = format!(r#"

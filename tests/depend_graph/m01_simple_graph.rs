@@ -78,6 +78,7 @@ fn two_node_with_simple_param() {
     g.add_depend("Node1", "Node2");
 
     g.set_finish("Node2", true).unwrap();
+    g.dump_graphviz();
 
     let rt = runtime.clone();
     let _ = runtime.spawn(runtime.alloc(), async move {
@@ -188,7 +189,8 @@ fn two_node_with_no_match() {
     g.add_depend("Node2", "Node3");
 
     g.set_finish("Node3", true).unwrap();
-
+    g.dump_graphviz();
+    
     let rt = runtime.clone();
     let _ = runtime.spawn(runtime.alloc(), async move {
         g.build().unwrap();
@@ -198,6 +200,8 @@ fn two_node_with_no_match() {
 
         g.remove_node("Node3");
         g.set_finish("Node2", true).unwrap();
+        g.dump_graphviz();
+
         g.build().unwrap();
 
         println!("\n\n======== 2 run graph");
