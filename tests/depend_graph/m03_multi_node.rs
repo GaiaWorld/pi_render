@@ -40,10 +40,10 @@ fn multi_node() {
         g.build().unwrap();
 
         println!("======== 1 run graph");
-        g.run(&rt).await.unwrap();
+        g.run(&rt, &()).await.unwrap();
 
         println!("======== 2 run graph");
-        g.run(&rt).await.unwrap();
+        g.run(&rt, &()).await.unwrap();
     });
 
     std::thread::sleep(Duration::from_secs(3));
@@ -121,13 +121,14 @@ pub struct Input5 {
 }
 
 struct Node1;
-impl DependNode for Node1 {
+impl DependNode<()> for Node1 {
     type Input = ();
     type Output = Output1;
 
     fn run<'a>(
         &'a mut self,
-        input: &Self::Input,
+        context: &'a (),
+        input: &'a Self::Input,
         usage: &'a ParamUsage,
     ) -> BoxFuture<'a, Result<Self::Output, String>> {
         println!("======== Enter Node1 Running");
@@ -148,12 +149,13 @@ impl DependNode for Node1 {
 }
 
 struct Node2;
-impl DependNode for Node2 {
+impl DependNode<()> for Node2 {
     type Input = ();
     type Output = Output2;
 
     fn run<'a>(
         &'a mut self,
+        context: &'a (),
         input: &'a Self::Input,
         usage: &'a ParamUsage,
     ) -> BoxFuture<'a, Result<Self::Output, String>> {
@@ -176,12 +178,13 @@ impl DependNode for Node2 {
 }
 
 struct Node3;
-impl DependNode for Node3 {
+impl DependNode<()> for Node3 {
     type Input = ();
     type Output = Output3;
 
     fn run<'a>(
         &'a mut self,
+        context: &'a (),
         input: &'a Self::Input,
         usage: &'a ParamUsage,
     ) -> BoxFuture<'a, Result<Self::Output, String>> {
@@ -201,12 +204,13 @@ impl DependNode for Node3 {
 }
 
 struct Node4;
-impl DependNode for Node4 {
+impl DependNode<()> for Node4 {
     type Input = Input4;
     type Output = A;
 
     fn run<'a>(
         &'a mut self,
+        context: &'a (),
         input: &'a Self::Input,
         usage: &'a ParamUsage,
     ) -> BoxFuture<'a, Result<Self::Output, String>> {
@@ -229,12 +233,13 @@ impl DependNode for Node4 {
 }
 
 struct Node5;
-impl DependNode for Node5 {
+impl DependNode<()> for Node5 {
     type Input = Input5;
     type Output = F;
 
     fn run<'a>(
         &'a mut self,
+        context: &'a (),
         input: &'a Self::Input,
         usage: &'a ParamUsage,
     ) -> BoxFuture<'a, Result<Self::Output, String>> {
@@ -257,12 +262,13 @@ impl DependNode for Node5 {
 }
 
 struct Node6;
-impl DependNode for Node6 {
+impl DependNode<()> for Node6 {
     type Input = A;
     type Output = ();
 
     fn run<'a>(
         &'a mut self,
+        context: &'a (),
         input: &'a Self::Input,
         usage: &'a ParamUsage,
     ) -> BoxFuture<'a, Result<Self::Output, String>> {

@@ -1,5 +1,5 @@
-use pi_futures::BoxFuture;
 use pi_async::rt::{AsyncRuntime, AsyncRuntimeBuilder};
+use pi_futures::BoxFuture;
 use pi_render::depend_graph::{
     graph::DependGraph,
     node::{DependNode, ParamUsage},
@@ -43,7 +43,7 @@ fn input_collector() {
         g.build().unwrap();
 
         println!("======== run graph");
-        g.run(&rt).await.unwrap();
+        g.run(&rt, &()).await.unwrap();
     });
 
     std::thread::sleep(Duration::from_secs(3));
@@ -76,13 +76,14 @@ pub struct Input2 {
 
 struct Node1(u32);
 
-impl DependNode for Node1 {
+impl DependNode<()> for Node1 {
     type Input = ();
     type Output = Output1;
 
     fn run<'a>(
         &'a mut self,
-        input: &Self::Input,
+        context: &'a (),
+        input: &'a Self::Input,
         usage: &'a ParamUsage,
     ) -> BoxFuture<'a, Result<Self::Output, String>> {
         println!("======== Enter Node1 Running");
@@ -106,12 +107,13 @@ impl DependNode for Node1 {
 }
 
 struct Node2;
-impl DependNode for Node2 {
+impl DependNode<()> for Node2 {
     type Input = Input2;
     type Output = ();
 
     fn run<'a>(
         &'a mut self,
+        context: &'a (),
         input: &'a Self::Input,
         usage: &'a ParamUsage,
     ) -> BoxFuture<'a, Result<Self::Output, String>> {

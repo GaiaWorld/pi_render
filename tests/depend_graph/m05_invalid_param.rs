@@ -21,13 +21,14 @@ fn out_same_type() {
     }
 
     struct Node1;
-    impl DependNode for Node1 {
+    impl DependNode<()> for Node1 {
         type Input = ();
         type Output = Output1;
 
         fn run<'a>(
             &'a mut self,
-            input: &Self::Input,
+            context: &'a (),
+            input: &'a Self::Input,
             usage: &'a ParamUsage,
         ) -> BoxFuture<'a, Result<Self::Output, String>> {
             Box::pin(async move {
@@ -41,13 +42,14 @@ fn out_same_type() {
     }
 
     struct Node2;
-    impl DependNode for Node2 {
+    impl DependNode<()> for Node2 {
         type Input = ();
         type Output = ();
 
         fn run<'a>(
             &'a mut self,
-            input: &Self::Input,
+            context: &'a (),
+            input: &'a Self::Input,
             usage: &'a ParamUsage,
         ) -> BoxFuture<'a, Result<Self::Output, String>> {
             Box::pin(async move { Ok(()) })
@@ -69,7 +71,7 @@ fn out_same_type() {
         g.build().unwrap();
 
         println!("======== run graph");
-        g.run(&rt).await.unwrap();
+        g.run(&rt, &()).await.unwrap();
     });
 
     std::thread::sleep(Duration::from_secs(3));
@@ -88,13 +90,14 @@ fn in_same_type() {
     }
 
     struct Node1;
-    impl DependNode for Node1 {
+    impl DependNode<()> for Node1 {
         type Input = ();
         type Output = ();
 
         fn run<'a>(
             &'a mut self,
-            input: &Self::Input,
+            context: &'a (),
+            input: &'a Self::Input,
             usage: &'a ParamUsage,
         ) -> BoxFuture<'a, Result<Self::Output, String>> {
             Box::pin(async move { Ok(()) })
@@ -102,13 +105,14 @@ fn in_same_type() {
     }
 
     struct Node2;
-    impl DependNode for Node2 {
+    impl DependNode<()> for Node2 {
         type Input = Input1;
         type Output = ();
 
         fn run<'a>(
             &'a mut self,
-            input: &Self::Input,
+            context: &'a (),
+            input: &'a Self::Input,
             usage: &'a ParamUsage,
         ) -> BoxFuture<'a, Result<Self::Output, String>> {
             Box::pin(async move { Ok(()) })
@@ -130,7 +134,7 @@ fn in_same_type() {
         g.build().unwrap();
 
         println!("======== run graph");
-        g.run(&rt).await.unwrap();
+        g.run(&rt, &()).await.unwrap();
     });
 
     std::thread::sleep(Duration::from_secs(3));
@@ -141,13 +145,14 @@ fn in_same_type() {
 #[test]
 fn multi_output_type() {
     struct Node1;
-    impl DependNode for Node1 {
+    impl DependNode<()> for Node1 {
         type Input = ();
         type Output = u32;
 
         fn run<'a>(
             &'a mut self,
-            input: &Self::Input,
+            context: &'a (),
+            input: &'a Self::Input,
             usage: &'a ParamUsage,
         ) -> BoxFuture<'a, Result<Self::Output, String>> {
             Box::pin(async move { Ok(1) })
@@ -155,13 +160,14 @@ fn multi_output_type() {
     }
 
     struct Node2;
-    impl DependNode for Node2 {
+    impl DependNode<()> for Node2 {
         type Input = u32;
         type Output = ();
 
         fn run<'a>(
             &'a mut self,
-            input: &Self::Input,
+            context: &'a (),
+            input: &'a Self::Input,
             usage: &'a ParamUsage,
         ) -> BoxFuture<'a, Result<Self::Output, String>> {
             Box::pin(async move { Ok(()) })
@@ -186,7 +192,7 @@ fn multi_output_type() {
         g.build().unwrap();
 
         println!("======== run graph");
-        g.run(&rt).await.unwrap();
+        g.run(&rt, &()).await.unwrap();
     });
 
     std::thread::sleep(Duration::from_secs(3));

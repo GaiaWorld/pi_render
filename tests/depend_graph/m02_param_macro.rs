@@ -16,13 +16,14 @@ fn two_node_with_noslot() {
     pub struct A(u32);
 
     struct Node1;
-    impl DependNode for Node1 {
+    impl DependNode<()> for Node1 {
         type Input = ();
         type Output = A;
 
         fn run<'a>(
             &'a mut self,
-            input: &Self::Input,
+            context: &'a (),
+            input: &'a Self::Input,
             usage: &'a ParamUsage,
         ) -> BoxFuture<'a, Result<Self::Output, String>> {
             println!("======== Enter Node1 Running");
@@ -44,13 +45,14 @@ fn two_node_with_noslot() {
     }
 
     struct Node2;
-    impl DependNode for Node2 {
+    impl DependNode<()> for Node2 {
         type Input = A;
         type Output = ();
 
         fn run<'a>(
             &'a mut self,
-            input: &Self::Input,
+            context: &'a (),
+            input: &'a Self::Input,
             usage: &'a ParamUsage,
         ) -> BoxFuture<'a, Result<Self::Output, String>> {
             println!("======== Enter Node2 Running");
@@ -70,7 +72,7 @@ fn two_node_with_noslot() {
 
     let runtime = AsyncRuntimeBuilder::default_worker_thread(None, None, None, None);
 
-    let mut g = DependGraph::default();
+    let mut g = DependGraph::<()>::default();
 
     g.add_node("Node1", Node1);
     g.add_node("Node2", Node2);
@@ -84,7 +86,7 @@ fn two_node_with_noslot() {
         g.build().unwrap();
 
         println!("======== 1 run graph");
-        g.run(&rt).await.unwrap();
+        g.run(&rt, &()).await.unwrap();
     });
 
     std::thread::sleep(Duration::from_secs(3));
@@ -116,13 +118,14 @@ fn two_node_with_slot() {
     }
 
     struct Node1;
-    impl DependNode for Node1 {
+    impl DependNode<()> for Node1 {
         type Input = ();
         type Output = Output1;
 
         fn run<'a>(
             &'a mut self,
-            input: &Self::Input,
+            context: &'a (),
+            input: &'a Self::Input,
             usage: &'a ParamUsage,
         ) -> BoxFuture<'a, Result<Self::Output, String>> {
             println!("======== Enter Node1 Running");
@@ -150,13 +153,14 @@ fn two_node_with_slot() {
     }
 
     struct Node2;
-    impl DependNode for Node2 {
+    impl DependNode<()> for Node2 {
         type Input = Input2;
         type Output = ();
 
         fn run<'a>(
             &'a mut self,
-            input: &Self::Input,
+            context: &'a (),
+            input: &'a Self::Input,
             usage: &'a ParamUsage,
         ) -> BoxFuture<'a, Result<Self::Output, String>> {
             println!("======== Enter Node2 Running");
@@ -193,7 +197,7 @@ fn two_node_with_slot() {
         g.build().unwrap();
 
         println!("======== 1 run graph");
-        g.run(&rt).await.unwrap();
+        g.run(&rt, &()).await.unwrap();
     });
 
     std::thread::sleep(Duration::from_secs(3));
