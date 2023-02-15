@@ -1,5 +1,5 @@
-use pi_futures::BoxFuture;
 use pi_async::rt::{AsyncRuntime, AsyncRuntimeBuilder};
+use pi_futures::BoxFuture;
 use pi_render::depend_graph::{
     graph::DependGraph,
     node::{DependNode, ParamUsage},
@@ -35,11 +35,11 @@ fn change_graph() {
         println!("======================== should build call ");
 
         g.build().unwrap();
-        g.run(&rt).await.unwrap();
+        g.run(&rt, &()).await.unwrap();
 
         println!("======================== shouldn't build call ");
         g.build().unwrap();
-        g.run(&rt).await.unwrap();
+        g.run(&rt, &()).await.unwrap();
 
         *n1.0.as_ref().borrow_mut() = false;
         *n2.0.as_ref().borrow_mut() = false;
@@ -57,11 +57,11 @@ fn change_graph() {
 
         println!("======================== should build call ");
         g.build().unwrap();
-        g.run(&rt).await.unwrap();
+        g.run(&rt, &()).await.unwrap();
 
         println!("======================== shouldn't build call ");
         g.build().unwrap();
-        g.run(&rt).await.unwrap();
+        g.run(&rt, &()).await.unwrap();
     });
 
     std::thread::sleep(Duration::from_secs(3));
@@ -121,18 +121,19 @@ impl Default for Node1 {
     }
 }
 
-impl DependNode for Node1 {
+impl DependNode<()> for Node1 {
     type Input = ();
     type Output = Output1;
 
-    fn build<'a>(&'a mut self, usage: &'a ParamUsage) -> Option<BoxFuture<'a, Result<(), String>>> {
+    fn build<'a>(&'a mut self, _context: &'a (), _usage: &'a ParamUsage) -> Result<(), String> {
         println!("++++++++++++++++++++++++ Node1 Build");
-        None
+        Ok(())
     }
 
     fn run<'a>(
         &'a mut self,
-        input: &Self::Input,
+        context: &'a (),
+        input: &'a Self::Input,
         usage: &'a ParamUsage,
     ) -> BoxFuture<'a, Result<Self::Output, String>> {
         let is_first_build = *self.0.as_ref().borrow();
@@ -166,17 +167,18 @@ impl Default for Node2 {
     }
 }
 
-impl DependNode for Node2 {
+impl DependNode<()> for Node2 {
     type Input = ();
     type Output = Output2;
 
-    fn build<'a>(&'a mut self, usage: &'a ParamUsage) -> Option<BoxFuture<'a, Result<(), String>>> {
+    fn build<'a>(&'a mut self, _context: &'a (), _usage: &'a ParamUsage) -> Result<(), String> {
         println!("++++++++++++++++++++++++ Node2 Build");
-        None
+        Ok(())
     }
 
     fn run<'a>(
         &'a mut self,
+        context: &'a (),
         input: &'a Self::Input,
         usage: &'a ParamUsage,
     ) -> BoxFuture<'a, Result<Self::Output, String>> {
@@ -214,17 +216,18 @@ impl Default for Node3 {
     }
 }
 
-impl DependNode for Node3 {
+impl DependNode<()> for Node3 {
     type Input = Input3;
     type Output = ();
 
-    fn build<'a>(&'a mut self, usage: &'a ParamUsage) -> Option<BoxFuture<'a, Result<(), String>>> {
+    fn build<'a>(&'a mut self, _context: &'a (), _usage: &'a ParamUsage) -> Result<(), String> {
         println!("++++++++++++++++++++++++ Node3 Build");
-        None
+        Ok(())
     }
 
     fn run<'a>(
         &'a mut self,
+        context: &'a (),
         input: &'a Self::Input,
         usage: &'a ParamUsage,
     ) -> BoxFuture<'a, Result<Self::Output, String>> {
@@ -252,17 +255,18 @@ impl Default for Node4 {
     }
 }
 
-impl DependNode for Node4 {
+impl DependNode<()> for Node4 {
     type Input = B;
     type Output = ();
 
-    fn build<'a>(&'a mut self, usage: &'a ParamUsage) -> Option<BoxFuture<'a, Result<(), String>>> {
+    fn build<'a>(&'a mut self, _context: &'a (), _usage: &'a ParamUsage) -> Result<(), String> {
         println!("++++++++++++++++++++++++ Node4 Build");
-        None
+        Ok(())
     }
 
     fn run<'a>(
         &'a mut self,
+        context: &'a (),
         input: &'a Self::Input,
         usage: &'a ParamUsage,
     ) -> BoxFuture<'a, Result<Self::Output, String>> {
