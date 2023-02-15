@@ -12,7 +12,6 @@ use super::{
     param::{Assign, InParam, OutParam},
     GraphError,
 };
-use pi_async::prelude::AsyncRuntime;
 use pi_futures::BoxFuture;
 use pi_hash::{XHashMap, XHashSet};
 use pi_share::{Cell, Share, ThreadSync};
@@ -93,7 +92,7 @@ impl From<&NodeLabel> for String {
         match value {
             NodeLabel::Name(value) => value.to_string(),
             NodeLabel::Id(id) => {
-                format!("{:?}", id)
+                format!("{id:?}")
             }
         }
     }
@@ -284,28 +283,28 @@ where
         let last_count = self.curr_next_refs.fetch_sub(1, Ordering::SeqCst);
         assert!(
             last_count >= 1,
-            "DependNode error, last_count = {}",
-            last_count
+            "DependNode error, last_count = {last_count}"
         );
 
         if last_count == 1 {
-			// SAFE： 此处强转可变，然后清理self.output是安全的
-			// curr_next_refs为原子操作，在一次图运行过程中， 保证了此处代码仅运行一次
-			unsafe{&mut *(self as *const Self as usize as *mut Self)}.output = Default::default();
+            // SAFE: 此处强转可变，然后清理self.output是安全的
+            // curr_next_refs 为 原子操作，在一次图运行过程中， 保证了此处代码仅运行一次
+            unsafe { &mut *(self as *const Self as usize as *mut Self) }.output =
+                Default::default();
         }
     }
 
     fn build<'a>(&'a mut self, context: &'a Context) -> Result<(), GraphError> {
         self.node
             .build(context, &self.param_usage)
-            .map_err(|e| GraphError::CustomBuildError(e))
+            .map_err(GraphError::CustomBuildError)
     }
 
     fn run<'a>(&'a mut self, context: &'a Context) -> BoxFuture<'a, Result<(), GraphError>> {
         Box::pin(async move {
             for (pre_id, pre_node) in &self.pre_nodes {
                 let p = pre_node.0.as_ref();
-				let p = p.borrow();
+                let p = p.borrow();
                 self.input.fill_from(*pre_id, p.deref());
 
                 // 用完了 一个前置，引用计数 减 1
@@ -324,7 +323,12 @@ where
                     self.input = Default::default();
 
                     // 替换 输出
-                    self.output = output;
+                    if self.total_next_refs == 0 {
+                        // 注：如果此节点 无 后继节点，则 该节点输出 会 直接为 Default
+                        self.output = Default::default();
+                    } else {
+                        self.output = output;
+                    }
 
                     Ok(())
                 }
