@@ -11,7 +11,7 @@ use once_cell::sync::Lazy;
 use pi_naga::{ScalarKind, ShaderStage, Binding, AddressSpace, ImageDimension, ImageClass, ArraySize, Interpolation, Sampling, Module, Type, Constant, UniqueArena, TypeInner, ConstantInner, ScalarValue, Arena, front};
 use pi_hash::{XHashMap, XHashSet};
 use thiserror::Error;
-use render_core::rhi::shader::{ShaderImport, CodeLoader, ProcessShaderError};
+// use render_core::rhi::shader::{ShaderImport, CodeLoader, ProcessShaderError};
 use regex::Regex;
 use pi_atom::Atom;
 
@@ -24,6 +24,15 @@ pub enum ShaderPath {
 		fs: String
 	},
     SpirV(String),
+}
+
+/// 每一条 #import 信息
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub enum ShaderImport {
+    /// 路径 识别
+    Path(String),
+    /// 定制，具体语义由 高层解析
+    Custom(String),
 }
 
 /// 解析器
@@ -2225,15 +2234,15 @@ fn sort_and_alignment(layout_info: &mut LayoutInfo, set: u32, binding: u32) {
 // }
 
 
-struct CodeLoaderFromFile;
-impl CodeLoader for CodeLoaderFromFile {
-	fn load(&self, path: &PathBuf) -> Result<Vec<u8>, ProcessShaderError> {
-		match std::fs::read(path) {
-			Ok(r) => Ok(r),
-			_ => Err(ProcessShaderError::LoadFail(path.clone()))
-		}
-	}
-}
+// struct CodeLoaderFromFile;
+// impl CodeLoader for CodeLoaderFromFile {
+// 	fn load(&self, path: &PathBuf) -> Result<Vec<u8>, ProcessShaderError> {
+// 		match std::fs::read(path) {
+// 			Ok(r) => Ok(r),
+// 			_ => Err(ProcessShaderError::LoadFail(path.clone()))
+// 		}
+// 	}
+// }
 
 // fn canonicalize(src_path: &PathBuf, cur_path: &PathBuf, str: &str) -> Result<PathBuf, CompileShaderError> {
 // 	let mut arr = str.split("::");

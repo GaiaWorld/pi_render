@@ -19,7 +19,6 @@ pi_atom = "0.2"
 log = "0.4"
 regex = "1.5"
 once_cell = "1.4" # TODO: replace once_cell with std equivalent if/when this lands: https://github.com/rust-lang/rfcs/pull/2788
-render_core = { path = "../render_core"}
 pi_hash = "0.1"
 
 [dev-dependencies]

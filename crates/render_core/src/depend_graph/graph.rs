@@ -136,7 +136,6 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
     /// 移除 节点
     pub fn remove_node(&mut self, label: impl Into<NodeLabel>) -> Result<(), GraphError> {
         let label = label.into();
-
         let id = match self.get_node_id(&label) {
             Ok(v) => v,
             Err(_) => return Ok(()),
@@ -145,14 +144,12 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
         // 拓扑结构改变
         self.is_topo_dirty = true;
 
-        self.nodes.remove(id);
+        let node = match self.nodes.remove(id) {
+			Some(r) => r,
+			None => return Ok(())
+		};
         self.finish_nodes.remove(&id);
-
-        let name = match label {
-            NodeLabel::Id(id) => self.get_node_name(id)?,
-            NodeLabel::Name(ref name) => name,
-        };
-        self.node_names.remove(name.to_string().as_str());
+        self.node_names.remove(node.0.as_str());
 
         // 图：删点 必 删边
         if let Some(slot) = self.edges.remove(&id) {
@@ -276,7 +273,7 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
 impl<Context: ThreadSync + 'static> DependGraph<Context> {
     /// 构建图，不需要 运行时
     pub fn build(&mut self) -> Result<(), GraphError> {
-        let sub_ng = match self.update_topo() {
+        let sub_ng = match self.update_topo()? {
             None => return Ok(()),
             Some(g) => g,
         };
@@ -358,7 +355,7 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
         }
     }
 
-    fn update_topo(&mut self) -> Option<NGraph<NodeId, NodeId>> {
+    fn update_topo(&mut self) -> Result<Option<NGraph<NodeId, NodeId>>, GraphError> {
         if self.is_topo_dirty {
             // 拓扑结构变，全部 需要 重构
             self.is_finish_dirty = true;
@@ -370,13 +367,13 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
             self.run_ng = None;
         } else {
             // 都没改过，就认为 run_ng 全部就绪
-            return None;
+            return Ok(None);
         }
 
         // 有必要的话，修改 拓扑结构
-        self.change_topo().unwrap();
+        self.change_topo()?;
 
-        Some(self.gen_sub().unwrap())
+        Ok(Some(self.gen_sub()?))
     }
 
     // 取 label 对应的 Name
@@ -426,11 +423,12 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
 
         // 构建成功, ng_builder 就 删掉
         let mut builder = NGraphBuilder::<NodeId, NodeId>::new();
-
         // 节点 就是 高层添加 的 节点
         for (node_id, _) in &self.nodes {
             builder = builder.node(node_id, node_id);
         }
+
+		
 
         {
             let mut access_edges = XHashSet::<(NodeId, NodeId)>::default();
@@ -559,7 +557,9 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
         let f = move |context: &'static Context| -> BoxFuture<'static, std::io::Result<()>> {
             let node = node.clone();
             Box::pin(async move {
+				// log::warn!("run graphnode start {:?}", node_id);
                 node.as_ref().borrow_mut().run(context).await.unwrap();
+				// log::warn!("run graphnode end {:?}", node_id);
                 Ok(())
             })
         };

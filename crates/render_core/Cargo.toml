@@ -11,6 +11,7 @@ keywords = ["pi"]
 [features]
 webgl = []
 location = []
+trace=[]
 
 [dependencies]
 # pi_share = {version="0.4", features=["serial", "rc"]}
@@ -30,6 +31,7 @@ pi_null = "0.1"
 pi_ecs_macros = "0.1"
 pi_slotmap = "0.1"
 normpath = "1.0"
+tracing = { version = "0.1", default-features = false, features = ["std"] }
 
 bitvec = { version = "1.0", features = ["serde"] }
 render_utils = { version = "0.1", path = "../render_utils" }

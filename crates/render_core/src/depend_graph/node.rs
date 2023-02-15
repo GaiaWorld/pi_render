@@ -166,7 +166,7 @@ pub(crate) trait InternalNode<Context: ThreadSync + 'static>: OutParam {
     fn add_pre_node(&mut self, nodes: (NodeId, NodeState<Context>));
 
     // 每帧 后继的渲染节点 获取参数时候，需要调用 此函数
-    fn dec_curr_ref(&mut self);
+    fn dec_curr_ref(&self);
 
     // 构建，当依赖图 构建时候，会调用一次
     // 一般 用于 准备 渲染 资源的 创建
@@ -279,7 +279,7 @@ where
         self.pre_nodes.push(node);
     }
 
-    fn dec_curr_ref(&mut self) {
+    fn dec_curr_ref(&self) {
         // 注：这里 last_count 是 self.curr_next_refs 减1 前 的结果
         let last_count = self.curr_next_refs.fetch_sub(1, Ordering::SeqCst);
         assert!(
@@ -289,7 +289,9 @@ where
         );
 
         if last_count == 1 {
-            self.output = Default::default();
+			// SAFE： 此处强转可变，然后清理self.output是安全的
+			// curr_next_refs为原子操作，在一次图运行过程中， 保证了此处代码仅运行一次
+			unsafe{&mut *(self as *const Self as usize as *mut Self)}.output = Default::default();
         }
     }
 
@@ -303,11 +305,11 @@ where
         Box::pin(async move {
             for (pre_id, pre_node) in &self.pre_nodes {
                 let p = pre_node.0.as_ref();
-                let mut p = p.borrow_mut();
-                self.input.fill_from(*pre_id, p.deref_mut());
+				let p = p.borrow();
+                self.input.fill_from(*pre_id, p.deref());
 
                 // 用完了 一个前置，引用计数 减 1
-                p.deref_mut().dec_curr_ref();
+                p.deref().dec_curr_ref();
             }
 
             let runner = self.node.run(context, &self.input, &self.param_usage);
