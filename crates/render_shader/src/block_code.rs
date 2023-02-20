@@ -1,5 +1,28 @@
 use pi_atom::Atom;
 
+pub trait TToBlockCodeAtom {
+    fn to_block_code(&self) -> BlockCodeAtom;
+}
+
+impl TToBlockCodeAtom for render_core::rhi::shader::BlockCodeAtom {
+    fn to_block_code(&self) -> BlockCodeAtom {
+        let mut code_define = String::from("");
+        for c in self.define.iter() {
+            code_define += c.code.as_str();
+        }
+        
+        let mut code_running = String::from("");
+        for c in self.running.iter() {
+            code_running += c.code.as_str();
+        }
+        
+        BlockCodeAtom {
+            define: Atom::from(code_define),
+            running: Atom::from(code_running),
+        }
+    }
+}
+
 /// 代码片段
 #[derive(Debug, Clone)]
 pub struct BlockCodeAtom {

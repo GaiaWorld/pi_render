@@ -158,7 +158,7 @@ pub async fn setup_render_context(
 
 /// Initializes the renderer by retrieving and preparing the GPU instance, device and queue
 /// for the specified backend.
-async fn initialize_renderer(
+pub async fn initialize_renderer(
     instance: &wgpu::Instance,
     options: &RenderOptions,
     request_adapter_options: &wgpu::RequestAdapterOptions<'_>,

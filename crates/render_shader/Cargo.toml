@@ -25,12 +25,10 @@ naga = { version = "0.9", features = [
 pi_share = "0.4"
 pi_assets = "0.10"
 pi_slotmap = "0.1"
+pi_hash = "0.1"
 pi_atom = { version="0.2", features = ["serde"] }
 
-render_data_container = { path = "../render_data_container" }
 render_core = { path = "../render_core" }
-render_geometry = { path = "../render_geometry" }
-render_resource = { path = "../render_resource" }
 
 [patch."https://github.com/GaiaWorld/pi_share.git"]
 pi_share = { path = "../../../pi_share" }

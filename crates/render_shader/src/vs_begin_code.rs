@@ -1,6 +1,6 @@
 use std::mem::size_of;
 
-use render_geometry::vertex_data::EVertexDataKind;
+use crate::attributes::EVertexDataKind;
 
 #[derive(Debug, Clone)]
 pub struct AttributeRefCode {
@@ -20,7 +20,7 @@ impl AttributeRefCode {
         result += self.name.as_str();
         if let Some(kind) = &self.kind {
             result += " = ";
-            result += kind.vs_code();
+            result += kind.var_code();
         }
         result += ";\r\n";
 
@@ -59,9 +59,8 @@ impl VSBeginCode {
 
 #[cfg(test)]
 mod test {
-    use render_geometry::vertex_data::EVertexDataKind;
 
-    use crate::vs_begin_code::VSBeginCode;
+    use crate::{vs_begin_code::VSBeginCode, attributes::EVertexDataKind};
 
     use super::{AttributeRefCode, AttributesRef};
 

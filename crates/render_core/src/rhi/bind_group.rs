@@ -2,7 +2,7 @@ use pi_share::Share;
 use std::ops::Deref;
 use uuid::Uuid;
 
-#[derive(Copy, Clone, Hash, Eq, PartialEq, Debug)]
+#[derive(Copy, Clone, Hash, Eq, PartialEq, Debug, PartialOrd, Ord)]
 pub struct BindGroupId(Uuid);
 
 #[derive(Clone, Debug)]

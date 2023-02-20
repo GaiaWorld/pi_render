@@ -49,10 +49,17 @@ path = "examples/clean/main.rs"
 
 [patch.crates-io]
 pi_assets={ path = "../pi_assets" }
-# pi_ecs = { path = "../pi_ecs" }
+pi_ecs = { path = "../pi_ecs" }
 
-# [patch."https://github.com/GaiaWorld/pi_hal"]
-# pi_hal = { path = "../pi_hal" }
+[patch."https://github.com/GaiaWorld/pi_hal"]
+pi_hal = { path = "../pi_hal" }
 
-# [patch."https://github.com/GaiaWorld/pi_ecs"]
-# pi_ecs = { path = "../pi_ecs" }
+[patch."https://github.com/GaiaWorld/pi_ecs"]
+pi_ecs = { path = "../pi_ecs" }
+
+[patch."http://ser.yinengyun.com:10082/tech/winit.git"]
+winit = { path = "../winit" }
+
+[net]
+git-fetch-with-cli = true
+offline = true

@@ -1,5 +1,5 @@
 [package]
-name = "render_pipeline_key"
+name = "render_pipeline"
 version = "0.0.1"
 authors = ["baip0002 <2494156981@qq.com>"]
 edition = "2021"
@@ -10,5 +10,13 @@ keywords = ["scene pipeline key"]
 
 [dependencies]
 wgpu = { version = "0.13", features = ["spirv", "glsl"] }
+
+pi_share = "0.4"
+pi_assets = "0.10"
+pi_slotmap = "0.1"
+pi_hash = "0.1"
+render_geometry = { path = "../render_geometry" }
+render_shader = { path = "../render_shader" }
+render_core = { path = "../render_core" }
 
 # [[example]]

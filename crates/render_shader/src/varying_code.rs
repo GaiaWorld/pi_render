@@ -51,7 +51,7 @@ impl Varying {
 }
 
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Varyings(pub Vec<Varying>);
 impl Varyings {
     pub fn size(&self) -> usize {
@@ -61,6 +61,21 @@ impl Varyings {
         });
 
         size
+    }
+}
+
+impl From<&render_core::rhi::shader::ShaderVarying> for Varyings {
+    fn from(value: &render_core::rhi::shader::ShaderVarying) -> Self {
+        let mut result = Varyings::default();
+        value.0.iter().for_each(|val| {
+            result.0.push(
+                Varying {
+                    format: val.format.clone(),
+                    name: val.name.clone(),
+                }
+            )
+        });
+        result
     }
 }
 

@@ -1,13 +1,18 @@
 use std::{hash::Hash, fmt::Debug};
 use pi_atom::Atom;
-use render_pipeline_key::pipeline_key::PipelineStateKey;
-use sampler::SamplerAssetKey;
 
 pub mod bind_group_layout;
 pub mod bind_group;
 pub mod uniform_buffer;
 pub mod sampler;
 pub mod texture2d;
+pub mod data_texture2d;
+pub mod buffer;
+pub mod memory;
+pub mod base;
+pub mod shader_bind;
+pub mod shader_set;
+pub mod texture;
 
 pub trait AssetKey: Debug + Clone + Hash + PartialEq + Eq + PartialOrd + Ord {
     
@@ -35,32 +40,7 @@ pub type ShaderAssetKey = Atom;
 
 pub type ShaderDefineMode = u128;
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct ShaderEffectAssetKey {
-    pub shader: ShaderAssetKey,
-    pub define: ShaderDefineMode,
-}
-
-#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct RenderPipelineAssetKey {
-    pub shader_effect: ShaderEffectAssetKey,
-    pub pipeline: PipelineStateKey,
-}
 
 pub type BindGroupSet = u8;
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct BindGroupLayoutAssetKey {
-    pub shader_effect: ShaderEffectAssetKey,
-    pub set: BindGroupSet,
-}
-
-pub type BindGroupAssetKey = BindGroupLayoutAssetKey;
-
 pub type ImageAssetKey = Atom;
-
-#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct TextureAssetKey {
-    pub image: ImageAssetKey,
-    pub sampler: SamplerAssetKey,
-}
