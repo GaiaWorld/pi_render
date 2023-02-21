@@ -6,7 +6,6 @@ use super::{
     texture::{Sampler, Texture},
 };
 use derive_deref_rs::Deref;
-use futures::Future;
 use pi_share::Share;
 use wgpu::{util::DeviceExt, BufferAsyncError};
 

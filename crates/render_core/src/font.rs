@@ -7,7 +7,6 @@ use pi_assets::{asset::Handle, mgr::AssetMgr};
 use pi_atom::Atom;
 use pi_hash::DefaultHasher;
 use pi_share::{Share, ShareMutex};
-use pi_slotmap::Key;
 use wgpu::{Texture, ImageCopyTexture, TextureAspect, ImageDataLayout, Extent3d, Origin3d};
 use pi_hal::font::font::FontMgr;
 pub use pi_hal::font::font::{ Font, Size, GlyphId, FontId, Glyph};
