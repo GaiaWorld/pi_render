@@ -32,7 +32,9 @@ fn multi_node() {
     g.add_depend("Node5", "Node6");
 
     g.set_finish("Node6", true).unwrap();
-
+    
+    g.dump_graphviz();
+    
     let rt = runtime.clone();
     let _ = runtime.spawn(runtime.alloc(), async move {
         let rt = rt.clone();

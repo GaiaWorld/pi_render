@@ -93,6 +93,77 @@ impl<Context: ThreadSync + 'static> Default for DependGraph<Context> {
 
 /// 渲染图的 拓扑信息 相关 方法
 impl<Context: ThreadSync + 'static> DependGraph<Context> {
+    #[cfg(not(debug_assertions))]
+    pub fn dump_graphviz(&self) -> String {
+        "".into()
+    }
+
+    /// 将 渲染图 打印成 Graphviz (.dot) 格式
+    /// 红色 是 结束 节点
+    #[cfg(debug_assertions)]
+    pub fn dump_graphviz(&self) -> String {
+        use log::warn;
+
+        let s = self.dump_graphviz_impl();
+
+        // + Debug 模式
+        //     - windwos 非 wasm32 平台，运行目录 生成 dump_graphviz.dot
+        //     - 其他 平台，返回 字符串
+        // + Release 模式：返回 空串
+        #[cfg(all(target_os = "windows", not(target_arch = "wasm32")))]
+        {
+            use std::io::Write;
+
+            match std::fs::OpenOptions::new()
+                .write(true)
+                .create(true)
+                .open("dump_graphviz.dot")
+            {
+                Ok(mut file) => match file.write_all(s.as_bytes()) {
+                    Ok(_) => {}
+                    Err(e) => {
+                        warn!("write to dump_graphviz.dot error = {:?}", e);
+                    }
+                },
+                Err(e) => {
+                    warn!("open dump_graphviz.dot for write error = {:?}", e);
+                }
+            }
+        }
+        s
+    }
+
+    /// 将 渲染图 打印成 Graphviz (.dot) 格式
+    /// 红色 是 结束 节点
+    #[cfg(debug_assertions)]
+    fn dump_graphviz_impl(&self) -> String {
+        let mut v = vec!["digraph Render {".into()];
+
+        for (id, (name, _)) in self.nodes.iter() {
+            let color = if self.finish_nodes.get(&id).is_some() {
+                "red"
+            } else {
+                "white"
+            };
+
+            v.push(format!(
+                "\t \"{id:?}\" [\"style\"=\"filled\" \"label\"={name} \"fillcolor\"=\"{color}\"]"
+            ));
+        }
+
+        v.push("".into());
+
+        for (id, slot) in self.edges.iter() {
+            for next_id in slot.next_nodes.iter() {
+                v.push(format!("\t \"{id:?}\" -> \"{next_id:?}\""));
+            }
+        }
+
+        v.push("}".into());
+
+        v.join("\n")
+    }
+
     /// 查 指定节点 的 前驱节点
     pub fn get_prev_ids(&self, id: NodeId) -> Option<&[NodeId]> {
         self.edges.get(&id).map(|v| v.prev_nodes.as_slice())
@@ -118,7 +189,7 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
 
         // 如果存在同名节点，返回 Err
         if let Some(id) = self.node_names.get(&name) {
-            return Err(GraphError::ExitNode(format!("{:?}", id)));
+            return Err(GraphError::ExitNode(format!("{id:?}")));
         }
 
         // 拓扑结构改变
@@ -145,9 +216,9 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
         self.is_topo_dirty = true;
 
         let node = match self.nodes.remove(id) {
-			Some(r) => r,
-			None => return Ok(())
-		};
+            Some(r) => r,
+            None => return Ok(()),
+        };
         self.finish_nodes.remove(&id);
         self.node_names.remove(node.0.as_str());
 
@@ -213,19 +284,21 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
         let before_node = self.get_node_id(&before_label)?;
         let after_node = self.get_node_id(&after_label)?;
 
-        if let Some(_) = self
+        if self
             .edges
             .get_mut(&before_node)
             .and_then(|slot| slot.add_next_slot(after_node))
+            .is_some()
         {
             // 拓扑结构改变
             self.is_topo_dirty = true;
         }
 
-        if let Some(_) = self
+        if self
             .edges
             .get_mut(&after_node)
             .and_then(|slot| slot.add_prev_slot(before_node))
+            .is_some()
         {
             // 拓扑结构改变
             self.is_topo_dirty = true;
@@ -247,19 +320,21 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
         let before_node = self.get_node_id(&before_label)?;
         let after_node = self.get_node_id(&after_label)?;
 
-        if let Some(_) = self
+        if self
             .edges
             .get_mut(&after_node)
             .and_then(|slot| slot.remove_prev_slot(before_node))
+            .is_some()
         {
             // 拓扑结构改变
             self.is_topo_dirty = true;
         }
 
-        if let Some(_) = self
+        if self
             .edges
             .get_mut(&before_node)
             .and_then(|slot| slot.remove_next_slot(after_node))
+            .is_some()
         {
             // 拓扑结构改变
             self.is_topo_dirty = true;
@@ -296,7 +371,7 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
             Some(g) => match async_graph(rt.clone(), g.clone(), context).await {
                 Ok(_) => {}
                 Err(e) => {
-                    let err = GraphError::RunNGraphError(format!("run_ng, {:?}", e));
+                    let err = GraphError::RunNGraphError(format!("run_ng, {e:?}"));
 
                     error!("{}", err);
                     return Err(err);
@@ -313,7 +388,7 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
             Some(ref g) => match async_graph(rt.clone(), g.clone(), context).await {
                 Ok(_) => Ok(()),
                 Err(e) => {
-                    let err = GraphError::RunNGraphError(format!("run_ng, {:?}", e));
+                    let err = GraphError::RunNGraphError(format!("run_ng, {e:?}"));
 
                     error!("{}", err);
                     Err(err)
@@ -381,7 +456,7 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
         self.nodes
             .get(id)
             .map(|v| v.0.as_str())
-            .ok_or_else(|| GraphError::NoneNode(format!("id = {:?}", id)))
+            .ok_or_else(|| GraphError::NoneNode(format!("id = {id:?}")))
     }
 
     // 取 label 对应的 NodeState
@@ -428,8 +503,6 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
             builder = builder.node(node_id, node_id);
         }
 
-		
-
         {
             let mut access_edges = XHashSet::<(NodeId, NodeId)>::default();
             for (before, slot) in self.edges.iter() {
@@ -447,7 +520,7 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
         let ng = match builder.build() {
             Ok(ng) => ng,
             Err(e) => {
-                let msg = format!("ng build failed, e = {:?}", e);
+                let msg = format!("ng build failed, e = {e:?}");
                 return Err(GraphError::BuildError(msg));
             }
         };
@@ -511,7 +584,7 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
                 self.run_ng = Some(Share::new(g));
             }
             Err(e) => {
-                let msg = format!("run_ng e = {:?}", e);
+                let msg = format!("run_ng e = {e:?}");
                 error!("{}", msg);
                 return Err(GraphError::BuildError(msg));
             }
@@ -524,7 +597,7 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
                 Ok(())
             }
             Err(e) => {
-                let msg = format!("build_builder e = {:?}", e);
+                let msg = format!("build_builder e = {e:?}");
                 error!("{}", msg);
                 Err(GraphError::BuildError(msg))
             }
@@ -557,9 +630,9 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
         let f = move |context: &'static Context| -> BoxFuture<'static, std::io::Result<()>> {
             let node = node.clone();
             Box::pin(async move {
-				// log::warn!("run graphnode start {:?}", node_id);
+                // log::warn!("run graphnode start {:?}", node_id);
                 node.as_ref().borrow_mut().run(context).await.unwrap();
-				// log::warn!("run graphnode end {:?}", node_id);
+                // log::warn!("run graphnode end {:?}", node_id);
                 Ok(())
             })
         };

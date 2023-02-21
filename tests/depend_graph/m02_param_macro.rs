@@ -1,5 +1,5 @@
-use pi_futures::BoxFuture;
 use pi_async::rt::{AsyncRuntime, AsyncRuntimeBuilder};
+use pi_futures::BoxFuture;
 use pi_render::depend_graph::{
     graph::DependGraph,
     node::{DependNode, ParamUsage},
@@ -80,6 +80,7 @@ fn two_node_with_noslot() {
     g.add_depend("Node1", "Node2");
 
     g.set_finish("Node2", true).unwrap();
+    g.dump_graphviz();
 
     let rt = runtime.clone();
     let _ = runtime.spawn(runtime.alloc(), async move {
@@ -191,6 +192,7 @@ fn two_node_with_slot() {
     g.add_depend("Node1", "Node2");
 
     g.set_finish("Node2", true).unwrap();
+    g.dump_graphviz();
 
     let rt = runtime.clone();
     let _ = runtime.spawn(runtime.alloc(), async move {
