@@ -24,7 +24,7 @@ pub struct KeyShaderSetTextureSamplers {
 
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct EffectTextureSamplers {
     pub textures: (
         Option<EffectBindTexture2D01>, Option<EffectBindTexture2D02>, Option<EffectBindTexture2D03>,
