@@ -6,7 +6,40 @@ use pi_async::rt::serial::AsyncRuntime;
 use pi_atom::Atom;
 
 use pi_share::{Share, ShareRwLock};
-use render_core::{rhi::{device::RenderDevice, initialize_renderer, options::RenderOptions, RenderQueue, asset::TextureRes, shader::ShaderMeta}, renderer::{bind_buffer::BindBufferAllocator, sampler::SamplerRes, buildin_data::{DefaultTexture, EDefaultTexture}, bind_group::{BindGroupLayout, BindGroup}, attributes::{ShaderAttribute, EVertexDataKind, KeyShaderFromAttributes}, shader_stage::EShaderStage}, render_3d::{shader::{shader_effect_meta::ShaderEffectMeta, uniform_texture::UniformTexture2DDesc, uniform_value::{UniformPropertyMat4, UniformPropertyVec4, MaterialValueBindDesc}, varying_code::{Varyings, Varying}, block_code::BlockCodeAtom, shader_defines::ShaderDefinesSet, shader::Shader3D, instance_code::EInstanceCode}, bind_groups::{texture_sampler::{BindGroupTextureSamplers, BindGroupTextureSamplersUsage}, model::{BindGroupModel, BindGroupModelUsage}, scene::{BindGroupScene, BindGroupSceneUsage}}, binds::{model::base::ShaderBindModelAboutMatrix, effect_value::ShaderBindEffectValue, scene::{base::ShaderBindSceneAboutBase, effect::ShaderBindSceneAboutEffect}, effect_texture2d::EffectBindTexture2D01}}};
+use render_core::{
+    rhi::{device::RenderDevice, initialize_renderer, options::RenderOptions, RenderQueue, asset::TextureRes, shader::ShaderMeta, bind_group::BindGroup},
+    renderer::{
+        bind_buffer::BindBufferAllocator,
+        sampler::SamplerRes,
+        buildin_data::{DefaultTexture, EDefaultTexture},
+        bind_group::{BindGroupLayout, BindGroupUsage},
+        attributes::{ShaderAttribute, EVertexDataKind, KeyShaderFromAttributes},
+        shader_stage::EShaderStage
+    },
+    render_3d::{
+        shader::{
+            shader_effect_meta::ShaderEffectMeta,
+            uniform_texture::UniformTexture2DDesc,
+            uniform_value::{UniformPropertyMat4, UniformPropertyVec4, MaterialValueBindDesc},
+            varying_code::{Varyings, Varying},
+            block_code::BlockCodeAtom,
+            shader_defines::ShaderDefinesSet,
+            shader::Shader3D,
+            instance_code::EInstanceCode
+        },
+        bind_groups::{
+            texture_sampler::{BindGroupTextureSamplers, BindGroupTextureSamplersUsage},
+            model::{BindGroupModel, BindGroupModelUsage},
+            scene::{BindGroupScene, BindGroupSceneUsage}
+        },
+        binds::{
+            model::base::ShaderBindModelAboutMatrix,
+            effect_value::ShaderBindEffectValue,
+            scene::{base::ShaderBindSceneAboutBase, effect::ShaderBindSceneAboutEffect},
+            effect_texture2d::EffectBindTexture2D01
+        }
+    }
+};
 use wgpu::{Device, Instance};
 
 pub fn setup_render_context(

@@ -5,7 +5,7 @@ use pi_share::Share;
 
 use crate::{
     renderer::{
-        bind_group::{BindGroup, BindGroupLayout},
+        bind_group::{BindGroupUsage, BindGroupLayout},
         bind::{KeyBindTexture2D, EKeyBind}, shader::TShaderSetBlock, texture::BindDataTexture2D
     },
     render_3d::{
@@ -15,7 +15,7 @@ use crate::{
         },
         shader::shader_effect_meta::ShaderEffectMeta
     },
-    rhi::device::RenderDevice
+    rhi::{device::RenderDevice, bind_group::BindGroup}
 };
 
 
@@ -25,7 +25,7 @@ pub struct KeyShaderSetTextureSamplers {
 }
 
 pub struct BindGroupTextureSamplers {
-    pub bind_group: Handle<BindGroup>,
+    pub bind_group: BindGroupUsage,
     pub key: KeyShaderSetTextureSamplers,
     pub effect_textures: (
         Option<EffectBindTexture2D01>, Option<EffectBindTexture2D02>, Option<EffectBindTexture2D03>,
@@ -54,7 +54,7 @@ impl BindGroupTextureSamplers {
         asset_mgr_bind_group: &Share<AssetMgr<BindGroup>>,
     ) -> Option<Self> {
         let mut key = KeyShaderSetTextureSamplers::default();
-        let mut binds = BindGroup::none_binds();
+        let mut binds = BindGroupUsage::none_binds();
 
         let mut binding = 0;
         let mut eff_textures: (
@@ -104,7 +104,7 @@ impl BindGroupTextureSamplers {
             if let Some(layout) = val.key_bind(&meta, binding as u16) {  binds[binding] = Some(layout); binding += 1; } else { return None; }; eff_samplers.5 = Some(val.clone());
         }
 
-        if let Some(bind_group) = BindGroup::create(device, binds, asset_mgr_bind_group_layout, asset_mgr_bind_group) {
+        if let Some(bind_group) = BindGroupUsage::create(device, binds, asset_mgr_bind_group_layout, asset_mgr_bind_group) {
             Some(
                 Self {
                     bind_group,

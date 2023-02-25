@@ -4,7 +4,7 @@ use std::sync::Arc;
 use pi_assets::{asset::{Handle, Asset}, mgr::AssetMgr};
 use pi_share::Share;
 
-use crate::rhi::device::RenderDevice;
+use crate::rhi::{device::RenderDevice, bind_group::BindGroup};
 
 use super::{bind::{EKeyBind, EBindData, KeyBindLayout, EBindResource}, ASSET_SIZE_FOR_UNKOWN};
 
@@ -58,14 +58,14 @@ impl Asset for BindGroupLayout {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct KeyBindGroup(pub [Option<EKeyBind>;MAX_BIND_COUNT]);
 
-#[derive(Debug)]
-pub struct BindGroup {
+#[derive(Debug, Clone)]
+pub struct BindGroupUsage {
     pub(crate) binds: [Option<EKeyBind>;MAX_BIND_COUNT],
-    pub(crate) bind_group: crate::rhi::bind_group::BindGroup,
+    pub(crate) bind_group: Handle<BindGroup>,
     pub(crate) key_bind_group_layout: KeyBindGroupLayout,
     pub(crate) bind_group_layout: Handle<BindGroupLayout>,
 }
-impl BindGroup {
+impl BindGroupUsage {
     pub fn none_binds() -> [Option<EKeyBind>;MAX_BIND_COUNT] {
         [
             None, None, None, None, None, None, None, None, 
@@ -77,7 +77,7 @@ impl BindGroup {
         binds: [Option<EKeyBind>;MAX_BIND_COUNT],
         asset_mgr_bind_group_layout: &Share<AssetMgr<BindGroupLayout>>,
         asset_mgr_bind_group: &Share<AssetMgr<BindGroup>>,
-    ) -> Option<Handle<Self>> {
+    ) -> Option<Self> {
         let mut resources: Vec<EBindResource> = vec![];
 
         let mut key_bind_group_layout = KeyBindGroupLayout::default();
@@ -93,10 +93,23 @@ impl BindGroup {
 
 
         let key_bind_group = KeyBindGroup(binds.clone());
-        if let Some(bind_group) = asset_mgr_bind_group.get(&key_bind_group) {
-            Some(bind_group)
+        let bind_group = asset_mgr_bind_group.get(&key_bind_group);
+        let bind_group_layout = BindGroupLayout::create(device, &key_bind_group_layout, asset_mgr_bind_group_layout);
+        if let Some(bind_group) = bind_group {
+            if let Some(bind_group_layout) = bind_group_layout {
+                Some(
+                    Self {
+                        binds,
+                        bind_group,
+                        bind_group_layout,
+                        key_bind_group_layout
+                    }
+                )
+            } else {
+                None
+            }
         } else {
-            if let Some(bind_group_layout) = BindGroupLayout::create(device, &key_bind_group_layout, asset_mgr_bind_group_layout) {
+            if let Some(bind_group_layout) = bind_group_layout {
                 let mut entries = vec![];
                 resources.iter().for_each(|v| {
                     entries.push(v.entry())
@@ -106,15 +119,18 @@ impl BindGroup {
                     &wgpu::BindGroupDescriptor { label: None, layout: &bind_group_layout.layout, entries: entries.as_slice() }
                 );
         
-                asset_mgr_bind_group.insert(
-                    key_bind_group,
-                    Self {
-                        binds,
-                        bind_group,
-                        bind_group_layout,
-                        key_bind_group_layout
-                    }
-                )
+                if let Some(bind_group) = asset_mgr_bind_group.insert(key_bind_group, bind_group) {
+                    Some(
+                        Self {
+                            binds,
+                            bind_group,
+                            bind_group_layout,
+                            key_bind_group_layout
+                        }
+                    )
+                } else {
+                    None
+                }
             } else {
                 None
             }
@@ -157,9 +173,4 @@ impl Asset for BindGroup {
 pub struct BindGroupLayoutUsage {
     pub set: u32,
     pub layout: Arc<KeyBindGroupLayout>,
-}
-
-pub struct BindGroupUsage {
-    pub set: u32,
-    pub layout: Arc<KeyBindGroup>,
 }
