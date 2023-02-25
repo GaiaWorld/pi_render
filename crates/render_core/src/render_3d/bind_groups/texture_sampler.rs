@@ -36,6 +36,7 @@ pub struct EffectTextureSamplers {
     ),
 }
 
+#[derive(Debug, Clone)]
 pub struct BindGroupTextureSamplers {
     pub bind_group: BindGroupUsage,
     pub key: KeyShaderSetTextureSamplers,
@@ -112,6 +113,7 @@ impl BindGroupTextureSamplers {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct BindGroupTextureSamplersUsage {
     pub bind_group: BindGroupTextureSamplers,
     pub set: u32,

@@ -10,6 +10,7 @@ pub struct KeyShaderSetModel {
     pub skin: ESkinCode,
 }
 
+#[derive(Debug, Clone)]
 pub struct BindGroupModel {
     pub bind_group: BindGroupUsage,
     matrix: BindUseModelMatrix,
@@ -75,6 +76,7 @@ impl BindGroupModel {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct BindGroupModelUsage {
     pub bind_group: BindGroupModel,
     pub set: u32,

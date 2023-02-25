@@ -64,6 +64,7 @@ impl BindGroupScene {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct BindGroupSceneUsage {
     pub bind_group: BindGroupScene,
     pub set: u32,
