@@ -24,31 +24,29 @@ pub struct KeyShaderSetTextureSamplers {
 
 }
 
-pub struct BindGroupTextureSamplers {
-    pub bind_group: BindGroupUsage,
-    pub key: KeyShaderSetTextureSamplers,
-    pub effect_textures: (
+#[derive(Debug, Default)]
+pub struct EffectTextureSamplers {
+    pub textures: (
         Option<EffectBindTexture2D01>, Option<EffectBindTexture2D02>, Option<EffectBindTexture2D03>,
         Option<EffectBindTexture2D04>, Option<EffectBindTexture2D05>, Option<EffectBindTexture2D06>,
     ),
-    pub effect_samplers: (
+    pub samplers: (
         Option<EffectBindSampler2D01>, Option<EffectBindSampler2D02>, Option<EffectBindSampler2D03>,
         Option<EffectBindSampler2D04>, Option<EffectBindSampler2D05>, Option<EffectBindSampler2D06>,
     ),
+}
+
+pub struct BindGroupTextureSamplers {
+    pub bind_group: BindGroupUsage,
+    pub key: KeyShaderSetTextureSamplers,
+    pub effect_texture_samplers: EffectTextureSamplers,
     pub meta: Handle<ShaderEffectMeta>,
 }
 
 impl BindGroupTextureSamplers {
     pub fn new(
         meta: Handle<ShaderEffectMeta>,
-        effect_textures: (
-            Option<&EffectBindTexture2D01>, Option<&EffectBindTexture2D02>, Option<&EffectBindTexture2D03>,
-            Option<&EffectBindTexture2D04>, Option<&EffectBindTexture2D05>, Option<&EffectBindTexture2D06>,
-        ),
-        effect_samplers: (
-            Option<&EffectBindSampler2D01>, Option<&EffectBindSampler2D02>, Option<&EffectBindSampler2D03>,
-            Option<&EffectBindSampler2D04>, Option<&EffectBindSampler2D05>, Option<&EffectBindSampler2D06>,
-        ),
+        effect_texture_samplers: EffectTextureSamplers,
         device: &RenderDevice,
         asset_mgr_bind_group_layout: &Share<AssetMgr<BindGroupLayout>>,
         asset_mgr_bind_group: &Share<AssetMgr<BindGroup>>,
@@ -57,61 +55,55 @@ impl BindGroupTextureSamplers {
         let mut binds = BindGroupUsage::none_binds();
 
         let mut binding = 0;
-        let mut eff_textures: (
-            Option<EffectBindTexture2D01>, Option<EffectBindTexture2D02>, Option<EffectBindTexture2D03>,
-            Option<EffectBindTexture2D04>, Option<EffectBindTexture2D05>, Option<EffectBindTexture2D06>,
-        ) = (None, None, None, None, None, None);
-        let mut eff_samplers: (
-            Option<EffectBindSampler2D01>, Option<EffectBindSampler2D02>, Option<EffectBindSampler2D03>,
-            Option<EffectBindSampler2D04>, Option<EffectBindSampler2D05>, Option<EffectBindSampler2D06>,
-        ) = (None, None, None, None, None, None);
 
-        if let Some(val) = effect_textures.0 {
-            if let Some(layout) = val.key_bind(&meta, binding as u16) {  binds[binding] = Some(layout); binding += 1; } else { return None; }; eff_textures.0 = Some(val.clone());
+        if let Some(val) = &effect_texture_samplers.textures.0 {
+            if let Some(layout) = val.key_bind(&meta, binding as u16) {  binds[binding] = Some(layout); binding += 1; } else { return None; };
         }
-        if let Some(val) = effect_textures.1 {
-            if let Some(layout) = val.key_bind(&meta, binding as u16) {  binds[binding] = Some(layout); binding += 1; } else { return None; }; eff_textures.1 = Some(val.clone());
+        if let Some(val) = &effect_texture_samplers.textures.1 {
+            if let Some(layout) = val.key_bind(&meta, binding as u16) {  binds[binding] = Some(layout); binding += 1; } else { return None; };
         }
-        if let Some(val) = effect_textures.2 {
-            if let Some(layout) = val.key_bind(&meta, binding as u16) {  binds[binding] = Some(layout); binding += 1; } else { return None; }; eff_textures.2 = Some(val.clone());
+        if let Some(val) = &effect_texture_samplers.textures.2 {
+            if let Some(layout) = val.key_bind(&meta, binding as u16) {  binds[binding] = Some(layout); binding += 1; } else { return None; };
         }
-        if let Some(val) = effect_textures.3 {
-            if let Some(layout) = val.key_bind(&meta, binding as u16) {  binds[binding] = Some(layout); binding += 1; } else { return None; }; eff_textures.3 = Some(val.clone());
+        if let Some(val) = &effect_texture_samplers.textures.3 {
+            if let Some(layout) = val.key_bind(&meta, binding as u16) {  binds[binding] = Some(layout); binding += 1; } else { return None; };
         }
-        if let Some(val) = effect_textures.4 {
-            if let Some(layout) = val.key_bind(&meta, binding as u16) {  binds[binding] = Some(layout); binding += 1; } else { return None; }; eff_textures.4 = Some(val.clone());
+        if let Some(val) = &effect_texture_samplers.textures.4 {
+            if let Some(layout) = val.key_bind(&meta, binding as u16) {  binds[binding] = Some(layout); binding += 1; } else { return None; };
         }
-        if let Some(val) = effect_textures.5 {
-            if let Some(layout) = val.key_bind(&meta, binding as u16) {  binds[binding] = Some(layout); binding += 1; } else { return None; }; eff_textures.5 = Some(val.clone());
+        if let Some(val) = &effect_texture_samplers.textures.5 {
+            if let Some(layout) = val.key_bind(&meta, binding as u16) {  binds[binding] = Some(layout); binding += 1; } else { return None; };
         }
         
-        if let Some(val) = effect_samplers.0 {
-            if let Some(layout) = val.key_bind(&meta, binding as u16) {  binds[binding] = Some(layout); binding += 1; } else { return None; }; eff_samplers.0 = Some(val.clone());
+        if let Some(val) = &effect_texture_samplers.samplers.0 {
+            if let Some(layout) = val.key_bind(&meta, binding as u16) {  binds[binding] = Some(layout); binding += 1; } else { return None; };
         }
-        if let Some(val) = effect_samplers.1 {
-            if let Some(layout) = val.key_bind(&meta, binding as u16) {  binds[binding] = Some(layout); binding += 1; } else { return None; }; eff_samplers.1 = Some(val.clone());
+        if let Some(val) = &effect_texture_samplers.samplers.1 {
+            if let Some(layout) = val.key_bind(&meta, binding as u16) {  binds[binding] = Some(layout); binding += 1; } else { return None; };
         }
-        if let Some(val) = effect_samplers.2 {
-            if let Some(layout) = val.key_bind(&meta, binding as u16) {  binds[binding] = Some(layout); binding += 1; } else { return None; }; eff_samplers.2 = Some(val.clone());
+        if let Some(val) = &effect_texture_samplers.samplers.2 {
+            if let Some(layout) = val.key_bind(&meta, binding as u16) {  binds[binding] = Some(layout); binding += 1; } else { return None; };
         }
-        if let Some(val) = effect_samplers.3 {
-            if let Some(layout) = val.key_bind(&meta, binding as u16) {  binds[binding] = Some(layout); binding += 1; } else { return None; }; eff_samplers.3 = Some(val.clone());
+        if let Some(val) = &effect_texture_samplers.samplers.3 {
+            if let Some(layout) = val.key_bind(&meta, binding as u16) {  binds[binding] = Some(layout); binding += 1; } else { return None; };
         }
-        if let Some(val) = effect_samplers.4 {
-            if let Some(layout) = val.key_bind(&meta, binding as u16) {  binds[binding] = Some(layout); binding += 1; } else { return None; }; eff_samplers.4 = Some(val.clone());
+        if let Some(val) = &effect_texture_samplers.samplers.4 {
+            if let Some(layout) = val.key_bind(&meta, binding as u16) {  binds[binding] = Some(layout); binding += 1; } else { return None; };
         }
-        if let Some(val) = effect_samplers.5 {
-            if let Some(layout) = val.key_bind(&meta, binding as u16) {  binds[binding] = Some(layout); binding += 1; } else { return None; }; eff_samplers.5 = Some(val.clone());
+        if let Some(val) = &effect_texture_samplers.samplers.5 {
+            if let Some(layout) = val.key_bind(&meta, binding as u16) {  binds[binding] = Some(layout); binding += 1; } else { return None; };
         }
 
+        if binding == 0 {
+            return None;
+        }
         if let Some(bind_group) = BindGroupUsage::create(device, binds, asset_mgr_bind_group_layout, asset_mgr_bind_group) {
             Some(
                 Self {
                     bind_group,
                     key,
                     meta,
-                    effect_textures: eff_textures,
-                    effect_samplers: eff_samplers,
+                    effect_texture_samplers,
                 }
             )
         } else {
@@ -130,41 +122,41 @@ impl TShaderSetBlock for BindGroupTextureSamplersUsage {
 
         let mut result = String::from("");
 
-        if let Some(val) = &self.bind_group.effect_textures.0 {
+        if let Some(val) = &self.bind_group.effect_texture_samplers.textures.0 {
             result += val.vs_define_code(&self.bind_group.meta, self.set, binding).as_str(); binding += 1;
         }
-        if let Some(val) = &self.bind_group.effect_textures.1 {
+        if let Some(val) = &self.bind_group.effect_texture_samplers.textures.1 {
             result += val.vs_define_code(&self.bind_group.meta, self.set, binding).as_str(); binding += 1;
         }
-        if let Some(val) = &self.bind_group.effect_textures.2 {
+        if let Some(val) = &self.bind_group.effect_texture_samplers.textures.2 {
             result += val.vs_define_code(&self.bind_group.meta, self.set, binding).as_str(); binding += 1;
         }
-        if let Some(val) = &self.bind_group.effect_textures.3 {
+        if let Some(val) = &self.bind_group.effect_texture_samplers.textures.3 {
             result += val.vs_define_code(&self.bind_group.meta, self.set, binding).as_str(); binding += 1;
         }
-        if let Some(val) = &self.bind_group.effect_textures.4 {
+        if let Some(val) = &self.bind_group.effect_texture_samplers.textures.4 {
             result += val.vs_define_code(&self.bind_group.meta, self.set, binding).as_str(); binding += 1;
         }
-        if let Some(val) = &self.bind_group.effect_textures.5 {
+        if let Some(val) = &self.bind_group.effect_texture_samplers.textures.5 {
             result += val.vs_define_code(&self.bind_group.meta, self.set, binding).as_str(); binding += 1;
         }
         
-        if let Some(val) = &self.bind_group.effect_samplers.0 {
+        if let Some(val) = &self.bind_group.effect_texture_samplers.samplers.0 {
             result += val.vs_define_code(&self.bind_group.meta, self.set, binding).as_str(); binding += 1;
         }
-        if let Some(val) = &self.bind_group.effect_samplers.1 {
+        if let Some(val) = &self.bind_group.effect_texture_samplers.samplers.1 {
             result += val.vs_define_code(&self.bind_group.meta, self.set, binding).as_str(); binding += 1;
         }
-        if let Some(val) = &self.bind_group.effect_samplers.2 {
+        if let Some(val) = &self.bind_group.effect_texture_samplers.samplers.2 {
             result += val.vs_define_code(&self.bind_group.meta, self.set, binding).as_str(); binding += 1;
         }
-        if let Some(val) = &self.bind_group.effect_samplers.3 {
+        if let Some(val) = &self.bind_group.effect_texture_samplers.samplers.3 {
             result += val.vs_define_code(&self.bind_group.meta, self.set, binding).as_str(); binding += 1;
         }
-        if let Some(val) = &self.bind_group.effect_samplers.4 {
+        if let Some(val) = &self.bind_group.effect_texture_samplers.samplers.4 {
             result += val.vs_define_code(&self.bind_group.meta, self.set, binding).as_str(); binding += 1;
         }
-        if let Some(val) = &self.bind_group.effect_samplers.5 {
+        if let Some(val) = &self.bind_group.effect_texture_samplers.samplers.5 {
             result += val.vs_define_code(&self.bind_group.meta, self.set, binding).as_str(); binding += 1;
         }
 
@@ -176,41 +168,41 @@ impl TShaderSetBlock for BindGroupTextureSamplersUsage {
 
         let mut result = String::from("");
 
-        if let Some(val) = &self.bind_group.effect_textures.0 {
+        if let Some(val) = &self.bind_group.effect_texture_samplers.textures.0 {
             result += val.fs_define_code(&self.bind_group.meta, self.set, binding).as_str(); binding += 1;
         }
-        if let Some(val) = &self.bind_group.effect_textures.1 {
+        if let Some(val) = &self.bind_group.effect_texture_samplers.textures.1 {
             result += val.fs_define_code(&self.bind_group.meta, self.set, binding).as_str(); binding += 1;
         }
-        if let Some(val) = &self.bind_group.effect_textures.2 {
+        if let Some(val) = &self.bind_group.effect_texture_samplers.textures.2 {
             result += val.fs_define_code(&self.bind_group.meta, self.set, binding).as_str(); binding += 1;
         }
-        if let Some(val) = &self.bind_group.effect_textures.3 {
+        if let Some(val) = &self.bind_group.effect_texture_samplers.textures.3 {
             result += val.fs_define_code(&self.bind_group.meta, self.set, binding).as_str(); binding += 1;
         }
-        if let Some(val) = &self.bind_group.effect_textures.4 {
+        if let Some(val) = &self.bind_group.effect_texture_samplers.textures.4 {
             result += val.fs_define_code(&self.bind_group.meta, self.set, binding).as_str(); binding += 1;
         }
-        if let Some(val) = &self.bind_group.effect_textures.5 {
+        if let Some(val) = &self.bind_group.effect_texture_samplers.textures.5 {
             result += val.fs_define_code(&self.bind_group.meta, self.set, binding).as_str(); binding += 1;
         }
         
-        if let Some(val) = &self.bind_group.effect_samplers.0 {
+        if let Some(val) = &self.bind_group.effect_texture_samplers.samplers.0 {
             result += val.fs_define_code(&self.bind_group.meta, self.set, binding).as_str(); binding += 1;
         }
-        if let Some(val) = &self.bind_group.effect_samplers.1 {
+        if let Some(val) = &self.bind_group.effect_texture_samplers.samplers.1 {
             result += val.fs_define_code(&self.bind_group.meta, self.set, binding).as_str(); binding += 1;
         }
-        if let Some(val) = &self.bind_group.effect_samplers.2 {
+        if let Some(val) = &self.bind_group.effect_texture_samplers.samplers.2 {
             result += val.fs_define_code(&self.bind_group.meta, self.set, binding).as_str(); binding += 1;
         }
-        if let Some(val) = &self.bind_group.effect_samplers.3 {
+        if let Some(val) = &self.bind_group.effect_texture_samplers.samplers.3 {
             result += val.fs_define_code(&self.bind_group.meta, self.set, binding).as_str(); binding += 1;
         }
-        if let Some(val) = &self.bind_group.effect_samplers.4 {
+        if let Some(val) = &self.bind_group.effect_texture_samplers.samplers.4 {
             result += val.fs_define_code(&self.bind_group.meta, self.set, binding).as_str(); binding += 1;
         }
-        if let Some(val) = &self.bind_group.effect_samplers.5 {
+        if let Some(val) = &self.bind_group.effect_texture_samplers.samplers.5 {
             result += val.fs_define_code(&self.bind_group.meta, self.set, binding).as_str(); binding += 1;
         }
 
