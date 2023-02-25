@@ -1,7 +1,8 @@
 use std::{num::NonZeroU64, sync::Arc};
 
-use pi_assets::asset::Handle;
-use render_core::rhi::device::RenderDevice;
+use pi_assets::{asset::Handle, mgr::AssetMgr};
+use pi_share::Share;
+use render_core::{rhi::device::RenderDevice, renderer::bind_buffer::{BindBufferRange, BindBufferAllocator, AssetBindBuffer}};
 use render_shader::{unifrom_code::{MaterialValueBindDesc, TBindDescToShaderCode}, shader::{TShaderBindCode, KeyShaderEffect, ShaderEffectMeta}};
 
 use crate::{bind_group::bind::TKeyBind, buffer::{dyn_mergy_buffer::{DynMergyBufferRange, DynMergyBufferAllocator}, EErrorBuffer}};
@@ -31,7 +32,7 @@ pub struct ShaderBindEffectValue {
     pub uint_begin: u32,
     pub key_meta: KeyShaderEffect,
     pub meta: Handle<ShaderEffectMeta>,
-    pub(crate) data: DynMergyBufferRange,
+    pub(crate) data: BindBufferRange,
 }
 impl ShaderBindEffectValue {
     pub const BIND: u32 = 0;
@@ -49,7 +50,8 @@ impl ShaderBindEffectValue {
         device: &RenderDevice,
         key_meta: KeyShaderEffect,
         meta: Handle<ShaderEffectMeta>,
-        allocator: &mut DynMergyBufferAllocator,
+        allocator: &mut BindBufferAllocator,
+        asset_mgr: &Share<AssetMgr<AssetBindBuffer>>,
     ) -> Result<Self, EErrorBuffer> {
         let uniforms = &meta.uniforms;
         let mat4_count      = uniforms.mat4_list.len() as u8;
@@ -95,8 +97,8 @@ impl ShaderBindEffectValue {
             total_size += 4 * Self::UINT_BYTES; // 4 个 占位u32; 对应MaterialValueBindDesc中也有处理
         }
 
-        match allocator.allocate(total_size as usize, device) {
-            Ok(data) => {
+        match allocator.allocate(total_size, asset_mgr) {
+            Some(data) => {
                 Ok(
                     Self {
                         total_size: total_size as usize,
@@ -122,7 +124,7 @@ impl ShaderBindEffectValue {
                     }
                 )
             },
-            Err(v) => Err(v),
+            None => Err(EErrorBuffer::AllocatorOverSize),
         }
     }
     
@@ -138,7 +140,7 @@ impl ShaderBindEffectValue {
         + Self::LABEL_MASK + &self.uint_count.to_string()
     }
 
-    pub fn data(&self) -> &DynMergyBufferRange {
+    pub fn data(&self) -> &BindBufferRange {
         &self.data
     }
 }
@@ -162,12 +164,12 @@ impl std::hash::Hash for ShaderBindEffectValue {
         // self.int_begin.hash(state);
         // self.uint_begin.hash(state);
         self.key_meta.hash(state);
-        self.data.hash(state);
+        self.data.id_buffer().hash(state);
     }
 }
 impl PartialEq for ShaderBindEffectValue {
     fn eq(&self, other: &Self) -> bool {
-        self.key_meta == other.key_meta && self.data == other.data
+        self.key_meta == other.key_meta && self.data.id_buffer() == other.data.id_buffer()
     }
 }
 impl Eq for ShaderBindEffectValue {
@@ -242,7 +244,7 @@ impl TRenderBindBufferData for BindUseEffectValue {
     }
 
     fn dyn_offset(&self) -> wgpu::DynamicOffset {
-        self.data.data.start() as wgpu::DynamicOffset
+        self.data.data.offset()
     }
 }
 

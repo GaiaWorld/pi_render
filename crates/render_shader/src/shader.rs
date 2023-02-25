@@ -2,7 +2,7 @@ use std::{sync::Arc};
 
 use pi_assets::asset::Asset;
 use pi_atom::Atom;
-use render_core::rhi::{device::RenderDevice, shader::ShaderMeta};
+use render_core::{rhi::{device::RenderDevice, shader::ShaderMeta}, renderer::{vertex_buffer::KeyShaderFromAttributes, shader::{KeyShaderMeta, Shader, TKeyShaderSetBlock, KeyShader, TShaderSetBlock}, instance::EInstanceCode}};
 
 use crate::{
     block_code::{BlockCode, BlockCodeAtom, TToBlockCodeAtom},
@@ -21,9 +21,8 @@ use crate::{
         vec_u8_to_f32_16, vec_u8_to_f32_4, vec_u8_to_f32_2, vec_u8_to_f32, vec_u8_to_u32, vec_u8_to_i32,
         EffectUniformTextureDescs
     },
-    instance_code::EInstanceCode,
-    shader_set::{KeyShaderModelAbout, KeyShaderSceneAbout},
-    attributes::{ShaderAttribute}, shader_defines::{KeyShaderDefines, ShaderDefinesSet}, buildin_data::EDefaultTexture
+    shader_defines::{KeyShaderDefines, ShaderDefinesSet},
+    buildin_data::EDefaultTexture
 };
 
 pub trait TShaderBindCode {
@@ -31,15 +30,53 @@ pub trait TShaderBindCode {
     fn fs_define_code(&self, set: u32) -> String;
 }
 
-pub trait TShaderSetCode {
+pub trait TShaderBlockCode {
     fn vs_define_code(&self) -> String;
     fn fs_define_code(&self) -> String;
     fn vs_running_code(&self) -> String;
     fn fs_running_code(&self) -> String;
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct KeyShaderEffect(pub Atom);
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum EKeyShader3DSet {
+    Scene(),
+    Model(),
+    TextureSampler(),
+}
+impl TKeyShaderSetBlock for EKeyShader3DSet {}
+
+pub type KeyShader3D = KeyShader<4, EKeyShader3DSet>;
+
+pub type Shader3D = Shader<4, EKeyShader3DSet>;
+
+impl TShaderBlockCode for KeyShaderFromAttributes {
+    fn vs_define_code(&self) -> String {
+        let mut result = String::from("");
+        self.0.iter().for_each(|attr| {
+            result += attr.define_code().as_str();
+        });
+
+        result
+    }
+
+    fn fs_define_code(&self) -> String {
+        String::from("")
+    }
+
+    fn vs_running_code(&self) -> String {
+        let mut result = String::from("");
+        self.0.iter().for_each(|attr| {
+            result += attr.running_code().as_str();
+        });
+
+        result
+    }
+
+    fn fs_running_code(&self) -> String {
+        String::from("")
+    }
+}
+
 
 /// 材质代码
 /// 
@@ -152,7 +189,7 @@ impl From<(ShaderMeta, Vec<Atom>, Vec<Atom>)> for ShaderEffectMeta {
     }
 }
 impl Asset for ShaderEffectMeta {
-    type Key = KeyShaderEffect;
+    type Key = KeyShaderMeta;
     fn size(&self) -> usize {
         self.size
     }
@@ -196,7 +233,7 @@ impl ShaderEffectMeta {
         + self.uniforms.int_list.len()
         + self.uniforms.uint_list.len()
     }
-    pub fn vs_blocks<T0: TShaderSetCode, T1: TShaderSetCode, T2: TShaderSetCode, T3: TShaderSetCode>(
+    pub fn vs_blocks<T0: TShaderSetBlock, T1: TShaderSetBlock, T2: TShaderSetBlock, T3: TShaderSetBlock>(
         &self,
         vertex_layouts: &KeyShaderFromAttributes,
         instance: &EInstanceCode,
@@ -276,9 +313,9 @@ impl ShaderEffectMeta {
             running: String::from("\r\n}\r\n"),
         });
 
-        ResShader::define_code(&result) + ResShader::running_code(&result).as_str()
+        Self::define_code(&result) + Self::running_code(&result).as_str()
     }
-    pub fn fs_blocks<T0: TShaderSetCode, T1: TShaderSetCode, T2: TShaderSetCode, T3: TShaderSetCode>(
+    pub fn fs_blocks<T0: TShaderSetBlock, T1: TShaderSetBlock, T2: TShaderSetBlock, T3: TShaderSetBlock>(
         &self,
         scene_about: &T0,
         model_about: &T1,
@@ -343,63 +380,13 @@ impl ShaderEffectMeta {
             running: String::from("\r\n}\r\n"),
         });
         
-        ResShader::define_code(&result) + ResShader::running_code(&result).as_str()
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct KeyShaderFromAttributes(pub Vec<ShaderAttribute>);
-impl TShaderSetCode for KeyShaderFromAttributes {
-    fn vs_define_code(&self) -> String {
-        let mut result = String::from("");
-        self.0.iter().for_each(|attr| {
-            result += attr.define_code().as_str();
-        });
-
-        result
+        Self::define_code(&result) + Self::running_code(&result).as_str()
     }
 
-    fn fs_define_code(&self) -> String {
-        String::from("")
-    }
-
-    fn vs_running_code(&self) -> String {
-        let mut result = String::from("");
-        self.0.iter().for_each(|attr| {
-            result += attr.running_code().as_str();
-        });
-
-        result
-    }
-
-    fn fs_running_code(&self) -> String {
-        String::from("")
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct KeyShaderFromEffect(pub KeyShaderEffect, pub KeyShaderSceneAbout, pub KeyShaderModelAbout);
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct KeyShader {
-    pub key_attributes: KeyShaderFromAttributes,
-    pub key_effect: KeyShaderFromEffect,
-    pub defines_key: u128,
-}
-
-#[derive(Debug)]
-pub struct ResShader {
-    pub vs: wgpu::ShaderModule,
-    pub vs_point: &'static str,
-    pub fs: wgpu::ShaderModule,
-    pub fs_point: &'static str,
-}
-impl ResShader {
-    pub fn build<T0: TShaderSetCode, T1: TShaderSetCode, T2: TShaderSetCode>(
+    pub fn build<T0: TShaderSetBlock, T1: TShaderSetBlock, T2: TShaderSetBlock>(
+        &self,
         device: &RenderDevice,
-        preshaderkey: &KeyShaderEffect,
-        preshader: &ShaderEffectMeta,
-        key_shader_defines: KeyShaderDefines,
+        key_meta: &KeyShaderMeta,
         key_attributes: &KeyShaderFromAttributes,
         instance: &EInstanceCode,
         set_0: &T0,
@@ -407,8 +394,9 @@ impl ResShader {
         // effect_value: &ShaderSetEffectValueAbout,
         set_2: Option<&T2>,
         set_3: Option<&T2>
-    ) -> Self {
-        let vs = preshader.vs_blocks(
+    ) -> Shader3D {
+
+        let vs = self.vs_blocks(
             key_attributes,
             instance,
             set_0,
@@ -417,7 +405,7 @@ impl ResShader {
             set_2,
             set_3
         );
-        let fs = preshader.fs_blocks(
+        let fs = self.fs_blocks(
             set_0,
             set_1,
             set_2,
@@ -434,7 +422,7 @@ impl ResShader {
         std::fs::write(root_dir.join(file_name), fs.as_str());
 
         let vs = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some((preshaderkey.0.to_string() + "-VS").as_str()),
+            label: Some((key_meta.to_string() + "-VS").as_str()),
             source: wgpu::ShaderSource::Glsl {
                 shader: std::borrow::Cow::Borrowed(vs.as_str()),
                 stage: naga::ShaderStage::Vertex,
@@ -443,7 +431,7 @@ impl ResShader {
         });
 
         let fs = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some((preshaderkey.0.to_string() + "-FS").as_str()),
+            label: Some((key_meta.to_string() + "-FS").as_str()),
             source: wgpu::ShaderSource::Glsl {
                 shader: std::borrow::Cow::Borrowed(fs.as_str()),
                 stage: naga::ShaderStage::Fragment,
@@ -451,9 +439,9 @@ impl ResShader {
             },
         });
 
-        Self { vs, vs_point: "main", fs, fs_point: "main" }
+        Shader3D { vs, vs_point: "main", fs, fs_point: "main", p: std::marker::PhantomData  }
     }
-
+    
     pub fn define_code(
         list: &Vec<BlockCode>,
     ) -> String {
@@ -476,19 +464,10 @@ impl ResShader {
     }
 }
 
-impl Asset for ResShader {
-    type Key = KeyShader;
-
-    fn size(&self) -> usize {
-        10 * 1024
-    }
-}
-
 #[cfg(test)]
 mod test {
-    use std::{ops::Range, sync::Arc};
-
     use pi_atom::Atom;
+    use render_core::renderer::{shader::TShaderSetBlock, attributes::{EVertexDataKind, ShaderAttribute}, instance::EInstanceCode};
 
     use crate::{
         unifrom_code::{
@@ -496,13 +475,9 @@ mod test {
         }, 
         shader::{ShaderEffectMeta, KeyShaderFromAttributes},
         varying_code::Varying,
-        instance_code::EInstanceCode,
-        attributes::{EVertexDataKind, ShaderAttribute},
         shader_defines::ShaderDefinesSet,
         buildin_data::EDefaultTexture
     };
-
-    use super::TShaderSetCode;
 
 
     pub struct Uni(pub UniformPropertyName);
@@ -513,7 +488,7 @@ mod test {
     }
 
     pub struct TestSet(pub String);
-    impl TShaderSetCode for TestSet {
+    impl TShaderSetBlock for TestSet {
         fn vs_define_code(&self) -> String {
             self.0.clone() + " vs_define_code \r\n"
         }

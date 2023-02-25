@@ -4,7 +4,7 @@ use pi_share::Share;
 use render_core::rhi::{device::RenderDevice, asset::TextureRes};
 use render_shader::{
     shader_set::{KeyShaderSceneAbout, KeyShaderModelAbout},
-    shader::{TShaderSetCode, TShaderBindCode},
+    shader::{TShaderBlockCode, TShaderBindCode},
     set_bind::ShaderSetBind,
     buildin_var::ShaderVarUniform, unifrom_code::{UniformSamplerDesc, UniformTextureDesc, EffectUniformTextureWithSamplerUseinfo}, skin_code::ESkinCode
 };
@@ -140,7 +140,7 @@ impl RenderBindGroupTextureSamplers {
         entries
     }
 }
-impl TShaderSetCode for RenderBindGroupTextureSamplers {
+impl TShaderBlockCode for RenderBindGroupTextureSamplers {
     fn vs_define_code(&self) -> String {
         let mut result = String::from("");
 

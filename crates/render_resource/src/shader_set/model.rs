@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use pi_assets::{asset::Handle, mgr::AssetMgr};
 use render_core::rhi::{device::RenderDevice, asset::TextureRes};
-use render_shader::{shader_set::KeyShaderModelAbout, unifrom_code::MaterialValueBindDesc, skin_code::ESkinCode, shader::{TShaderSetCode, TShaderBindCode}, set_bind::ShaderSetBind, buildin_var::ShaderVarUniform};
+use render_shader::{shader_set::KeyShaderModelAbout, unifrom_code::MaterialValueBindDesc, skin_code::ESkinCode, shader::{TShaderBlockCode, TShaderBindCode}, set_bind::ShaderSetBind, buildin_var::ShaderVarUniform};
 
 use crate::{shader_bind::{ShaderBindModelAboutMatrix, ShaderBindEffectValue, ShaderBindModelAboutSkinValue, TShaderBind, BindUseSkinValue, BindUseEffectValue, BindUseModelMatrix}, bind_group::{bind_group::{RenderBindGroup, KeyRenderBindgroup, AssetMgrRenderBindgroup, TBindGroup}, bind::{KeyBind, TKeyBind}}, sampler::AssetMgrSampler};
 
@@ -32,17 +32,17 @@ impl RenderBindGroupModel {
 
         let mut bind = 0;
         let bind_model_matrix = BindUseModelMatrix::new(bind, bind_model); bind += 1;
-        offsets.push(bind_model_matrix.data.data.start() as wgpu::DynamicOffset);
+        offsets.push(bind_model_matrix.data.data.offset() as wgpu::DynamicOffset);
         key_bindgroup.0.push(bind_model_matrix.key_bind());
 
         let bind_effect = BindUseEffectValue::new(bind, bind_effect.clone()); bind += 1;
-        offsets.push(bind_effect.data.data.start() as wgpu::DynamicOffset);
+        offsets.push(bind_effect.data.data.offset() as wgpu::DynamicOffset);
         key_bindgroup.0.push(bind_effect.key_bind());
 
         let bind_skin = match bind_skin {
             Some(bind_skin) => {
                 let result = BindUseSkinValue::new(bind, bind_skin); bind += 1;
-                offsets.push(result.data.data.start() as wgpu::DynamicOffset);
+                offsets.push(result.data.data.offset() as wgpu::DynamicOffset);
                 key_bindgroup.0.push(result.key_bind());
                 Some(result)
             },
@@ -92,7 +92,7 @@ impl RenderBindGroupModel {
         }
     }
 }
-impl TShaderSetCode for RenderBindGroupModel {
+impl TShaderBlockCode for RenderBindGroupModel {
     fn vs_define_code(&self) -> String {
         
         let mut result = String::from("");

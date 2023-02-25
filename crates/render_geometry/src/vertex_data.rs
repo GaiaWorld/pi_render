@@ -127,7 +127,7 @@ mod vertex_code_test {
     use std::hash::Hash;
 
     use render_data_container::KeyVertexBuffer;
-    use render_shader::shader::TShaderSetCode;
+    use render_shader::shader::TShaderBlockCode;
 
     use crate::vertex_buffer_desc::{VertexBufferDesc, EInstanceKind};
 

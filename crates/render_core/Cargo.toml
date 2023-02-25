@@ -55,7 +55,7 @@ once_cell = "1.4" # TODO: replace once_cell with std equivalent if/when this lan
 regex = "1.5"
 thiserror = "1.0"
 pi_slab = "0.1"
-wgpu = { version = "0.13", features = ["spirv"] }
+wgpu = { version = "0.13", features = ["spirv", "glsl"] }
 derive-deref-rs = "0.1"
 pi_any = "0.1"
 # pi_res_loader = {  git = "https://github.com/GaiaWorld/pi_res_loader.git" }
@@ -80,3 +80,9 @@ parking_lot = "0.11"
 [dev-dependencies]
 bytemuck = { version = "1.4", features = ["derive"] }
 render_derive={path="../render_derive"}
+env_logger = "0.9"
+
+
+[[example]]
+name = "shader3d"
+path = "examples/shader3d.rs"

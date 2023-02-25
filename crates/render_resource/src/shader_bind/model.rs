@@ -1,6 +1,8 @@
 use std::{num::NonZeroU64, sync::Arc};
 
-use render_core::rhi::device::RenderDevice;
+use pi_assets::mgr::AssetMgr;
+use pi_share::Share;
+use render_core::{rhi::device::RenderDevice, renderer::bind_buffer::{BindBufferRange, BindBufferAllocator, AssetBindBuffer}};
 use render_shader::{skin_code::ESkinCode, set_bind::ShaderSetBind, buildin_var::ShaderVarUniform, shader::TShaderBindCode};
 
 use crate::{buffer::dyn_mergy_buffer::{DynMergyBufferRange, DynMergyBufferAllocator}, bind_group::bind::TKeyBind};
@@ -10,17 +12,21 @@ use super::{TShaderBind, TRenderBindBufferData};
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct ShaderBindModelAboutMatrix {
-    pub(crate) data: DynMergyBufferRange,
+    pub(crate) data: BindBufferRange,
 }
 impl ShaderBindModelAboutMatrix {
 
-    pub const OFFSET_WORLD_MATRIX:          wgpu::BufferAddress = 0;
-    pub const OFFSET_WORLD_MATRIX_INV:      wgpu::BufferAddress = 16 * 4;
+    pub const OFFSET_WORLD_MATRIX:          wgpu::DynamicOffset = 0;
+    pub const OFFSET_WORLD_MATRIX_INV:      wgpu::DynamicOffset = 16 * 4;
 
-    pub const TOTAL_SIZE:                   wgpu::BufferAddress = 16 * 4 + 16 * 4;
+    pub const TOTAL_SIZE:                   wgpu::DynamicOffset = 16 * 4 + 16 * 4;
 
-    pub fn new(device: &RenderDevice, allocator: &mut DynMergyBufferAllocator) -> Option<Self> {
-        if let Ok(range) = allocator.allocate(ShaderBindModelAboutMatrix::TOTAL_SIZE as usize, &device) {
+    pub fn new(
+        device: &RenderDevice,
+        allocator: &mut BindBufferAllocator,
+        asset_mgr: &Share<AssetMgr<AssetBindBuffer>>,
+    ) -> Option<Self> {
+        if let Some(range) = allocator.allocate(ShaderBindModelAboutMatrix::TOTAL_SIZE, asset_mgr) {
             Some(
                 Self { data: range }
             )
@@ -28,7 +34,7 @@ impl ShaderBindModelAboutMatrix {
             None
         }
     }
-    pub fn data(&self) -> &DynMergyBufferRange {
+    pub fn data(&self) -> &BindBufferRange {
         &self.data
     }
 }
@@ -68,7 +74,7 @@ impl TShaderBind for BindUseModelMatrix {
             wgpu::BindGroupLayoutEntry {
                 binding: self.bind,
                 visibility: wgpu::ShaderStages ::VERTEX,
-                ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: true, min_binding_size: NonZeroU64::new(ShaderBindModelAboutMatrix::TOTAL_SIZE) },
+                ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: true, min_binding_size: NonZeroU64::new(ShaderBindModelAboutMatrix::TOTAL_SIZE as wgpu::BufferAddress) },
                 count: None,
             }
         );
@@ -86,7 +92,7 @@ impl TKeyBind for BindUseModelMatrix {
                 entry: wgpu::BindGroupLayoutEntry {
                     binding: self.bind,
                     visibility: wgpu::ShaderStages ::VERTEX,
-                    ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: true, min_binding_size: NonZeroU64::new(ShaderBindModelAboutMatrix::TOTAL_SIZE) },
+                    ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: true, min_binding_size: NonZeroU64::new(ShaderBindModelAboutMatrix::TOTAL_SIZE as wgpu::BufferAddress) },
                     count: None,
                 },
             }
@@ -99,7 +105,7 @@ impl TRenderBindBufferData for BindUseModelMatrix {
     }
 
     fn dyn_offset(&self) -> wgpu::DynamicOffset {
-        self.data.data.start() as wgpu::DynamicOffset
+        self.data.data.offset()
     }
 }
 
@@ -107,7 +113,7 @@ impl TRenderBindBufferData for BindUseModelMatrix {
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct ShaderBindModelAboutSkinValue {
     pub(crate) skin: ESkinCode,
-    pub(crate) data: DynMergyBufferRange,
+    pub(crate) data: BindBufferRange,
 }
 impl ShaderBindModelAboutSkinValue {
 
@@ -117,8 +123,9 @@ impl ShaderBindModelAboutSkinValue {
 
     pub fn new(
         skin: &ESkinCode,
-        dynbuffer: &mut DynMergyBufferAllocator,
         device: &RenderDevice,
+        allocator: &mut BindBufferAllocator,
+        asset_mgr: &Share<AssetMgr<AssetBindBuffer>>,
     ) -> Option<Self> {
         let size = match skin {
             ESkinCode::None => 0,
@@ -128,7 +135,7 @@ impl ShaderBindModelAboutSkinValue {
         };
 
         if size > 0 {
-            if let Ok(buffer) = dynbuffer.allocate(size, device) {
+            if let Some(buffer) = allocator.allocate(size as u32, asset_mgr) {
                 Some(Self {
                     skin: skin.clone(),
                     data: buffer,
@@ -140,7 +147,7 @@ impl ShaderBindModelAboutSkinValue {
             None
         }
     }
-    pub fn data(&self) -> &DynMergyBufferRange {
+    pub fn data(&self) -> &BindBufferRange {
         &self.data
     }
 }
@@ -300,6 +307,6 @@ impl TRenderBindBufferData for BindUseSkinValue {
     }
 
     fn dyn_offset(&self) -> wgpu::DynamicOffset {
-        self.data.data.start() as wgpu::DynamicOffset
+        self.data.data.offset() as wgpu::DynamicOffset
     }
 }

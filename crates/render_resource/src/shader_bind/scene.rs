@@ -1,5 +1,8 @@
 use std::{num::NonZeroU64, sync::Arc};
 
+use pi_assets::mgr::AssetMgr;
+use pi_share::Share;
+use render_core::renderer::bind_buffer::{BindBufferAllocator, AssetBindBuffer, BindBufferRange};
 use render_shader::{set_bind::ShaderSetBind, buildin_var::ShaderVarUniform, shader::TShaderBindCode};
 
 use crate::{buffer::dyn_mergy_buffer::DynMergyBufferRange, bind_group::bind::TKeyBind};
@@ -9,21 +12,28 @@ use super::{TShaderBind, TRenderBindBufferData};
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct ShaderBindSceneAboutCamera {
-    pub(crate) data: DynMergyBufferRange,
+    pub(crate) data: BindBufferRange,
 }
 impl ShaderBindSceneAboutCamera {
 
-    pub const OFFSET_VIEW_MATRIX:           wgpu::BufferAddress = 0;
-    pub const OFFSET_PROJECT_MATRIX:        wgpu::BufferAddress = 16 * 4;
-    pub const OFFSET_VIEW_PROJECT_MATRIX:   wgpu::BufferAddress = 16 * 4 + 16 * 4;
-    pub const OFFSET_CAMERA_POSITION:       wgpu::BufferAddress = 16 * 4 + 16 * 4 + 16 * 4;
-    pub const OFFSET_CAMERA_DIRECTION:      wgpu::BufferAddress = 16 * 4 + 16 * 4 + 16 * 4 + 4 * 4;
+    pub const OFFSET_VIEW_MATRIX:           wgpu::DynamicOffset = 0;
+    pub const OFFSET_PROJECT_MATRIX:        wgpu::DynamicOffset = 16 * 4;
+    pub const OFFSET_VIEW_PROJECT_MATRIX:   wgpu::DynamicOffset = 16 * 4 + 16 * 4;
+    pub const OFFSET_CAMERA_POSITION:       wgpu::DynamicOffset = 16 * 4 + 16 * 4 + 16 * 4;
+    pub const OFFSET_CAMERA_DIRECTION:      wgpu::DynamicOffset = 16 * 4 + 16 * 4 + 16 * 4 + 4 * 4;
     
-    pub const TOTAL_SIZE:                   wgpu::BufferAddress = 16 * 4 + 16 * 4 + 16 * 4 + 4 * 4 + 4 * 4;
-    pub fn new(data: DynMergyBufferRange) -> Self {
-        Self { data }
+    pub const TOTAL_SIZE:                   wgpu::DynamicOffset = 16 * 4 + 16 * 4 + 16 * 4 + 4 * 4 + 4 * 4;
+    pub fn new(
+        allocator: &mut BindBufferAllocator,
+        asset_mgr: &Share<AssetMgr<AssetBindBuffer>>,
+    ) -> Option<Self> {
+        if let Some(data) = allocator.allocate(Self::TOTAL_SIZE, asset_mgr) {
+            Some(Self { data })
+        } else {
+            None
+        }
     }
-    pub fn data(&self) -> &DynMergyBufferRange {
+    pub fn data(&self) -> &BindBufferRange {
         &self.data
     }
 }
@@ -61,7 +71,7 @@ impl TShaderBind for BindUseSceneAboutCamera {
             wgpu::BindGroupLayoutEntry {
                 binding: self.bind,
                 visibility: wgpu::ShaderStages ::VERTEX_FRAGMENT,
-                ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: true, min_binding_size: NonZeroU64::new(ShaderBindSceneAboutCamera::TOTAL_SIZE) },
+                ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: true, min_binding_size: NonZeroU64::new(ShaderBindSceneAboutCamera::TOTAL_SIZE as wgpu::BufferAddress) },
                 count: None,
             }
         )
@@ -79,7 +89,7 @@ impl TKeyBind for BindUseSceneAboutCamera {
                 entry: wgpu::BindGroupLayoutEntry {
                     binding: self.bind,
                     visibility: wgpu::ShaderStages ::VERTEX,
-                    ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: true, min_binding_size: NonZeroU64::new(ShaderBindSceneAboutCamera::TOTAL_SIZE) },
+                    ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: true, min_binding_size: NonZeroU64::new(ShaderBindSceneAboutCamera::TOTAL_SIZE as wgpu::BufferAddress) },
                     count: None,
                 },
             }
@@ -92,24 +102,31 @@ impl TRenderBindBufferData for BindUseSceneAboutCamera {
     }
 
     fn dyn_offset(&self) -> wgpu::DynamicOffset {
-        self.data.data.start() as wgpu::DynamicOffset
+        self.data.data.offset() as wgpu::DynamicOffset
     }
 }
 
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct ShaderBindSceneAboutTime {
-    pub(crate) data: DynMergyBufferRange,
+    pub(crate) data: BindBufferRange,
 }
 impl ShaderBindSceneAboutTime {
 
-    pub const OFFSET_TIME:                  wgpu::BufferAddress = 0;
-    pub const OFFSET_DELTA_TIME:            wgpu::BufferAddress = 4 * 4;
+    pub const OFFSET_TIME:                  wgpu::DynamicOffset = 0;
+    pub const OFFSET_DELTA_TIME:            wgpu::DynamicOffset = 4 * 4;
 
-    pub const TOTAL_SIZE:                   wgpu::BufferAddress = 4 * 4 + 4 * 4;
+    pub const TOTAL_SIZE:                   wgpu::DynamicOffset = 4 * 4 + 4 * 4;
 
-    pub fn new(data: DynMergyBufferRange) -> Self {
-        Self { data }
+    pub fn new(
+        allocator: &mut BindBufferAllocator,
+        asset_mgr: &Share<AssetMgr<AssetBindBuffer>>,
+    ) -> Option<Self> {
+        if let Some(data) = allocator.allocate(Self::TOTAL_SIZE, asset_mgr) {
+            Some(Self { data })
+        } else {
+            None
+        }
     }
 }
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -142,7 +159,7 @@ impl TShaderBind for BindUseSceneAboutTime {
             wgpu::BindGroupLayoutEntry {
                 binding: self.bind,
                 visibility: wgpu::ShaderStages ::VERTEX_FRAGMENT,
-                ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: true, min_binding_size: NonZeroU64::new(ShaderBindSceneAboutTime::TOTAL_SIZE) },
+                ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: true, min_binding_size: NonZeroU64::new(ShaderBindSceneAboutTime::TOTAL_SIZE as wgpu::BufferAddress) },
                 count: None,
             }
         );
@@ -160,7 +177,7 @@ impl TKeyBind for BindUseSceneAboutTime {
                 entry: wgpu::BindGroupLayoutEntry {
                     binding: self.bind,
                     visibility: wgpu::ShaderStages ::VERTEX,
-                    ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: true, min_binding_size: NonZeroU64::new(ShaderBindSceneAboutTime::TOTAL_SIZE) },
+                    ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: true, min_binding_size: NonZeroU64::new(ShaderBindSceneAboutTime::TOTAL_SIZE as wgpu::BufferAddress) },
                     count: None,
                 },
             }
@@ -173,22 +190,29 @@ impl TRenderBindBufferData for BindUseSceneAboutTime {
     }
 
     fn dyn_offset(&self) -> wgpu::DynamicOffset {
-        self.data.data.start() as wgpu::DynamicOffset
+        self.data.data.offset() as wgpu::DynamicOffset
     }
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct ShaderBindSceneAboutFog {
-    pub(crate) data: DynMergyBufferRange,
+    pub(crate) data: BindBufferRange,
 }
 impl ShaderBindSceneAboutFog {
 
-    pub const OFFSET_FOG_INFO:              wgpu::BufferAddress = 0;
-    pub const OFFSET_FOG_PARAM:             wgpu::BufferAddress = 4 * 4;
+    pub const OFFSET_FOG_INFO:              wgpu::DynamicOffset = 0;
+    pub const OFFSET_FOG_PARAM:             wgpu::DynamicOffset = 4 * 4;
 
-    pub const TOTAL_SIZE:                   wgpu::BufferAddress = 4 * 4 + 4 * 4;
-    pub fn new(data: DynMergyBufferRange) -> Self {
-        Self { data }
+    pub const TOTAL_SIZE:                   wgpu::DynamicOffset = 4 * 4 + 4 * 4;
+    pub fn new(
+        allocator: &mut BindBufferAllocator,
+        asset_mgr: &Share<AssetMgr<AssetBindBuffer>>,
+    ) -> Option<Self> {
+        if let Some(data) = allocator.allocate(Self::TOTAL_SIZE, asset_mgr) {
+            Some(Self { data })
+        } else {
+            None
+        }
     }
 }
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -222,7 +246,7 @@ impl TShaderBind for BindUseSceneAboutFog {
             wgpu::BindGroupLayoutEntry {
                 binding: self.bind,
                 visibility: wgpu::ShaderStages ::VERTEX_FRAGMENT,
-                ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: true, min_binding_size: NonZeroU64::new(ShaderBindSceneAboutFog::TOTAL_SIZE) },
+                ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: true, min_binding_size: NonZeroU64::new(ShaderBindSceneAboutFog::TOTAL_SIZE as wgpu::BufferAddress) },
                 count: None,
             }
         );
@@ -240,7 +264,7 @@ impl TKeyBind for BindUseSceneAboutFog {
                 entry: wgpu::BindGroupLayoutEntry {
                     binding: self.bind,
                     visibility: wgpu::ShaderStages ::VERTEX,
-                    ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: true, min_binding_size: NonZeroU64::new(ShaderBindSceneAboutFog::TOTAL_SIZE) },
+                    ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: true, min_binding_size: NonZeroU64::new(ShaderBindSceneAboutFog::TOTAL_SIZE as wgpu::BufferAddress) },
                     count: None,
                 },
             }
@@ -253,7 +277,7 @@ impl TRenderBindBufferData for BindUseSceneAboutFog {
     }
 
     fn dyn_offset(&self) -> wgpu::DynamicOffset {
-        self.data.data.start() as wgpu::DynamicOffset
+        self.data.data.offset() as wgpu::DynamicOffset
     }
 }
 
@@ -261,15 +285,22 @@ impl TRenderBindBufferData for BindUseSceneAboutFog {
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct ShaderBindSceneAboutAmbient {
-    pub(crate) data: DynMergyBufferRange,
+    pub(crate) data: BindBufferRange,
 }
 impl ShaderBindSceneAboutAmbient {
 
-    pub const OFFSET_AMBIENT:               wgpu::BufferAddress = 0;
-    pub const TOTAL_SIZE:                   wgpu::BufferAddress = 4 * 4;
+    pub const OFFSET_AMBIENT:               wgpu::DynamicOffset = 0;
+    pub const TOTAL_SIZE:                   wgpu::DynamicOffset = 4 * 4;
 
-    pub fn new(data: DynMergyBufferRange) -> Self {
-        Self { data }
+    pub fn new(
+        allocator: &mut BindBufferAllocator,
+        asset_mgr: &Share<AssetMgr<AssetBindBuffer>>,
+    ) -> Option<Self> {
+        if let Some(data) = allocator.allocate(Self::TOTAL_SIZE, asset_mgr) {
+            Some(Self { data })
+        } else {
+            None
+        }
     }
 }
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -302,7 +333,7 @@ impl TShaderBind for BindUseSceneAboutAmbient {
             wgpu::BindGroupLayoutEntry {
                 binding: self.bind,
                 visibility: wgpu::ShaderStages ::VERTEX_FRAGMENT,
-                ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: true, min_binding_size: NonZeroU64::new(ShaderBindSceneAboutAmbient::TOTAL_SIZE) },
+                ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: true, min_binding_size: NonZeroU64::new(ShaderBindSceneAboutAmbient::TOTAL_SIZE as wgpu::BufferAddress) },
                 count: None,
             }
         );
@@ -320,7 +351,7 @@ impl TKeyBind for BindUseSceneAboutAmbient {
                 entry: wgpu::BindGroupLayoutEntry {
                     binding: self.bind,
                     visibility: wgpu::ShaderStages ::VERTEX,
-                    ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: true, min_binding_size: NonZeroU64::new(ShaderBindSceneAboutAmbient::TOTAL_SIZE) },
+                    ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: true, min_binding_size: NonZeroU64::new(ShaderBindSceneAboutAmbient::TOTAL_SIZE as wgpu::BufferAddress) },
                     count: None,
                 },
             }
@@ -333,36 +364,43 @@ impl TRenderBindBufferData for BindUseSceneAboutAmbient {
     }
 
     fn dyn_offset(&self) -> wgpu::DynamicOffset {
-        self.data.data.start() as wgpu::DynamicOffset
+        self.data.data.offset() as wgpu::DynamicOffset
     }
 }
 
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct ShaderBindSceneAboutEffect {
-    pub(crate) data: DynMergyBufferRange,
+    pub(crate) data: BindBufferRange,
 }
 impl ShaderBindSceneAboutEffect {
 
-    pub const OFFSET_TIME:                  wgpu::BufferAddress = 0;
-    pub const SIZE_TIME:                    wgpu::BufferAddress = 4 * 4;
-    pub const OFFSET_DELTA_TIME:            wgpu::BufferAddress = Self::OFFSET_TIME + Self::SIZE_TIME;
-    pub const SIZE_DELTA_TIME:              wgpu::BufferAddress = 4 * 4;
+    pub const OFFSET_TIME:                  wgpu::DynamicOffset = 0;
+    pub const SIZE_TIME:                    wgpu::DynamicOffset = 4 * 4;
+    pub const OFFSET_DELTA_TIME:            wgpu::DynamicOffset = Self::OFFSET_TIME + Self::SIZE_TIME;
+    pub const SIZE_DELTA_TIME:              wgpu::DynamicOffset = 4 * 4;
 
-    pub const OFFSET_FOG_INFO:              wgpu::BufferAddress = Self::OFFSET_DELTA_TIME + Self::SIZE_DELTA_TIME;
-    pub const SIZE_FOG_INFO:                wgpu::BufferAddress = 4 * 4;
-    pub const OFFSET_FOG_PARAM:             wgpu::BufferAddress = Self::OFFSET_FOG_INFO + Self::SIZE_FOG_INFO;
-    pub const SIZE_FOG_PARAM:               wgpu::BufferAddress = 4 * 4;
+    pub const OFFSET_FOG_INFO:              wgpu::DynamicOffset = Self::OFFSET_DELTA_TIME + Self::SIZE_DELTA_TIME;
+    pub const SIZE_FOG_INFO:                wgpu::DynamicOffset = 4 * 4;
+    pub const OFFSET_FOG_PARAM:             wgpu::DynamicOffset = Self::OFFSET_FOG_INFO + Self::SIZE_FOG_INFO;
+    pub const SIZE_FOG_PARAM:               wgpu::DynamicOffset = 4 * 4;
 
-    pub const OFFSET_AMBIENT:               wgpu::BufferAddress = Self::OFFSET_FOG_PARAM + Self::SIZE_FOG_PARAM;
-    pub const SIZE_AMBIENT:                 wgpu::BufferAddress = 4 * 4;
+    pub const OFFSET_AMBIENT:               wgpu::DynamicOffset = Self::OFFSET_FOG_PARAM + Self::SIZE_FOG_PARAM;
+    pub const SIZE_AMBIENT:                 wgpu::DynamicOffset = 4 * 4;
 
-    pub const TOTAL_SIZE:                   wgpu::BufferAddress = Self::OFFSET_AMBIENT + Self::SIZE_AMBIENT;
+    pub const TOTAL_SIZE:                   wgpu::DynamicOffset = Self::OFFSET_AMBIENT + Self::SIZE_AMBIENT;
 
-    pub fn new(data: DynMergyBufferRange) -> Self {
-        Self { data }
+    pub fn new(
+        allocator: &mut BindBufferAllocator,
+        asset_mgr: &Share<AssetMgr<AssetBindBuffer>>,
+    ) -> Option<Self> {
+        if let Some(data) = allocator.allocate(Self::TOTAL_SIZE, asset_mgr) {
+            Some(Self { data })
+        } else {
+            None
+        }
     }
-    pub fn data(&self) -> &DynMergyBufferRange {
+    pub fn data(&self) -> &BindBufferRange {
         &self.data
     }
 }
@@ -400,7 +438,7 @@ impl TShaderBind for BindUseSceneAboutEffect {
             wgpu::BindGroupLayoutEntry {
                 binding: self.bind,
                 visibility: wgpu::ShaderStages ::VERTEX_FRAGMENT,
-                ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: true, min_binding_size: NonZeroU64::new(ShaderBindSceneAboutEffect::TOTAL_SIZE) },
+                ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: true, min_binding_size: NonZeroU64::new(ShaderBindSceneAboutEffect::TOTAL_SIZE as wgpu::BufferAddress) },
                 count: None,
             }
         );
@@ -418,7 +456,7 @@ impl TKeyBind for BindUseSceneAboutEffect {
                 entry: wgpu::BindGroupLayoutEntry {
                     binding: self.bind,
                     visibility: wgpu::ShaderStages ::VERTEX,
-                    ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: true, min_binding_size: NonZeroU64::new(ShaderBindSceneAboutEffect::TOTAL_SIZE) },
+                    ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: true, min_binding_size: NonZeroU64::new(ShaderBindSceneAboutEffect::TOTAL_SIZE as wgpu::BufferAddress) },
                     count: None,
                 },
             }
@@ -431,6 +469,6 @@ impl TRenderBindBufferData for BindUseSceneAboutEffect {
     }
 
     fn dyn_offset(&self) -> wgpu::DynamicOffset {
-        self.data.data.start() as wgpu::DynamicOffset
+        self.data.data.offset() as wgpu::DynamicOffset
     }
 }

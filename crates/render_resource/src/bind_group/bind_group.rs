@@ -31,7 +31,7 @@ pub type AssetMgrRenderBindgroup = AssetMgr<RenderBindGroup>;
 
 #[derive(Clone)]
 pub enum TempBindData {
-    Buffer(u32, Buffer, usize),
+    Buffer(u32, Buffer, u32),
     Texture(u32, Handle<TextureRes>),
     Sampler(u32, Handle<AssetSampler>),
 }

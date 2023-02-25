@@ -6,14 +6,8 @@ use pi_async::rt::serial::AsyncRuntime;
 use pi_atom::Atom;
 
 use pi_share::{Share, ShareRwLock};
-use render_core::rhi::{device::RenderDevice, initialize_renderer, options::RenderOptions, RenderQueue, asset::TextureRes, shader::ShaderMeta};
-use render_shader::{
-    unifrom_code::{UniformPropertyMat4, UniformPropertyVec4, EffectUniformTextureDescs, MaterialValueBindDesc, UniformTextureDesc},
-    buildin_data::{EDefaultTexture, DefaultTexture}, skin_code::ESkinCode, shader::{TShaderSetCode, ShaderEffectMeta, ResShader, KeyShaderEffect, KeyShaderFromAttributes}, shader_set::{KeyShaderModelAbout, KeyShaderSceneAbout}, varying_code::{Varyings, Varying}, block_code::BlockCodeAtom, shader_defines::{ShaderDefinesSet, KeyShaderDefines}, instance_code::EInstanceCode, attributes::{ShaderAttribute, EVertexDataKind}
-};
+use render_core::{rhi::{device::RenderDevice, initialize_renderer, options::RenderOptions, RenderQueue, asset::TextureRes, shader::ShaderMeta}, renderer::{bind_buffer::BindBufferAllocator, sampler::SamplerRes, buildin_data::{DefaultTexture, EDefaultTexture}, bind_group::{BindGroupLayout, BindGroup}, attributes::{ShaderAttribute, EVertexDataKind, KeyShaderFromAttributes}, shader_stage::EShaderStage}, render_3d::{shader::{shader_effect_meta::ShaderEffectMeta, uniform_texture::UniformTexture2DDesc, uniform_value::{UniformPropertyMat4, UniformPropertyVec4, MaterialValueBindDesc}, varying_code::{Varyings, Varying}, block_code::BlockCodeAtom, shader_defines::ShaderDefinesSet, shader::Shader3D, instance_code::EInstanceCode}, bind_groups::{texture_sampler::{BindGroupTextureSamplers, BindGroupTextureSamplersUsage}, model::{BindGroupModel, BindGroupModelUsage}, scene::{BindGroupScene, BindGroupSceneUsage}}, binds::{model::base::ShaderBindModelAboutMatrix, effect_value::ShaderBindEffectValue, scene::{base::ShaderBindSceneAboutBase, effect::ShaderBindSceneAboutEffect}, effect_texture2d::EffectBindTexture2D01}}};
 use wgpu::{Device, Instance};
-
-use render_resource::{shader_set::{RenderBindGroupModel, RenderBindGroupTextureSamplers, RenderBindGroupScene}, shader_bind::{ShaderBindModelAboutMatrix, ShaderBindEffectValue, EffectTextureAndSamplerBinds, ShaderBindSceneAboutCamera, ShaderBindSceneAboutTime, ShaderBindSceneAboutFog, ShaderBindSceneAboutEffect}, buffer::dyn_mergy_buffer::DynMergyBufferAllocator, base::TMemoryAllocatorLimit, sampler::AssetSampler, bind_group::bind_group::RenderBindGroup};
 
 pub fn setup_render_context(
     options: RenderOptions,
@@ -70,12 +64,12 @@ pub fn setup_render_context(
     }
 }
 
-pub struct BufferLimit;
-impl TMemoryAllocatorLimit for BufferLimit {
-    fn max_size(&self) -> u64 {
-        1 * 1024 * 1024 * 1024
-    }
-}
+// pub struct BufferLimit;
+// impl TMemoryAllocatorLimit for BufferLimit {
+//     fn max_size(&self) -> u64 {
+//         1 * 1024 * 1024 * 1024
+//     }
+// }
 
 
 pub(crate) fn main() {
@@ -98,11 +92,13 @@ pub(crate) fn main() {
     );
     
 
-    let mut allocator = DynMergyBufferAllocator::new(&BufferLimit, 1 * 1024 * 1024);
+    // let mut bind_buffer_allocator = DynMergyBufferAllocator::new(&BufferLimit, 1 * 1024 * 1024);
+    let mut bind_buffer_allocator = BindBufferAllocator::new(&device);
     let mut asset_shader_meta: Share<AssetMgr<ShaderEffectMeta>> = AssetMgr::<ShaderEffectMeta>::new(GarbageEmpty(), false, 60 * 1024 * 1024, 1000);
     let mut asset_tex: Share<AssetMgr<TextureRes>> = AssetMgr::<TextureRes>::new(GarbageEmpty(), false, 60 * 1024 * 1024, 1000);
-    let mut asset_sampler: Share<AssetMgr<AssetSampler>> = AssetMgr::<AssetSampler>::new(GarbageEmpty(), false, 60 * 1024 * 1024, 1000);
-    let mut asset_bindgroup: Share<AssetMgr<RenderBindGroup>> = AssetMgr::<RenderBindGroup>::new(GarbageEmpty(), false, 60 * 1024 * 1024, 1000);
+    let mut asset_sampler: Share<AssetMgr<SamplerRes>> = AssetMgr::<SamplerRes>::new(GarbageEmpty(), false, 60 * 1024 * 1024, 1000);
+    let mut asset_bind_group: Share<AssetMgr<BindGroup>> = AssetMgr::<BindGroup>::new(GarbageEmpty(), false, 60 * 1024 * 1024, 1000);
+    let mut asset_bind_group_layout: Share<AssetMgr<BindGroupLayout>> = AssetMgr::<BindGroupLayout>::new(GarbageEmpty(), false, 60 * 1024 * 1024, 1000);
 
     let white = DefaultTexture::create(&device, &queue, EDefaultTexture::White, wgpu::TextureDimension::D2);
     let texture = white.create_view(&wgpu::TextureViewDescriptor {
@@ -118,28 +114,25 @@ pub(crate) fn main() {
     asset_tex.insert(Atom::from(DefaultTexture::WHITE_2D).get_hash() as u64, TextureRes::new(1, 1, 4, texture, true));
 
     let textures = vec![
-        UniformTextureDesc::new(
+        UniformTexture2DDesc::new(
             Atom::from("_EmissiveTex"), 
             wgpu::TextureSampleType::Float { filterable: true}, 
-            wgpu::TextureViewDimension::D2, 
             false, 
-            wgpu::ShaderStages::FRAGMENT,
+            EShaderStage::FRAGMENT,
             EDefaultTexture::White,
         ),
-        UniformTextureDesc::new(
+        UniformTexture2DDesc::new(
             Atom::from("_MainTex"), 
             wgpu::TextureSampleType::Float { filterable: true}, 
-            wgpu::TextureViewDimension::D2, 
             false, 
-            wgpu::ShaderStages::FRAGMENT,
+            EShaderStage::FRAGMENT,
             EDefaultTexture::White,
         ),
-        UniformTextureDesc::new(
+        UniformTexture2DDesc::new(
             Atom::from("_BoneTex"), 
             wgpu::TextureSampleType::Float { filterable: true}, 
-            wgpu::TextureViewDimension::D2, 
             false, 
-            wgpu::ShaderStages::VERTEX_FRAGMENT,
+            EShaderStage::VERTEXFRAGMENT,
             EDefaultTexture::White,
         ),
     ];
@@ -157,7 +150,7 @@ pub(crate) fn main() {
     let shader_meta = ShaderEffectMeta::new(
         valuedesc,
         textures,
-        render_shader::varying_code::Varyings(
+        Varyings(
             vec![
                 Varying { 
                     format: Atom::from("vec3"),
@@ -169,7 +162,7 @@ pub(crate) fn main() {
                 },
             ]
         ),
-        render_shader::block_code::BlockCodeAtom { 
+        BlockCodeAtom { 
             define: Atom::from(""), 
             running: Atom::from("
 vec3 position = A_POSITION;
@@ -189,7 +182,7 @@ mat3 normalWorld = mat3(finalWorld);
 v_normal = normal; // normalize(vec3(finalWorld * vec4(normal, 1.0)));
 ")
         },
-        render_shader::block_code::BlockCodeAtom { 
+        BlockCodeAtom { 
             define: Atom::from("layout(location = 0) out vec4 gl_FragColor;\r\n"), 
             running: Atom::from("
 vec4 baseColor = vec4(1., 1., 1., 1.);
@@ -208,68 +201,78 @@ gl_FragColor = vec4(baseColor.rgb, alpha);
         ShaderDefinesSet::default()
     );
 
-    let key_meta = KeyShaderEffect(Atom::from("TTest"));
+    let key_meta = Atom::from("TTest");
     let shader_meta = asset_shader_meta.insert(key_meta.clone(), shader_meta).unwrap();
     let varyings = Varyings::default();
 
     let useinfo = shader_meta.textures.use_info(vec![]);
     println!("useinfo: {:?}", useinfo);
-    println!("_BoneTex Slot: {:?}", shader_meta.textures.descs.binary_search_by(|a| { a.slotname.cmp(&Atom::from("_BoneTex")) } ));
-    println!("_BoneTex Slot: {:?}", shader_meta.textures.descs.binary_search_by(|a| { a.slotname.cmp(&Atom::from("_MainTex")) } ));
+    println!("_BoneTex Slot: {:?}", shader_meta.textures.binary_search_by(|a| { a.slotname.cmp(&Atom::from("_BoneTex")) } ));
+    println!("_BoneTex Slot: {:?}", shader_meta.textures.binary_search_by(|a| { a.slotname.cmp(&Atom::from("_MainTex")) } ));
 
-    let key_model = KeyShaderModelAbout { skin: ESkinCode::None };
-    let effect_bind_textures = EffectTextureAndSamplerBinds::new(&useinfo);
-    let bindgroup_texure_samplers = RenderBindGroupTextureSamplers::new(
-        3, 
-        &effect_bind_textures, 
-        &device, 
-        &asset_tex,
-        &asset_sampler,
-        &asset_bindgroup
-    ).unwrap();
+    // let effect_bind_textures = EffectTextureSamples::new(&useinfo);
+    // let bindgroup_texure_samplers = BindGroupTextureSamplers::new(
+    //     &shader_meta, 
+    //     (
+    //         Some(())
+    //     ), 
+    //     (
+            
+    //     ),
+    //     &device, 
+    //     &asset_bind_group_layout,
+    //     &asset_bind_group
+    // ).unwrap();
 
-    println!("texdesc.vs_code ");
-    println!("{}", bindgroup_texure_samplers.vs_define_code());
-    println!("texdesc.fs_code ");
-    println!("{}", bindgroup_texure_samplers.fs_define_code());
+    // println!("texdesc.vs_code ");
+    // println!("{}", bindgroup_texure_samplers.vs_define_code());
+    // println!("texdesc.fs_code ");
+    // println!("{}", bindgroup_texure_samplers.fs_define_code());
 
     let valuedesc = &shader_meta.uniforms;
-    let bind_model: Arc<ShaderBindModelAboutMatrix> = Arc::new(ShaderBindModelAboutMatrix::new(&device, &mut allocator).unwrap());
-    let bind_effect: Arc<ShaderBindEffectValue> = Arc::new(ShaderBindEffectValue::new(&device, key_meta.clone(), shader_meta.clone(), &mut allocator).unwrap());
+    let bind_model: Arc<ShaderBindModelAboutMatrix> = Arc::new(ShaderBindModelAboutMatrix::new(&mut bind_buffer_allocator).unwrap());
+    let bind_effect_value: Arc<ShaderBindEffectValue> = Arc::new(ShaderBindEffectValue::new(&device, key_meta.clone(), shader_meta.clone(), &mut bind_buffer_allocator).unwrap());
+    bind_model.data().write_data(0, &[0, 0, 0, 0]);
+    bind_effect_value.data().write_data(0, &[0, 0, 0, 0]);
 
-    let bindgroup_model: RenderBindGroupModel = RenderBindGroupModel::new(
-        1,
-        bind_model,
-        &bind_effect,
+
+    // let key_scene = KeyShaderSceneAbout { fog: true, brdf: false, env: false };
+    let bind_camera = Arc::new(ShaderBindSceneAboutBase::new(&mut bind_buffer_allocator).unwrap());
+    let bind_effect = Arc::new(ShaderBindSceneAboutEffect::new(&mut bind_buffer_allocator).unwrap());
+    bind_camera.data().write_data(0, &[0, 0, 0, 0]);
+    bind_effect.data().write_data(0, &[0, 0, 0, 0]);
+    
+    bind_buffer_allocator.write_buffer(&device, &queue);
+    // write buffer, before bindgroup
+
+    let bindgroup_model: BindGroupModel = BindGroupModel::new(
+        &bind_model,
         None,
+        Some(&bind_effect_value),
         &device,
-        &asset_tex,
-        &asset_sampler,
-        &asset_bindgroup
+        &asset_bind_group_layout,
+        &asset_bind_group,
     ).unwrap();
-
-    let key_scene = KeyShaderSceneAbout { fog: true, brdf: false, env: false };
-    let range = allocator.allocate(ShaderBindSceneAboutCamera::TOTAL_SIZE as usize, &device).unwrap();
-    let bind_camera = Arc::new(ShaderBindSceneAboutCamera::new(range));
-    let range = allocator.allocate(ShaderBindSceneAboutEffect::TOTAL_SIZE as usize, &device).unwrap();
-    let bind_effect = Arc::new(ShaderBindSceneAboutEffect::new(range));
-    let bindgroup_scene = RenderBindGroupScene::new(0, key_scene, bind_camera, bind_effect, &device, &asset_tex, &asset_sampler, &asset_bindgroup).unwrap();
+    let bindgroup_scene = BindGroupScene::new(
+        &bind_camera, 
+        Some(&bind_effect),
+        &device, 
+        &asset_bind_group_layout, 
+        &asset_bind_group,
+    ).unwrap();
 
     let meshdes = vec![
         ShaderAttribute { kind: EVertexDataKind::Position, location: 0 },
         ShaderAttribute { kind: EVertexDataKind::Normal, location: 1 },
     ];
-    let reslayouts = KeyShaderFromAttributes(meshdes);
-    let shader = ResShader::build::<RenderBindGroupScene, RenderBindGroupModel, RenderBindGroupTextureSamplers>(
+    let shader = shader_meta.build::<BindGroupSceneUsage, BindGroupModelUsage, BindGroupTextureSamplersUsage>(
         &device,
         &key_meta,
-        &shader_meta,
-        0,
-        &reslayouts,
+        &KeyShaderFromAttributes(meshdes),
         &EInstanceCode(EInstanceCode::NONE),
-        &bindgroup_scene,
-        &bindgroup_model,
-        Some(&bindgroup_texure_samplers),
-        None
+        &BindGroupSceneUsage { bind_group: bindgroup_scene, set: 0 } ,
+        &BindGroupModelUsage { bind_group: bindgroup_model, set: 1 } ,
+        None,
+        None,
     );
 }

@@ -4,7 +4,7 @@ use pi_assets::{asset::Handle, mgr::AssetMgr};
 use render_core::rhi::{device::RenderDevice, asset::TextureRes};
 use render_shader::{
     shader_set::KeyShaderSceneAbout,
-    shader::{TShaderSetCode, TShaderBindCode},
+    shader::{TShaderBlockCode, TShaderBindCode},
     set_bind::ShaderSetBind,
     buildin_var::ShaderVarUniform
 };
@@ -46,11 +46,11 @@ impl RenderBindGroupScene {
         let mut bind = 0;
 
         let bind_camera = BindUseSceneAboutCamera::new(bind, bind_camera); bind += 1;
-        offsets.push(bind_camera.data.data.start() as wgpu::DynamicOffset);
+        offsets.push(bind_camera.data.data.offset() as wgpu::DynamicOffset);
         key_bindgroup.0.push(bind_camera.key_bind());
 
         let bind_effect = BindUseSceneAboutEffect::new(bind, bind_effect); bind += 1; 
-        offsets.push(bind_effect.data.data.start() as wgpu::DynamicOffset);
+        offsets.push(bind_effect.data.data.offset() as wgpu::DynamicOffset);
         key_bindgroup.0.push(bind_effect.key_bind());
 
         let (bind_brdf_texture, bind_brdf_sampler) = if key.brdf {
@@ -125,7 +125,7 @@ impl RenderBindGroupScene {
     }
 
 }
-impl TShaderSetCode for RenderBindGroupScene {
+impl TShaderBlockCode for RenderBindGroupScene {
 
     fn vs_define_code(&self) -> String {
         let mut result = String::from("");
