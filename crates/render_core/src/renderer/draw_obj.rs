@@ -16,6 +16,8 @@ pub trait TGeometry: Clone {
     fn indices(&self) -> Option<&RenderIndices>;
 }
 
+
+#[derive(Debug, Clone)]
 pub struct DrawObjGeometry {
     pub vertices: Vec<RenderVertices>,
     pub instances: Vec<RenderVertices>,

@@ -69,6 +69,7 @@ pub trait TRenderPipeline: Clone {
     fn pipeline(&self) -> &crate::rhi::pipeline::RenderPipeline;
 }
 
+#[derive(Debug, Clone)]
 pub struct RenderPipeline<const MAX_BIND_GROUP_COUNT: usize, K: TKeyShaderSetBlock>(pub crate::rhi::pipeline::RenderPipeline, PhantomData<K>);
 impl<const MAX_BIND_GROUP_COUNT: usize, K: TKeyShaderSetBlock> RenderPipeline<MAX_BIND_GROUP_COUNT, K> {
     pub fn pipeline(
