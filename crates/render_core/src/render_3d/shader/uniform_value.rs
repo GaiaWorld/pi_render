@@ -17,7 +17,7 @@ pub enum UniformValueKind {
 }
 
 impl UniformValueKind {
-    fn code(&self) -> String {
+    pub fn code(&self) -> String {
         match self {
             UniformValueKind::Mat4              => String::from("mat4"),
             UniformValueKind::Mat2              => String::from("mat2"),
@@ -280,7 +280,7 @@ impl MaterialValueBindDesc {
         self.uint_list.sort_by(|a, b| { a.0.cmp(&b.0) });
     }
     pub fn size(&self) -> usize {
-        let mut size = 16; // 基础大小 16 - 避免为 0
+        let mut size = 0;
         self.mat4_list.iter().for_each(|item| {
             size += item.0.as_bytes().len();
         });
@@ -349,85 +349,91 @@ impl MaterialValueBindDesc {
     fn _code(&self, set: u32, index: u32) -> String {
         let mut result = String::from("");
 
-        let mut total_num = 0;
+        if self.size() == 0 {
 
-        result += "layout(set = ";
-        result += set.to_string().as_str();
-        result += ", binding = ";
-        result += index.to_string().as_str();
-        result += ") uniform MatParam {\r\n";
-
-        self.mat4_list.iter().for_each(|name| {
-            result += "mat4 ";
-            result += &name.0;
-            result += ";\r\n";
-        });
-        total_num += self.mat4_list.len();
-        
-        self.mat2_list.iter().for_each(|name| {
-            result += "mat2 ";
-            result += &name.0;
-            result += ";\r\n";
-        });
-        total_num += self.mat2_list.len();
-        
-        self.vec4_list.iter().for_each(|name| {
-            result += "vec4 ";
-            result += &name.0;
-            result += ";\r\n";
-        });
-        total_num += self.vec4_list.len();
-        
-        self.vec2_list.iter().for_each(|name| {
-            result += "vec2 ";
-            result += &name.0;
-            result += ";\r\n";
-        });
-        total_num += self.vec2_list.len();
-        let fill_vec2_count    = self.vec2_list.len() % 2;
-        if fill_vec2_count > 0 {
-            result += "vec2 _placeholder_vec2_0;\r\n";
-        }
-        
-        self.float_list.iter().for_each(|name| {
-            result += "float ";
-            result += &name.0;
-            result += ";\r\n";
-        });
-        total_num += self.float_list.len();
-        
-        self.int_list.iter().for_each(|name| {
-            result += "int ";
-            result += &name.0;
-            result += ";\r\n";
-        });
-        total_num += self.int_list.len();
-        
-        self.uint_list.iter().for_each(|name| {
-            result += "uint ";
-            result += &name.0;
-            result += ";\r\n";
-        });
-        total_num += self.uint_list.len();
-        let fill_int_count    = (self.float_list.len() + self.int_list.len() + self.uint_list.len()) % 4;
-        if fill_int_count > 0 {
-            for i in fill_int_count..4 {
-                result += "uint _placeholder_int_";
-                result += &i.to_string();
-                result += ";\r\n";
-            }
         } else {
-            // 4 个 占位u32; 对应 ShaderBindEffectValue 中也有处理
-            if total_num == 0 {
-                for i in 0..4 {
+            let mut total_num = 0;
+    
+            result += "layout(set = ";
+            result += set.to_string().as_str();
+            result += ", binding = ";
+            result += index.to_string().as_str();
+            result += ") uniform MatParam {\r\n";
+    
+            self.mat4_list.iter().for_each(|name| {
+                result += "mat4 ";
+                result += &name.0;
+                result += ";\r\n";
+            });
+            total_num += self.mat4_list.len();
+            
+            self.mat2_list.iter().for_each(|name| {
+                result += "mat2 ";
+                result += &name.0;
+                result += ";\r\n";
+            });
+            total_num += self.mat2_list.len();
+            
+            self.vec4_list.iter().for_each(|name| {
+                result += "vec4 ";
+                result += &name.0;
+                result += ";\r\n";
+            });
+            total_num += self.vec4_list.len();
+            
+            self.vec2_list.iter().for_each(|name| {
+                result += "vec2 ";
+                result += &name.0;
+                result += ";\r\n";
+            });
+            total_num += self.vec2_list.len();
+            let fill_vec2_count    = self.vec2_list.len() % 2;
+            if fill_vec2_count > 0 {
+                result += "vec2 _placeholder_vec2_0;\r\n";
+            }
+            
+            self.float_list.iter().for_each(|name| {
+                result += "float ";
+                result += &name.0;
+                result += ";\r\n";
+            });
+            total_num += self.float_list.len();
+            
+            self.int_list.iter().for_each(|name| {
+                result += "int ";
+                result += &name.0;
+                result += ";\r\n";
+            });
+            total_num += self.int_list.len();
+            
+            self.uint_list.iter().for_each(|name| {
+                result += "uint ";
+                result += &name.0;
+                result += ";\r\n";
+            });
+            total_num += self.uint_list.len();
+            let fill_int_count    = (self.float_list.len() + self.int_list.len() + self.uint_list.len()) % 4;
+            if fill_int_count > 0 {
+                for i in fill_int_count..4 {
                     result += "uint _placeholder_int_";
                     result += &i.to_string();
                     result += ";\r\n";
                 }
+            // } else {
+            //     // 4 个 占位u32; 对应 ShaderBindEffectValue 中也有处理
+            //     if total_num == 0 {
+            //         for i in 0..4 {
+            //             result += "uint _placeholder_int_";
+            //             result += &i.to_string();
+            //             result += ";\r\n";
+            //         }
+            //     }
             }
+    
+            result += "};\r\n";
+            log::info!("Uniform Count: {}", total_num);
+    
         }
-
-        result += "};\r\n";
 
         result
     }

@@ -1,12 +1,11 @@
 use std::{sync::Arc, marker::PhantomData};
 
-use lazy_static::__Deref;
 use pi_assets::{asset::{Asset, Handle}, mgr::AssetMgr};
 use pi_share::Share;
 
 use crate::rhi::device::RenderDevice;
 
-use super::{bind_group::{KeyBindGroupLayout, BindGroupLayout}, shader::{KeyShader, TKeyShaderSetBlock, Shader}, vertex_buffer::{VertexBufferLayouts, KeyPipelineFromAttributes}, ASSET_SIZE_FOR_UNKOWN};
+use super::{bind_group::{KeyBindGroupLayout, BindGroupLayout}, shader::{KeyShader, TKeyShaderSetBlock, Shader}, vertex_buffer::{KeyPipelineFromAttributes}, ASSET_SIZE_FOR_UNKOWN};
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct DepthBiasState {
@@ -64,6 +63,10 @@ pub struct KeyRenderPipeline<const MAX_BIND_GROUP_COUNT: usize, K: TKeyShaderSet
     pub key_shader: KeyShader<MAX_BIND_GROUP_COUNT, K>,
     pub key_bindgroup_layouts: [Option<Arc<KeyBindGroupLayout>>; MAX_BIND_GROUP_COUNT],
     pub key_vertex_layouts: KeyPipelineFromAttributes,
+}
+
+pub trait TRenderPipeline {
+    fn pipeline(&self) -> &crate::rhi::pipeline::RenderPipeline;
 }
 
 pub struct RenderPipeline<const MAX_BIND_GROUP_COUNT: usize, K: TKeyShaderSetBlock>(pub crate::rhi::pipeline::RenderPipeline, PhantomData<K>);
@@ -163,5 +166,10 @@ impl<const MAX_BIND_GROUP_COUNT: usize, K: TKeyShaderSetBlock> Asset for RenderP
 
     fn size(&self) -> usize {
         ASSET_SIZE_FOR_UNKOWN
+    }
+}
+impl<const MAX_BIND_GROUP_COUNT: usize, K: TKeyShaderSetBlock> TRenderPipeline for RenderPipeline<MAX_BIND_GROUP_COUNT, K> {
+    fn pipeline(&self) -> &crate::rhi::pipeline::RenderPipeline {
+        &self.0
     }
 }

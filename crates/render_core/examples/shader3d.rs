@@ -28,9 +28,9 @@ use render_core::{
             instance_code::EInstanceCode
         },
         bind_groups::{
-            texture_sampler::{BindGroupTextureSamplers, BindGroupTextureSamplersUsage},
-            model::{BindGroupModel, BindGroupModelUsage},
-            scene::{BindGroupScene, BindGroupSceneUsage}
+            texture_sampler::{BindGroupTextureSamplers},
+            model::{BindGroupModel},
+            scene::{BindGroupScene}
         },
         binds::{
             model::base::ShaderBindModelAboutMatrix,
@@ -298,13 +298,13 @@ gl_FragColor = vec4(baseColor.rgb, alpha);
         ShaderAttribute { kind: EVertexDataKind::Position, location: 0 },
         ShaderAttribute { kind: EVertexDataKind::Normal, location: 1 },
     ];
-    let shader = shader_meta.build::<BindGroupSceneUsage, BindGroupModelUsage, BindGroupTextureSamplersUsage>(
+    let shader = shader_meta.build::<BindGroupScene, BindGroupModel, BindGroupTextureSamplers>(
         &device,
         &key_meta,
         &KeyShaderFromAttributes(meshdes),
         &EInstanceCode(EInstanceCode::NONE),
-        &BindGroupSceneUsage { bind_group: bindgroup_scene, set: 0 } ,
-        &BindGroupModelUsage { bind_group: bindgroup_model, set: 1 } ,
+        &bindgroup_scene,
+        &bindgroup_model,
         None,
         None,
     );

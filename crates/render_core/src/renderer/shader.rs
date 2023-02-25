@@ -1,9 +1,9 @@
-use std::{sync::Arc, marker::PhantomData, hash::Hash, fmt::Debug};
+use std::{marker::PhantomData, hash::Hash, fmt::Debug};
 
 use pi_assets::asset::Asset;
 use pi_atom::Atom;
 
-use super::{vertices::TKeyAttributes, ASSET_SIZE_FOR_UNKOWN, attributes::KeyShaderFromAttributes};
+use super::{ASSET_SIZE_FOR_UNKOWN, attributes::KeyShaderFromAttributes};
 
 
 pub type KeyShaderMeta = Atom;

@@ -3,6 +3,15 @@ pub trait TVertexFormatByteSize {
     fn use_bytes(&self) -> wgpu::BufferAddress ;
 }
 
+impl TVertexFormatByteSize for wgpu::IndexFormat {
+    fn use_bytes(&self) -> wgpu::BufferAddress  {
+        match self {
+            wgpu::IndexFormat::Uint16 => 2,
+            wgpu::IndexFormat::Uint32 => 4,
+        }
+    }
+}
+
 impl TVertexFormatByteSize for wgpu::VertexFormat {
     fn use_bytes(&self) -> wgpu::BufferAddress {
         match self {

@@ -1,14 +1,12 @@
-use std::{sync::Arc, num::NonZeroU64};
+use std::{sync::Arc};
 
-use pi_assets::{asset::Handle, mgr::AssetMgr};
-use pi_share::Share;
+use pi_assets::{asset::Handle};
 
 use crate::{
     render_3d::shader::{shader_effect_meta::ShaderEffectMeta, TBindDescToShaderCode},
     rhi::device::RenderDevice,
     renderer::{
         shader::{KeyShaderMeta, TShaderBindCode},
-        buffer::{RWBufferRange, AssetRWBuffer},
         bind_buffer::{BindBufferAllocator, BindBufferRange},
         bind::{TKeyBind, KeyBindBuffer, KeyBindLayoutBuffer},
         shader_stage::EShaderStage
@@ -53,7 +51,7 @@ impl ShaderBindEffectValue {
     pub const UINT_BYTES: u32 = 1 * 4;
 
     pub fn new(
-        device: &RenderDevice,
+        _: &RenderDevice,
         key_meta: KeyShaderMeta,
         meta: Handle<ShaderEffectMeta>,
         allocator: &mut BindBufferAllocator,
@@ -66,7 +64,7 @@ impl ShaderBindEffectValue {
         let float_count     = uniforms.float_list.len() as u8;
         let int_count       = uniforms.int_list.len() as u8;
         let uint_count      = uniforms.uint_list.len() as u8;
-        let align_bytes     = 16;
+        // let align_bytes     = 16;
         
         let mut fill_vec2_count    = vec2_count % 2;
         fill_vec2_count = if fill_vec2_count == 0 { 0 } else { 2 - fill_vec2_count };
@@ -98,38 +96,42 @@ impl ShaderBindEffectValue {
 
         total_size += fill_int_count as u32 * Self::INT_BYTES;
 
-        if total_size == 0 {
-            total_size += 4 * Self::UINT_BYTES; // 4 个 占位u32; 对应MaterialValueBindDesc中也有处理
-        }
+        // if total_size == 0 {
+        //     total_size += 4 * Self::UINT_BYTES; // 4 个 占位u32; 对应 MaterialValueBindDesc 中也有处理
+        // }
 
-        match allocator.allocate(total_size) {
-            Some(data) => {
-                Some(
-                    Self {
-                        total_size: total_size as usize,
-                        mat4_count,
-                        mat2_count,
-                        vec4_count,
-                        vec2_count,
-                        float_count,
-                        int_count,
-                        uint_count,
-                        fill_vec2_count,
-                        fill_int_count,
-                        mat4_begin,
-                        mat2_begin,
-                        vec4_begin,
-                        vec2_begin,
-                        float_begin,
-                        int_begin,
-                        uint_begin,
-                        key_meta,
-                        meta,
-                        data
-                    }
-                )
-            },
-            None => None,
+        if total_size == 0 {
+            None
+        } else {
+            match allocator.allocate(total_size) {
+                Some(data) => {
+                    Some(
+                        Self {
+                            total_size: total_size as usize,
+                            mat4_count,
+                            mat2_count,
+                            vec4_count,
+                            vec2_count,
+                            float_count,
+                            int_count,
+                            uint_count,
+                            fill_vec2_count,
+                            fill_int_count,
+                            mat4_begin,
+                            mat2_begin,
+                            vec4_begin,
+                            vec2_begin,
+                            float_begin,
+                            int_begin,
+                            uint_begin,
+                            key_meta,
+                            meta,
+                            data
+                        }
+                    )
+                },
+                None => None,
+            }
         }
     }
     

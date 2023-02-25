@@ -7,10 +7,9 @@ use crate::{
     renderer::{
         texture::BindDataTexture2D,
         bind::{KeyBindLayoutTexture2D, EKeyBind, KeyBindTexture2D},
-        shader_stage::EShaderStage
     },
-    rhi::{texture::image_texture::KeyImageTexture2D, asset::TextureRes},
-    render_3d::shader::{UniformPropertyName, shader_effect_meta::ShaderEffectMeta, ShaderSetBind, TBindDescToShaderCode}};
+    rhi::{asset::TextureRes},
+    render_3d::shader::{shader_effect_meta::ShaderEffectMeta, TBindDescToShaderCode}};
 
 
 pub trait TEffectBindTexture2D {

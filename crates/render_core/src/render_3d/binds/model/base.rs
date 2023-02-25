@@ -1,11 +1,7 @@
 use std::sync::Arc;
 
-use pi_assets::mgr::AssetMgr;
-use pi_share::Share;
-
 use crate::{
     renderer::{
-        buffer::{RWBufferRange, AssetRWBuffer},
         bind_buffer::{BindBufferAllocator, BindBufferRange},
         shader::TShaderBindCode, buildin_var::ShaderVarUniform,
         bind::{TKeyBind, KeyBindLayoutBuffer, KeyBindBuffer},
@@ -60,7 +56,7 @@ impl ShaderBindModelAboutMatrix {
         result
     }
 
-    pub fn fs_define_code(set: u32, binding: u32) -> String {
+    pub fn fs_define_code(_: u32, _: u32) -> String {
         String::from("")
     }
 
@@ -90,7 +86,7 @@ impl TShaderBindCode for BindUseModelMatrix {
         result
     }
 
-    fn fs_define_code(&self, set: u32) -> String {
+    fn fs_define_code(&self, _: u32) -> String {
         String::from("")
     }
 

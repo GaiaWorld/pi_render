@@ -1,13 +1,17 @@
-use std::{ops::Range, mem::{replace, size_of}, hash::Hash, sync::Arc, fmt::Debug};
+use std::{ops::Range, mem::{size_of}, hash::Hash, sync::Arc, fmt::Debug};
 
-use derive_deref_rs::Deref;
 use pi_assets::{asset::{Asset, GarbageEmpty, Handle}, mgr::AssetMgr};
 use pi_atom::Atom;
 use pi_share::{Share, ShareMutex};
 
-use crate::rhi::{device::RenderDevice, RenderQueue, shader::WriteBuffer, buffer::Buffer};
+use crate::rhi::{device::RenderDevice, RenderQueue,  buffer::Buffer};
 
-use super::{attributes::{VertexAttribute, EVertexDataKind, ShaderAttribute, TAsWgpuVertexAtribute, KeyShaderFromAttributes}, vertex_buffer_desc::VertexBufferDesc, vertex_format::TVertexFormatByteSize, buffer::{FixedSizeBufferPool, AssetRWBuffer, RWBufferRange}, ASSET_SIZE_FOR_UNKOWN};
+use super::{
+    attributes::{EVertexDataKind, ShaderAttribute, TAsWgpuVertexAtribute, KeyShaderFromAttributes},
+    vertex_buffer_desc::VertexBufferDesc,
+    vertex_format::TVertexFormatByteSize,
+    buffer::{FixedSizeBufferPool, AssetRWBuffer, RWBufferRange},
+};
 
 
 pub type KeyVertexBuffer = Atom;
@@ -115,6 +119,7 @@ impl VertexBufferLayouts {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum EVertexBufferRange {
+    /// * (BufferRange, 使用大小)
     Updatable(RWBufferRange, u32),
     NotUpdatable(NotUpdatableBufferRange),
 }
@@ -131,7 +136,7 @@ impl EVertexBufferRange {
             EVertexBufferRange::NotUpdatable(val) => val.used_size,
         }
     }
-    pub fn range(&self) -> Range<u64> {
+    pub fn range(&self) -> Range<wgpu::BufferAddress> {
         match self {
             EVertexBufferRange::Updatable(val, size) => {
                 Range { start: val.offset() as u64, end: (val.offset() + size) as u64 }
@@ -152,9 +157,9 @@ impl Asset for EVertexBufferRange {
 pub struct VertexBufferAllocator {
     /// * 最小对齐尺寸
     base_size: u32,
-    /// * 最大对齐尺寸, 超过该尺寸的独立创建Buffer
-    max_base_size: u32,
-    block_size: u32,
+    // /// * 最大对齐尺寸, 超过该尺寸的独立创建Buffer
+    // max_base_size: u32,
+    // block_size: u32,
     pool_slots: [FixedSizeBufferPool;Self::LEVEL_COUNT],
     pool_count: usize,
     asset_mgr: Share<AssetMgr<AssetRWBuffer>>,
@@ -177,7 +182,7 @@ impl VertexBufferAllocator {
     pub fn new() -> Self {
         let base_size = Self::BAE_SIZE;
         let level = Self::LEVEL_COUNT;
-        let max_base_size = Self::MAX_BASE_SIZE;
+        // let max_base_size = Self::MAX_BASE_SIZE;
         let block_size = base_size * 1024;
 
         let usage = wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::VERTEX;
@@ -206,10 +211,10 @@ impl VertexBufferAllocator {
 
         Self {
             base_size,
-            block_size,
+            // block_size,
             pool_slots,
             pool_count: level,
-            max_base_size,
+            // max_base_size,
             asset_mgr,
             asset_mgr_2,
             asset_mgr_vb,

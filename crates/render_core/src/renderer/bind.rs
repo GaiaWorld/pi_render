@@ -1,13 +1,8 @@
 use std::{num::{NonZeroU64, NonZeroU32}, fmt::Debug, hash::Hash, sync::Arc};
 
-use pi_assets::{mgr::AssetMgr, asset::Handle};
-use pi_share::Share;
-
-use crate::rhi::asset::TextureRes;
-
 use super::{
-    texture::{KeyTexture, KeyTextureArray, BindDataTextureArray, BindDataTexture2D},
-    sampler::{KeySampler, KeySamplerArray, SamplerRes, BindDataSampler},
+    texture::{BindDataTextureArray, BindDataTexture2D},
+    sampler::{BindDataSampler},
     shader_stage::EShaderStage,
     bind_buffer::BindBufferRange
 };
@@ -150,19 +145,19 @@ pub enum EBindData {
     Texture2DArray(BindDataTextureArray),
 }
 impl EBindData {
-    pub(crate) fn bind_source<'a>(
-        &'a self,
-        binding: u32,
-    ) -> EBindResource<'a> {
-        match self {
-            EBindData::Buffer(val) => EBindResource::<'a>::Buffer(binding, &val.buffer(), val.size()),
-            EBindData::Texture2D(val) => EBindResource::<'a>::Texture2D(binding, &val.0.texture_view),
-            EBindData::Sampler(val) => EBindResource::<'a>::Sampler(binding, &val.0.0),
-            EBindData::Texture2DArray(val) => {
-                EBindResource::<'a>::Texture2DArray(binding, val.array())
-            }
-        }
-    }
+    // pub(crate) fn bind_source<'a>(
+    //     &'a self,
+    //     binding: u32,
+    // ) -> EBindResource<'a> {
+    //     match self {
+    //         EBindData::Buffer(val) => EBindResource::<'a>::Buffer(binding, &val.buffer(), val.size()),
+    //         EBindData::Texture2D(val) => EBindResource::<'a>::Texture2D(binding, &val.0.texture_view),
+    //         EBindData::Sampler(val) => EBindResource::<'a>::Sampler(binding, &val.0.0),
+    //         EBindData::Texture2DArray(val) => {
+    //             EBindResource::<'a>::Texture2DArray(binding, val.array())
+    //         }
+    //     }
+    // }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

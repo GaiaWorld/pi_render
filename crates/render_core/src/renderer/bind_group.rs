@@ -6,7 +6,7 @@ use pi_share::Share;
 
 use crate::rhi::{device::RenderDevice, bind_group::BindGroup};
 
-use super::{bind::{EKeyBind, EBindData, KeyBindLayout, EBindResource}, ASSET_SIZE_FOR_UNKOWN};
+use super::{bind::{EKeyBind, KeyBindLayout, EBindResource}, ASSET_SIZE_FOR_UNKOWN};
 
 pub const MAX_BIND_COUNT: usize = 16;
 
@@ -60,9 +60,9 @@ pub struct KeyBindGroup(pub [Option<EKeyBind>;MAX_BIND_COUNT]);
 
 #[derive(Debug, Clone)]
 pub struct BindGroupUsage {
+    pub(crate) set: u32,
     pub(crate) binds: [Option<EKeyBind>;MAX_BIND_COUNT],
     pub(crate) bind_group: Handle<BindGroup>,
-    pub(crate) key_bind_group_layout: KeyBindGroupLayout,
     pub(crate) bind_group_layout: Handle<BindGroupLayout>,
 }
 impl BindGroupUsage {
@@ -73,6 +73,7 @@ impl BindGroupUsage {
         ]
     }
     pub fn create(
+        set: u32,
         device: &RenderDevice,
         binds: [Option<EKeyBind>;MAX_BIND_COUNT],
         asset_mgr_bind_group_layout: &Share<AssetMgr<BindGroupLayout>>,
@@ -99,10 +100,10 @@ impl BindGroupUsage {
             if let Some(bind_group_layout) = bind_group_layout {
                 Some(
                     Self {
+                        set,
                         binds,
                         bind_group,
                         bind_group_layout,
-                        key_bind_group_layout
                     }
                 )
             } else {
@@ -122,10 +123,10 @@ impl BindGroupUsage {
                 if let Some(bind_group) = asset_mgr_bind_group.insert(key_bind_group, bind_group) {
                     Some(
                         Self {
+                            set,
                             binds,
                             bind_group,
                             bind_group_layout,
-                            key_bind_group_layout
                         }
                     )
                 } else {

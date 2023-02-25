@@ -1,4 +1,4 @@
-use std::ops::{Range, DerefMut};
+use std::ops::{Range};
 
 use derive_deref_rs::Deref;
 use pi_assets::asset::Handle;

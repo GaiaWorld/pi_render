@@ -6,7 +6,7 @@ use wgpu::ShaderSource;
 
 use crate::{
     renderer::{
-        shader::{TShaderSetBlock, TKeyShaderSetBlock, KeyShader, Shader, KeyShaderMeta},
+        shader::{TShaderSetBlock, KeyShaderMeta},
         buildin_data::EDefaultTexture,
         shader_stage::EShaderStage,
         attributes::KeyShaderFromAttributes
@@ -19,7 +19,7 @@ use super::{
     varying_code::{VaryingCode, Varyings},
     shader_defines::ShaderDefinesSet,
     uniform_value::{MaterialValueBindDesc, UniformPropertyMat4, UniformPropertyMat2, UniformPropertyVec4, UniformPropertyVec2, UniformPropertyFloat, UniformPropertyInt, UniformPropertyUint}, 
-    uniform_texture::{UniformTexture2DDesc, EffectUniformTexture2DDescs, UniformSamplerDesc},
+    uniform_texture::{UniformTexture2DDesc, EffectUniformTexture2DDescs},
     instance_code::EInstanceCode, shader::{Shader3D, TShaderBlockCode}
 };
 
@@ -47,7 +47,7 @@ impl From<(crate::rhi::shader::ShaderMeta, Vec<Atom>, Vec<Atom>)> for ShaderEffe
         
         let mut uniforms: MaterialValueBindDesc = MaterialValueBindDesc::default();
         let mut textures: Vec<UniformTexture2DDesc> = vec![];
-        let mut samplers: Vec<Arc<UniformSamplerDesc>> = vec![];
+        // let mut samplers: Vec<Arc<UniformSamplerDesc>> = vec![];
 
         let len = value.bindings.buffer_uniform_expands.len();
         for index in 0..len {
@@ -62,13 +62,13 @@ impl From<(crate::rhi::shader::ShaderMeta, Vec<Atom>, Vec<Atom>)> for ShaderEffe
                     let info = bindinfo.get(j);
                     if let (Some(entry), Some(info)) = (entry, info) {
                         match entry.ty {
-                            wgpu::BindingType::Buffer { ty, has_dynamic_offset, min_binding_size } => {
+                            wgpu::BindingType::Buffer { ty: _, has_dynamic_offset: _, min_binding_size: _ } => {
                                 info.list.iter().for_each(|uniform| {
                                     if let Some(value) = &uniform.buffer_expand {
                                         match value.ty.ty {
                                             crate::rhi::shader::TypeKind::Float => {
                                                 match value.ty.size {
-                                                    crate::rhi::shader::TypeSize::Mat { rows, columns } => {
+                                                    crate::rhi::shader::TypeSize::Mat { rows, columns: _ } => {
                                                         if rows == 4 {
                                                             uniforms.mat4_list.push(UniformPropertyMat4(uniform.name.clone(), crate::render_3d::vec_u8_to_f32_16(&value.default_value)));
                                                         } else if rows == 2 {
@@ -97,7 +97,7 @@ impl From<(crate::rhi::shader::ShaderMeta, Vec<Atom>, Vec<Atom>)> for ShaderEffe
                                     }
                                 });
                             },
-                            wgpu::BindingType::Sampler(val) => {
+                            wgpu::BindingType::Sampler(_) => {
                                 // let val = UniformSamplerDesc {
                                 //     slotname: info.list.get(0).unwrap().name.clone(),
                                 //     ty: val,
@@ -124,7 +124,7 @@ impl From<(crate::rhi::shader::ShaderMeta, Vec<Atom>, Vec<Atom>)> for ShaderEffe
                                     wgpu::TextureViewDimension::D3 => todo!(),
                                 }
                             },
-                            wgpu::BindingType::StorageTexture { access, format, view_dimension } => {
+                            wgpu::BindingType::StorageTexture { access: _, format: _, view_dimension: _ } => {
                                 
                             },
                         }
@@ -136,7 +136,6 @@ impl From<(crate::rhi::shader::ShaderMeta, Vec<Atom>, Vec<Atom>)> for ShaderEffe
         let vs = value.vs.to_block_code();
         let fs = value.fs.to_block_code();
         let varyings = Varyings::from(&value.varyings);
-        let size = varyings.size() + vs.size() + fs.size();
 
         Self::new(uniforms, textures, varyings, vs, fs, defines)
     }

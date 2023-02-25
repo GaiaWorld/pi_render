@@ -1,26 +1,12 @@
-use std::sync::Arc;
-
-use pi_assets::asset::Asset;
-use pi_atom::Atom;
-use wgpu::ShaderSource;
 
 use crate::{
     renderer::{
-        shader::{TShaderSetBlock, TKeyShaderSetBlock, KeyShader, Shader, KeyShaderMeta},
-        buildin_data::EDefaultTexture,
-        shader_stage::EShaderStage, attributes::KeyShaderFromAttributes
+        shader::{TKeyShaderSetBlock, KeyShader, Shader},
+        attributes::KeyShaderFromAttributes
     },
-    rhi::device::RenderDevice, render_3d::bind_groups::{scene::KeyShaderSetScene, model::KeyShaderSetModel, texture_sampler::KeyShaderSetTextureSamplers}
+    render_3d::bind_groups::{scene::KeyShaderSetScene, model::KeyShaderSetModel, texture_sampler::KeyShaderSetTextureSamplers}
 };
 
-use super::{
-    block_code::{BlockCode, BlockCodeAtom, TToBlockCodeAtom},
-    varying_code::{VaryingCode, Varyings},
-    shader_defines::ShaderDefinesSet,
-    uniform_value::{MaterialValueBindDesc, UniformPropertyMat4, UniformPropertyMat2, UniformPropertyVec4, UniformPropertyVec2, UniformPropertyFloat, UniformPropertyInt, UniformPropertyUint}, 
-    uniform_texture::{UniformTexture2DDesc, EffectUniformTexture2DDescs, UniformSamplerDesc},
-    instance_code::EInstanceCode
-};
 
 
 pub trait TShaderBlockCode {

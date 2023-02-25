@@ -1,5 +1,6 @@
 pub mod draw_obj;
 pub mod draw_sort;
+pub mod draw_obj_list;
 pub mod vertices;
 pub mod indices;
 pub mod buffer;

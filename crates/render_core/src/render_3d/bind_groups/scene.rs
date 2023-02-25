@@ -1,9 +1,24 @@
 use std::sync::Arc;
 
-use pi_assets::{mgr::AssetMgr, asset::Handle};
+use pi_assets::{mgr::AssetMgr};
 use pi_share::Share;
 
-use crate::{renderer::{bind_group::{BindGroupUsage, BindGroupLayout}, bind::{EKeyBind, KeyBindBuffer}, shader::{TShaderSetBlock, TShaderBindCode}}, render_3d::{shader::skin_code::ESkinCode, binds::{model::{base::{BindUseModelMatrix, ShaderBindModelAboutMatrix}, skin::{BindUseSkinValue, ShaderBindModelAboutSkinValue}}, scene::{base::{ShaderBindSceneAboutBase, BindUseSceneAboutCamera}, effect::{ShaderBindSceneAboutEffect, BindUseSceneAboutEffect}}}}, rhi::{device::RenderDevice, bind_group::BindGroup}};
+use crate::{
+    renderer::{
+        bind_group::{BindGroupUsage, BindGroupLayout},
+        bind::{EKeyBind, KeyBindBuffer},
+        shader::{TShaderSetBlock, TShaderBindCode}
+    },
+    render_3d::{
+        binds::{
+            scene::{
+                base::{ShaderBindSceneAboutBase, BindUseSceneAboutCamera},
+                effect::{ShaderBindSceneAboutEffect, BindUseSceneAboutEffect}
+            }
+        }
+    },
+    rhi::{device::RenderDevice, bind_group::BindGroup}
+};
 
 #[derive(Debug, Default, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct KeyShaderSetScene {
@@ -32,7 +47,7 @@ impl BindGroupScene {
         let mut base_effect = None;
 
         let mut binding = 0;
-        let mut base = BindUseSceneAboutCamera { data: bind_base.clone(), bind: binding as u32 };
+        let base = BindUseSceneAboutCamera { data: bind_base.clone(), bind: binding as u32 };
         binds[binding] = Some(EKeyBind::Buffer(KeyBindBuffer {
             data: bind_base.data.clone(),
             layout: Arc::new(bind_base.key_layout(binding as u16)),
@@ -46,10 +61,10 @@ impl BindGroupScene {
                 data: bind_base_effect.data.clone(),
                 layout: Arc::new(bind_base_effect.key_layout(binding as u16)),
             }));
-            binding += 1;
+            // binding += 1;
         }
 
-        if let Some(bind_group) = BindGroupUsage::create(device, binds, asset_mgr_bind_group_layout, asset_mgr_bind_group) {
+        if let Some(bind_group) = BindGroupUsage::create(0, device, binds, asset_mgr_bind_group_layout, asset_mgr_bind_group) {
             Some(
                 Self {
                     bind_group,
@@ -63,19 +78,13 @@ impl BindGroupScene {
         }
     }
 }
-
-#[derive(Debug, Clone)]
-pub struct BindGroupSceneUsage {
-    pub bind_group: BindGroupScene,
-    pub set: u32,
-}
-impl TShaderSetBlock for BindGroupSceneUsage {
+impl TShaderSetBlock for BindGroupScene {
     fn vs_define_code(&self) -> String {
         let mut result = String::from("");
 
-        result += self.bind_group.base.vs_define_code(self.set).as_str();
-        if let Some(base_effect) = &self.bind_group.base_effect {
-            result += base_effect.vs_define_code(self.set).as_str();
+        result += self.base.vs_define_code(self.bind_group.set).as_str();
+        if let Some(base_effect) = &self.base_effect {
+            result += base_effect.vs_define_code(self.bind_group.set).as_str();
         }
 
         result

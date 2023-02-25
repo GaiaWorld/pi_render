@@ -1,12 +1,12 @@
-use std::{sync::Arc, hash::Hash, fmt::Debug};
+use std::{hash::Hash, fmt::Debug};
 
 use derive_deref_rs::Deref;
-use pi_assets::{asset::{Asset, Handle, GarbageEmpty}, mgr::AssetMgr};
-use pi_share::{Share, ShareMutex};
+use pi_assets::{asset::{GarbageEmpty}, mgr::AssetMgr};
+use pi_share::{Share};
 
-use crate::rhi::{dyn_uniform_buffer::SingleBufferAlloter, shader::WriteBuffer, device::RenderDevice, RenderQueue, buffer::Buffer};
+use crate::rhi::{device::RenderDevice, RenderQueue};
 
-use super::{bytes_write_to_memory, buffer::{AssetRWBuffer, RWBufferRange, FixedSizeBufferPool}};
+use super::{buffer::{AssetRWBuffer, RWBufferRange, FixedSizeBufferPool}};
 
 
 pub struct BindBufferAllocator {
@@ -15,7 +15,6 @@ pub struct BindBufferAllocator {
     block_size: u32,
     pool_slots: Vec<FixedSizeBufferPool>,
     small_count: u32,
-    large_count: u32,
     asset_mgr: Share<AssetMgr<AssetRWBuffer>>,
 }
 impl BindBufferAllocator {
@@ -55,7 +54,6 @@ impl BindBufferAllocator {
             block_size,
             pool_slots,
             small_count,
-            large_count,
             asset_mgr
         }
     }

@@ -5,10 +5,10 @@ use pi_assets::asset::Handle;
 
 use crate::{
     renderer::{
-        sampler::{BindDataSampler, SamplerRes, SamplerDesc},
+        sampler::{BindDataSampler, SamplerRes},
         bind::{KeyBindLayoutSampler, EKeyBind, KeyBindSampler}
     },
-    render_3d::shader::{shader_effect_meta::ShaderEffectMeta, uniform_sampler::sampler_code, uniform_texture::UniformTextureWithSamplerParam}
+    render_3d::shader::{shader_effect_meta::ShaderEffectMeta, uniform_sampler::sampler_code}
 };
 
 pub trait TEffectBindSampler2D {

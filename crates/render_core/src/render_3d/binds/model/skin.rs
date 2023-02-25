@@ -1,11 +1,7 @@
 use std::sync::Arc;
 
-use pi_assets::mgr::AssetMgr;
-use pi_share::Share;
-
 use crate::{
     renderer::{
-        buffer::{RWBufferRange, AssetRWBuffer},
         bind_buffer::{BindBufferAllocator, BindBufferRange},
         shader::TShaderBindCode, buildin_var::ShaderVarUniform,
         bind::{TKeyBind, KeyBindLayoutBuffer, KeyBindBuffer},
@@ -29,7 +25,7 @@ impl ShaderBindModelAboutSkinValue {
 
     pub fn new(
         skin: &ESkinCode,
-        device: &RenderDevice,
+        _: &RenderDevice,
         allocator: &mut BindBufferAllocator,
     ) -> Option<Self> {
         let size = match skin {
@@ -87,14 +83,14 @@ impl ShaderBindModelAboutSkinValue {
         result
     }
 
-    pub fn fs_define_code(set: u32, binding: u32) -> String {
+    pub fn fs_define_code(_: u32, _: u32) -> String {
         String::from("")
     }
     pub fn vs_running_code(skin: &ESkinCode) -> String {
         let mut result = String::from("");
         match skin {
             ESkinCode::None => {},
-            ESkinCode::UBO(_, bone) => {
+            ESkinCode::UBO(_, _) => {
                 result += skin.running_code().as_str();
             },
             _ => {
@@ -121,11 +117,11 @@ impl BindUseSkinValue {
     pub fn data(&self) -> &ShaderBindModelAboutSkinValue {
         &self.data
     }
-    pub fn vs_running_code(&self, set: u32) -> String {
+    pub fn vs_running_code(&self, _: u32) -> String {
         let mut result = String::from("");
         match self.data.skin {
             ESkinCode::None => {},
-            ESkinCode::UBO(_, bone) => {
+            ESkinCode::UBO(_, _) => {
                 result += self.data.skin.running_code().as_str();
             },
             _ => {
@@ -162,7 +158,7 @@ impl TShaderBindCode for BindUseSkinValue {
         result
     }
 
-    fn fs_define_code(&self, set: u32) -> String {
+    fn fs_define_code(&self, _: u32) -> String {
         String::from("")
     }
 
