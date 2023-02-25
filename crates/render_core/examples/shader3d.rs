@@ -246,16 +246,16 @@ gl_FragColor = vec4(baseColor.rgb, alpha);
     // write buffer, before bindgroup
 
     let bindgroup_model: BindGroupModel = BindGroupModel::new(
-        &bind_model,
+        bind_model,
         None,
-        Some(&bind_effect_value),
+        Some(bind_effect_value),
         &device,
         &asset_bind_group_layout,
         &asset_bind_group,
     ).unwrap();
     let bindgroup_scene = BindGroupScene::new(
-        &bind_camera, 
-        Some(&bind_effect),
+        bind_camera, 
+        Some(bind_effect),
         &device, 
         &asset_bind_group_layout, 
         &asset_bind_group,

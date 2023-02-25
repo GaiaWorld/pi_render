@@ -1,11 +1,7 @@
 use std::sync::Arc;
 
-use pi_assets::mgr::AssetMgr;
-use pi_share::Share;
-
 use crate::{
     renderer::{
-        buffer::{RWBufferRange, AssetRWBuffer},
         bind_buffer::{BindBufferAllocator, BindBufferRange},
         shader::TShaderBindCode,
         buildin_var::ShaderVarUniform,
@@ -21,7 +17,13 @@ pub struct ShaderBindSceneAboutEffect {
     pub(crate) data: BindBufferRange,
 }
 impl ShaderBindSceneAboutEffect {
-    pub const OFFSET_FOG_INFO:              wgpu::DynamicOffset = 0;
+
+    pub const OFFSET_TIME:                  wgpu::DynamicOffset = 0;
+    pub const SIZE_TIME:                    wgpu::DynamicOffset = 4 * 4;
+    pub const OFFSET_DELTA_TIME:            wgpu::DynamicOffset = Self::OFFSET_TIME + Self::SIZE_TIME;
+    pub const SIZE_DELTA_TIME:              wgpu::DynamicOffset = 4 * 4;
+
+    pub const OFFSET_FOG_INFO:              wgpu::DynamicOffset = Self::OFFSET_DELTA_TIME;
     pub const SIZE_FOG_INFO:                wgpu::DynamicOffset = 4 * 4;
     pub const OFFSET_FOG_PARAM:             wgpu::DynamicOffset = Self::OFFSET_FOG_INFO + Self::SIZE_FOG_INFO;
     pub const SIZE_FOG_PARAM:               wgpu::DynamicOffset = 4 * 4;
@@ -50,18 +52,20 @@ impl ShaderBindSceneAboutEffect {
     pub fn data(&self) -> &BindBufferRange {
         &self.data
     }
-    pub fn vs_define_code(set: u32, binding: u32) -> String {
+    pub fn vs_define_code(&self, set: u32, binding: u32) -> String {
         let mut result = String::from("");
         result += ShaderSetBind::code_set_bind_head(set, binding).as_str();
         result += " SceneEffect {\r\n";
+        result += ShaderSetBind::code_uniform("vec4", ShaderVarUniform::TIME).as_str();
+        result += ShaderSetBind::code_uniform("vec4", ShaderVarUniform::DELTA_TIME).as_str();
         result += ShaderSetBind::code_uniform("vec4", ShaderVarUniform::FOG_INFO).as_str();
         result += ShaderSetBind::code_uniform("vec4", ShaderVarUniform::FOG_PARAM).as_str();
         result += ShaderSetBind::code_uniform("vec4", ShaderVarUniform::AMBIENT_PARAM).as_str();
         result += "};\r\n";
         result
     }
-    pub fn fs_define_code(set: u32, binding: u32) -> String {
-        Self::vs_define_code(set, binding)
+    pub fn fs_define_code(&self, set: u32, binding: u32) -> String {
+        self.vs_define_code(set, binding)
     }
 }
 
@@ -78,14 +82,7 @@ impl BindUseSceneAboutEffect {
 }
 impl TShaderBindCode for BindUseSceneAboutEffect {
     fn vs_define_code(&self, set: u32) -> String {
-        let mut result = String::from("");
-        result += ShaderSetBind::code_set_bind_head(set, self.bind).as_str();
-        result += " SceneEffect {\r\n";
-        result += ShaderSetBind::code_uniform("vec4", ShaderVarUniform::FOG_INFO).as_str();
-        result += ShaderSetBind::code_uniform("vec4", ShaderVarUniform::FOG_PARAM).as_str();
-        result += ShaderSetBind::code_uniform("vec4", ShaderVarUniform::AMBIENT_PARAM).as_str();
-        result += "};\r\n";
-        result
+        self.data.vs_define_code(set, self.bind)
     }
     fn fs_define_code(&self, set: u32) -> String {
         self.vs_define_code(set)

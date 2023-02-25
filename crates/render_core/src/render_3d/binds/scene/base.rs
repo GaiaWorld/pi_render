@@ -22,17 +22,17 @@ pub struct ShaderBindSceneAboutBase {
 impl ShaderBindSceneAboutBase {
 
     pub const OFFSET_VIEW_MATRIX:           wgpu::DynamicOffset = 0;
-    pub const OFFSET_PROJECT_MATRIX:        wgpu::DynamicOffset = 16 * 4;
-    pub const OFFSET_VIEW_PROJECT_MATRIX:   wgpu::DynamicOffset = 16 * 4 + 16 * 4;
-    pub const OFFSET_CAMERA_POSITION:       wgpu::DynamicOffset = 16 * 4 + 16 * 4 + 16 * 4;
-    pub const OFFSET_CAMERA_DIRECTION:      wgpu::DynamicOffset = 16 * 4 + 16 * 4 + 16 * 4 + 4 * 4;
-
-    pub const OFFSET_TIME:                  wgpu::DynamicOffset = Self::OFFSET_CAMERA_DIRECTION + 4 * 4;
-    pub const SIZE_TIME:                    wgpu::DynamicOffset = 4 * 4;
-    pub const OFFSET_DELTA_TIME:            wgpu::DynamicOffset = Self::OFFSET_TIME + Self::SIZE_TIME;
-    pub const SIZE_DELTA_TIME:              wgpu::DynamicOffset = 4 * 4;
+    pub const SIZE_VIEW_MATRIX:             wgpu::DynamicOffset = 16 * 4;
+    pub const OFFSET_PROJECT_MATRIX:        wgpu::DynamicOffset = Self::OFFSET_VIEW_MATRIX + Self::SIZE_VIEW_MATRIX;
+    pub const SIZE_PROJECT_MATRIX:          wgpu::DynamicOffset = 16 * 4;
+    pub const OFFSET_VIEW_PROJECT_MATRIX:   wgpu::DynamicOffset = Self::OFFSET_PROJECT_MATRIX + Self::SIZE_PROJECT_MATRIX;
+    pub const SIZE_VIEW_PROJECT_MATRIX:     wgpu::DynamicOffset = 16 * 4;
+    pub const OFFSET_CAMERA_POSITION:       wgpu::DynamicOffset = Self::OFFSET_VIEW_PROJECT_MATRIX + Self::SIZE_VIEW_PROJECT_MATRIX;
+    pub const SIZE_CAMERA_POSITION:         wgpu::DynamicOffset = 4 * 4;
+    pub const OFFSET_CAMERA_DIRECTION:      wgpu::DynamicOffset = Self::OFFSET_CAMERA_POSITION + Self::SIZE_CAMERA_POSITION;
+    pub const SIZE_CAMERA_DIRECTION:        wgpu::DynamicOffset = 4 * 4;
     
-    pub const TOTAL_SIZE:                   wgpu::DynamicOffset = Self::OFFSET_DELTA_TIME + Self::SIZE_DELTA_TIME;
+    pub const TOTAL_SIZE:                   wgpu::DynamicOffset = Self::OFFSET_CAMERA_DIRECTION + Self::SIZE_CAMERA_DIRECTION;
     pub fn new(
         allocator: &mut BindBufferAllocator,
     ) -> Option<Self> {
@@ -52,7 +52,7 @@ impl ShaderBindSceneAboutBase {
     pub fn data(&self) -> &BindBufferRange {
         &self.data
     }
-    pub fn vs_define_code(set: u32, bind: u32, ) -> String {
+    pub fn vs_define_code(&self, set: u32, bind: u32, ) -> String {
         let mut result = String::from("");
         result += ShaderSetBind::code_set_bind_head(set, bind).as_str();
         result += " Camera {\r\n";
@@ -61,13 +61,11 @@ impl ShaderBindSceneAboutBase {
         result += ShaderSetBind::code_uniform("mat4", ShaderVarUniform::VIEW_PROJECT_MATRIX).as_str();
         result += ShaderSetBind::code_uniform("vec4", ShaderVarUniform::CAMERA_POSITION).as_str();
         result += ShaderSetBind::code_uniform("vec4", ShaderVarUniform::CAMERA_DIRECTION).as_str();
-        result += ShaderSetBind::code_uniform("vec4", ShaderVarUniform::TIME).as_str();
-        result += ShaderSetBind::code_uniform("vec4", ShaderVarUniform::DELTA_TIME).as_str();
         result += "};\r\n";
         result
     }
-    pub fn fs_define_code(set: u32, bind: u32) -> String {
-        Self::vs_define_code(set, bind)
+    pub fn fs_define_code(&self, set: u32, bind: u32) -> String {
+        self.vs_define_code(set, bind)
     }
 }
 
@@ -83,18 +81,7 @@ impl BindUseSceneAboutCamera {
 }
 impl TShaderBindCode for BindUseSceneAboutCamera {
     fn vs_define_code(&self, set: u32) -> String {
-        let mut result = String::from("");
-        result += ShaderSetBind::code_set_bind_head(set, self.bind).as_str();
-        result += " Camera {\r\n";
-        result += ShaderSetBind::code_uniform("mat4", ShaderVarUniform::VIEW_MATRIX).as_str();
-        result += ShaderSetBind::code_uniform("mat4", ShaderVarUniform::PROJECT_MATRIX).as_str();
-        result += ShaderSetBind::code_uniform("mat4", ShaderVarUniform::VIEW_PROJECT_MATRIX).as_str();
-        result += ShaderSetBind::code_uniform("vec4", ShaderVarUniform::CAMERA_POSITION).as_str();
-        result += ShaderSetBind::code_uniform("vec4", ShaderVarUniform::CAMERA_DIRECTION).as_str();
-        result += ShaderSetBind::code_uniform("vec4", ShaderVarUniform::TIME).as_str();
-        result += ShaderSetBind::code_uniform("vec4", ShaderVarUniform::DELTA_TIME).as_str();
-        result += "};\r\n";
-        result
+        self.data.vs_define_code(set, self.bind)
     }
     fn fs_define_code(&self, set: u32) -> String {
         self.vs_define_code(set)
