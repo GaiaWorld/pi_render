@@ -1,16 +1,16 @@
 
 use super::{pipeline::{TRenderPipeline}, vertices::{RenderVertices, RenderIndices}, bind_group::BindGroupUsage};
 
-pub trait TBindGroups {
+pub trait TBindGroups: Clone {
     fn bindgroups(&self) -> &[BindGroupUsage];
 }
-pub trait TVerticess {
+pub trait TVerticess: Clone {
     fn value(&self) -> &[RenderVertices];
 }
-pub trait TInstaces {
+pub trait TInstaces: Clone {
     fn value(&self) -> &[RenderVertices];
 }
-pub trait TGeometry {
+pub trait TGeometry: Clone {
     fn vertices(&self) -> &[RenderVertices];
     fn instances(&self) -> &[RenderVertices];
     fn indices(&self) -> Option<&RenderIndices>;
@@ -35,6 +35,7 @@ impl TGeometry for DrawObjGeometry {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct DrawObj<T: TRenderPipeline, B: TBindGroups, G: TGeometry> {
     pub pipeline: T,
     pub bindgroups: B,

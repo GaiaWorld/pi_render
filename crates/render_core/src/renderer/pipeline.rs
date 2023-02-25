@@ -65,7 +65,7 @@ pub struct KeyRenderPipeline<const MAX_BIND_GROUP_COUNT: usize, K: TKeyShaderSet
     pub key_vertex_layouts: KeyPipelineFromAttributes,
 }
 
-pub trait TRenderPipeline {
+pub trait TRenderPipeline: Clone {
     fn pipeline(&self) -> &crate::rhi::pipeline::RenderPipeline;
 }
 
