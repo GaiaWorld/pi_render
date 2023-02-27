@@ -4,50 +4,27 @@ use crate::renderer::draw_obj::TempDrawInfoRecord;
 
 use super::{draw_obj::{DrawObj, TBindGroups, TGeometry}, pipeline::TRenderPipeline};
 
-
+#[derive(Default)]
 pub struct DrawList<T: TRenderPipeline, B: TBindGroups, G: TGeometry> {
     pub list: Vec<DrawObj<T, B, G>>
 }
 impl<T: TRenderPipeline, B: TBindGroups, G: TGeometry> DrawList<T, B, G> {
     pub fn render<'a>(
-        &self,
-        commands: &'a mut wgpu::CommandEncoder,
-        target_view: &wgpu::TextureView,
-        depth_stencil: Option<wgpu::RenderPassDepthStencilAttachment>,
+        &'a self,
+        renderpass: & mut wgpu::RenderPass<'a>,
     ) {
         let time = Instant::now();
         let draws = &self.list;
 
         let mut temp_vertex_record: TempDrawInfoRecord = TempDrawInfoRecord::default();
 
-        let ops = wgpu::Operations {
-            load: wgpu::LoadOp::Load,
-            store: true,
-        };
-        let mut color_attachments = vec![];
-        color_attachments.push(
-            Some(
-                wgpu::RenderPassColorAttachment {
-                    resolve_target: None,
-                    ops,
-                    view: target_view,
-                }
-            )
-        );
-
-        let mut renderpass = commands.begin_render_pass(
-            &wgpu::RenderPassDescriptor {
-                label: Some("RenderNode"),
-                color_attachments: color_attachments.as_slice(),
-                depth_stencil_attachment: depth_stencil,
-            }
-        );
-
         let mut draw_count = 0;
         draws.iter().for_each(|draw| {
             renderpass.set_pipeline(draw.pipeline.pipeline());
-            draw.bindgroups.bindgroups().iter().for_each(|bindinfo| {
-                renderpass.set_bind_group(bindinfo.set, &bindinfo.bind_group(), &bindinfo.offsets());
+            draw.bindgroups.bindgroups().for_each(|bindinfo| {
+                if let Some(bindinfo) = bindinfo {
+                    renderpass.set_bind_group(bindinfo.set, &bindinfo.bind_group(), &bindinfo.offsets());
+                }
             });
 
             let mut vertex_range = 0..0;
@@ -72,6 +49,7 @@ impl<T: TRenderPipeline, B: TBindGroups, G: TGeometry> DrawList<T, B, G> {
                         renderpass.set_index_buffer(indices.slice(), indices.format);
                     }
 
+                    log::info!("RenderIndices value_range: {:?}", indices.value_range());
                     renderpass.draw_indexed(indices.value_range(), 0 as i32, instance_range);
                 },
                 None => {

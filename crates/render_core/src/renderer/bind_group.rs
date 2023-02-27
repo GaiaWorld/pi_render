@@ -107,6 +107,7 @@ impl BindGroupUsage {
                     }
                 )
             } else {
+                panic!("2");
                 None
             }
         } else {
@@ -130,9 +131,11 @@ impl BindGroupUsage {
                         }
                     )
                 } else {
+                    panic!("3");
                     None
                 }
             } else {
+                panic!("4");
                 None
             }
         }
@@ -142,8 +145,20 @@ impl BindGroupUsage {
         &self.bind_group
     }
 
-    pub fn layout(&self) -> &BindGroupLayout {
-        &self.bind_group_layout
+    pub fn key_layout(&self) -> KeyBindGroupLayout {
+        let mut key_bind_group_layout = KeyBindGroupLayout::default();
+
+        for i in 0..16 {
+            if let Some(v) = &self.binds[i] {
+                key_bind_group_layout.0[i] = Some(v.key_bind_layout());
+            }
+        }
+
+        key_bind_group_layout
+    }
+
+    pub fn layout(&self) -> Handle<BindGroupLayout> {
+        self.bind_group_layout.clone()
     }
 
     pub fn offsets(&self) -> Vec<wgpu::DynamicOffset> {
@@ -154,9 +169,9 @@ impl BindGroupUsage {
                     EKeyBind::Buffer(val) => {
                         result.push(val.data.offset())
                     },
-                    EKeyBind::Texture2D(_) => todo!(),
-                    EKeyBind::Sampler(_) => todo!(),
-                    EKeyBind::Texture2DArray(_) => todo!(),
+                    EKeyBind::Texture2D(_) => {},
+                    EKeyBind::Sampler(_) => {},
+                    EKeyBind::Texture2DArray(_) => {},
                 }
             }
         });

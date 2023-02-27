@@ -3,6 +3,7 @@ use std::{ops::Range, mem::{size_of}, hash::Hash, sync::Arc, fmt::Debug};
 use pi_assets::{asset::{Asset, GarbageEmpty, Handle}, mgr::AssetMgr};
 use pi_atom::Atom;
 use pi_share::{Share, ShareMutex};
+use wgpu::util::BufferInitDescriptor;
 
 use crate::rhi::{device::RenderDevice, RenderQueue,  buffer::Buffer};
 
@@ -165,7 +166,6 @@ pub struct VertexBufferAllocator {
     asset_mgr: Share<AssetMgr<AssetRWBuffer>>,
     asset_mgr_2: Share<AssetMgr<NotUpdatableBuffer>>,
     unupdatables: Vec<FixedSizeBufferPoolNotUpdatable>,
-    asset_mgr_vb: Share<AssetMgr<EVertexBufferRange>>,
 }
 impl VertexBufferAllocator {
     /// * 每 level 间 对齐尺寸比值为 2
@@ -185,7 +185,7 @@ impl VertexBufferAllocator {
         // let max_base_size = Self::MAX_BASE_SIZE;
         let block_size = base_size * 1024;
 
-        let usage = wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::VERTEX;
+        let usage = wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::INDEX;
         let pool_slots = [
             FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(00) as u32, usage),
             FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(01) as u32, usage),
@@ -207,7 +207,6 @@ impl VertexBufferAllocator {
 
         let asset_mgr = AssetMgr::<AssetRWBuffer>::new(GarbageEmpty(), false, 16 * 1024 * 1024, 60 * 1000);
         let asset_mgr_2 = AssetMgr::<NotUpdatableBuffer>::new(GarbageEmpty(), false, 32 * 1024 * 1024, 60 * 1000);
-        let asset_mgr_vb = AssetMgr::<EVertexBufferRange>::new(GarbageEmpty(), false, 16 * 1024, 10 * 1000);
 
         Self {
             base_size,
@@ -217,14 +216,10 @@ impl VertexBufferAllocator {
             // max_base_size,
             asset_mgr,
             asset_mgr_2,
-            asset_mgr_vb,
             unupdatables: vec![],
         }
     }
-    pub fn get(&self, key: &KeyVertexBuffer) -> Option<Handle<EVertexBufferRange>> {
-        self.asset_mgr_vb.get(key)
-    }
-    pub fn create_updatable_buffer(&mut self, key: KeyVertexBuffer, data: &[u8]) -> Option<Handle<EVertexBufferRange>> {
+    pub fn create_updatable_buffer(&mut self, data: &[u8]) -> Option<EVertexBufferRange> {
         let size = data.len() as u32;
         let index = match self.pool_slots.binary_search_by(|v| { v.fixed_size.cmp(&size)  }) {
             Ok(index) => index,
@@ -235,7 +230,7 @@ impl VertexBufferAllocator {
             if let Some(pool) = self.pool_slots.get_mut(index) {
                 if let Some(range) = pool.allocate(&self.asset_mgr) {
                     range.write_data(0, data);
-                    self.asset_mgr_vb.insert(key, EVertexBufferRange::Updatable(range, size))
+                    Some(EVertexBufferRange::Updatable(range, size))
                 } else {
                     None
                 }
@@ -251,7 +246,7 @@ impl VertexBufferAllocator {
             pool.write_buffer(device, queue);
         });
     }
-    pub fn create_not_updatable_buffer(&mut self, device: &RenderDevice, queue: &RenderQueue, key: KeyVertexBuffer, data: &[u8]) -> Option<Handle<EVertexBufferRange>> {
+    pub fn create_not_updatable_buffer(&mut self, device: &RenderDevice, queue: &RenderQueue, data: &[u8]) -> Option<EVertexBufferRange> {
         let size = data.len() as u32;
         let mut level = 0;
         let mut level_size = self.base_size;
@@ -268,19 +263,20 @@ impl VertexBufferAllocator {
             }
         }
 
-        let old_count = self.pool_slots.len();
+        let old_count = self.unupdatables.len();
         let new_count = level + 1;
         if old_count < new_count {
-            let usage = wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::VERTEX;
+            let usage = wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::INDEX;
             for level in old_count..new_count {
                 self.unupdatables.push(
                     FixedSizeBufferPoolNotUpdatable::new(self.base_size * 2_i32.pow(level as u32) as u32, usage)
                 );
             }
         }
+        log::info!("size: {}, level: {}, old_count: {}, new: {}", size, level, old_count, new_count);
 
         if let Some(range) = self.unupdatables.get_mut(level).unwrap().allocate(&self.asset_mgr_2, device, queue, data) {
-            self.asset_mgr_vb.insert(key, EVertexBufferRange::NotUpdatable(range))
+            Some(EVertexBufferRange::NotUpdatable(range))
         } else {
             None
         }
@@ -400,19 +396,27 @@ impl Asset for NotUpdatableBuffer {
 }
 impl NotUpdatableBuffer {
     pub fn new(device: &RenderDevice, size: u32, usage: wgpu::BufferUsages) -> Self {
-        let buffer = device.create_buffer(
-            &wgpu::BufferDescriptor {
+        let mut data = vec![];
+        for _ in 0..size {
+            data.push(0)
+        }
+        let buffer = device.create_buffer_with_data(
+            &BufferInitDescriptor {
                 label: None,
-                size: size as u64,
+                contents: &data,
                 usage,
-                mapped_at_creation: false,
             }
         );
 
         Self(buffer, size)
     }
     pub(crate) fn write_buffer(&self, queue: &RenderQueue, data: &[u8]) {
-        queue.write_buffer(&self.0, 0, data);
+        let mut temp = vec![];
+        data.iter().for_each(|v| { temp.push(*v) });
+        for _ in data.len()..self.size() {
+            temp.push(0);
+        }
+        queue.write_buffer(&self.0, 0, &temp);
     }
 }
 

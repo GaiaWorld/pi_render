@@ -89,6 +89,8 @@ impl RenderIndices {
             range0.end += range0.start + range.end - range.start;
         }
 
+        log::info!("RenderIndices Range: {:?}", range0);
+
         self.buffer.buffer().deref().slice(range0)
     }
 }

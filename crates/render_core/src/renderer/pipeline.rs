@@ -61,7 +61,7 @@ pub struct KeyRenderPipelineState {
 pub struct KeyRenderPipeline<const MAX_BIND_GROUP_COUNT: usize, K: TKeyShaderSetBlock> {
     pub key_state: KeyRenderPipelineState,
     pub key_shader: KeyShader<MAX_BIND_GROUP_COUNT, K>,
-    pub key_bindgroup_layouts: [Option<Arc<KeyBindGroupLayout>>; MAX_BIND_GROUP_COUNT],
+    pub key_bindgroup_layouts: [Option<KeyBindGroupLayout>; MAX_BIND_GROUP_COUNT],
     pub key_vertex_layouts: KeyPipelineFromAttributes,
 }
 
@@ -97,8 +97,8 @@ impl<const MAX_BIND_GROUP_COUNT: usize, K: TKeyShaderSetBlock> RenderPipeline<MA
     pub fn create(
         key_state: KeyRenderPipelineState,
         key_shader: KeyShader<MAX_BIND_GROUP_COUNT, K>,
-        shader: Shader<MAX_BIND_GROUP_COUNT, K>,
-        key_bindgroup_layouts: [Option<Arc<KeyBindGroupLayout>>; MAX_BIND_GROUP_COUNT],
+        shader: Handle<Shader<MAX_BIND_GROUP_COUNT, K>>,
+        key_bindgroup_layouts: [Option<KeyBindGroupLayout>; MAX_BIND_GROUP_COUNT],
         bind_group_layouts: [Option<Handle<BindGroupLayout>>; MAX_BIND_GROUP_COUNT],
         key_vertex_layouts: KeyPipelineFromAttributes,
         asset_mgr_pipeline: &Share<AssetMgr<RenderPipeline<MAX_BIND_GROUP_COUNT, K>>>,

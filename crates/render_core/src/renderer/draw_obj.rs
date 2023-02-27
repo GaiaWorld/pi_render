@@ -2,7 +2,7 @@
 use super::{pipeline::{TRenderPipeline}, vertices::{RenderVertices, RenderIndices}, bind_group::BindGroupUsage};
 
 pub trait TBindGroups: Clone {
-    fn bindgroups(&self) -> &[BindGroupUsage];
+    fn bindgroups<'a>(&'a self) -> std::slice::Iter<'a, Option<BindGroupUsage>>;
 }
 pub trait TVerticess: Clone {
     fn value(&self) -> &[RenderVertices];

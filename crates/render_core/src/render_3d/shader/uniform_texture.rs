@@ -3,7 +3,7 @@ use std::{sync::Arc, hash::Hash};
 use derive_deref_rs::Deref;
 use pi_atom::Atom;
 
-use crate::renderer::{buildin_data::{EDefaultTexture, DefaultTexture}, sampler::SamplerDesc, shader_stage::EShaderStage};
+use crate::renderer::{buildin_data::{EDefaultTexture, DefaultTexture}, sampler::KeySampler, shader_stage::EShaderStage};
 
 use super::{UniformPropertyName, TBindDescToShaderCode, ShaderSetBind, TUnifromShaderProperty};
 
@@ -174,7 +174,7 @@ impl Ord for UniformTexture2DDesc {
 pub struct UniformTextureWithSamplerParam {
     pub slotname: UniformPropertyName,
     pub filter: bool,
-    pub sample: SamplerDesc,
+    pub sample: KeySampler,
     pub url: Atom,
 }
 impl PartialEq for UniformTextureWithSamplerParam {
@@ -240,7 +240,7 @@ impl EffectUniformTexture2DDescs {
                     let param = UniformTextureWithSamplerParam {
                         slotname: slotname.clone(),
                         filter: true,
-                        sample: SamplerDesc::default(),
+                        sample: KeySampler::default(),
                         url: Atom::from(DefaultTexture::path(item.initial, wgpu::TextureDimension::D2)),
                     };
                     (Arc::new(param), item.clone(), UniformSamplerDesc::base(item))
