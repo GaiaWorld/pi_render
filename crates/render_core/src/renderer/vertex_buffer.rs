@@ -1,4 +1,4 @@
-use std::{ops::Range, mem::{size_of}, hash::Hash, sync::Arc, fmt::Debug};
+use std::{ops::Range, mem::{size_of, replace}, hash::Hash, sync::Arc, fmt::Debug};
 
 use pi_assets::{asset::{Asset, GarbageEmpty, Handle}, mgr::AssetMgr};
 use pi_atom::Atom;
@@ -273,7 +273,7 @@ impl VertexBufferAllocator {
                 );
             }
         }
-        log::info!("size: {}, level: {}, old_count: {}, new: {}", size, level, old_count, new_count);
+        // log::info!("size: {}, level: {}, old_count: {}, new: {}", size, level, old_count, new_count);
 
         if let Some(range) = self.unupdatables.get_mut(level).unwrap().allocate(&self.asset_mgr_2, device, queue, data) {
             Some(EVertexBufferRange::NotUpdatable(range))
@@ -312,20 +312,24 @@ impl FixedSizeBufferPoolNotUpdatable {
         // 寻找可用区间
         for i in 0..len {
             if let Some(use_buffer) = self.buffers.get(i) {
+                // 有数据的情况一定是正在使用的
                 if let Some(asset_buffer) = &use_buffer.0 {
-                    let _clock = self.mutex.lock();
-                    let buffer = unsafe {
-                        &mut *(Handle::as_ptr(asset_buffer) as usize as *mut NotUpdatableBuffer)
-                    };
-
-                    buffer.write_buffer(queue, data);
-                    return Some(
-                        NotUpdatableBufferRange {
-                            used_size: data.len() as u32,
-                            id_buffer: IDNotUpdatableBuffer { index: i as u32, size: self.block_size },
-                            buffer: use_buffer.clone()
-                        }
-                    );
+                    // if asset_buffer.2 == false {
+                    //     let _clock = self.mutex.lock();
+                    //     let buffer = unsafe {
+                    //         &mut *(Handle::as_ptr(asset_buffer) as usize as *mut NotUpdatableBuffer)
+                    //     };
+    
+                    //     buffer.2 = true;
+                    //     buffer.write_buffer(queue, data);
+                    //     return Some(
+                    //         NotUpdatableBufferRange {
+                    //             used_size: data.len() as u32,
+                    //             id_buffer: IDNotUpdatableBuffer { index: i as u32, size: self.block_size },
+                    //             buffer: use_buffer.clone()
+                    //         }
+                    //     );
+                    // }
                 } else {
                     key_buffer = Some(IDNotUpdatableBuffer { index: i as u32, size: self.block_size },);
                 }
@@ -342,6 +346,7 @@ impl FixedSizeBufferPoolNotUpdatable {
                 let buffer = unsafe {
                     &mut *(Handle::as_ptr(&asset_buffer) as usize as *mut NotUpdatableBuffer)
                 };
+                buffer.2 = true;
                 buffer.write_buffer(queue, data);
                 return Some(
                     NotUpdatableBufferRange {
@@ -387,7 +392,7 @@ pub struct IDNotUpdatableBuffer {
 
 pub struct UseNotUpdatableBuffer(Option<Handle<NotUpdatableBuffer>>);
 
-pub struct NotUpdatableBuffer(Buffer, u32);
+pub struct NotUpdatableBuffer(Buffer, u32, bool);
 impl Asset for NotUpdatableBuffer {
     type Key = IDNotUpdatableBuffer;
     fn size(&self) -> usize {
@@ -408,15 +413,16 @@ impl NotUpdatableBuffer {
             }
         );
 
-        Self(buffer, size)
+        Self(buffer, size, true)
     }
     pub(crate) fn write_buffer(&self, queue: &RenderQueue, data: &[u8]) {
-        let mut temp = vec![];
-        data.iter().for_each(|v| { temp.push(*v) });
-        for _ in data.len()..self.size() {
-            temp.push(0);
-        }
-        queue.write_buffer(&self.0, 0, &temp);
+        // let mut temp = vec![];
+        // data.iter().for_each(|v| { temp.push(*v) });
+        // for _ in data.len()..self.size() {
+        //     temp.push(0);
+        // }
+        // queue.write_buffer(&self.0, 0, &temp);
+        queue.write_buffer(&self.0, 0, data);
     }
 }
 

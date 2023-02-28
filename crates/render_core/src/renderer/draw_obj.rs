@@ -1,4 +1,6 @@
 
+use std::ops::Range;
+
 use super::{pipeline::{TRenderPipeline}, vertices::{RenderVertices, RenderIndices}, bind_group::BindGroupUsage};
 
 pub trait TBindGroups: Clone {
@@ -11,25 +13,32 @@ pub trait TInstaces: Clone {
     fn value(&self) -> &[RenderVertices];
 }
 pub trait TGeometry: Clone {
-    fn vertices(&self) -> &[RenderVertices];
-    fn instances(&self) -> &[RenderVertices];
+    fn vertices<'a>(&'a self) -> &[RenderVertices];
+    fn instances<'a>(&'a self) -> &[RenderVertices];
     fn indices(&self) -> Option<&RenderIndices>;
 }
 
+pub trait TFixedGeometry: Clone {
+    fn vertices<'a>(&'a self) -> &[Option<RenderVertices>];
+    fn instances(&self) -> Range<u32>;
+    fn indices(&self) -> Option<&RenderIndices>;
+}
 
+///
+/// * MAX_VERTEX_BUFFER : 可能的最大顶点Buffer数目, 本地电脑 16
 #[derive(Debug, Clone)]
-pub struct DrawObjGeometry {
-    pub vertices: Vec<RenderVertices>,
-    pub instances: Vec<RenderVertices>,
+pub struct DrawObjGeometry<const MAX_VERTEX_BUFFER: usize> {
+    pub vertices: [Option<RenderVertices>;MAX_VERTEX_BUFFER],
+    pub instances: Range<u32>,
     pub indices: Option<RenderIndices>,
 }
-impl TGeometry for DrawObjGeometry {
-    fn vertices(&self) -> &[RenderVertices] {
+impl<const MAX_VERTEX_BUFFER: usize> TFixedGeometry for DrawObjGeometry<MAX_VERTEX_BUFFER> {
+    fn vertices(&self) -> &[Option<RenderVertices>] {
         &self.vertices
     }
 
-    fn instances(&self) -> &[RenderVertices] {
-        &self.instances
+    fn instances(&self) -> Range<u32> {
+        self.instances.clone()
     }
 
     fn indices(&self) -> Option<&RenderIndices> {
@@ -41,7 +50,7 @@ impl TGeometry for DrawObjGeometry {
 pub struct DrawObj<T: TRenderPipeline, B: TBindGroups, G: TGeometry> {
     pub pipeline: T,
     pub bindgroups: B,
-    pub geo: G,
+    pub geometry: G,
 }
 
 

@@ -48,11 +48,14 @@ impl FixedSizeBufferPool {
     }
     pub(crate) fn write_buffer(&mut self, device: &RenderDevice, queue: &RenderQueue) {
         self.buffers.iter_mut().for_each(|item| {
+            // log::info!("write_buffer: >>>>>>>>>> A {:?}", self.fixed_size);
             if let Some(asset_buffer) = &item.0 {
                 let buffer = unsafe {
                     &mut *(Handle::as_ptr(asset_buffer) as usize as *mut AssetRWBuffer)
                 };
+                // log::info!("write_buffer: >>>>>>>>>> B");
                 if buffer.0.write_to_buffer(device, queue, &None) == false {
+                    // log::info!("write_buffer: {:?}", buffer.0.is_using());
                     if !buffer.0.is_using() {
                         item.0 = None;
                     }
@@ -147,7 +150,7 @@ impl<'a> WriteBuffer for TempWriteBuffer<'a> {
 pub struct IDRWBuffer {
     /// * Buffer 的固化大小 - (内存区间的对齐大小)
     pub fixed_size: u32,
-    /// * 在该 固化大小 的BufferPool 中的序号
+    /// * 在该固化大小的BufferPool 中的序号
     pub index: u32,
 }
 

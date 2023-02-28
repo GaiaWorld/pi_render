@@ -1,4 +1,4 @@
-use std::{hash::Hash, fmt::Debug};
+use std::{hash::Hash, fmt::Debug, sync::Arc};
 
 use derive_deref_rs::Deref;
 use pi_assets::{asset::{GarbageEmpty}, mgr::AssetMgr};
@@ -78,7 +78,7 @@ impl BindBufferAllocator {
         
         if let Some(pool) = self.pool_slots.get_mut(slot_index as usize) {
             if let Some(range) = pool.allocate(&self.asset_mgr) {
-                Some(BindBufferRange(range))
+                Some(BindBufferRange(Arc::new(range)))
             } else {
                 None
             }
@@ -94,4 +94,4 @@ impl BindBufferAllocator {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Deref)]
-pub struct BindBufferRange(pub RWBufferRange);
+pub struct BindBufferRange(pub Arc<RWBufferRange>);

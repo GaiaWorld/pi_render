@@ -29,27 +29,25 @@ impl<T: TRenderPipeline, B: TBindGroups, G: TGeometry> DrawList<T, B, G> {
 
             let mut vertex_range = 0..0;
             let mut instance_range = 0..1;
-            draw.geo.vertices().iter().for_each(|item| {
+            draw.geometry.vertices().iter().for_each(|item| {
                 if temp_vertex_record.record_vertex_and_check_diff_with_last(item) {
                     renderpass.set_vertex_buffer(item.slot, item.slice());
                     vertex_range = item.value_range();
                 }
             });
 
-            draw.geo.instances().iter().for_each(|item| {
+            draw.geometry.instances().iter().for_each(|item| {
                 if temp_vertex_record.record_vertex_and_check_diff_with_last(item) {
                     renderpass.set_vertex_buffer(item.slot, item.slice());
                     instance_range = item.value_range();
                 }
             });
 
-            match &draw.geo.indices() {
+            match &draw.geometry.indices() {
                 Some(indices) => {
                     if temp_vertex_record.record_indices_and_check_diff_with_last(indices) {
                         renderpass.set_index_buffer(indices.slice(), indices.format);
                     }
-
-                    log::info!("RenderIndices value_range: {:?}", indices.value_range());
                     renderpass.draw_indexed(indices.value_range(), 0 as i32, instance_range);
                 },
                 None => {

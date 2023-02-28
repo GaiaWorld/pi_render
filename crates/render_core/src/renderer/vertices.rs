@@ -13,8 +13,11 @@ pub trait TKeyAttributes: Debug + Clone + PartialEq + Eq + Hash {
 #[derive(Clone)]
 pub struct RenderVertices {
     pub slot: u32,
+    /// 使用的Buffer数据
     pub buffer: Handle<EVertexBufferRange>,
+    /// 使用了Buffer的哪个部分
     pub buffer_range: Option<Range<wgpu::BufferAddress>>,
+    /// Buffer 打组的数据单位尺寸
     pub size_per_value: wgpu::BufferAddress,
 }
 impl RenderVertices {
@@ -63,7 +66,9 @@ impl Debug for RenderVertices {
 
 #[derive(Debug, Clone)]
 pub struct RenderIndices {
+    /// 使用的Buffer数据
     pub buffer: Handle<EVertexBufferRange>,
+    /// 使用了Buffer的哪个部分
     pub buffer_range: Option<Range<wgpu::BufferAddress>>,
     pub format: wgpu::IndexFormat,
 }
@@ -72,8 +77,11 @@ impl RenderIndices {
         let mut range0 = self.buffer.range();
     
         if let Some(range) = self.buffer_range.as_ref() {
-            range0.start += range.start;
-            range0.end += range0.start + range.end - range.start;
+            range0.end = range.end - range.start;
+            range0.start = 0;
+        } else {
+            range0.end = range0.end - range0.start;
+            range0.start = 0;
         }
         
         Range {
@@ -84,12 +92,13 @@ impl RenderIndices {
     pub fn slice<'a>(&'a self) -> wgpu::BufferSlice {
         let mut range0 = self.buffer.range();
     
+        // log::info!("RenderIndices buffer Range: {:?}", range0);
         if let Some(range) = self.buffer_range.as_ref() {
             range0.start += range.start;
-            range0.end += range0.start + range.end - range.start;
+            range0.end = range0.start + range.end - range.start;
         }
 
-        log::info!("RenderIndices Range: {:?}", range0);
+        // log::info!("RenderIndices Range: {:?}", range0);
 
         self.buffer.buffer().deref().slice(range0)
     }
