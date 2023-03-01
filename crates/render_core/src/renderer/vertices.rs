@@ -3,10 +3,56 @@ use std::{ops::Range, hash::Hash, fmt::Debug};
 use lazy_static::__Deref;
 use pi_assets::asset::Handle;
 
+use crate::rhi::{asset::RenderRes, buffer::Buffer};
+
 use super::{vertex_buffer::EVertexBufferRange, vertex_format::TVertexFormatByteSize};
 
 pub trait TKeyAttributes: Debug + Clone + PartialEq + Eq + Hash {
 
+}
+
+#[derive(Clone)]
+pub enum EVerticesBufferUsage {
+    GUI(Handle<RenderRes<Buffer>>),
+    Other(Handle<EVertexBufferRange>),
+}
+impl EVerticesBufferUsage {
+    pub fn range(&self) -> Range<wgpu::BufferAddress> {
+        match self {
+            EVerticesBufferUsage::GUI(val) => Range { start: 0, end: val.size() },
+            EVerticesBufferUsage::Other(val) => val.range(),
+        }
+    }
+    pub fn buffer(&self) -> &wgpu::Buffer {
+        match self {
+            EVerticesBufferUsage::GUI(val) => val,
+            EVerticesBufferUsage::Other(val) => val.buffer(),
+        }
+    }
+}
+impl PartialEq for EVerticesBufferUsage {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::GUI(l0), Self::GUI(r0)) => {
+                l0.key() == r0.key()
+            },
+            (Self::Other(l0), Self::Other(r0)) => {
+                l0.key() == r0.key() && l0.range() == r0.range()
+            },
+            _ => false,
+        }
+    }
+}
+impl Eq for EVerticesBufferUsage {
+    fn assert_receiver_is_total_eq(&self) {}
+}
+impl Debug for EVerticesBufferUsage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::GUI(arg0) => f.debug_tuple("GUI").field(arg0).finish(),
+            Self::Other(arg0) => f.debug_tuple("Other").field(arg0).finish(),
+        }
+    }
 }
 
 
@@ -14,7 +60,7 @@ pub trait TKeyAttributes: Debug + Clone + PartialEq + Eq + Hash {
 pub struct RenderVertices {
     pub slot: u32,
     /// 使用的Buffer数据
-    pub buffer: Handle<EVertexBufferRange>,
+    pub buffer: EVerticesBufferUsage,
     /// 使用了Buffer的哪个部分
     pub buffer_range: Option<Range<wgpu::BufferAddress>>,
     /// Buffer 打组的数据单位尺寸
@@ -23,12 +69,16 @@ pub struct RenderVertices {
 impl RenderVertices {
     pub fn value_range(&self) -> Range<u32> {
         let mut range0 = self.buffer.range();
-    
-        if let Some(range) = self.buffer_range.as_ref() {
-            range0.start += range.start;
-            range0.end += range0.start + range.end - range.start;
-        }
-        
+
+        let range = if let Some(range) = self.buffer_range.as_ref() {
+            range.clone()
+        } else {
+            Range { start: 0, end: 0 }
+        };
+
+        range0.start    += range.start;
+        range0.end      += range0.start + range.end - range.start;
+
         Range {
             start: (range0.start / self.size_per_value) as u32,
             end: (range0.end / self.size_per_value) as u32,
@@ -36,18 +86,22 @@ impl RenderVertices {
     }
     pub fn slice<'a>(&'a self) -> wgpu::BufferSlice {
         let mut range0 = self.buffer.range();
-    
-        if let Some(range) = self.buffer_range.as_ref() {
-            range0.start += range.start;
-            range0.end += range0.start + range.end - range.start;
-        }
 
-        self.buffer.buffer().deref().slice(range0)
+        let range = if let Some(range) = self.buffer_range.as_ref() {
+            range.clone()
+        } else {
+            Range { start: 0, end: 0 }
+        };
+    
+        range0.start    += range.start;
+        range0.end      += range0.start + range.end - range.start;
+
+        self.buffer.buffer().slice(range0)
     }
 }
 impl PartialEq for RenderVertices {
     fn eq(&self, other: &Self) -> bool {
-        self.slot == other.slot && self.buffer.key() == other.buffer.key() && self.buffer_range == other.buffer_range
+        &self.slot == &other.slot && &self.buffer == &other.buffer && &self.buffer_range == &other.buffer_range
     }
     fn ne(&self, other: &Self) -> bool {
         !self.eq(other)
@@ -60,14 +114,14 @@ impl Eq for RenderVertices {
 }
 impl Debug for RenderVertices {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("RenderVertices").field("slot", &self.slot).field("buffer", &self.buffer.key()).field("buffer_range", &self.buffer_range).field("size_per_value", &self.size_per_value).finish()
+        f.debug_struct("RenderVertices").field("slot", &self.slot).field("buffer", &self.buffer).field("buffer_range", &self.buffer_range).field("size_per_value", &self.size_per_value).finish()
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct RenderIndices {
     /// 使用的Buffer数据
-    pub buffer: Handle<EVertexBufferRange>,
+    pub buffer: EVerticesBufferUsage,
     /// 使用了Buffer的哪个部分
     pub buffer_range: Option<Range<wgpu::BufferAddress>>,
     pub format: wgpu::IndexFormat,
@@ -78,7 +132,7 @@ impl RenderIndices {
     
         if let Some(range) = self.buffer_range.as_ref() {
             range0.end = range.end - range.start;
-            range0.start = 0;
+            range0.start = range.start;
         } else {
             range0.end = range0.end - range0.start;
             range0.start = 0;
@@ -90,22 +144,22 @@ impl RenderIndices {
         }
     }
     pub fn slice<'a>(&'a self) -> wgpu::BufferSlice {
-        let mut range0 = self.buffer.range();
+        let range0 = self.buffer.range();
     
         // log::info!("RenderIndices buffer Range: {:?}", range0);
-        if let Some(range) = self.buffer_range.as_ref() {
-            range0.start += range.start;
-            range0.end = range0.start + range.end - range.start;
-        }
+        // if let Some(range) = self.buffer_range.as_ref() {
+        //     range0.start += range.start;
+        //     range0.end = range0.start + range.end - range.start;
+        // }
 
         // log::info!("RenderIndices Range: {:?}", range0);
 
-        self.buffer.buffer().deref().slice(range0)
+        self.buffer.buffer().slice(range0)
     }
 }
 impl PartialEq for RenderIndices {
     fn eq(&self, other: &Self) -> bool {
-        self.buffer.key() == other.buffer.key() && self.buffer_range == other.buffer_range && self.format == other.format
+        &self.buffer == &other.buffer && self.format == other.format
     }
     fn ne(&self, other: &Self) -> bool {
         !self.eq(other)
