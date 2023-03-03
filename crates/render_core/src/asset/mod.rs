@@ -1,34 +1,8 @@
 use std::{hash::Hash, marker::PhantomData, fmt::Debug};
 
-use pi_assets::{asset::{Handle, Asset}, mgr::AssetMgr};
+use pi_assets::{asset::{Handle, Asset, GarbageEmpty}, mgr::AssetMgr};
 use pi_hash::XHashMap;
 use pi_share::Share;
-
-use crate::rhi::{device::RenderDevice, RenderQueue};
-
-pub mod draw_obj;
-pub mod draw_sort;
-pub mod draw_obj_list;
-pub mod vertices;
-pub mod indices;
-pub mod buffer;
-pub mod bind_buffer;
-pub mod bind;
-pub mod bind_group;
-pub mod attributes;
-pub mod buildin_data;
-pub mod buildin_var;
-pub mod shader;
-pub mod instance;
-pub mod vertex_buffer;
-pub mod vertex_buffer_loader;
-pub mod vertex_buffer_desc;
-pub mod vertex_format;
-pub mod pipeline;
-pub mod texture;
-pub mod sampler;
-pub mod shader_stage;
-pub mod error;
 
 pub const ASSET_SIZE_FOR_UNKOWN: usize = 256;
 
@@ -44,28 +18,45 @@ pub fn bytes_write_to_memory(
     }
 }
 
-#[derive(Debug, Default)]
-pub struct AssetDataMap<K: Clone + Hash + PartialEq + Eq, A: Asset<Key = K>> {
-    datamap: XHashMap<K, A>,
+pub struct AssetDataCenter<K: Clone + Hash + PartialEq + Eq, A: Asset<Key = K>, P: Clone> {
+    datamap: XHashMap<K, (A, Option<P>)>,
+    asset_mgr: Share<AssetMgr<A>>,
 }
-impl<K: Clone + Hash + PartialEq + Eq, A: Asset<Key = K>> AssetDataMap<K, A> {
+impl<K: Clone + Hash + PartialEq + Eq, A: Asset<Key = K>, P: Clone> AssetDataCenter<K, A, P> {
+    pub fn new(ref_garbage: bool, capacity: usize, timeout: usize) -> Self {
+        let asset_mgr = AssetMgr::<A>::new(GarbageEmpty(), ref_garbage, capacity, timeout);
+
+        Self { datamap: XHashMap::default(), asset_mgr }
+    }
+    pub fn get(
+        &self,
+        key: &K,
+    ) -> Option<Handle<A>> {
+        self.asset_mgr.get(key)
+    }
+    pub fn check(
+        &self,
+        key: &K,
+    ) -> bool {
+        self.datamap.contains_key(key)
+    }
     pub fn add(
         &mut self,
         key: &K,
         value: A,
+        param: Option<P>,
     ) {
         if !self.datamap.contains_key(key) {
-            self.datamap.insert(key.clone(), value);
+            self.datamap.insert(key.clone(), (value, param));
         }
     }
     pub fn single_create(
         &mut self,
-        asset_mgr: &Share<AssetMgr<A>>,
-    ) -> XHashMap<K, Handle<A>> {
+    ) -> XHashMap<K, (Handle<A>, Option<P>)> {
         let mut result = XHashMap::default();
         self.datamap.drain().for_each(|(key, data)| {
-            if let Some(range) = asset_mgr.insert(key.clone(), data) {
-                result.insert(key, range);
+            if let Some(range) = self.asset_mgr.insert(key.clone(), data.0) {
+                result.insert(key, (range, data.1));
             }
         });
         result
@@ -76,27 +67,35 @@ pub struct AssetLoader<
     K: Debug + Clone + Hash + PartialEq + Eq,
     I: Clone + Hash + PartialEq + Eq,
     A: Asset<Key = K>,
-    D: From<Handle<A>>
+    P: Clone,
+    D: From<(Handle<A>, Option<P>)>
 > {
     waits: XHashMap<K, XHashMap<I, I>>,
-    p: PhantomData<(A, D)>
+    p: PhantomData<(A, P, D)>
 }
 impl<
     K: Debug + Clone + Hash + PartialEq + Eq,
     I: Clone + Hash + PartialEq + Eq,
     A: Asset<Key = K>,
-    D: From<Handle<A>>
-> AssetLoader<K, I, A, D> {
+    P: Clone,
+    D: From<(Handle<A>, Option<P>)>
+> Default for AssetLoader<K, I, A, P, D> {
+    fn default() -> Self {
+        Self { waits: XHashMap::default(), p: PhantomData }
+    }
+}
+impl<
+    K: Debug + Clone + Hash + PartialEq + Eq,
+    I: Clone + Hash + PartialEq + Eq,
+    A: Asset<Key = K>,
+    P: Clone,
+    D: From<(Handle<A>, Option<P>)>
+> AssetLoader<K, I, A, P, D> {
     pub fn request(
         &mut self,
         id: I,
         key: &K,
-        value: Option<A>,
-        datamap: &mut AssetDataMap<K, A>,
     ) {
-        if let Some(value) = value {
-            datamap.add(key, value);
-        }
         if !self.waits.contains_key(key) {
             self.waits.insert(key.clone(), XHashMap::default());
         }
@@ -107,7 +106,7 @@ impl<
     pub fn loaded(
         &mut self,
         key: &K,
-        value: &Handle<A>,
+        value: &(Handle<A>, Option<P>)
     ) -> Vec<(I, D)> {
         let mut result = vec![];
         if let Some(list) = self.waits.get_mut(&key) {

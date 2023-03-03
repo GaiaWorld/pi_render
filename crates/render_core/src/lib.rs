@@ -18,6 +18,7 @@ pub mod graph;
 pub mod rhi;
 pub mod renderer;
 pub mod render_3d;
+pub mod asset;
 
 mod math;
 pub use math::*;

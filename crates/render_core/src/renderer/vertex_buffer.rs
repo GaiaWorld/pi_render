@@ -5,7 +5,7 @@ use pi_atom::Atom;
 use pi_share::{Share, ShareMutex};
 use wgpu::util::BufferInitDescriptor;
 
-use crate::rhi::{device::RenderDevice, RenderQueue,  buffer::Buffer};
+use crate::{rhi::{device::RenderDevice, RenderQueue,  buffer::Buffer}, render_3d::shader::instance_code::EInstanceCode};
 
 use super::{
     attributes::{EVertexDataKind, ShaderAttribute, TAsWgpuVertexAtribute, KeyShaderFromAttributes},
@@ -81,7 +81,6 @@ impl From<&Vec<VertexBufferDesc>> for VertexBufferLayouts {
 impl VertexBufferLayouts {
     pub fn as_key_shader_from_attributes(&self) -> KeyShaderFromAttributes {
         let mut result = KeyShaderFromAttributes(vec![]);
-
         self.layout_list.iter().for_each(|layout| {
             let len = layout.list.len();
 

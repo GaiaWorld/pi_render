@@ -14,5 +14,5 @@ pub trait TInstancedData {
     /// 数据类型
     fn vertex_kind(&self) -> EVertexDataKind;
     /// 数据搜集处理
-    fn collect(list: &Vec<&Self>, key: KeyVertexBuffer, device: &RenderDevice, queue: &RenderQueue, allocator: &mut VertexBufferAllocator, asset_mgr: &Share<AssetMgr<EVertexBufferRange>>) -> Option<Handle<EVertexBufferRange>> ;
+    fn collect(list: &Vec<&Self>) -> Vec<u8> ;
 }
