@@ -7,12 +7,12 @@ use pi_atom::Atom;
 
 use pi_share::{Share, ShareRwLock};
 use render_core::{
-    rhi::{device::RenderDevice, initialize_renderer, options::RenderOptions, RenderQueue, asset::TextureRes, shader::ShaderMeta, bind_group::BindGroup},
+    rhi::{device::RenderDevice, initialize_renderer, options::RenderOptions, RenderQueue, asset::TextureRes},
     renderer::{
         bind_buffer::BindBufferAllocator,
         sampler::SamplerRes,
         buildin_data::{DefaultTexture, EDefaultTexture},
-        bind_group::{BindGroupLayout, BindGroupUsage},
+        bind_group::{BindGroupLayout, BindGroupUsage, BindGroup},
         attributes::{ShaderAttribute, EVertexDataKind, KeyShaderFromAttributes},
         shader_stage::EShaderStage
     },
@@ -29,8 +29,8 @@ use render_core::{
         },
         bind_groups::{
             texture_sampler::{BindGroupTextureSamplers},
-            model::{BindGroupModel},
-            scene::{BindGroupScene}
+            model::{BindGroupModel, KeyBindGroupModel},
+            scene::{BindGroupScene, KeyBindGroupScene}
         },
         binds::{
             model::base::ShaderBindModelAboutMatrix,
@@ -278,21 +278,31 @@ gl_FragColor = vec4(baseColor.rgb, alpha);
     bind_buffer_allocator.write_buffer(&device, &queue);
     // write buffer, before bindgroup
 
-    let bindgroup_model: BindGroupModel = BindGroupModel::new(
+    let key = KeyBindGroupModel::new(
         bind_model,
         None,
         Some(bind_effect_value),
-        &device,
-        &asset_bind_group_layout,
-        &asset_bind_group,
-    ).unwrap();
-    let bindgroup_scene = BindGroupScene::new(
+    );
+    let key_bind_group = key.key_bind_group();
+    let key_bind_group_layout = key_bind_group.key_bind_group_layout();
+    let bind_group_layout = BindGroupLayout::new(&device, &key_bind_group_layout);
+    let bind_group_layout = asset_bind_group_layout.insert(key_bind_group_layout, bind_group_layout).unwrap();
+    let bind_group = BindGroup::new(&device, &key_bind_group, bind_group_layout);
+    let bind_group = asset_bind_group.insert(key_bind_group.clone(), bind_group).unwrap();
+    let bindgroup_model: BindGroupModel = BindGroupModel::new(BindGroupUsage::new(1, key_bind_group, bind_group), key);
+
+    let key = KeyBindGroupScene::new(
         bind_camera, 
         Some(bind_effect),
-        &device, 
-        &asset_bind_group_layout, 
-        &asset_bind_group,
-    ).unwrap();
+    );
+    let key_bind_group = key.key_bind_group();
+    let key_bind_group_layout = key_bind_group.key_bind_group_layout();
+    let bind_group_layout = BindGroupLayout::new(&device, &key_bind_group_layout);
+    let bind_group_layout = asset_bind_group_layout.insert(key_bind_group_layout, bind_group_layout).unwrap();
+    let bind_group = BindGroup::new(&device, &key_bind_group, bind_group_layout);
+    let bind_group = asset_bind_group.insert(key_bind_group.clone(), bind_group).unwrap();
+    let bindgroup_scene = BindGroupScene::new(BindGroupUsage::new(1, key_bind_group, bind_group), key);
+
 
     let meshdes = vec![
         ShaderAttribute { kind: EVertexDataKind::Position, location: 0 },

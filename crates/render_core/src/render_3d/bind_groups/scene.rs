@@ -5,7 +5,7 @@ use pi_share::Share;
 
 use crate::{
     renderer::{
-        bind_group::{BindGroupUsage, BindGroupLayout},
+        bind_group::{BindGroupUsage, BindGroupLayout, KeyBindGroup},
         bind::{EKeyBind, KeyBindBuffer},
         shader::{TShaderSetBlock, TShaderBindCode}
     },
@@ -17,7 +17,7 @@ use crate::{
             }
         }
     },
-    rhi::{device::RenderDevice, bind_group::BindGroup}
+    rhi::{device::RenderDevice}
 };
 
 #[derive(Debug, Default, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
@@ -27,63 +27,75 @@ pub struct KeyShaderSetScene {
     pub env: bool,
 }
 
-#[derive(Debug, Clone)]
-pub struct BindGroupScene {
-    pub bind_group: BindGroupUsage,
-    base: BindUseSceneAboutCamera,
-    base_effect: Option<BindUseSceneAboutEffect>,
-    pub key: KeyShaderSetScene,
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub struct KeyBindGroupScene {
+    pub bind_base: BindUseSceneAboutCamera,
+    pub bind_base_effect: Option<BindUseSceneAboutEffect>,
+    pub key_set: KeyShaderSetScene,
 }
-impl BindGroupScene {
+impl KeyBindGroupScene {
     pub fn new(
         bind_base: Arc<ShaderBindSceneAboutBase>,
         bind_base_effect: Option<Arc<ShaderBindSceneAboutEffect>>,
-        device: &RenderDevice,
-        asset_mgr_bind_group_layout: &Share<AssetMgr<BindGroupLayout>>,
-        asset_mgr_bind_group: &Share<AssetMgr<BindGroup>>,
-    ) -> Option<Self> {
-        let mut key = KeyShaderSetScene::default();
-        let mut binds = BindGroupUsage::none_binds();
-        let mut base_effect = None;
+    ) -> Self {
+        let mut key_set = KeyShaderSetScene::default();
 
         let mut binding = 0;
-        let base = BindUseSceneAboutCamera { data: bind_base.clone(), bind: binding as u32 };
-        binds[binding] = Some(EKeyBind::Buffer(KeyBindBuffer {
-            data: bind_base.data.clone(),
-            layout: Arc::new(bind_base.key_layout(binding as u16)),
-        }));
+        let bind_base = BindUseSceneAboutCamera { data: bind_base, bind: binding as u32 };
         binding += 1;
 
-        if let Some(bind_base_effect) = bind_base_effect {
-            base_effect = Some(BindUseSceneAboutEffect { data: bind_base_effect.clone(), bind: binding as u32 });
-            key.base_effect = true;
-            binds[binding] = Some(EKeyBind::Buffer(KeyBindBuffer {
-                data: bind_base_effect.data.clone(),
-                layout: Arc::new(bind_base_effect.key_layout(binding as u16)),
+        let bind_base_effect = if let Some(bind_base_effect) = bind_base_effect {
+            key_set.base_effect = true;
+            Some(BindUseSceneAboutEffect { data: bind_base_effect, bind: binding as u32 })
+            // binding += 1;
+        } else { None };
+
+        Self {
+            bind_base,
+            bind_base_effect,
+            key_set,
+        }
+    }
+    pub fn key_bind_group(&self) -> KeyBindGroup {
+        let mut binds = BindGroupUsage::none_binds();
+        binds[self.bind_base.bind as usize] = Some(EKeyBind::Buffer(KeyBindBuffer {
+            data: self.bind_base.data.data.clone(),
+            layout: Arc::new(self.bind_base.data.key_layout(self.bind_base.bind as u16)),
+        }));
+
+        if let Some(bind_base_effect) = &self.bind_base_effect {
+            binds[bind_base_effect.bind as usize] = Some(EKeyBind::Buffer(KeyBindBuffer {
+                data: bind_base_effect.data.data.clone(),
+                layout: Arc::new(bind_base_effect.data.key_layout(bind_base_effect.bind as u16)),
             }));
             // binding += 1;
         }
 
-        if let Some(bind_group) = BindGroupUsage::create(0, device, binds, asset_mgr_bind_group_layout, asset_mgr_bind_group) {
-            Some(
-                Self {
-                    bind_group,
-                    base,
-                    base_effect,
-                    key,
-                }
-            )
-        } else {
-            None
-        }
+        KeyBindGroup(binds)
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct BindGroupScene {
+    pub(crate) bind_group: BindGroupUsage,
+    pub(crate) key: KeyBindGroupScene,
+}
+impl BindGroupScene {
+    pub fn new(
+        bind_group: BindGroupUsage,
+        key: KeyBindGroupScene,
+    ) -> Self {
+        Self { bind_group, key }
+    }
+    pub fn key(&self) -> &KeyBindGroupScene { &self.key }
+    pub fn bind_group(&self) -> &BindGroupUsage { &self.bind_group }
 }
 impl TShaderSetBlock for BindGroupScene {
     fn vs_define_code(&self) -> String {
         let mut result = String::from("");
 
-        result += self.base.vs_define_code(self.bind_group.set).as_str();
-        if let Some(base_effect) = &self.base_effect {
+        result += self.key.bind_base.vs_define_code(self.bind_group.set).as_str();
+        if let Some(base_effect) = &self.key.bind_base_effect {
             result += base_effect.vs_define_code(self.bind_group.set).as_str();
         }
 

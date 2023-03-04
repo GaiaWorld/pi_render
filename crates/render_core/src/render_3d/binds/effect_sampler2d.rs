@@ -26,7 +26,7 @@ pub trait TEffectBindSampler2DData: TEffectBindSampler2D {
     }
 }
 
-#[derive(Debug, Clone, Deref)]
+#[derive(Debug, Clone, Deref, Hash, PartialEq, Eq)]
 pub struct EffectBindSampler2D01(pub BindDataSampler);
 impl From<Handle<SamplerRes>> for EffectBindSampler2D01 {
     fn from(value: Handle<SamplerRes>) -> Self { Self( BindDataSampler(value) ) }
@@ -38,7 +38,7 @@ impl TEffectBindSampler2DData for EffectBindSampler2D01 {
     fn data(&self) -> &BindDataSampler { &self }
 }
 
-#[derive(Debug, Clone, Deref)]
+#[derive(Debug, Clone, Deref, Hash, PartialEq, Eq)]
 pub struct EffectBindSampler2D02(pub BindDataSampler);
 impl From<Handle<SamplerRes>> for EffectBindSampler2D02 {
     fn from(value: Handle<SamplerRes>) -> Self { Self( BindDataSampler(value) ) }
@@ -51,7 +51,7 @@ impl TEffectBindSampler2DData for EffectBindSampler2D02 {
 }
 
 
-#[derive(Debug, Clone, Deref)]
+#[derive(Debug, Clone, Deref, Hash, PartialEq, Eq)]
 pub struct EffectBindSampler2D03(pub BindDataSampler);
 impl From<Handle<SamplerRes>> for EffectBindSampler2D03 {
     fn from(value: Handle<SamplerRes>) -> Self { Self( BindDataSampler(value) ) }
@@ -64,7 +64,7 @@ impl TEffectBindSampler2DData for EffectBindSampler2D03 {
 }
 
 
-#[derive(Debug, Clone, Deref)]
+#[derive(Debug, Clone, Deref, Hash, PartialEq, Eq)]
 pub struct EffectBindSampler2D04(pub BindDataSampler);
 impl From<Handle<SamplerRes>> for EffectBindSampler2D04 {
     fn from(value: Handle<SamplerRes>) -> Self { Self( BindDataSampler(value) ) }
@@ -77,7 +77,7 @@ impl TEffectBindSampler2DData for EffectBindSampler2D04 {
 }
 
 
-#[derive(Debug, Clone, Deref)]
+#[derive(Debug, Clone, Deref, Hash, PartialEq, Eq)]
 pub struct EffectBindSampler2D05(pub BindDataSampler);
 impl From<Handle<SamplerRes>> for EffectBindSampler2D05 {
     fn from(value: Handle<SamplerRes>) -> Self { Self( BindDataSampler(value) ) }
@@ -90,7 +90,7 @@ impl TEffectBindSampler2DData for EffectBindSampler2D05 {
 }
 
 
-#[derive(Debug, Clone, Deref)]
+#[derive(Debug, Clone, Deref, Hash, PartialEq, Eq)]
 pub struct EffectBindSampler2D06(pub BindDataSampler);
 impl From<Handle<SamplerRes>> for EffectBindSampler2D06 {
     fn from(value: Handle<SamplerRes>) -> Self { Self( BindDataSampler(value) ) }

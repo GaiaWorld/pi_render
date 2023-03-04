@@ -76,17 +76,15 @@ pub struct AssetLoader<
     K: Debug + Clone + Hash + PartialEq + Eq,
     I: Clone + Hash + PartialEq + Eq,
     A: Asset<Key = K>,
-    D: From<Handle<A>>
 > {
     waits: XHashMap<K, XHashMap<I, I>>,
-    p: PhantomData<(A, D)>
+    p: PhantomData<A>
 }
 impl<
     K: Debug + Clone + Hash + PartialEq + Eq,
     I: Clone + Hash + PartialEq + Eq,
     A: Asset<Key = K>,
-    D: From<Handle<A>>
-> AssetLoader<K, I, A, D> {
+> AssetLoader<K, I, A> {
     pub fn request(
         &mut self,
         id: I,
@@ -108,11 +106,11 @@ impl<
         &mut self,
         key: &K,
         value: &Handle<A>,
-    ) -> Vec<(I, D)> {
+    ) -> Vec<(I, Handle<A>)> {
         let mut result = vec![];
         if let Some(list) = self.waits.get_mut(&key) {
             list.drain().for_each(|(_, id)| {
-                result.push((id, D::from(value.clone())))
+                result.push((id, value.clone()))
             });
         }
 

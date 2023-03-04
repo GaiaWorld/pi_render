@@ -71,23 +71,6 @@ impl<const MAX_BIND_GROUP_COUNT: usize, K: TKeyShaderSetBlock> KeyRenderPipeline
         self.hash(&mut hasher);
         hasher.finish()
     }
-    pub fn bind_group_layouts(
-        key_bindgroup_layouts: &[Option<Arc<KeyBindGroupLayout>>; MAX_BIND_GROUP_COUNT],
-        asset_mgr_bindgroup_layout: &Share<AssetMgr<BindGroupLayout>>,
-    ) -> Option<Vec<Handle<BindGroupLayout>>> {
-        let mut result = vec![];
-        let len = key_bindgroup_layouts.len();
-        for i in 0..len {
-            if let Some(key) = key_bindgroup_layouts.get(i).unwrap() {
-                if let Some(layout) = asset_mgr_bindgroup_layout.get(key) {
-                    result.push(layout);
-                } else {
-                    return None;
-                }
-            }
-        }
-        Some(result)
-    }
     pub fn create(
         key: KeyRenderPipeline<MAX_BIND_GROUP_COUNT, K>,
         shader: Handle<Shader<MAX_BIND_GROUP_COUNT, K>>,

@@ -1,6 +1,7 @@
-use std::sync::Arc;
+use std::{sync::Arc, hash::Hash};
 
-use pi_assets::asset::Asset;
+use derive_deref_rs::Deref;
+use pi_assets::asset::{Asset, Handle};
 use pi_atom::Atom;
 use wgpu::ShaderSource;
 

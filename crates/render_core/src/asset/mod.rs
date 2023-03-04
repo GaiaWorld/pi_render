@@ -1,4 +1,4 @@
-use std::{hash::Hash, marker::PhantomData, fmt::Debug};
+use std::{hash::Hash, marker::PhantomData, fmt::Debug, mem::replace, collections::hash_map::Keys};
 
 use pi_assets::{asset::{Handle, Asset, GarbageEmpty}, mgr::AssetMgr};
 use pi_hash::XHashMap;
@@ -50,6 +50,9 @@ impl<K: Clone + Hash + PartialEq + Eq, A: Asset<Key = K>, P: Clone> AssetDataCen
             self.datamap.insert(key.clone(), (value, param));
         }
     }
+    pub fn datamap(&self) -> &XHashMap<K, (A, Option<P>)> {
+        &self.datamap
+    }
     pub fn single_create(
         &mut self,
     ) -> XHashMap<K, (Handle<A>, Option<P>)> {
@@ -68,18 +71,16 @@ pub struct AssetLoader<
     I: Clone + Hash + PartialEq + Eq,
     A: Asset<Key = K>,
     P: Clone,
-    D: From<(Handle<A>, Option<P>)>
 > {
     waits: XHashMap<K, XHashMap<I, I>>,
-    p: PhantomData<(A, P, D)>
+    p: PhantomData<(A, P)>
 }
 impl<
     K: Debug + Clone + Hash + PartialEq + Eq,
     I: Clone + Hash + PartialEq + Eq,
     A: Asset<Key = K>,
-    P: Clone,
-    D: From<(Handle<A>, Option<P>)>
-> Default for AssetLoader<K, I, A, P, D> {
+    P: Clone
+> Default for AssetLoader<K, I, A, P> {
     fn default() -> Self {
         Self { waits: XHashMap::default(), p: PhantomData }
     }
@@ -88,9 +89,8 @@ impl<
     K: Debug + Clone + Hash + PartialEq + Eq,
     I: Clone + Hash + PartialEq + Eq,
     A: Asset<Key = K>,
-    P: Clone,
-    D: From<(Handle<A>, Option<P>)>
-> AssetLoader<K, I, A, P, D> {
+    P: Clone
+> AssetLoader<K, I, A, P> {
     pub fn request(
         &mut self,
         id: I,
@@ -107,11 +107,12 @@ impl<
         &mut self,
         key: &K,
         value: &(Handle<A>, Option<P>)
-    ) -> Vec<(I, D)> {
+    ) -> Vec<(I, (Handle<A>, Option<P>))> {
         let mut result = vec![];
-        if let Some(list) = self.waits.get_mut(&key) {
+        let list = replace(&mut self.waits.get_mut(&key), None);
+        if let Some(list) = list {
             list.drain().for_each(|(_, id)| {
-                result.push((id, D::from(value.clone())))
+                result.push((id, value.clone()))
             });
         }
 
