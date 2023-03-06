@@ -12,6 +12,7 @@ pub struct BufferId(Uuid);
 pub struct Buffer {
     id: BufferId,
     value: Share<wgpu::Buffer>,
+    size: wgpu::BufferAddress,
 }
 
 impl Buffer {
@@ -19,6 +20,11 @@ impl Buffer {
     #[inline]
     pub fn id(&self) -> BufferId {
         self.id
+    }
+
+    #[inline]
+    pub fn size(&self) -> wgpu::BufferAddress {
+        self.size
     }
 
     /// 取 切片
@@ -42,11 +48,12 @@ impl Buffer {
     }
 }
 
-impl From<wgpu::Buffer> for Buffer {
-    fn from(value: wgpu::Buffer) -> Self {
+impl From<(wgpu::Buffer, wgpu::BufferAddress)> for Buffer {
+    fn from(value: (wgpu::Buffer, wgpu::BufferAddress)) -> Self {
         Buffer {
             id: BufferId(Uuid::new_v4()),
-            value: Share::new(value),
+            value: Share::new(value.0),
+            size: value.1,
         }
     }
 }

@@ -1,0 +1,60 @@
+use std::{time::Instant, sync::Arc, slice::Iter};
+
+use crate::renderer::draw_obj::TempDrawInfoRecord;
+
+use super::{draw_obj::{DrawObj}};
+
+#[derive(Default)]
+pub struct DrawList {
+    pub list: Vec<Arc<DrawObj>>,
+    /// x, y, w, h, min_depth, max_depth
+    /// 数值 0. ~ 1., 在设置视口时 应用到具体的视口上
+    pub viewport: (f32, f32, f32, f32, f32, f32),
+}
+impl DrawList {
+    pub fn render<'a, T: AsRef<DrawObj>>(
+        draws: &'a [T],
+        renderpass: & mut wgpu::RenderPass<'a>,
+    ) {
+        let time = Instant::now();
+
+        let mut temp_vertex_record: TempDrawInfoRecord = TempDrawInfoRecord::default();
+
+        let mut draw_count = 0;
+        draws.iter().for_each(|draw| {
+            let draw = draw.as_ref();
+            if let Some(pipeline) = &draw.pipeline {
+                renderpass.set_pipeline(pipeline);
+                draw.bindgroups.set(renderpass);
+
+                let mut vertex_range = 0..0;
+                draw.vertices.iter().for_each(|item| {
+                    if let Some(item) = item {
+                        if temp_vertex_record.record_vertex_and_check_diff_with_last(item) {
+                            renderpass.set_vertex_buffer(item.slot, item.slice());
+                            vertex_range = item.value_range();
+                        }
+                    }
+                });
+    
+                let instance_range = draw.instances.clone();
+
+                match &draw.indices {
+                    Some(indices) => {
+                        if temp_vertex_record.record_indices_and_check_diff_with_last(indices) {
+                            renderpass.set_index_buffer(indices.slice(), indices.format);
+                        }
+                        renderpass.draw_indexed(indices.value_range(), 0 as i32, instance_range);
+                    },
+                    None => {
+                        renderpass.draw(vertex_range, instance_range);
+                    },
+                }
+                draw_count += 1;
+            }
+        });
+        
+        let time1 = Instant::now();
+        log::info!("DrawList: {}, {:?}", draw_count, time1 - time);
+    }
+}

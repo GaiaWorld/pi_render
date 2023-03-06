@@ -115,13 +115,13 @@ impl RenderDevice {
     /// Creates a [`Buffer`].
     pub fn create_buffer(&self, desc: &wgpu::BufferDescriptor) -> Buffer {
         let wgpu_buffer = self.0.create_buffer(desc);
-        Buffer::from(wgpu_buffer)
+        Buffer::from((wgpu_buffer, desc.size))
     }
 
     /// Creates a [`Buffer`] and initializes it with the specified data.
     pub fn create_buffer_with_data(&self, desc: &wgpu::util::BufferInitDescriptor) -> Buffer {
         let wgpu_buffer = self.0.create_buffer_init(desc);
-        Buffer::from(wgpu_buffer)
+        Buffer::from((wgpu_buffer, desc.contents.len() as wgpu::BufferAddress))
     }
 
     /// Creates a new [`Texture`].
