@@ -283,7 +283,7 @@ impl VertexBufferAllocator {
 
 }
 
-pub(crate) struct FixedSizeBufferPoolNotUpdatable {
+pub struct FixedSizeBufferPoolNotUpdatable {
     /// * 大内存块列表 (第i个的尺寸为 i*block_size)
     buffers: Vec<Arc<UseNotUpdatableBuffer>>,
     /// * 目标尺寸
@@ -294,7 +294,7 @@ pub(crate) struct FixedSizeBufferPoolNotUpdatable {
 impl FixedSizeBufferPoolNotUpdatable {
     /// * `block_size` 大内存块的基础尺寸
     /// * `fixed_size` 目标区间尺寸
-    pub(crate) fn new(
+    pub fn new(
         block_size: u32,
         usage: wgpu::BufferUsages,
     ) -> Self {
@@ -305,7 +305,7 @@ impl FixedSizeBufferPoolNotUpdatable {
             usage
         }
     }
-    pub(crate) fn allocate(&mut self, asset_mgr: &Share<AssetMgr<NotUpdatableBuffer>>, device: &RenderDevice, queue: &RenderQueue, data: &[u8]) -> Option<NotUpdatableBufferRange> {
+    pub fn allocate(&mut self, asset_mgr: &Share<AssetMgr<NotUpdatableBuffer>>, device: &RenderDevice, queue: &RenderQueue, data: &[u8]) -> Option<NotUpdatableBufferRange> {
         let len = self.buffers.len();
         let mut key_buffer = None;
         // 寻找可用区间
