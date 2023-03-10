@@ -77,14 +77,10 @@ impl RenderVertices {
     pub fn value_range(&self) -> Range<u32> {
         let mut range0 = self.buffer.range();
 
-        let range = if let Some(range) = self.buffer_range.as_ref() {
-            range.clone()
-        } else {
-            Range { start: 0, end: 0 }
-        };
-
-        range0.start    += range.start;
-        range0.end      = range0.start + range.end - range.start;
+        if let Some(range) = self.buffer_range.as_ref() {
+            range0.start    += range.start;
+            range0.end      = range0.start + (range.end - range.start);
+        }
 
         Range {
             start: (range0.start / self.size_per_value) as u32,
@@ -94,17 +90,12 @@ impl RenderVertices {
     pub fn slice<'a>(&'a self) -> wgpu::BufferSlice {
         let mut range0 = self.buffer.range();
 
-        let range = if let Some(range) = self.buffer_range.as_ref() {
-            range.clone()
-        } else {
-            Range { start: 0, end: 0 }
-        };
-        // log::info!("slice {:?}", range);
-    
-        range0.start    += range.start;
-        range0.end      = range0.start + range.end - range.start;
+        if let Some(range) = self.buffer_range.as_ref() {
+            range0.start    += range.start;
+            range0.end      = range0.start + (range.end - range.start);
+        }
+        log::info!("slice {:?}", range0);
 
-        // log::info!("slice {:?}", range0);
         self.buffer.buffer().slice(range0)
     }
 }
