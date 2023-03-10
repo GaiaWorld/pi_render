@@ -1,4 +1,4 @@
-use std::{ops::Range, hash::Hash, fmt::Debug};
+use std::{ops::Range, hash::Hash, fmt::Debug, sync::Arc};
 
 use lazy_static::__Deref;
 use pi_assets::asset::Handle;
@@ -15,7 +15,7 @@ pub trait TKeyAttributes: Debug + Clone + PartialEq + Eq + Hash {
 pub enum EVerticesBufferUsage {
     GUI(Handle<RenderRes<Buffer>>),
     Other(Handle<EVertexBufferRange>),
-    EVBRange(EVertexBufferRange),
+    EVBRange(Arc<EVertexBufferRange>),
 }
 impl EVerticesBufferUsage {
     pub fn range(&self) -> Range<wgpu::BufferAddress> {
