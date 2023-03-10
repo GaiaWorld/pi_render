@@ -19,6 +19,7 @@ impl DrawList {
         let time = Instant::now();
 
         let mut temp_vertex_record: TempDrawInfoRecord = TempDrawInfoRecord::default();
+        let mut vertex_range = 0..0;
 
         let mut draw_count = 0;
         draws.iter().for_each(|draw| {
@@ -27,9 +28,10 @@ impl DrawList {
                 renderpass.set_pipeline(pipeline);
                 draw.bindgroups.set(renderpass);
 
-                let mut vertex_range = 0..0;
                 draw.vertices.iter().for_each(|item| {
                     if let Some(item) = item {
+                        // log::info!("vertex_range {:?}", item.buffer_range.clone());
+                        // log::info!("vertex_range {:?}", item.value_range().clone());
                         if temp_vertex_record.record_vertex_and_check_diff_with_last(item) {
                             renderpass.set_vertex_buffer(item.slot, item.slice());
                             vertex_range = item.value_range();
@@ -38,16 +40,18 @@ impl DrawList {
                 });
     
                 let instance_range = draw.instances.clone();
+                // log::info!("vertex_range {:?}", vertex_range.clone());
 
                 match &draw.indices {
                     Some(indices) => {
                         if temp_vertex_record.record_indices_and_check_diff_with_last(indices) {
                             renderpass.set_index_buffer(indices.slice(), indices.format);
                         }
+                        // log::info!("indices {:?}", indices.value_range());
                         renderpass.draw_indexed(indices.value_range(), 0 as i32, instance_range);
                     },
                     None => {
-                        renderpass.draw(vertex_range, instance_range);
+                        renderpass.draw(vertex_range.clone(), instance_range);
                     },
                 }
                 draw_count += 1;

@@ -38,7 +38,7 @@ use render_core::{
             scene::{base::ShaderBindSceneAboutBase, effect::ShaderBindSceneAboutEffect},
             effect_texture2d::EffectBindTexture2D01
         }
-    }
+    }, asset::TAssetKeyU64
 };
 use wgpu::{Device, Instance};
 
@@ -286,9 +286,9 @@ gl_FragColor = vec4(baseColor.rgb, alpha);
     let key_bind_group = key.key_bind_group();
     let key_bind_group_layout = key_bind_group.key_bind_group_layout();
     let bind_group_layout = BindGroupLayout::new(&device, &key_bind_group_layout);
-    let bind_group_layout = asset_bind_group_layout.insert(key_bind_group_layout, bind_group_layout).unwrap();
+    let bind_group_layout = asset_bind_group_layout.insert(key_bind_group_layout.asset_u64(), bind_group_layout).unwrap();
     let bind_group = BindGroup::new(&device, &key_bind_group, bind_group_layout);
-    let bind_group = asset_bind_group.insert(key_bind_group.clone(), bind_group).unwrap();
+    let bind_group = asset_bind_group.insert(key_bind_group.asset_u64(), bind_group).unwrap();
     let bindgroup_model: BindGroupModel = BindGroupModel::new(BindGroupUsage::new(1, key_bind_group, bind_group), key);
 
     let key = KeyBindGroupScene::new(
@@ -298,9 +298,9 @@ gl_FragColor = vec4(baseColor.rgb, alpha);
     let key_bind_group = key.key_bind_group();
     let key_bind_group_layout = key_bind_group.key_bind_group_layout();
     let bind_group_layout = BindGroupLayout::new(&device, &key_bind_group_layout);
-    let bind_group_layout = asset_bind_group_layout.insert(key_bind_group_layout, bind_group_layout).unwrap();
+    let bind_group_layout = asset_bind_group_layout.insert(key_bind_group_layout.asset_u64(), bind_group_layout).unwrap();
     let bind_group = BindGroup::new(&device, &key_bind_group, bind_group_layout);
-    let bind_group = asset_bind_group.insert(key_bind_group.clone(), bind_group).unwrap();
+    let bind_group = asset_bind_group.insert(key_bind_group.asset_u64(), bind_group).unwrap();
     let bindgroup_scene = BindGroupScene::new(BindGroupUsage::new(1, key_bind_group, bind_group), key);
 
 

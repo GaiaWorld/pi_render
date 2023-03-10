@@ -15,18 +15,21 @@ pub trait TKeyAttributes: Debug + Clone + PartialEq + Eq + Hash {
 pub enum EVerticesBufferUsage {
     GUI(Handle<RenderRes<Buffer>>),
     Other(Handle<EVertexBufferRange>),
+    EVBRange(EVertexBufferRange),
 }
 impl EVerticesBufferUsage {
     pub fn range(&self) -> Range<wgpu::BufferAddress> {
         match self {
             EVerticesBufferUsage::GUI(val) => Range { start: 0, end: val.size() },
             EVerticesBufferUsage::Other(val) => val.range(),
+            EVerticesBufferUsage::EVBRange(val) => val.range(),
         }
     }
     pub fn buffer(&self) -> &wgpu::Buffer {
         match self {
             EVerticesBufferUsage::GUI(val) => val,
             EVerticesBufferUsage::Other(val) => val.buffer(),
+            EVerticesBufferUsage::EVBRange(val) => val.buffer(),
         }
     }
 }
@@ -38,6 +41,9 @@ impl PartialEq for EVerticesBufferUsage {
             },
             (Self::Other(l0), Self::Other(r0)) => {
                 l0.key() == r0.key() && l0.range() == r0.range()
+            },
+            (Self::EVBRange(_), Self::EVBRange(_)) => {
+                false
             },
             _ => false,
         }
@@ -51,6 +57,7 @@ impl Debug for EVerticesBufferUsage {
         match self {
             Self::GUI(arg0) => f.debug_tuple("GUI").field(arg0).finish(),
             Self::Other(arg0) => f.debug_tuple("Other").field(arg0).finish(),
+            Self::EVBRange(arg0) => f.debug_tuple("Other").field(arg0).finish(),
         }
     }
 }
@@ -77,7 +84,7 @@ impl RenderVertices {
         };
 
         range0.start    += range.start;
-        range0.end      += range0.start + range.end - range.start;
+        range0.end      = range0.start + range.end - range.start;
 
         Range {
             start: (range0.start / self.size_per_value) as u32,
@@ -92,10 +99,12 @@ impl RenderVertices {
         } else {
             Range { start: 0, end: 0 }
         };
+        // log::info!("slice {:?}", range);
     
         range0.start    += range.start;
-        range0.end      += range0.start + range.end - range.start;
+        range0.end      = range0.start + range.end - range.start;
 
+        // log::info!("slice {:?}", range0);
         self.buffer.buffer().slice(range0)
     }
 }
