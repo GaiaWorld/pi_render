@@ -5,9 +5,9 @@ use pi_assets::{asset::{Handle, Asset}, mgr::AssetMgr};
 use pi_hash::DefaultHasher;
 use pi_share::Share;
 
-use crate::{rhi::{device::RenderDevice}, asset::TAssetKeyU64};
+use crate::{rhi::{device::RenderDevice}, asset::{TAssetKeyU64, ASSET_SIZE_FOR_UNKOWN}};
 
-use super::{bind::{EKeyBind, KeyBindLayout, EBindResource}, ASSET_SIZE_FOR_UNKOWN};
+use super::{bind::{EKeyBind, KeyBindLayout, EBindResource}};
 
 pub const MAX_BIND_COUNT: usize = 16;
 

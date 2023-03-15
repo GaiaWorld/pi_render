@@ -5,7 +5,7 @@ use pi_share::{Share, ShareMutex};
 
 use crate::rhi::{dyn_uniform_buffer::SingleBufferAlloter, shader::WriteBuffer, device::RenderDevice, RenderQueue, buffer::Buffer};
 
-use super::bytes_write_to_memory;
+use crate::asset::bytes_write_to_memory;
 
 pub struct AssetRWBuffer(SingleBufferAlloter, u32);
 impl Asset for AssetRWBuffer {

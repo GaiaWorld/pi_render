@@ -4,6 +4,9 @@ use pi_assets::asset::Handle;
 use pi_atom::Atom;
 
 use crate::rhi::asset::TextureRes;
+use crate::rhi::texture::TextureView;
+
+use super::texture_view::ETextureViewUsage;
 
 
 pub type KeyTexture = Atom;
@@ -29,11 +32,17 @@ impl ETextureArray {
     }
 }
 
+// #[derive(Clone, Hash)]
 #[derive(Clone)]
-pub struct BindDataTexture2D(pub Handle<TextureRes>);
+pub struct BindDataTexture2D(pub ETextureViewUsage);
+impl BindDataTexture2D {
+    pub fn view(&self) -> &wgpu::TextureView {
+        self.0.view()
+    }
+}
 impl Hash for BindDataTexture2D {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.0.key().hash(state);
+        self.0.key().hash(state)
     }
 }
 impl PartialEq for BindDataTexture2D {
@@ -55,7 +64,7 @@ impl Deref for BindDataTexture2D {
     type Target = wgpu::TextureView;
 
     fn deref(&self) -> &Self::Target {
-        &self.0.texture_view
+        self.0.view()
     }
 }
 
@@ -69,7 +78,7 @@ impl<const N: usize> BindDataTextureArrayN<N> {
     }
     pub fn array<'a>(&'a self) -> Vec<&'a wgpu::TextureView> {
         let mut views = vec![];
-        self.0.iter().for_each(|v| views.push(&v.0.texture_view));
+        self.0.iter().for_each(|v| views.push(v.0.view()) );
         views
     }
 }

@@ -5,7 +5,7 @@ use pi_atom::Atom;
 use pi_share::{Share, ShareMutex};
 use wgpu::util::BufferInitDescriptor;
 
-use crate::{rhi::{device::RenderDevice, RenderQueue,  buffer::Buffer}, render_3d::shader::instance_code::EInstanceCode};
+use crate::{rhi::{device::RenderDevice, RenderQueue,  buffer::Buffer}, render_3d::shader::instance_code::EInstanceCode, asset::TAssetKeyU64};
 
 use super::{
     attributes::{EVertexDataKind, ShaderAttribute, TAsWgpuVertexAtribute, KeyShaderFromAttributes},
@@ -14,8 +14,24 @@ use super::{
     buffer::{FixedSizeBufferPool, AssetRWBuffer, RWBufferRange},
 };
 
-
-pub type KeyVertexBuffer = Atom;
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub struct KeyVertexBuffer(String);
+impl KeyVertexBuffer {
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+impl From<String> for KeyVertexBuffer {
+    fn from(value: String) -> Self {
+        Self(value)
+    }
+}
+impl From<&str> for KeyVertexBuffer {
+    fn from(value: &str) -> Self {
+        Self(String::from(value))
+    }
+}
+impl TAssetKeyU64 for KeyVertexBuffer {}
 pub type AssetVertexBuffer = EVertexBufferRange;
 
 // #[derive(Debug, Clone, Hash, PartialEq, Eq)]

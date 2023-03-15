@@ -30,20 +30,6 @@ pub mod sampler;
 pub mod shader_stage;
 pub mod error;
 
-pub const ASSET_SIZE_FOR_UNKOWN: usize = 256;
-
-pub fn bytes_write_to_memory(
-    bytes: &[u8],
-    offset: usize,
-    memory: &mut [u8],
-) {
-    let mut index = 0;
-    for v in bytes.iter() {
-        memory[offset + index] = *v;
-        index += 1;
-    }
-}
-
 #[derive(Debug, Default)]
 pub struct AssetDataMap<K: Clone + Hash + PartialEq + Eq, A: Asset<Key = K>> {
     datamap: XHashMap<K, A>,

@@ -209,7 +209,7 @@ impl EKeyBind {
     ) -> EBindResource<'a> {
         match self {
             Self::Buffer(val) => EBindResource::<'a>::Buffer(binding, &val.data.buffer(), val.data.size()),
-            Self::Texture2D(val) => EBindResource::<'a>::Texture2D(binding, &val.data.0.texture_view),
+            Self::Texture2D(val) => EBindResource::<'a>::Texture2D(binding, &val.data.view()),
             Self::Sampler(val) => EBindResource::<'a>::Sampler(binding, &val.data.0.0),
             Self::Texture2DArray(val) => {
                 EBindResource::<'a>::Texture2DArray(binding, val.data.array())
