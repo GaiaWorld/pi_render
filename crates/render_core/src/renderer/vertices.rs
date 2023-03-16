@@ -16,6 +16,7 @@ pub enum EVerticesBufferUsage {
     GUI(Handle<RenderRes<Buffer>>),
     Other(Handle<EVertexBufferRange>),
     EVBRange(Arc<EVertexBufferRange>),
+    Temp(Arc<Buffer>),
 }
 impl EVerticesBufferUsage {
     pub fn range(&self) -> Range<wgpu::BufferAddress> {
@@ -23,6 +24,7 @@ impl EVerticesBufferUsage {
             EVerticesBufferUsage::GUI(val) => Range { start: 0, end: val.size() },
             EVerticesBufferUsage::Other(val) => val.range(),
             EVerticesBufferUsage::EVBRange(val) => val.range(),
+            EVerticesBufferUsage::Temp(val) => Range { start: 0, end: val.size() },
         }
     }
     pub fn buffer(&self) -> &wgpu::Buffer {
@@ -30,6 +32,7 @@ impl EVerticesBufferUsage {
             EVerticesBufferUsage::GUI(val) => val,
             EVerticesBufferUsage::Other(val) => val.buffer(),
             EVerticesBufferUsage::EVBRange(val) => val.buffer(),
+            EVerticesBufferUsage::Temp(val) => val,
         }
     }
 }
@@ -57,7 +60,8 @@ impl Debug for EVerticesBufferUsage {
         match self {
             Self::GUI(arg0) => f.debug_tuple("GUI").field(arg0).finish(),
             Self::Other(arg0) => f.debug_tuple("Other").field(arg0).finish(),
-            Self::EVBRange(arg0) => f.debug_tuple("Other").field(arg0).finish(),
+            Self::EVBRange(arg0) => f.debug_tuple("EVBRange").field(arg0).finish(),
+            Self::Temp(arg0) => f.debug_tuple("Temp").field(arg0).finish(),
         }
     }
 }

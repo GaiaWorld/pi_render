@@ -14,6 +14,33 @@ impl Asset for AssetRWBuffer {
         self.1 as usize
     }
 }
+impl AssetRWBuffer {
+    fn write_buffer(&self, device: &RenderDevice, queue: &RenderQueue,  info: &Option<String>) -> bool {
+        unsafe {
+            let temp = &mut *(self as *const Self as usize as *mut Self);
+            temp.0.write_to_buffer(device, queue, info)
+        }
+    }
+    fn alloc(&self) -> Option<usize> {
+        unsafe {
+            let temp = &mut *(self as *const Self as usize as *mut Self);
+            temp.0.alloc()
+        }
+    }
+    fn fill(&self, offset: u32, local_offset: usize, data: &[u8]) {
+        unsafe {
+            let temp = &mut *(self as *const Self as usize as *mut Self);
+            let val = TempWriteBuffer(local_offset, data);
+            temp.0.fill(offset, &val);
+        }
+    }
+    fn free(&self, index: usize) {
+        unsafe {
+            let temp = &mut *(self as *const Self as usize as *mut Self);
+            temp.0.free(index);
+        }
+    }
+}
 
 struct UseAssetRWBuffer(Option<Handle<AssetRWBuffer>>);
 
@@ -50,13 +77,10 @@ impl FixedSizeBufferPool {
         self.buffers.iter_mut().for_each(|item| {
             // log::info!("write_buffer: >>>>>>>>>> A {:?}", self.fixed_size);
             if let Some(asset_buffer) = &item.0 {
-                let buffer = unsafe {
-                    &mut *(Handle::as_ptr(asset_buffer) as usize as *mut AssetRWBuffer)
-                };
                 // log::info!("write_buffer: >>>>>>>>>> B");
-                if buffer.0.write_to_buffer(device, queue, &None) == false {
+                if asset_buffer.write_buffer(device, queue, &None) == false {
                     // log::info!("write_buffer: {:?}", buffer.0.is_using());
-                    if !buffer.0.is_using() {
+                    if !asset_buffer.0.is_using() {
                         item.0 = None;
                     }
                 }
@@ -71,10 +95,7 @@ impl FixedSizeBufferPool {
             if let Some(use_buffer) = self.buffers.get(i) {
                 if let Some(asset_buffer) = &use_buffer.0 {
                     let _clock = self.mutex.lock();
-                    let buffer = unsafe {
-                        &mut *(Handle::as_ptr(asset_buffer) as usize as *mut AssetRWBuffer)
-                    };
-                    if let Some(index) = buffer.0.alloc() {
+                    if let Some(index) = asset_buffer.alloc() {
                         return Some(
                             RWBufferRange { index, id_buffer: IDRWBuffer { fixed_size: self.fixed_size, index: i as u32 }, buffer: asset_buffer.clone() }
                         );
@@ -91,10 +112,7 @@ impl FixedSizeBufferPool {
                 let use_buffer = UseAssetRWBuffer(Some(asset_buffer.clone()));
                 self.buffers[key_buffer.index as usize] = use_buffer;
 
-                let buffer = unsafe {
-                    &mut *(Handle::as_ptr(&asset_buffer) as usize as *mut AssetRWBuffer)
-                };
-                if let Some(index) = buffer.0.alloc() {
+                if let Some(index) = asset_buffer.alloc() {
                     return Some(
                         RWBufferRange { index, id_buffer: key_buffer.clone(), buffer: asset_buffer.clone() }
                     );
@@ -169,13 +187,8 @@ impl Debug for RWBufferRange {
 }
 impl RWBufferRange {
     pub fn write_data(&self, local_offset: usize, data: &[u8]) {
-        let buffer = unsafe {
-            &mut *(Handle::as_ptr(&self.buffer) as usize as *mut AssetRWBuffer)
-        };
-
         let offset = self.index as u32 * self.id_buffer.fixed_size;
-        let temp = TempWriteBuffer(local_offset, data);
-        buffer.0.fill(offset as u32, &temp);
+        self.buffer.fill(offset as u32, local_offset, data);
     }
     pub fn buffer(&self) -> &Buffer {
         self.buffer.0.wgpu_buffer().unwrap()
@@ -192,10 +205,7 @@ impl RWBufferRange {
 }
 impl Drop for RWBufferRange {
     fn drop(&mut self) {
-        let buffer = unsafe {
-            &mut *(Arc::as_ptr(&self.buffer) as usize as *mut AssetRWBuffer)
-        };
-        buffer.0.free(self.index);
+        self.buffer.free(self.index);
     }
 }
 impl Hash for RWBufferRange {

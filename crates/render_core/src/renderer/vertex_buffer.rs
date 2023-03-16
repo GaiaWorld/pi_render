@@ -329,22 +329,7 @@ impl FixedSizeBufferPoolNotUpdatable {
             if let Some(use_buffer) = self.buffers.get(i) {
                 // 有数据的情况一定是正在使用的
                 if let Some(asset_buffer) = &use_buffer.0 {
-                    // if asset_buffer.2 == false {
-                    //     let _clock = self.mutex.lock();
-                    //     let buffer = unsafe {
-                    //         &mut *(Handle::as_ptr(asset_buffer) as usize as *mut NotUpdatableBuffer)
-                    //     };
-    
-                    //     buffer.2 = true;
-                    //     buffer.write_buffer(queue, data);
-                    //     return Some(
-                    //         NotUpdatableBufferRange {
-                    //             used_size: data.len() as u32,
-                    //             id_buffer: IDNotUpdatableBuffer { index: i as u32, size: self.block_size },
-                    //             buffer: use_buffer.clone()
-                    //         }
-                    //     );
-                    // }
+                    //
                 } else {
                     key_buffer = Some(IDNotUpdatableBuffer { index: i as u32, size: self.block_size },);
                 }
@@ -358,10 +343,8 @@ impl FixedSizeBufferPoolNotUpdatable {
                 let use_buffer = Arc::new(use_buffer);
                 self.buffers[key_buffer.index as usize] = use_buffer.clone();
 
-                let buffer = unsafe {
-                    &mut *(Handle::as_ptr(&asset_buffer) as usize as *mut NotUpdatableBuffer)
-                };
-                buffer.2 = true;
+                let buffer = asset_buffer;
+                buffer.flag(true);
                 buffer.write_buffer(queue, data);
                 return Some(
                     NotUpdatableBufferRange {
@@ -406,6 +389,14 @@ pub struct IDNotUpdatableBuffer {
 }
 
 pub struct UseNotUpdatableBuffer(Option<Handle<NotUpdatableBuffer>>);
+impl UseNotUpdatableBuffer {
+    pub fn none(&self) {
+        unsafe {
+            let temp = &mut *(self as *const Self as usize as *mut Self);
+            temp.0 = None;
+        }
+    }
+}
 
 pub struct NotUpdatableBuffer(Buffer, u32, bool);
 impl Asset for NotUpdatableBuffer {
@@ -439,6 +430,12 @@ impl NotUpdatableBuffer {
         // queue.write_buffer(&self.0, 0, &temp);
         queue.write_buffer(&self.0, 0, data);
     }
+    pub fn flag(&self, val: bool) {
+        unsafe {
+            let temp = &mut *(self as *const Self as usize as *mut Self);
+            temp.2 = val;
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -468,10 +465,7 @@ impl NotUpdatableBufferRange {
 }
 impl Drop for NotUpdatableBufferRange {
     fn drop(&mut self) {
-        let buffer = unsafe {
-            &mut *(Arc::as_ptr(&self.buffer) as usize as *mut UseNotUpdatableBuffer)
-        };
-        buffer.0 = None;
+        self.buffer.none();
     }
 }
 impl Hash for NotUpdatableBufferRange {
