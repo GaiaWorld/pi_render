@@ -1,5 +1,5 @@
 
-use std::ops::Range;
+use std::{ops::Range, sync::Arc};
 
 use pi_assets::asset::Handle;
 use pi_map::vecmap::VecMap;
@@ -18,6 +18,7 @@ pub enum DrawBindGroup {
     Offset(BufferGroup), // 某个buffer的部分 (在全局中的索引， buffer偏移量) 具有动态偏移
     Independ(Handle<RenderRes<BindGroup>>), // 无动态偏移
     GroupUsage(BindGroupUsage),
+    Arc(Arc<BindGroup>),
 }
 impl DrawBindGroup {
     pub fn set<'w, 'a>(&'a self, rpass: &'w mut RenderPass<'a>, i: u32) {
@@ -32,6 +33,9 @@ impl DrawBindGroup {
             Self::GroupUsage(group) => {
                 rpass.set_bind_group(group.set, group.bind_group(), &group.offsets());
             },
+            Self::Arc(group) => {
+                rpass.set_bind_group(i, group, &[]);
+            },
         };
     }
 
@@ -40,6 +44,7 @@ impl DrawBindGroup {
             DrawBindGroup::Offset(group) => group.set_uniform(value),
             DrawBindGroup::Independ(_group) => todo!(),
 			DrawBindGroup::GroupUsage(_group) => todo!(),
+			DrawBindGroup::Arc(_group) => todo!(),
         };
     }
 }
@@ -84,12 +89,13 @@ pub struct DrawObj {
     /// * MAX_VERTEX_BUFFER : 可能的最大顶点Buffer数目, 本地电脑 16
     pub vertices: VecMap<RenderVertices>,
     pub instances: Range<u32>,
+    pub vertex: Range<u32>,
     pub indices: Option<RenderIndices>,
 }
 
 impl Default for DrawObj {
     fn default() -> Self {
-        Self { pipeline: Default::default(), bindgroups: Default::default(), vertices: Default::default(), instances: 0..1, indices: Default::default() }
+        Self { pipeline: Default::default(), bindgroups: Default::default(), vertices: Default::default(), instances: 0..1, vertex: 0..0, indices: Default::default() }
     }
 }
 

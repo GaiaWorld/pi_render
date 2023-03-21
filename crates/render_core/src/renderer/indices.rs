@@ -3,7 +3,7 @@ use std::ops::{Range};
 use derive_deref_rs::Deref;
 use pi_assets::asset::Handle;
 
-use super::vertex_buffer::{KeyVertexBuffer, EVertexBufferRange};
+use super::{vertex_buffer::{KeyVertexBuffer, EVertexBufferRange}, vertices::EVerticesBufferUsage};
 
 #[derive(Debug)]
 pub struct IndicesBufferDesc {
@@ -16,9 +16,9 @@ pub struct IndicesBufferDesc {
 pub struct AssetKeyBufferIndices(pub KeyVertexBuffer);
 
 #[derive(Deref)]
-pub struct AssetResBufferIndices(pub Handle<EVertexBufferRange>);
-impl From<Handle<EVertexBufferRange>> for AssetResBufferIndices {
-    fn from(value: Handle<EVertexBufferRange>) -> Self {
+pub struct AssetResBufferIndices(pub EVerticesBufferUsage);
+impl From<EVerticesBufferUsage> for AssetResBufferIndices {
+    fn from(value: EVerticesBufferUsage) -> Self {
         Self(value)
     }
 }

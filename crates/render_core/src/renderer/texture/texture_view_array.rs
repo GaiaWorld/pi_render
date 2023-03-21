@@ -2,10 +2,9 @@ use std::sync::Arc;
 
 use smallvec::SmallVec;
 
-use super::{ETexture, texture_view::TextureViewDesc, EKeyTexture};
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub struct KeyTextureViewN<const N: usize>(pub [EKeyTexture;N], pub TextureViewDesc);
+// #[derive(Debug, Clone, Hash, PartialEq, Eq)]
+// pub struct KeyTextureViewN<const N: usize>(pub [EKeyTexture;N], pub TextureViewDesc);
 
 // pub struct TextureViewN<const N: usize> {
 //     textures: [ETexture;N],

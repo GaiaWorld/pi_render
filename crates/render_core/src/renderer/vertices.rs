@@ -1,4 +1,4 @@
-use std::{ops::Range, hash::Hash, fmt::Debug};
+use std::{ops::Range, hash::Hash, fmt::Debug, sync::Arc};
 
 use lazy_static::__Deref;
 use pi_assets::asset::Handle;
@@ -15,18 +15,24 @@ pub trait TKeyAttributes: Debug + Clone + PartialEq + Eq + Hash {
 pub enum EVerticesBufferUsage {
     GUI(Handle<RenderRes<Buffer>>),
     Other(Handle<EVertexBufferRange>),
+    EVBRange(Arc<EVertexBufferRange>),
+    Temp(Arc<Buffer>),
 }
 impl EVerticesBufferUsage {
     pub fn range(&self) -> Range<wgpu::BufferAddress> {
         match self {
             EVerticesBufferUsage::GUI(val) => Range { start: 0, end: val.size() },
             EVerticesBufferUsage::Other(val) => val.range(),
+            EVerticesBufferUsage::EVBRange(val) => val.range(),
+            EVerticesBufferUsage::Temp(val) => Range { start: 0, end: val.size() },
         }
     }
     pub fn buffer(&self) -> &wgpu::Buffer {
         match self {
             EVerticesBufferUsage::GUI(val) => val,
             EVerticesBufferUsage::Other(val) => val.buffer(),
+            EVerticesBufferUsage::EVBRange(val) => val.buffer(),
+            EVerticesBufferUsage::Temp(val) => val,
         }
     }
 }
@@ -38,6 +44,9 @@ impl PartialEq for EVerticesBufferUsage {
             },
             (Self::Other(l0), Self::Other(r0)) => {
                 l0.key() == r0.key() && l0.range() == r0.range()
+            },
+            (Self::EVBRange(_), Self::EVBRange(_)) => {
+                false
             },
             _ => false,
         }
@@ -51,6 +60,8 @@ impl Debug for EVerticesBufferUsage {
         match self {
             Self::GUI(arg0) => f.debug_tuple("GUI").field(arg0).finish(),
             Self::Other(arg0) => f.debug_tuple("Other").field(arg0).finish(),
+            Self::EVBRange(arg0) => f.debug_tuple("EVBRange").field(arg0).finish(),
+            Self::Temp(arg0) => f.debug_tuple("Temp").field(arg0).finish(),
         }
     }
 }
@@ -70,14 +81,10 @@ impl RenderVertices {
     pub fn value_range(&self) -> Range<u32> {
         let mut range0 = self.buffer.range();
 
-        let range = if let Some(range) = self.buffer_range.as_ref() {
-            range.clone()
-        } else {
-            Range { start: 0, end: 0 }
-        };
-
-        range0.start    += range.start;
-        range0.end      += range0.start + range.end - range.start;
+        if let Some(range) = self.buffer_range.as_ref() {
+            range0.start    += range.start;
+            range0.end      = range0.start + (range.end - range.start);
+        }
 
         Range {
             start: (range0.start / self.size_per_value) as u32,
@@ -87,14 +94,11 @@ impl RenderVertices {
     pub fn slice<'a>(&'a self) -> wgpu::BufferSlice {
         let mut range0 = self.buffer.range();
 
-        let range = if let Some(range) = self.buffer_range.as_ref() {
-            range.clone()
-        } else {
-            Range { start: 0, end: 0 }
-        };
-    
-        range0.start    += range.start;
-        range0.end      += range0.start + range.end - range.start;
+        if let Some(range) = self.buffer_range.as_ref() {
+            range0.start    += range.start;
+            range0.end      = range0.start + (range.end - range.start);
+        }
+        log::info!("slice {:?}", range0);
 
         self.buffer.buffer().slice(range0)
     }

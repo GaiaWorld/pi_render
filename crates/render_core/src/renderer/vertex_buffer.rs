@@ -5,7 +5,7 @@ use pi_atom::Atom;
 use pi_share::{Share, ShareMutex};
 use wgpu::util::BufferInitDescriptor;
 
-use crate::{rhi::{device::RenderDevice, RenderQueue,  buffer::Buffer}, render_3d::shader::instance_code::EInstanceCode};
+use crate::{rhi::{device::RenderDevice, RenderQueue,  buffer::Buffer}, render_3d::shader::instance_code::EInstanceCode, asset::TAssetKeyU64};
 
 use super::{
     attributes::{EVertexDataKind, ShaderAttribute, TAsWgpuVertexAtribute, KeyShaderFromAttributes},
@@ -14,8 +14,24 @@ use super::{
     buffer::{FixedSizeBufferPool, AssetRWBuffer, RWBufferRange},
 };
 
-
-pub type KeyVertexBuffer = Atom;
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub struct KeyVertexBuffer(String);
+impl KeyVertexBuffer {
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+impl From<String> for KeyVertexBuffer {
+    fn from(value: String) -> Self {
+        Self(value)
+    }
+}
+impl From<&str> for KeyVertexBuffer {
+    fn from(value: &str) -> Self {
+        Self(String::from(value))
+    }
+}
+impl TAssetKeyU64 for KeyVertexBuffer {}
 pub type AssetVertexBuffer = EVertexBufferRange;
 
 // #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -290,7 +306,7 @@ impl VertexBufferAllocator {
 
 }
 
-pub(crate) struct FixedSizeBufferPoolNotUpdatable {
+pub struct FixedSizeBufferPoolNotUpdatable {
     /// * 大内存块列表 (第i个的尺寸为 i*block_size)
     buffers: Vec<Arc<UseNotUpdatableBuffer>>,
     /// * 目标尺寸
@@ -301,7 +317,7 @@ pub(crate) struct FixedSizeBufferPoolNotUpdatable {
 impl FixedSizeBufferPoolNotUpdatable {
     /// * `block_size` 大内存块的基础尺寸
     /// * `fixed_size` 目标区间尺寸
-    pub(crate) fn new(
+    pub fn new(
         block_size: u32,
         usage: wgpu::BufferUsages,
     ) -> Self {
@@ -312,7 +328,7 @@ impl FixedSizeBufferPoolNotUpdatable {
             usage
         }
     }
-    pub(crate) fn allocate(&mut self, asset_mgr: &Share<AssetMgr<NotUpdatableBuffer>>, device: &RenderDevice, queue: &RenderQueue, data: &[u8]) -> Option<NotUpdatableBufferRange> {
+    pub fn allocate(&mut self, asset_mgr: &Share<AssetMgr<NotUpdatableBuffer>>, device: &RenderDevice, queue: &RenderQueue, data: &[u8]) -> Option<NotUpdatableBufferRange> {
         let len = self.buffers.len();
         let mut key_buffer = None;
         // 寻找可用区间
@@ -320,22 +336,7 @@ impl FixedSizeBufferPoolNotUpdatable {
             if let Some(use_buffer) = self.buffers.get(i) {
                 // 有数据的情况一定是正在使用的
                 if let Some(asset_buffer) = &use_buffer.0 {
-                    // if asset_buffer.2 == false {
-                    //     let _clock = self.mutex.lock();
-                    //     let buffer = unsafe {
-                    //         &mut *(Handle::as_ptr(asset_buffer) as usize as *mut NotUpdatableBuffer)
-                    //     };
-    
-                    //     buffer.2 = true;
-                    //     buffer.write_buffer(queue, data);
-                    //     return Some(
-                    //         NotUpdatableBufferRange {
-                    //             used_size: data.len() as u32,
-                    //             id_buffer: IDNotUpdatableBuffer { index: i as u32, size: self.block_size },
-                    //             buffer: use_buffer.clone()
-                    //         }
-                    //     );
-                    // }
+                    //
                 } else {
                     key_buffer = Some(IDNotUpdatableBuffer { index: i as u32, size: self.block_size },);
                 }
@@ -349,10 +350,8 @@ impl FixedSizeBufferPoolNotUpdatable {
                 let use_buffer = Arc::new(use_buffer);
                 self.buffers[key_buffer.index as usize] = use_buffer.clone();
 
-                let buffer = unsafe {
-                    &mut *(Handle::as_ptr(&asset_buffer) as usize as *mut NotUpdatableBuffer)
-                };
-                buffer.2 = true;
+                let buffer = asset_buffer;
+                buffer.flag(true);
                 buffer.write_buffer(queue, data);
                 return Some(
                     NotUpdatableBufferRange {
@@ -397,6 +396,14 @@ pub struct IDNotUpdatableBuffer {
 }
 
 pub struct UseNotUpdatableBuffer(Option<Handle<NotUpdatableBuffer>>);
+impl UseNotUpdatableBuffer {
+    pub fn none(&self) {
+        unsafe {
+            let temp = &mut *(self as *const Self as usize as *mut Self);
+            temp.0 = None;
+        }
+    }
+}
 
 pub struct NotUpdatableBuffer(Buffer, u32, bool);
 impl Asset for NotUpdatableBuffer {
@@ -430,6 +437,12 @@ impl NotUpdatableBuffer {
         // queue.write_buffer(&self.0, 0, &temp);
         queue.write_buffer(&self.0, 0, data);
     }
+    pub fn flag(&self, val: bool) {
+        unsafe {
+            let temp = &mut *(self as *const Self as usize as *mut Self);
+            temp.2 = val;
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -459,10 +472,7 @@ impl NotUpdatableBufferRange {
 }
 impl Drop for NotUpdatableBufferRange {
     fn drop(&mut self) {
-        let buffer = unsafe {
-            &mut *(Arc::as_ptr(&self.buffer) as usize as *mut UseNotUpdatableBuffer)
-        };
-        buffer.0 = None;
+        self.buffer.none();
     }
 }
 impl Hash for NotUpdatableBufferRange {

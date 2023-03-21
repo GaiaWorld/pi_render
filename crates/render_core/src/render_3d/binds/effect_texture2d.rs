@@ -5,7 +5,7 @@ use pi_assets::asset::Handle;
 
 use crate::{
     renderer::{
-        texture::BindDataTexture2D,
+        texture::{BindDataTexture2D, texture_view::ETextureViewUsage},
         bind::{KeyBindLayoutTexture2D, EKeyBind, KeyBindTexture2D},
     },
     rhi::{asset::TextureRes},
@@ -31,7 +31,7 @@ pub trait TEffectBindTexture2DData: TEffectBindTexture2D {
 #[derive(Debug, Clone, Deref, Hash, PartialEq, Eq)]
 pub struct EffectBindTexture2D01(pub BindDataTexture2D);
 impl From<Handle<TextureRes>> for EffectBindTexture2D01 {
-    fn from(value: Handle<TextureRes>) -> Self { Self( BindDataTexture2D(value) ) }
+    fn from(value: Handle<TextureRes>) -> Self { Self( BindDataTexture2D(ETextureViewUsage::Tex(value)) ) }
 }
 impl TEffectBindTexture2D for EffectBindTexture2D01 {
     const INDEX: usize = 1 - 1;
@@ -43,7 +43,7 @@ impl TEffectBindTexture2DData for EffectBindTexture2D01 {
 #[derive(Debug, Clone, Deref, Hash, PartialEq, Eq)]
 pub struct EffectBindTexture2D02(pub BindDataTexture2D);
 impl From<Handle<TextureRes>> for EffectBindTexture2D02 {
-    fn from(value: Handle<TextureRes>) -> Self { Self( BindDataTexture2D(value) ) }
+    fn from(value: Handle<TextureRes>) -> Self { Self( BindDataTexture2D(ETextureViewUsage::Tex(value)) ) }
 }
 impl TEffectBindTexture2D for EffectBindTexture2D02 {
     const INDEX: usize = 2 - 1;
@@ -56,7 +56,7 @@ impl TEffectBindTexture2DData for EffectBindTexture2D02 {
 #[derive(Debug, Clone, Deref, Hash, PartialEq, Eq)]
 pub struct EffectBindTexture2D03(pub BindDataTexture2D);
 impl From<Handle<TextureRes>> for EffectBindTexture2D03 {
-    fn from(value: Handle<TextureRes>) -> Self { Self( BindDataTexture2D(value) ) }
+    fn from(value: Handle<TextureRes>) -> Self { Self( BindDataTexture2D(ETextureViewUsage::Tex(value)) ) }
 }
 impl TEffectBindTexture2D for EffectBindTexture2D03 {
     const INDEX: usize = 3 - 1;
@@ -69,7 +69,7 @@ impl TEffectBindTexture2DData for EffectBindTexture2D03 {
 #[derive(Debug, Clone, Deref, Hash, PartialEq, Eq)]
 pub struct EffectBindTexture2D04(pub BindDataTexture2D);
 impl From<Handle<TextureRes>> for EffectBindTexture2D04 {
-    fn from(value: Handle<TextureRes>) -> Self { Self( BindDataTexture2D(value) ) }
+    fn from(value: Handle<TextureRes>) -> Self { Self( BindDataTexture2D(ETextureViewUsage::Tex(value)) ) }
 }
 impl TEffectBindTexture2D for EffectBindTexture2D04 {
     const INDEX: usize = 4 - 1;
@@ -82,7 +82,7 @@ impl TEffectBindTexture2DData for EffectBindTexture2D04 {
 #[derive(Debug, Clone, Deref, Hash, PartialEq, Eq)]
 pub struct EffectBindTexture2D05(pub BindDataTexture2D);
 impl From<Handle<TextureRes>> for EffectBindTexture2D05 {
-    fn from(value: Handle<TextureRes>) -> Self { Self( BindDataTexture2D(value) ) }
+    fn from(value: Handle<TextureRes>) -> Self { Self( BindDataTexture2D(ETextureViewUsage::Tex(value)) ) }
 }
 impl TEffectBindTexture2D for EffectBindTexture2D05 {
     const INDEX: usize = 5 - 1;
@@ -95,7 +95,7 @@ impl TEffectBindTexture2DData for EffectBindTexture2D05 {
 #[derive(Debug, Clone, Deref, Hash, PartialEq, Eq)]
 pub struct EffectBindTexture2D06(pub BindDataTexture2D);
 impl From<Handle<TextureRes>> for EffectBindTexture2D06 {
-    fn from(value: Handle<TextureRes>) -> Self { Self( BindDataTexture2D(value) ) }
+    fn from(value: Handle<TextureRes>) -> Self { Self( BindDataTexture2D(ETextureViewUsage::Tex(value)) ) }
 }
 impl TEffectBindTexture2D for EffectBindTexture2D06 {
     const INDEX: usize = 6 - 1;

@@ -1,7 +1,8 @@
-use std::{hash::Hash, marker::PhantomData, fmt::Debug, mem::replace, collections::hash_map::Keys};
+use std::{hash::{Hash, Hasher}, marker::PhantomData, fmt::Debug, mem::replace, collections::hash_map::Keys};
 
 use pi_assets::{asset::{Handle, Asset, GarbageEmpty}, mgr::AssetMgr};
-use pi_hash::XHashMap;
+use pi_atom::Atom;
+use pi_hash::{XHashMap, DefaultHasher};
 use pi_share::Share;
 
 pub const ASSET_SIZE_FOR_UNKOWN: usize = 256;
@@ -15,6 +16,35 @@ pub fn bytes_write_to_memory(
     for v in bytes.iter() {
         memory[offset + index] = *v;
         index += 1;
+    }
+}
+
+pub trait TAssetKeyU64: Hash {
+    fn asset_u64(&self) -> u64 {
+        let mut hasher = DefaultHasher::default();
+        self.hash(&mut hasher);
+        hasher.finish()
+    }
+}
+impl TAssetKeyU64 for &str {
+    fn asset_u64(&self) -> u64 {
+        let mut hasher = DefaultHasher::default();
+        self.hash(&mut hasher);
+        hasher.finish()
+    }
+}
+impl TAssetKeyU64 for String {
+    fn asset_u64(&self) -> u64 {
+        let mut hasher = DefaultHasher::default();
+        self.hash(&mut hasher);
+        hasher.finish()
+    }
+}
+impl TAssetKeyU64 for Atom {
+    fn asset_u64(&self) -> u64 {
+        let mut hasher = DefaultHasher::default();
+        self.hash(&mut hasher);
+        hasher.finish()
     }
 }
 

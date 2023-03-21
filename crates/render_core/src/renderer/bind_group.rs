@@ -5,9 +5,9 @@ use pi_assets::{asset::{Handle, Asset}, mgr::AssetMgr};
 use pi_hash::DefaultHasher;
 use pi_share::Share;
 
-use crate::rhi::{device::RenderDevice};
+use crate::{rhi::{device::RenderDevice}, asset::{TAssetKeyU64, ASSET_SIZE_FOR_UNKOWN}};
 
-use super::{bind::{EKeyBind, KeyBindLayout, EBindResource}, ASSET_SIZE_FOR_UNKOWN};
+use super::{bind::{EKeyBind, KeyBindLayout, EBindResource}};
 
 pub const MAX_BIND_COUNT: usize = 16;
 
@@ -26,11 +26,10 @@ impl KeyBindGroupLayout {
         key_bind_group_layout
     }
     pub fn as_u64(&self) -> u64 {
-        let mut hasher = DefaultHasher::default();
-        self.hash(&mut hasher);
-        hasher.finish()
+        self.asset_u64()
     }
 }
+impl TAssetKeyU64 for KeyBindGroupLayout {}
 
 #[derive(Debug)]
 pub struct BindGroupLayout {
@@ -115,6 +114,7 @@ impl KeyBindGroup {
         hasher.finish()
     }
 }
+impl TAssetKeyU64 for KeyBindGroup {}
 
 #[derive(Debug, Clone)]
 pub struct BindGroupUsage {
