@@ -9,8 +9,8 @@ license = "MIT OR Apache-2.0"
 keywords = ["pi", "compile", "shader"]
 
 [dependencies]
-# pi_naga = { git="https://github.com/GaiaWorld/pi_naga.git", features=["glsl-in", "wgsl-in", "spv-in"]}
-pi_naga = { path="../../../pi_naga", features=["glsl-in", "wgsl-in", "spv-in"]}
+pi_naga = { git="https://github.com/GaiaWorld/pi_naga.git", features=["glsl-in", "wgsl-in", "spv-in"]}
+# pi_naga = { path="../../../pi_naga", features=["glsl-in", "wgsl-in", "spv-in"]}
 # naga="0.9"
 thiserror = "1.0"
 Inflector = "0.11"
