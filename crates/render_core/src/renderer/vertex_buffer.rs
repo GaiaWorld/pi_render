@@ -166,6 +166,13 @@ pub struct VertexBufferAllocator {
     asset_mgr_2: Share<AssetMgr<NotUpdatableBuffer>>,
     unupdatables: Vec<FixedSizeBufferPoolNotUpdatable>,
 }
+
+impl Default for VertexBufferAllocator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl VertexBufferAllocator {
     /// * 每 level 间 对齐尺寸比值为 2
     pub const LEVEL_COUNT: usize = 16;

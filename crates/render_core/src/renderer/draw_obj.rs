@@ -5,7 +5,7 @@ use pi_assets::asset::Handle;
 use pi_map::vecmap::VecMap;
 use wgpu::RenderPass;
 
-use crate::rhi::{draw_obj::DrawGroup, dyn_uniform_buffer::BufferGroup, asset::RenderRes, bind_group::BindGroup, pipeline::RenderPipeline, buffer::Buffer};
+use crate::rhi::{dyn_uniform_buffer::BufferGroup, asset::RenderRes, bind_group::BindGroup, pipeline::RenderPipeline, shader::{Uniform, BindLayout}};
 
 use super::{vertices::{RenderVertices, RenderIndices}, bind_group::BindGroupUsage};
 
@@ -34,6 +34,14 @@ impl DrawBindGroup {
             },
         };
     }
+
+	pub fn set_uniform<T: Uniform>(&mut self, value: &T) {
+        let _ = match self {
+            DrawBindGroup::Offset(group) => group.set_uniform(value),
+            DrawBindGroup::Independ(_group) => todo!(),
+			DrawBindGroup::GroupUsage(_group) => todo!(),
+        };
+    }
 }
 
 #[derive(Debug, Default)]
@@ -44,13 +52,17 @@ impl DrawBindGroups {
         self.0.get(group_id as usize)
     }
 
-    pub fn insert_group(&mut self, group_id: u32, value: DrawBindGroup) {
-        self.0.insert(group_id as usize, value);
+    pub fn insert_group<T: Into<DrawBindGroup>>(&mut self, group_id: u32, value: T) {
+        self.0.insert(group_id as usize, value.into());
     }
 
     #[inline]
     pub fn groups(&self) -> &VecMap<DrawBindGroup> {
         &self.0
+    }
+
+	pub fn set_uniform<T: Uniform>(&mut self, value: &T) {
+		self.0[T::Binding::set() as usize].set_uniform(value);
     }
 
     pub fn set<'w, 'a>(&'a self, rpass: &'w mut RenderPass<'a>) {
@@ -73,6 +85,55 @@ pub struct DrawObj {
     pub vertices: VecMap<RenderVertices>,
     pub instances: Range<u32>,
     pub indices: Option<RenderIndices>,
+}
+
+impl Default for DrawObj {
+    fn default() -> Self {
+        Self { pipeline: Default::default(), bindgroups: Default::default(), vertices: Default::default(), instances: 0..1, indices: Default::default() }
+    }
+}
+
+impl DrawObj {
+	pub fn insert_vertices(&mut self, vertices: RenderVertices) {
+		self.vertices.insert(vertices.slot as usize, vertices);
+	}
+
+	pub fn draw<'w, 'a>(&'a self, renderpass: &'w mut RenderPass<'a>) {
+		if let Some(pipeline) = &self.pipeline {
+			renderpass.set_pipeline(pipeline);
+			self.bindgroups.set(renderpass);
+
+			let mut vertex_range = 0..0;
+			let mut v_iter = self.vertices.iter();
+			let mut r = v_iter.next();
+			while let Some(item) = r {
+				if let Some(item) = item {
+					vertex_range = item.value_range();
+					break;
+				}
+				r = v_iter.next();
+			}
+
+			while let Some(item) = r {
+				if let Some(item) = item {
+					renderpass.set_vertex_buffer(item.slot, item.slice());
+				}
+				r = v_iter.next();
+			}
+
+			let instance_range = self.instances.clone();
+
+			match &self.indices {
+				Some(indices) => {
+					renderpass.set_index_buffer(indices.slice(), indices.format);
+					renderpass.draw_indexed(indices.value_range(), 0 as i32, instance_range);
+				},
+				None => {
+					renderpass.draw(vertex_range, instance_range);
+				},
+			}
+		}
+	}
 }
 
 

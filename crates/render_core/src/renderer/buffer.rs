@@ -3,7 +3,7 @@ use std::{sync::Arc, hash::Hash, fmt::Debug};
 use pi_assets::{asset::{Asset, Handle}, mgr::AssetMgr};
 use pi_share::{Share, ShareMutex};
 
-use crate::rhi::{dyn_uniform_buffer::SingleBufferAlloter, shader::WriteBuffer, device::RenderDevice, RenderQueue, buffer::Buffer};
+use crate::rhi::{dyn_uniform_buffer::{SingleBufferAlloter, Index}, shader::WriteBuffer, device::RenderDevice, RenderQueue, buffer::Buffer};
 
 use super::bytes_write_to_memory;
 
@@ -54,9 +54,9 @@ impl FixedSizeBufferPool {
                     &mut *(Handle::as_ptr(asset_buffer) as usize as *mut AssetRWBuffer)
                 };
                 // log::info!("write_buffer: >>>>>>>>>> B");
-                if buffer.0.write_to_buffer(device, queue, &None) == false {
+                if buffer.0.write_buffer(device, queue, &None) == false {
                     // log::info!("write_buffer: {:?}", buffer.0.is_using());
-                    if !buffer.0.is_using() {
+                    if buffer.0.is_empty() {
                         item.0 = None;
                     }
                 }
@@ -158,7 +158,7 @@ pub struct IDRWBuffer {
 /// * 判断数据 是否相同需要 判断 offset, IDBindBuffer 是否都相同
 #[derive(Clone)]
 pub struct RWBufferRange {
-    index: usize,
+    index: Index,
     id_buffer: IDRWBuffer,
     buffer: Handle<AssetRWBuffer>,
 }
@@ -173,7 +173,7 @@ impl RWBufferRange {
             &mut *(Handle::as_ptr(&self.buffer) as usize as *mut AssetRWBuffer)
         };
 
-        let offset = self.index as u32 * self.id_buffer.fixed_size;
+        let offset = self.index.index() * self.id_buffer.fixed_size;
         let temp = TempWriteBuffer(local_offset, data);
         buffer.0.fill(offset as u32, &temp);
     }
@@ -184,7 +184,7 @@ impl RWBufferRange {
         self.id_buffer.fixed_size
     }
     pub fn offset(&self) -> wgpu::DynamicOffset {
-        (self.index as u32 * self.id_buffer.fixed_size) as wgpu::DynamicOffset
+        (self.index.index() * self.id_buffer.fixed_size) as wgpu::DynamicOffset
     }
     pub fn id_buffer(&self) -> IDRWBuffer {
         self.id_buffer
@@ -195,7 +195,7 @@ impl Drop for RWBufferRange {
         let buffer = unsafe {
             &mut *(Arc::as_ptr(&self.buffer) as usize as *mut AssetRWBuffer)
         };
-        buffer.0.free(self.index);
+        buffer.0.recycle(self.index);
     }
 }
 impl Hash for RWBufferRange {

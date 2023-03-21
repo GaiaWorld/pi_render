@@ -8,13 +8,15 @@ use smallvec::{smallvec, SmallVec};
 use thiserror::Error;
 use wgpu::{util::BufferInitDescriptor, BufferUsages};
 
+use crate::renderer::draw_obj::DrawBindGroup;
+
 use super::{
     bind_group::BindGroup,
     bind_group_layout::BindGroupLayout,
     buffer::Buffer,
     device::RenderDevice,
     shader::{BindLayout, Uniform, WriteBuffer},
-    RenderQueue, draw_obj::DrawGroup,
+    RenderQueue,
 };
 /// 用于管理一类bindgroup分配的buffer
 /// 这些bindgroup需要满足如下要求：
@@ -176,10 +178,10 @@ pub struct BufferGroup {
     group_offsets: Share<GroupOffsets>,
 }
 
-impl Into<DrawGroup> for BufferGroup {
+impl Into<DrawBindGroup> for BufferGroup {
 	#[inline]
-    fn into(self) -> DrawGroup {
-        DrawGroup::Offset(self)
+    fn into(self) -> DrawBindGroup {
+        DrawBindGroup::Offset(self)
     }
 }
 
@@ -307,7 +309,7 @@ impl GroupBuffersAlloter {
 	/// -block_size_list： 每块的大小（bindgroup中可能包含多个binding，每个binding的块大小不一样）
     pub fn new(block_count: usize, block_size_list: &[u32]) -> Self {
         Self {
-            buffers: MulBufferAlloter::new(block_count, block_size_list),
+            buffers: MulBufferAlloter::new(block_count, block_size_list, BufferUsages::COPY_DST | BufferUsages::UNIFORM),
             group_offsets: Share::new(GroupOffsets {
                 bind_group: None,
                 offsets: BufferOffsets::new(block_size_list, block_count),
@@ -371,10 +373,10 @@ impl MulBufferAlloter {
 	/// 创建 BindGroup Buffer分配器
 	/// -block_count：块数量
 	/// -block_size_list： 每块的大小（bindgroup中可能包含多个binding，每个binding的块大小不一样）
-    pub fn new(block_count: usize, block_size_list: &[u32]) -> Self {
+    pub fn new(block_count: usize, block_size_list: &[u32], usage: wgpu::BufferUsages) -> Self {
         let mut buffer_maps = Vec::with_capacity(block_size_list.len());
         for block_size in block_size_list.iter() {
-            buffer_maps.push(BufferMap::new(*block_size as usize * block_count));
+            buffer_maps.push(BufferMap::new(*block_size as usize * block_count, usage));
         }
 
         Self {
@@ -411,17 +413,17 @@ pub struct SingleBufferAlloter {
     buffer_map: BufferMap,
 	// 空位标识
 	#[deref]
-    occupied_mark: OccupiedMarker,
+    occupied_mark: IdAlloterWithCountLimit,
 }
 
 impl SingleBufferAlloter {
 	/// 创建 BindGroup Buffer分配器
 	/// -block_count：块数量
 	/// -block_size： 每块的大小（单位：字节）
-    pub fn new(block_count: usize, block_size: u32) -> Self {
+    pub fn new(block_count: usize, block_size: u32, usage: wgpu::BufferUsages) -> Self {
         Self {
-            buffer_map: BufferMap::new(block_size as usize * block_count),
-            occupied_mark: OccupiedMarker::new(block_count),
+            buffer_map: BufferMap::new(block_size as usize * block_count, usage),
+            occupied_mark: IdAlloterWithCountLimit::new(block_count as u32),
         }
     }
 
@@ -437,10 +439,14 @@ impl SingleBufferAlloter {
         &mut self,
         device: &RenderDevice,
         queue: &RenderQueue,
-        info: &DynGroupBufferInfo,
+        info: &Option<String>,
     ) -> bool {
-        self.buffer_map.write_buffer(device, queue, &info.label)
+        self.buffer_map.write_buffer(device, queue, info)
     }
+
+	pub fn wgpu_buffer(&self) -> Option<&Buffer> {
+		self.buffer_map.wgpu_buffer()
+	}
 }
 use crossbeam::queue::SegQueue;
 
@@ -654,165 +660,21 @@ impl OccupiedMarker {
 pub struct BufferMap {
     cache_buffer: BufferCache,
     buffer: Option<Buffer>,
+	usage: wgpu::BufferUsages,
 }
 
-pub struct DynGroupBufferInfo {
-    entrys: Vec<wgpu::BindGroupLayoutEntry>,
-    layout: Share<BindGroupLayout>,
-    // 每个元素表示一组buffer, 一组buffer对应一个bindgroup
-    // 占用内存最大的bingding的索引（以此索引中的buffer的内存来判断是否超过内存限制）
-    // max_size_binding_index: usize,
-    limit_count: usize,
-    binding_size_list: Vec<u32>,
-    // 每个buffer的限制长度
-    label: Option<String>,
-    // layout_label: Option<String>,
-    group_label: Option<String>,
-}
-
-struct GroupBuffer {
-    mutex: ShareMutex<()>,
-    values: SmallVec<[GroupBuffersAlloter; 1]>,
-    // 最近使用的buffer索引（在buffers字段中的索引）
-    lately_use_buffer: usize,
-    // entry中描述的多个bingding将作为整体，分配一个块， 每个bingding在该块中，会对应一个偏移，该偏移存储在binding_offset_map中（VecMap的key为entry的binding值）
-    binding_offset_map: VecMap<usize>,
-}
-
-
-/// BindGroup buffer分配器
-#[derive(Deref)]
-pub struct GroupBuffersAlloter {
-	#[deref]
-    buffers: MulBufferAlloter,
-	// 偏移
-	group_offsets: Share<GroupOffsets> 
-}
-
-impl GroupBuffersAlloter {
-	/// 创建 BindGroup Buffer分配器
-	/// -block_count：块数量
-	/// -block_size_list： 每块的大小（bindgroup中可能包含多个binding，每个binding的块大小不一样）
-    pub fn new(block_count: usize, block_size_list: &[u32]) -> Self {
+impl BufferMap {
+    pub fn new(len: usize, usage: wgpu::BufferUsages) -> Self {
         Self {
             cache_buffer: BufferCache::new(len),
             buffer: None,
-        }
-    }
-
-	/// 更新buffer到显存
-	/// 通常每帧调用一次
-	#[inline]
-    pub fn write_buffer(
-        &mut self,
-        device: &RenderDevice,
-        queue: &RenderQueue,
-        info: &DynGroupBufferInfo,
-        layout: &BindGroupLayout,
-    ) {
-        let buffer_is_create = self.buffers.write_buffer(device, queue, info);
-
-        // 如果有buffer扩容，则重新创建bindgroup
-        if buffer_is_create {
-            let mut entries = Vec::new();
-            for (i, entry) in info.entrys.iter().enumerate() {
-                let buffer = self.buffer_maps[i].wgpu_buffer().unwrap();
-                entries.push(wgpu::BindGroupEntry {
-                    binding: entry.binding,
-                    resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                        buffer,
-                        offset: 0,
-                        size: std::num::NonZeroU64::new(info.binding_size_list[i] as u64),
-                    }),
-                })
-            }
-
-			// 只有此处会写入，其他地方不会写入。 此处应该是安全的？
-			let group =
-			unsafe { &mut *(Share::as_ptr(&self.group_offsets) as usize as *mut GroupOffsets) };
-			group.bind_group = Some(device.create_bind_group(&wgpu::BindGroupDescriptor {
-			layout,
-			entries: entries.as_slice(),
-			label: match &info.group_label {
-				Some(r) => Some(r.as_str()),
-				None => None,
-			},
-			}));
-        }
-    }
-}
-
-
-/// 多个buffer的分配器（通常这多个buffer的每个对应一个bindgroup的一个binding）
-#[derive(Deref)]
-pub struct MulBufferAlloter {
-    buffer_maps: Vec<BufferMap>,
-	// 空位标识
-	#[deref]
-    occupied_mark: OccupiedMarker,
-}
-
-impl MulBufferAlloter {
-	/// 创建 BindGroup Buffer分配器
-	/// -block_count：块数量
-	/// -block_size_list： 每块的大小（bindgroup中可能包含多个binding，每个binding的块大小不一样）
-    pub fn new(block_count: usize, block_size_list: &[u32]) -> Self {
-        let mut buffer_maps = Vec::with_capacity(block_size_list.len());
-        for block_size in block_size_list.iter() {
-            buffer_maps.push(BufferMap::new(*block_size as usize * block_count, wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::UNIFORM));
-        }
-
-        Self {
-            buffer_maps,
-            occupied_mark: OccupiedMarker::new(block_count),
-        }
-    }
-
-	/// 在buffer中填充数据
-	#[inline]
-    pub fn fill<T: WriteBuffer>(&mut self, binding: usize, offset: u32, value: &T) {
-        self.buffer_maps[binding].cache_buffer.full(offset, value);
-    }
-
-	/// 更新buffer到显存
-	#[inline]
-    pub fn write_buffer(
-        &mut self,
-        device: &RenderDevice,
-        queue: &RenderQueue,
-        info: &DynGroupBufferInfo,
-    ) -> bool {
-        let mut buffer_is_create = false;
-        for i in self.buffer_maps.iter_mut() {
-            buffer_is_create = i.write_buffer(device, queue, &info.label) || buffer_is_create;
-        }
-		buffer_is_create
-    }
-}
-
-/// 单个buffer的分配器
-#[derive(Deref)]
-pub struct SingleBufferAlloter {
-    buffer_map: BufferMap,
-	// 空位标识
-	#[deref]
-    occupied_mark: OccupiedMarker,
-}
-
-impl SingleBufferAlloter {
-	/// 创建 BindGroup Buffer分配器
-	/// -block_count：块数量
-	/// -block_size： 每块的大小（单位：字节）
-    pub fn new(block_count: usize, block_size: u32, usage: wgpu::BufferUsages,) -> Self {
-        Self {
-            buffer_map: BufferMap::new(block_size as usize * block_count, usage),
-            occupied_mark: OccupiedMarker::new(block_count),
+			usage,
         }
     }
 
     #[inline]
     pub fn wgpu_buffer(&self) -> Option<&Buffer> {
-        self.buffer_map.wgpu_buffer()
+        self.buffer.as_ref()
     }
 
     /// 写入buffer到显存，返回是否重新创建了buffer
@@ -820,29 +682,28 @@ impl SingleBufferAlloter {
         &mut self,
         device: &RenderDevice,
         queue: &RenderQueue,
-        info: &DynGroupBufferInfo,
+        label: &Option<String>,
     ) -> bool {
-        self.buffer_map.write_buffer(device, queue, &info.label)
-    }
-    
-	/// 更新代码到显存
-	#[inline]
-    pub fn write_to_buffer(
-        &mut self,
-        device: &RenderDevice,
-        queue: &RenderQueue,
-        info: &Option<String>,
-    ) -> bool {
-        self.buffer_map.write_buffer(device, queue, info)
-    }
+        // 什么也没改变， 直接返回
+        if self.cache_buffer.change_range.len() == 0 {
+            return false;
+        }
 
+        let r = match &self.buffer {
+            Some(buffer) => {
+                queue.write_buffer(
+                    buffer,
+                    self.cache_buffer.change_range.start as u64,
+                    &self.cache_buffer.buffer()[self.cache_buffer.change_range.start as usize
+                        ..self.cache_buffer.change_range.end as usize],
+                );
 
                 false
             }
             None => {
                 self.buffer = Some(device.create_buffer_with_data(&BufferInitDescriptor {
                     label: label.as_deref(),
-                    usage: BufferUsages::COPY_DST | BufferUsages::UNIFORM,
+                    usage: self.usage,
                     contents: self.cache_buffer.buffer(),
                 }));
                 // self.old_len = size;

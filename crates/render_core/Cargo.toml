@@ -59,7 +59,7 @@ once_cell = "1.4" # TODO: replace once_cell with std equivalent if/when this lan
 regex = "1.5"
 thiserror = "1.0"
 pi_slab = "0.1"
-wgpu = { version = "0.13", features = ["spirv", "glsl"] }
+wgpu = { version = "0.14", features = ["spirv", "glsl"] }
 derive-deref-rs = "0.1"
 pi_any = "0.1"
 # pi_res_loader = {  git = "https://github.com/GaiaWorld/pi_res_loader.git" }
@@ -82,6 +82,7 @@ crossbeam="0.8"
 bytemuck = { version = "1.4", features = ["derive"] }
 render_derive={path="../render_derive"}
 env_logger = "0.9"
+winit = {git = "http://ser.yinengyun.com:10082/tech/winit.git"}
 
 
 [[example]]
