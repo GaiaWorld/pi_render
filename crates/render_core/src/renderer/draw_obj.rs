@@ -109,16 +109,16 @@ impl DrawObj {
 			renderpass.set_pipeline(pipeline);
 			self.bindgroups.set(renderpass);
 
-			let mut vertex_range = 0..0;
+			// let mut vertex_range = 0..0;
 			let mut v_iter = self.vertices.iter();
 			let mut r = v_iter.next();
-			while let Some(item) = r {
-				if let Some(item) = item {
-					vertex_range = item.value_range();
-					break;
-				}
-				r = v_iter.next();
-			}
+			// while let Some(item) = r {
+			// 	if let Some(item) = item {
+			// 		vertex_range = item.value_range();
+			// 		break;
+			// 	}
+			// 	r = v_iter.next();
+			// }
 
 			while let Some(item) = r {
 				if let Some(item) = item {
@@ -135,7 +135,7 @@ impl DrawObj {
 					renderpass.draw_indexed(indices.value_range(), 0 as i32, instance_range);
 				},
 				None => {
-					renderpass.draw(vertex_range, instance_range);
+					renderpass.draw(self.vertex.clone(), instance_range);
 				},
 			}
 		}
