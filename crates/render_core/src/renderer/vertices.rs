@@ -98,7 +98,6 @@ impl RenderVertices {
             range0.start    += range.start;
             range0.end      = range0.start + (range.end - range.start);
         }
-        log::info!("slice {:?}", range0);
 
         self.buffer.buffer().slice(range0)
     }

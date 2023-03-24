@@ -8,7 +8,7 @@ use crate::{rhi::{device::RenderDevice, asset::RenderRes, pipeline::RenderPipeli
 
 use super::{bind_group::{KeyBindGroupLayout, BindGroupLayout}, shader::{KeyShader, TKeyShaderSetBlock, Shader}, vertex_buffer::{KeyPipelineFromAttributes}};
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, Default)]
 pub struct DepthBiasState {
     /// Constant depth biasing factor, in basic units of the depth format.
     pub constant: i32,
