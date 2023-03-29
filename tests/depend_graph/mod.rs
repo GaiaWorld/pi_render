@@ -9,3 +9,5 @@ pub mod m04_input_collector;
 pub mod m05_invalid_param;
 
 pub mod m06_change_graph;
+
+pub mod m07_input_unit;
