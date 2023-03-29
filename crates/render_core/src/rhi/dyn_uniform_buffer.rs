@@ -965,6 +965,9 @@ mod test {
 				max_buffer_size: limits
 					.max_buffer_size
 					.min(constrained_limits.max_buffer_size),
+    			max_bindings_per_bind_group: limits
+					.max_bindings_per_bind_group
+					.min(constrained_limits.max_bindings_per_bind_group),
 			};
 		}
 
@@ -1019,11 +1022,16 @@ mod test {
 		let is_end1 = is_end.clone();
 
 		let options = RenderOptions::default();
-		let instance = wgpu::Instance::new(options.backends);
+		let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+			/// Which `Backends` to enable.
+			backends: options.backends,
+			/// Which DX12 shader compiler to use.
+			dx12_shader_compiler: wgpu::Dx12Compiler::Fxc,
+		});
 		let event_loop =  EventLoopBuilder::new().with_any_thread(true).build();
 		let window = winit::window::Window::new(&event_loop).unwrap();
 
-		let surface = unsafe {instance.create_surface(&window)};
+		let surface = unsafe {instance.create_surface(&window).unwrap()};
 		
 
 		pi_hal::runtime::MULTI_MEDIA_RUNTIME.spawn(pi_hal::runtime::MULTI_MEDIA_RUNTIME.alloc(), async move {

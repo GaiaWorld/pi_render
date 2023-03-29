@@ -162,6 +162,7 @@ pub async fn create_texture_from_image<G: Garbageer<TextureRes>>(
 		dimension: wgpu::TextureDimension::D2,
 		format: ty,
 		usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+		view_formats: &[],
 	});
 	let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 

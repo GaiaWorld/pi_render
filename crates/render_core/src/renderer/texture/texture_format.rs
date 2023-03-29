@@ -46,6 +46,7 @@ impl TTextureFormatPixelByte for wgpu::TextureFormat {
             wgpu::TextureFormat::Rgba32Uint     => 16,
             wgpu::TextureFormat::Rgba32Sint     => 16,
             wgpu::TextureFormat::Rgba32Float    => 16,
+			wgpu::TextureFormat::Stencil8               => 01,
             wgpu::TextureFormat::Depth16Unorm           => 02,
             wgpu::TextureFormat::Depth32Float           => 04,
             wgpu::TextureFormat::Depth32FloatStencil8   => 05,

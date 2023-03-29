@@ -41,6 +41,7 @@ impl FontSheet {
 			sample_count: 1,
 			dimension: wgpu::TextureDimension::D2,
 			format: wgpu::TextureFormat::Rgba8Unorm,
+			view_formats: &[wgpu::TextureFormat::Rgba8Unorm, wgpu::TextureFormat::Rgba8UnormSrgb],
 			usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
 		});
 		let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());

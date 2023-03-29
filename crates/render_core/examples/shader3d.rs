@@ -173,6 +173,9 @@ pub async fn initialize_renderer(
 			max_buffer_size: limits
 				.max_buffer_size
 				.min(constrained_limits.max_buffer_size),
+			max_bindings_per_bind_group: limits
+				.max_bindings_per_bind_group
+				.min(constrained_limits.max_bindings_per_bind_group),
         };
     }
 
@@ -208,8 +211,13 @@ pub fn setup_render_context(
     let rt = runtime.clone();
 
     let _ = runtime.spawn(runtime.alloc(), async move {
-        let instance = wgpu::Instance::new(backends);
-        let surface = unsafe { instance.create_surface(window.as_ref()) };
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+			/// Which `Backends` to enable.
+			backends: options.backends,
+			/// Which DX12 shader compiler to use.
+			dx12_shader_compiler: wgpu::Dx12Compiler::Fxc,
+		});
+        let surface = unsafe { instance.create_surface(window.as_ref()).unwrap() };
         let request_adapter_options = wgpu::RequestAdapterOptions {
             power_preference: options.power_preference,
             compatible_surface: Some(&surface),
@@ -267,7 +275,12 @@ pub(crate) fn main() {
         ..Default::default()
     };
     let backends = options.backends;
-    let instance = wgpu::Instance::new(backends);
+    let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+		/// Which `Backends` to enable.
+		backends: options.backends,
+		/// Which DX12 shader compiler to use.
+		dx12_shader_compiler: wgpu::Dx12Compiler::Fxc,
+	});
     let surface = unsafe { instance.create_surface(window.as_ref()) };
 
     let (device, queue, adapter_info) = setup_render_context(

@@ -451,6 +451,7 @@ impl AtlasAllocator {
 			dimension: descript.dimension,
 			format: descript.format,
 			usage: descript.usage,
+			view_formats: &[wgpu::TextureFormat::Rgba8Unorm, wgpu::TextureFormat::Rgba8UnormSrgb],
 		};
 		// 缓存中不存在，则创建纹理
 		let texture: wgpu::Texture = (*self.device).create_texture(&desc);
