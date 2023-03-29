@@ -237,7 +237,9 @@ pub fn derive_node_param(input: TokenStream) -> TokenStream {
                             // 输入 类型 不能 相同
                             panic!("derive NodeParam: input type same, type = {:?}", ty);
                         }
-                        map.insert(ty, vec![pre_id]);
+                        if ty != std::any::TypeId::of::<()>() {
+                            map.insert(ty, vec![pre_id]);
+                        }
                     }
                     r
                 }

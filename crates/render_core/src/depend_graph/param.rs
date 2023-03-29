@@ -131,7 +131,10 @@ macro_rules! impl_base_copy {
                         // 输入 类型 不能 相同
                         panic!("impl_base_copy: input type same, type = {:?}", ty);
                     }
-                    map.insert(ty, vec![pre_id]);
+                    if ty != TypeId::of::<()>() {
+                        // 为 unit 类型时候不做相同类型判断，以便于 多个节点的输入都可以是同一个 unit 类型
+                        map.insert(ty, vec![pre_id]);
+                    }
                 }
                 r
             }
