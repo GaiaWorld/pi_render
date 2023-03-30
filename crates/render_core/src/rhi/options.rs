@@ -12,6 +12,7 @@ pub struct RenderOptions {
     pub present_mode: wgpu::PresentMode,
     pub device_label: Option<Cow<'static, str>>,
     pub backends: wgpu::Backends,
+	pub dx12_shader_compiler: wgpu::Dx12Compiler,
     pub power_preference: wgpu::PowerPreference,
     pub priority: RenderPriority,
     /// The features to ensure are enabled regardless of what the adapter/backend supports.
@@ -58,6 +59,7 @@ impl Default for RenderOptions {
             priority,
             features: wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES,
             disabled_features: None,
+			dx12_shader_compiler: Default::default(),
             limits,
             constrained_limits: None,
         }
