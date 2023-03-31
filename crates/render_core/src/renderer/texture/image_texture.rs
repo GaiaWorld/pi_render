@@ -152,7 +152,7 @@ pub async fn create_texture_from_image<G: Garbageer<ImageTexture>>(
 		dimension: wgpu::TextureDimension::D2,
 		format: ty,
 		usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-		view_formats: &[wgpu::TextureFormat::Rgba8Unorm, wgpu::TextureFormat::Rgba8UnormSrgb],
+		view_formats: &[],
 	});
 
 	queue.write_texture(

@@ -57,7 +57,7 @@ impl DefaultTexture {
                 dimension: dim,
                 format: wgpu::TextureFormat::Rgba8Unorm,
                 usage: wgpu::TextureUsages::TEXTURE_BINDING,
-				view_formats: &[wgpu::TextureFormat::Rgba8Unorm, wgpu::TextureFormat::Rgba8UnormSrgb],
+				view_formats: &[],
             },
             data
         )
