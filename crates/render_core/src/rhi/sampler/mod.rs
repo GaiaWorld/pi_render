@@ -154,6 +154,8 @@ impl SamplerDesc {
 }
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+
+#[wasm_bindgen]
 pub enum EAnisotropyClamp {
     None,
     One,
