@@ -1,6 +1,7 @@
 use std::{num::NonZeroU8, sync::Arc, hash::Hash, fmt::Debug};
 
 use pi_assets::asset::{Asset, Handle};
+use wasm_bindgen::prelude::wasm_bindgen;
 
 use super::{device::RenderDevice};
 
@@ -26,6 +27,7 @@ impl Sampler {
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[wasm_bindgen]
 pub enum EAddressMode {
     /// Clamp the value to the edge of the texture
     ///
@@ -67,6 +69,7 @@ impl EAddressMode {
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[wasm_bindgen]
 pub enum EFilterMode {
     Nearest,
     Linear,
