@@ -26,7 +26,7 @@ impl Sampler {
     }
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 #[wasm_bindgen]
 pub enum EAddressMode {
     /// Clamp the value to the edge of the texture
@@ -68,7 +68,7 @@ impl EAddressMode {
     }
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 #[wasm_bindgen]
 pub enum EFilterMode {
     Nearest,
@@ -88,7 +88,7 @@ impl EFilterMode {
     }
 }
 
-#[derive(Debug, Default, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, Hash, PartialEq, Eq)]
 pub struct SamplerDesc {
     /// How to deal with out of bounds accesses in the u (i.e. x) direction
     pub address_mode_u: EAddressMode,
@@ -154,7 +154,6 @@ impl SamplerDesc {
 }
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
-
 #[wasm_bindgen]
 pub enum EAnisotropyClamp {
     None,
