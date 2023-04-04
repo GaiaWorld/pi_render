@@ -78,13 +78,6 @@ impl TextureView {
     }
 
     #[inline]
-    pub fn texture_format(&self) -> Option<wgpu::TextureFormat> {
-        self.texture.as_ref().map(|t| {
-            t.texture.format()
-        })
-    }
-
-    #[inline]
     pub fn surface(&self) -> Option<&wgpu::Surface> {
         match self {
             Self::Texture(_) => None,
@@ -154,6 +147,13 @@ impl ScreenTexture {
 	#[inline]
     pub fn surface(&self) -> &wgpu::Surface {
         &self.surface
+    }
+
+    #[inline]
+    pub fn texture_format(&self) -> Option<wgpu::TextureFormat> {
+        self.texture.as_ref().map(|t| {
+            t.texture.format()
+        })
     }
 
 	#[inline]
