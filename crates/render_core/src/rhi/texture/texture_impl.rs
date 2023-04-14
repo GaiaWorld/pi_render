@@ -149,6 +149,13 @@ impl ScreenTexture {
         &self.surface
     }
 
+    #[inline]
+    pub fn texture_format(&self) -> Option<wgpu::TextureFormat> {
+        self.texture.as_ref().map(|t| {
+            t.texture.format()
+        })
+    }
+
 	#[inline]
     pub fn texture(&self) -> &Option<Share<wgpu::SurfaceTexture>> {
         &self.texture
