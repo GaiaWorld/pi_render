@@ -25,7 +25,7 @@ impl Sampler {
     }
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, Copy)]
 pub enum EAddressMode {
     /// Clamp the value to the edge of the texture
     ///

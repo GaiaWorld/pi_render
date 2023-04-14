@@ -2,7 +2,7 @@
 use std::{ops::Range, sync::Arc};
 
 use pi_assets::asset::Handle;
-use pi_map::vecmap::VecMap;
+use pi_map::smallvecmap::SmallVecMap;
 use wgpu::RenderPass;
 
 use crate::rhi::{dyn_uniform_buffer::BufferGroup, asset::RenderRes, bind_group::BindGroup, pipeline::RenderPipeline, shader::{Uniform, BindLayout}};
@@ -50,19 +50,19 @@ impl DrawBindGroup {
 }
 
 #[derive(Debug, Default)]
-pub struct DrawBindGroups(VecMap<DrawBindGroup>);
+pub struct DrawBindGroups(SmallVecMap<DrawBindGroup, 4>);
 impl DrawBindGroups {
     #[inline]
     pub fn get_group(&self, group_id: u32) -> Option<&DrawBindGroup> {
-        self.0.get(group_id as usize)
+        self.0.get(group_id)
     }
 
     pub fn insert_group<T: Into<DrawBindGroup>>(&mut self, group_id: u32, value: T) {
-        self.0.insert(group_id as usize, value.into());
+        self.0.insert(group_id, value.into());
     }
 
     #[inline]
-    pub fn groups(&self) -> &VecMap<DrawBindGroup> {
+    pub fn groups(&self) -> &SmallVecMap<DrawBindGroup, 4> {
         &self.0
     }
 
@@ -71,12 +71,8 @@ impl DrawBindGroups {
     }
 
     pub fn set<'w, 'a>(&'a self, rpass: &'w mut RenderPass<'a>) {
-        let mut i = 0;
-        for r in self.0.iter() {
-            if let Some(group) = r {
-                group.set(rpass, i as u32);
-            }
-            i += 1;
+        for (group, i) in self.0.iter() {
+            group.set(rpass, *i);
         }
     }
 }
@@ -87,7 +83,7 @@ pub struct DrawObj {
     pub bindgroups: DrawBindGroups,
     ///
     /// * MAX_VERTEX_BUFFER : 可能的最大顶点Buffer数目, 本地电脑 16
-    pub vertices: VecMap<RenderVertices>,
+    pub vertices: SmallVecMap<RenderVertices, 2>,
     pub instances: Range<u32>,
     pub vertex: Range<u32>,
     pub indices: Option<RenderIndices>,
@@ -101,7 +97,7 @@ impl Default for DrawObj {
 
 impl DrawObj {
 	pub fn insert_vertices(&mut self, vertices: RenderVertices) {
-		self.vertices.insert(vertices.slot as usize, vertices);
+		self.vertices.insert(vertices.slot, vertices);
 	}
 
 	pub fn draw<'w, 'a>(&'a self, renderpass: &'w mut RenderPass<'a>) {
@@ -120,10 +116,8 @@ impl DrawObj {
 			// 	r = v_iter.next();
 			// }
 
-			while let Some(item) = r {
-				if let Some(item) = item {
-					renderpass.set_vertex_buffer(item.slot, item.slice());
-				}
+			while let Some((item, _)) = r {
+				renderpass.set_vertex_buffer(item.slot, item.slice());
 				r = v_iter.next();
 			}
 

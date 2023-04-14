@@ -30,14 +30,12 @@ impl DrawList {
                 renderpass.set_pipeline(pipeline);
                 draw.bindgroups.set(renderpass);
 
-                draw.vertices.iter().for_each(|item| {
-                    if let Some(item) = item {
-                        // log::info!("vertex_range {:?}", item.buffer_range.clone());
-                        // log::info!("vertex_range {:?}", item.value_range().clone());
-                        if temp_vertex_record.record_vertex_and_check_diff_with_last(item) {
-                            renderpass.set_vertex_buffer(item.slot, item.slice());
-                        }
-                    }
+                draw.vertices.iter().for_each(|(item, _)| {
+                    // log::info!("vertex_range {:?}", item.buffer_range.clone());
+					// log::info!("vertex_range {:?}", item.value_range().clone());
+					if temp_vertex_record.record_vertex_and_check_diff_with_last(item) {
+						renderpass.set_vertex_buffer(item.slot, item.slice());
+					}
                 });
     
                 // log::info!("vertex_range {:?}", vertex_range.clone());
