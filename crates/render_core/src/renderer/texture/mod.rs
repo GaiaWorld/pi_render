@@ -3,7 +3,7 @@ mod texture_format;
 mod image_texture;
 mod image_texture_view;
 mod render_target;
-mod texture_view;
+pub mod texture_view;
 mod texture_view_array;
 
 use std::num::NonZeroU32;
