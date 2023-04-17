@@ -83,7 +83,7 @@ pub struct DrawObj {
     pub bindgroups: DrawBindGroups,
     ///
     /// * MAX_VERTEX_BUFFER : 可能的最大顶点Buffer数目, 本地电脑 16
-    pub vertices: SmallVecMap<RenderVertices, 2>,
+    pub vertices: SmallVecMap<RenderVertices, 3>,
     pub instances: Range<u32>,
     pub vertex: Range<u32>,
     pub indices: Option<RenderIndices>,

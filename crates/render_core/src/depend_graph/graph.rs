@@ -201,15 +201,17 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
 
         self.node_names.insert(name, node_id);
         self.edges.insert(node_id, NodeSlot::default());
+		
         Ok(node_id)
     }
 
     /// 移除 节点
     pub fn remove_node(&mut self, label: impl Into<NodeLabel>) -> Result<(), GraphError> {
         let label = label.into();
+
         let id = match self.get_node_id(&label) {
             Ok(v) => v,
-            Err(_) => return Ok(()),
+            Err(_) => return Err(GraphError::NoneNode(format!("{:?}", label))),
         };
 
         // 拓扑结构改变
@@ -217,7 +219,7 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
 
         let node = match self.nodes.remove(id) {
             Some(r) => r,
-            None => return Ok(()),
+            None => return Err(GraphError::NoneNode(format!("{:?}", label))),
         };
         self.finish_nodes.remove(&id);
         self.node_names.remove(node.0.as_str());
