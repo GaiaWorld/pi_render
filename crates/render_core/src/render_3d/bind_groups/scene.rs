@@ -11,10 +11,7 @@ use crate::{
     },
     render_3d::{
         binds::{
-            scene::{
-                base::{ShaderBindSceneAboutBase, BindUseSceneAboutCamera},
-                effect::{ShaderBindSceneAboutEffect, BindUseSceneAboutEffect}
-            }
+            scene::*
         }
     },
     rhi::{device::RenderDevice}

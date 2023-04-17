@@ -15,7 +15,7 @@ use crate::{
             effect_texture2d::{EffectBindTexture2D01, EffectBindTexture2D02, EffectBindTexture2D03, EffectBindTexture2D04, EffectBindTexture2D05, EffectBindTexture2D06, TEffectBindTexture2D, TEffectBindTexture2DData},
             effect_sampler2d::{EffectBindSampler2D01, EffectBindSampler2D02, EffectBindSampler2D03, EffectBindSampler2D04, EffectBindSampler2D05, EffectBindSampler2D06, TEffectBindSampler2D, TEffectBindSampler2DData}
         },
-        shader::shader_effect_meta::{ShaderEffectMeta}
+        shader::*
     },
     rhi::{device::RenderDevice}
 };

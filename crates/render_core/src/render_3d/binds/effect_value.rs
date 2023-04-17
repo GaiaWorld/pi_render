@@ -3,7 +3,7 @@ use std::{sync::Arc};
 use pi_assets::{asset::Handle};
 
 use crate::{
-    render_3d::shader::{shader_effect_meta::ShaderEffectMeta, TBindDescToShaderCode},
+    render_3d::shader::*,
     rhi::device::RenderDevice,
     renderer::{
         shader::{KeyShaderMeta, TShaderBindCode},

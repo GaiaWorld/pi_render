@@ -17,26 +17,16 @@ use render_core::{
         shader_stage::EShaderStage
     },
     render_3d::{
-        shader::{
-            shader_effect_meta::ShaderEffectMeta,
-            uniform_texture::UniformTexture2DDesc,
-            uniform_value::{UniformPropertyMat4, UniformPropertyVec4, MaterialValueBindDesc},
-            varying_code::{Varyings, Varying},
-            block_code::BlockCodeAtom,
-            shader_defines::ShaderDefinesSet,
-            shader::Shader3D,
-            instance_code::EInstanceCode
-        },
+        shader::*,
         bind_groups::{
             texture_sampler::{BindGroupTextureSamplers},
             model::{BindGroupModel, KeyBindGroupModel},
             scene::{BindGroupScene, KeyBindGroupScene}
         },
         binds::{
-            model::base::ShaderBindModelAboutMatrix,
+            model::*,
             effect_value::ShaderBindEffectValue,
-            scene::{base::ShaderBindSceneAboutBase, effect::ShaderBindSceneAboutEffect},
-            effect_texture2d::EffectBindTexture2D01
+            scene::*,
         }
     }, asset::TAssetKeyU64
 };

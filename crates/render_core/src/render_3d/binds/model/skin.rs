@@ -7,7 +7,7 @@ use crate::{
         bind::{TKeyBind, KeyBindLayoutBuffer, KeyBindBuffer},
         shader_stage::EShaderStage
     },
-    render_3d::shader::{ShaderSetBind, skin_code::ESkinCode}, rhi::device::RenderDevice
+    render_3d::shader::*, rhi::device::RenderDevice
 };
 
 

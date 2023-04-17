@@ -62,6 +62,7 @@ pi_slab = "0.1"
 wgpu = { version = "0.15", features = ["spirv", "glsl"] }
 derive-deref-rs = "0.1"
 pi_any = "0.1"
+pi_time = "0.2.6"
 # pi_res_loader = {  git = "https://github.com/GaiaWorld/pi_res_loader.git" }
 # pi_res_loader = { path = "../../../pi_res_loader" }
 # pi_res = { path = "../../../pi_res" }

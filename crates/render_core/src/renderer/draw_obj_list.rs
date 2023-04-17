@@ -1,4 +1,4 @@
-use std::{time::Instant, sync::Arc, slice::Iter};
+use std::{sync::Arc, slice::Iter};
 
 use crate::renderer::draw_obj::TempDrawInfoRecord;
 
@@ -16,7 +16,7 @@ impl DrawList {
         draws: &'a [T],
         renderpass: & mut wgpu::RenderPass<'a>,
     ) {
-        let time = Instant::now();
+        let time = pi_time::Instant::now();
 
         let mut temp_vertex_record: TempDrawInfoRecord = TempDrawInfoRecord::default();
 
@@ -58,7 +58,7 @@ impl DrawList {
             }
         });
         
-        let time1 = Instant::now();
+        let time1 = pi_time::Instant::now();
         log::info!("DrawList: {}, {:?}", draw_count, time1 - time);
     }
 }

@@ -4,17 +4,29 @@ use pi_atom::Atom;
 
 use crate::rhi::shader::BindingExpandDesc;
 
-pub mod block_code;
-pub mod instance_code;
-pub mod skin_code;
-pub mod varying_code;
-pub mod vs_begin_code;
-pub mod shader_defines;
-pub mod uniform_sampler;
-pub mod uniform_texture;
-pub mod uniform_value;
-pub mod shader;
-pub mod shader_effect_meta;
+mod block_code;
+mod instance_code;
+mod skin_code;
+mod varying_code;
+mod vs_begin_code;
+mod shader_defines;
+mod uniform_sampler;
+mod uniform_texture;
+mod uniform_value;
+mod shader;
+mod shader_effect_meta;
+
+pub use block_code::*;
+pub use instance_code::*;
+pub use skin_code::*;
+pub use varying_code::*;
+pub use vs_begin_code::*;
+pub use shader_defines::*;
+pub use uniform_sampler::*;
+pub use uniform_texture::*;
+pub use uniform_value::*;
+pub use shader::*;
+pub use shader_effect_meta::*;
 
 pub type UniformPropertyName = Atom;
 

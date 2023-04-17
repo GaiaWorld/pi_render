@@ -8,7 +8,7 @@ use crate::{
         sampler::{BindDataSampler, SamplerRes},
         bind::{KeyBindLayoutSampler, EKeyBind, KeyBindSampler}
     },
-    render_3d::shader::{shader_effect_meta::ShaderEffectMeta, uniform_sampler::sampler_code}
+    render_3d::shader::*
 };
 
 pub trait TEffectBindSampler2D {
