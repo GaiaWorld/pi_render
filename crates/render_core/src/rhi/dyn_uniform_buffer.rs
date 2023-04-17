@@ -122,6 +122,11 @@ impl GroupAlloter {
 			unsafe { &mut *(Share::as_ptr(&context.buffers) as usize as *mut GroupBuffer) };
 			let _lock = buffers.mutex.lock();
 
+			// 再次尝试分配（多线程结构下需要重新检查）
+            if let Some(r) = context.buffers.values[context.buffers.lately_use_buffer].alloc() {
+                return (r, context.buffers.lately_use_buffer);
+            }
+
 			let info = &context.info;
 
             // 找到一个存在空闲位置的buffer组
@@ -136,11 +141,10 @@ impl GroupAlloter {
             let next_count = info
                 .limit_count
                 .min(buffers.values.last().unwrap().capacity() as usize * 2);
-            buffers.lately_use_buffer = context.buffers.values.len();
             let buffer_maps = GroupBuffersAlloter::new(next_count, info.binding_size_list.as_slice());
             let alloc_index = buffer_maps.alloc().unwrap();
             buffers.values.push(buffer_maps);
-
+			buffers.lately_use_buffer = context.buffers.values.len() - 1;
             (alloc_index, context.buffers.lately_use_buffer)
         }
         let (alloc_index, lately_use_buffer) = alloc(self);
