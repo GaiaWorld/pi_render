@@ -1,4 +1,3 @@
-use super::shader::shader_effect_meta::ShaderEffectMeta;
 
 pub mod effect_value;
 pub mod effect_sampler2d;

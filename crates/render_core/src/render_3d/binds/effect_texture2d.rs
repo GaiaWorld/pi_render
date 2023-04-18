@@ -5,11 +5,12 @@ use pi_assets::asset::Handle;
 
 use crate::{
     renderer::{
-        texture::{BindDataTexture2D, texture_view::ETextureViewUsage},
+        texture::*,
         bind::{KeyBindLayoutTexture2D, EKeyBind, KeyBindTexture2D},
     },
     rhi::{asset::TextureRes},
-    render_3d::shader::{shader_effect_meta::ShaderEffectMeta, TBindDescToShaderCode}};
+    render_3d::shader::*
+};
 
 
 pub trait TEffectBindTexture2D {

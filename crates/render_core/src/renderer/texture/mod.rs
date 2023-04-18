@@ -1,14 +1,20 @@
 mod bind_texture;
-pub mod texture_format;
-pub mod image_texture;
-pub mod image_texture_view;
-pub mod render_target;
+mod texture_format;
+mod image_texture;
+mod image_texture_view;
+mod render_target;
 pub mod texture_view;
-pub mod texture_view_array;
+mod texture_view_array;
 
 use std::num::NonZeroU32;
 
 pub use bind_texture::*;
+pub use texture_format::*;
+pub use image_texture::*;
+pub use image_texture_view::*;
+pub use render_target::*;
+pub use texture_view::*;
+pub use texture_view_array::*;
 
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]

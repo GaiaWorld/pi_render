@@ -1,11 +1,10 @@
 use std::{ops::Range, mem::{size_of, replace}, hash::Hash, sync::Arc, fmt::Debug};
 
 use pi_assets::{asset::{Asset, GarbageEmpty, Handle}, mgr::AssetMgr};
-use pi_atom::Atom;
 use pi_share::{Share, ShareMutex};
 use wgpu::util::BufferInitDescriptor;
 
-use crate::{rhi::{device::RenderDevice, RenderQueue,  buffer::Buffer}, render_3d::shader::instance_code::EInstanceCode, asset::TAssetKeyU64};
+use crate::{rhi::{device::RenderDevice, RenderQueue,  buffer::Buffer}, asset::TAssetKeyU64};
 
 use super::{
     attributes::{EVertexDataKind, ShaderAttribute, TAsWgpuVertexAtribute, KeyShaderFromAttributes},

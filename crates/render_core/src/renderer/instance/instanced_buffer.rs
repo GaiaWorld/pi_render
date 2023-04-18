@@ -3,7 +3,7 @@ use crate::{renderer::vertex_buffer::{KeyVertexBuffer}};
 
 use crate::renderer::vertex_buffer_desc::EVertexBufferSlot;
 
-pub trait TInstancedBuffer {
+pub trait TInstanceBuffer {
     /// * Buffer 类型名称
     /// * `example` "InstanceWorldMatrix"
     fn display_name() -> String;

@@ -6,12 +6,9 @@ use pi_share::Share;
 use crate::{
     renderer::{bind_group::{BindGroupUsage, BindGroupLayout, KeyBindGroup}, bind::{EKeyBind, KeyBindBuffer}, shader::{TShaderSetBlock, TShaderBindCode}},
     render_3d::{
-        shader::skin_code::ESkinCode,
+        shader::*,
         binds::{
-            model::{
-                base::{BindUseModelMatrix, ShaderBindModelAboutMatrix},
-                skin::{BindUseSkinValue, ShaderBindModelAboutSkinValue}
-            },
+            model::*,
             effect_value::{ShaderBindEffectValue, BindUseEffectValue}
         }
     },
