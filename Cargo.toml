@@ -26,7 +26,7 @@ pi_async = "0.5"
 pi_map = "0.1"
 pi_hash = "0.1"
 
-nalgebra = "0.30"
+nalgebra = "0.32"
 winit = { git = "http://ser.yinengyun.com:10082/tech/winit.git" }
 log = "0.4"
 wgpu = "0.15"
