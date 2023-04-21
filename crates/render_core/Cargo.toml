@@ -23,7 +23,7 @@ pi_futures = "0.1"
 pi_async = "0.5"
 pi_share = "0.4"
 pi_async_graph = "0.4"
-pi_assets = "0.10"
+pi_assets = "0.11"
 pi_graph = "0.1"
 pi_hash = "0.1"
 pi_map = "0.1"
@@ -53,8 +53,8 @@ naga = { version = "0.11", features = [
     "wgsl-in",
     "wgsl-out",
 ] }
-nalgebra = "0.30"
-parry3d = "0.8"
+nalgebra = "0.32"
+parry3d = "0.13"
 once_cell = "1.4" # TODO: replace once_cell with std equivalent if/when this lands: https://github.com/rust-lang/rfcs/pull/2788
 regex = "1.5"
 thiserror = "1.0"
@@ -78,7 +78,7 @@ pi_hal = { git = "https://github.com/GaiaWorld/pi_hal.git" }
 
 wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
 
-parking_lot = "0.11"
+parking_lot = "0.12"
 crossbeam="0.8"
 
 [dev-dependencies]

@@ -370,7 +370,7 @@ impl FixedSizeBufferPoolNotUpdatable {
         // 创建块
         let buffer = NotUpdatableBuffer::new(device, self.block_size, self.usage);
         buffer.write_buffer(queue, data);
-        if let Some(asset_buffer) = asset_mgr.insert(key_buffer, buffer) {
+        if let Ok(asset_buffer) = asset_mgr.insert(key_buffer, buffer) {
             let use_buffer = UseNotUpdatableBuffer(Some(asset_buffer.clone()));
             let use_buffer = Arc::new(use_buffer);
             self.buffers[key_buffer.index as usize] = use_buffer.clone();

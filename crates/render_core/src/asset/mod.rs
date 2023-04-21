@@ -88,7 +88,7 @@ impl<K: Clone + Hash + PartialEq + Eq, A: Asset<Key = K>, P: Clone> AssetDataCen
     ) -> XHashMap<K, (Handle<A>, Option<P>)> {
         let mut result = XHashMap::default();
         self.datamap.drain().for_each(|(key, data)| {
-            if let Some(range) = self.asset_mgr.insert(key.clone(), data.0) {
+            if let Ok(range) = self.asset_mgr.insert(key.clone(), data.0) {
                 result.insert(key, (range, data.1));
             }
         });

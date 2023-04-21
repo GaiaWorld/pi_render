@@ -134,7 +134,7 @@ impl FixedSizeBufferPool {
             self.usage
         );
         if let Some(index) = buffer.alloc() {
-            if let Some(asset_buffer) = asset_mgr.insert(key_buffer, AssetRWBuffer(buffer, self.block_size)) {
+            if let Ok(asset_buffer) = asset_mgr.insert(key_buffer, AssetRWBuffer(buffer, self.block_size)) {
                 let use_buffer = UseAssetRWBuffer(Some(asset_buffer.clone()));
                 self.buffers[key_buffer.index as usize] = use_buffer;
                 return Some(

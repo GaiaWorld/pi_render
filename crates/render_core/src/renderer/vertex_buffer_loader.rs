@@ -29,7 +29,7 @@ impl SingleVertexBufferDataMap {
         let mut result = XHashMap::default();
         self.vertices.drain().for_each(|(key, data)| {
             if let Some(bufferrange) = allocator.create_not_updatable_buffer(device, queue, &data) {
-                if let Some(range) = asset_mgr.insert(key.clone(), bufferrange) {
+                if let Ok(range) = asset_mgr.insert(key.clone(), bufferrange) {
                     result.insert(key, EVerticesBufferUsage::Other(range));
                 }
             }

@@ -19,7 +19,7 @@ impl BindDataSampler {
             Some(Self(val))
         } else {
             let samp = Sampler::new(device, &key);
-            if let Some(samp) = asset.insert(key, samp) {
+            if let Ok(samp) = asset.insert(key, samp) {
                 Some(Self(samp))
             } else {
                 None
