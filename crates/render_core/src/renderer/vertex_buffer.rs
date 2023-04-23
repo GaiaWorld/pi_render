@@ -368,19 +368,19 @@ impl VertexBufferAllocator {
             }
         }
 
-        let old_count = self.unupdatables.len();
+        let old_count = self.unupdatables_for_index.len();
         let new_count = level + 1;
         if old_count < new_count {
             let usage = wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::INDEX;
             for level in old_count..new_count {
-                self.unupdatables.push(
+                self.unupdatables_for_index.push(
                     FixedSizeBufferPoolNotUpdatable::new(self.base_size * 2_i32.pow(level as u32) as u32, usage)
                 );
             }
         }
         // log::info!("size: {}, level: {}, old_count: {}, new: {}", size, level, old_count, new_count);
 
-        if let Some(range) = self.unupdatables.get_mut(level).unwrap().allocate(&self.asset_mgr_2, device, queue, data) {
+        if let Some(range) = self.unupdatables_for_index.get_mut(level).unwrap().allocate(&self.asset_mgr_2, device, queue, data) {
             Some(EVertexBufferRange::NotUpdatable(range))
         } else {
             None
