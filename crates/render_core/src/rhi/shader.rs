@@ -1,6 +1,6 @@
 use bytemuck::NoUninit;
 use derive_deref_rs::Deref;
-use naga::{back::wgsl::WriterFlags, valid::ModuleInfo, Module};
+use naga::{valid::ModuleInfo, Module};
 use once_cell::sync::Lazy;
 use pi_atom::Atom;
 use pi_futures::BoxFuture;
@@ -16,7 +16,9 @@ use std::{
 };
 use thiserror::Error;
 use uuid::Uuid;
-use wgpu::{util::make_spirv, ShaderModuleDescriptor, ShaderSource};
+#[cfg(feature="wgpu/spirv")]
+use wgpu::util::make_spirv;
+use wgpu::{ShaderModuleDescriptor, ShaderSource};
 
 pub trait Input {
     fn location() -> u32;
@@ -564,13 +566,14 @@ impl ShaderId {
 /// Shader 解析 错误
 #[derive(Error, Debug)]
 pub enum ShaderReflectError {
-    #[error(transparent)]
-    WgslParse(#[from] naga::front::wgsl::ParseError),
+    // #[error(transparent)]
+    // WgslParse(#[from] naga::front::wgsl::ParseError),
 
     #[error("GLSL Parse Error: {0:?}")]
     GlslParse(Vec<naga::front::glsl::Error>),
 
     #[error(transparent)]
+	#[cfg(feature="wgpu/spirv")]
     SpirVParse(#[from] naga::front::spv::Error),
 
     #[error(transparent)]
@@ -621,6 +624,7 @@ impl Shader {
     }
 
     /// 从 spirv 二进制 得到的 Shader
+	#[cfg(feature="wgpu/spirv")]
     pub fn from_spirv(source: impl Into<Cow<'static, [u8]>>) -> Shader {
         Shader {
             id: ShaderId::new(),
@@ -665,6 +669,7 @@ impl Shader {
 pub enum Source {
     Wgsl(Cow<'static, str>),
     Glsl(Cow<'static, str>, naga::ShaderStage),
+	#[cfg(feature="wgpu/spirv")]
     SpirV(Cow<'static, [u8]>),
 }
 
@@ -674,6 +679,7 @@ pub enum Source {
 pub enum ProcessedShader {
     Wgsl(Cow<'static, str>),
     Glsl(Cow<'static, str>, naga::ShaderStage),
+	#[cfg(feature="wgpu/spirv")]
     SpirV(Cow<'static, [u8]>),
 }
 
@@ -699,13 +705,14 @@ impl ProcessedShader {
     /// 反射
     pub fn reflect(&self) -> Result<ShaderReflection, ShaderReflectError> {
         let module = match &self {
-            ProcessedShader::Wgsl(source) => naga::front::wgsl::parse_str(source)?,
+            ProcessedShader::Wgsl(source) => {todo!()}//naga::front::wgsl::parse_str(source)?,
             ProcessedShader::Glsl(source, shader_stage) => {
                 let mut parser = naga::front::glsl::Parser::default();
                 parser
                     .parse(&naga::front::glsl::Options::from(*shader_stage), source)
                     .map_err(ShaderReflectError::GlslParse)?
             }
+			#[cfg(feature="wgpu/spirv")]
             ProcessedShader::SpirV(source) => naga::front::spv::parse_u8_slice(
                 source,
                 &naga::front::spv::Options {
@@ -739,15 +746,18 @@ impl ProcessedShader {
                     #[cfg(debug_assertions)]
                     let _ = self.reflect()?;
 
-                    ShaderSource::Wgsl(source.clone())
+					todo!();
+                    // ShaderSource::Wgsl(source.clone())
                 }
                 ProcessedShader::Glsl(_source, _stage) => {
                     let reflection = self.reflect()?;
 
                     // 通过 反射信息 转换成 wgsl
-                    let wgsl = reflection.get_wgsl()?;
-                    ShaderSource::Wgsl(wgsl.into())
+                    // let wgsl = reflection.get_wgsl()?;
+					todo!()
+                    // ShaderSource::Wgsl(wgsl.into())
                 }
+				#[cfg(feature="wgpu/spirv")]
                 ProcessedShader::SpirV(source) => make_spirv(source),
             },
         })
@@ -758,10 +768,10 @@ impl ProcessedShader {
 pub enum AsModuleDescriptorError {
     #[error(transparent)]
     ShaderReflectError(#[from] ShaderReflectError),
-    #[error(transparent)]
-    WgslConversion(#[from] naga::back::wgsl::Error),
-    #[error(transparent)]
-    SpirVConversion(#[from] naga::back::spv::Error),
+    // #[error(transparent)]
+    // WgslConversion(#[from] naga::back::wgsl::Error),
+    // #[error(transparent)]
+    // SpirVConversion(#[from] naga::back::spv::Error),
 }
 
 /// Shader 反射 信息
@@ -773,23 +783,23 @@ pub struct ShaderReflection {
 }
 
 impl ShaderReflection {
-    /// 转 spriv 二进制
-    pub fn get_spirv(&self) -> Result<Vec<u32>, naga::back::spv::Error> {
-        naga::back::spv::write_vec(
-            &self.module,
-            &self.module_info,
-            &naga::back::spv::Options {
-                flags: naga::back::spv::WriterFlags::empty(),
-                ..naga::back::spv::Options::default()
-            },
-            None,
-        )
-    }
+    // /// 转 spriv 二进制
+    // pub fn get_spirv(&self) -> Result<Vec<u32>, naga::back::spv::Error> {
+    //     naga::back::spv::write_vec(
+    //         &self.module,
+    //         &self.module_info,
+    //         &naga::back::spv::Options {
+    //             flags: naga::back::spv::WriterFlags::empty(),
+    //             ..naga::back::spv::Options::default()
+    //         },
+    //         None,
+    //     )
+    // }
 
-    /// 转 wgsl
-    pub fn get_wgsl(&self) -> Result<String, naga::back::wgsl::Error> {
-        naga::back::wgsl::write_string(&self.module, &self.module_info, WriterFlags::EXPLICIT_TYPES)
-    }
+    // /// 转 wgsl
+    // pub fn get_wgsl(&self) -> Result<String, naga::back::wgsl::Error> {
+    //     naga::back::wgsl::write_string(&self.module, &self.module_info, WriterFlags::EXPLICIT_TYPES)
+    // }
 }
 
 /// 加载 Shader
@@ -803,6 +813,7 @@ pub fn load_shader(
         let ext = path.extension().unwrap().to_str().unwrap();
 
         let shader = match ext {
+			#[cfg(feature="wgpu/spirv")]
             "spv" => Shader::from_spirv(bytes.to_vec()),
             "wgsl" => Shader::from_wgsl(String::from_utf8(bytes.to_vec()).unwrap()),
             "vert" => Shader::from_glsl(
@@ -893,6 +904,7 @@ impl ShaderImportProcessor {
         match &shader.source {
             Source::Wgsl(source) => self.get_imports_from_str(source),
             Source::Glsl(source, _stage) => self.get_imports_from_str(source),
+			#[cfg(feature="wgpu/spirv")]
             Source::SpirV(_source) => ShaderImports::default(),
         }
     }
@@ -1018,6 +1030,7 @@ impl<L: CodeLoader> ShaderProcessor<L> {
         let shader_str = match &shader.source {
             Source::Wgsl(source) => source.deref(),
             Source::Glsl(source, _stage) => source.deref(),
+			#[cfg(feature="wgpu/spirv")]
             Source::SpirV(source) => {
                 if shader_defs.is_empty() {
                     return Ok(ProcessedShader::SpirV(source.clone()));
@@ -1099,6 +1112,7 @@ impl<L: CodeLoader> ShaderProcessor<L> {
         match &shader.source {
             Source::Wgsl(_source) => Ok(ProcessedShader::Wgsl(processed_source)),
             Source::Glsl(_source, stage) => Ok(ProcessedShader::Glsl(processed_source, *stage)),
+			#[cfg(feature="wgpu/spirv")]
             Source::SpirV(_source) => {
                 unreachable!("SpirV has early return");
             }
@@ -1126,6 +1140,7 @@ impl<L: CodeLoader> ShaderProcessor<L> {
                     let suffix = suffix.to_str().unwrap();
                     let code = self.loader.load(&path)?;
                     let shader = match suffix {
+						#[cfg(feature="wgpu/spirv")]
                         "spv" => Shader::from_spirv(code),
                         "wgsl" => Shader::from_wgsl(String::from_utf8(code).unwrap()),
                         // NOTE: naga::ShaderStage::Vertex 随便写的，好像没有影响？
@@ -1169,6 +1184,7 @@ impl<L: CodeLoader> ShaderProcessor<L> {
                     return Err(ProcessShaderError::MismatchedImportFormat(import.clone()));
                 }
             }
+			#[cfg(feature="wgpu/spirv")]
             Source::SpirV(_) => {
                 return Err(ProcessShaderError::ShaderFormatDoesNotSupportImports);
             }
