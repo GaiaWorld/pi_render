@@ -135,25 +135,25 @@ impl VertexBufferLayouts {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum EVertexBufferRange {
     /// * (BufferRange, 使用大小)
-    Updatable(RWBufferRange, u32),
+    Updatable(RWBufferRange, u32, wgpu::BufferUsages),
     NotUpdatable(NotUpdatableBufferRange),
 }
 impl EVertexBufferRange {
     pub fn buffer(&self) -> &Buffer {
         match self {
-            EVertexBufferRange::Updatable(val, _) => val.buffer(),
+            EVertexBufferRange::Updatable(val, _, _) => val.buffer(),
             EVertexBufferRange::NotUpdatable(val) => val.buffer(),
         }
     }
     pub fn size(&self) -> u32 {
         match self {
-            EVertexBufferRange::Updatable(_, size) => *size,
+            EVertexBufferRange::Updatable(_, size, _) => *size,
             EVertexBufferRange::NotUpdatable(val) => val.used_size,
         }
     }
     pub fn range(&self) -> Range<wgpu::BufferAddress> {
         match self {
-            EVertexBufferRange::Updatable(val, size) => {
+            EVertexBufferRange::Updatable(val, size, _) => {
                 Range { start: val.offset() as u64, end: (val.offset() + size) as u64 }
             },
             EVertexBufferRange::NotUpdatable(val) => {
@@ -176,10 +176,12 @@ pub struct VertexBufferAllocator {
     // max_base_size: u32,
     // block_size: u32,
     pool_slots: [FixedSizeBufferPool;Self::LEVEL_COUNT],
+    pool_slots_for_index: [FixedSizeBufferPool;Self::LEVEL_COUNT],
     pool_count: usize,
     asset_mgr: Share<AssetMgr<AssetRWBuffer>>,
     asset_mgr_2: Share<AssetMgr<NotUpdatableBuffer>>,
     unupdatables: Vec<FixedSizeBufferPoolNotUpdatable>,
+    unupdatables_for_index: Vec<FixedSizeBufferPoolNotUpdatable>,
 }
 
 impl Default for VertexBufferAllocator {
@@ -206,8 +208,27 @@ impl VertexBufferAllocator {
         // let max_base_size = Self::MAX_BASE_SIZE;
         let block_size = base_size * 1024;
 
-        let usage = wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::INDEX;
+        let usage = wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::VERTEX;
         let pool_slots = [
+            FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(00) as u32, usage),
+            FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(01) as u32, usage),
+            FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(02) as u32, usage),
+            FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(03) as u32, usage),
+            FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(04) as u32, usage),
+            FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(05) as u32, usage),
+            FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(06) as u32, usage),
+            FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(07) as u32, usage),
+            FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(08) as u32, usage),
+            FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(09) as u32, usage),
+            FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(10) as u32, usage),
+            FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(11) as u32, usage),
+            FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(12) as u32, usage),
+            FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(13) as u32, usage),
+            FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(14) as u32, usage),
+            FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(15) as u32, usage),
+        ];
+        let usage = wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::INDEX;
+        let pool_slots_for_index = [
             FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(00) as u32, usage),
             FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(01) as u32, usage),
             FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(02) as u32, usage),
@@ -233,11 +254,13 @@ impl VertexBufferAllocator {
             base_size,
             // block_size,
             pool_slots,
+            pool_slots_for_index,
             pool_count: level,
             // max_base_size,
             asset_mgr,
             asset_mgr_2,
             unupdatables: vec![],
+            unupdatables_for_index: vec![]
         }
     }
     pub fn create_updatable_buffer(&mut self, data: &[u8]) -> Option<EVertexBufferRange> {
@@ -251,7 +274,29 @@ impl VertexBufferAllocator {
             if let Some(pool) = self.pool_slots.get_mut(index) {
                 if let Some(range) = pool.allocate(&self.asset_mgr) {
                     range.write_data(0, data);
-                    Some(EVertexBufferRange::Updatable(range, size))
+                    Some(EVertexBufferRange::Updatable(range, size, wgpu::BufferUsages::VERTEX))
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+    pub fn create_updatable_buffer_for_index(&mut self, data: &[u8]) -> Option<EVertexBufferRange> {
+        let size = data.len() as u32;
+        let index = match self.pool_slots_for_index.binary_search_by(|v| { v.fixed_size.cmp(&size)  }) {
+            Ok(index) => index,
+            Err(index) => index,
+        };
+
+        if index < self.pool_count {
+            if let Some(pool) = self.pool_slots_for_index.get_mut(index) {
+                if let Some(range) = pool.allocate(&self.asset_mgr) {
+                    range.write_data(0, data);
+                    Some(EVertexBufferRange::Updatable(range, size, wgpu::BufferUsages::INDEX))
                 } else {
                     None
                 }
@@ -264,6 +309,9 @@ impl VertexBufferAllocator {
     }
     pub fn update_buffer(&mut self, device: &RenderDevice, queue: &RenderQueue) {
         self.pool_slots.iter_mut().for_each(|pool| {
+            pool.write_buffer(device, queue);
+        });
+        self.pool_slots_for_index.iter_mut().for_each(|pool| {
             pool.write_buffer(device, queue);
         });
     }
@@ -287,7 +335,7 @@ impl VertexBufferAllocator {
         let old_count = self.unupdatables.len();
         let new_count = level + 1;
         if old_count < new_count {
-            let usage = wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::INDEX;
+            let usage = wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::VERTEX;
             for level in old_count..new_count {
                 self.unupdatables.push(
                     FixedSizeBufferPoolNotUpdatable::new(self.base_size * 2_i32.pow(level as u32) as u32, usage)
@@ -303,6 +351,41 @@ impl VertexBufferAllocator {
         }
     }
 
+    pub fn create_not_updatable_buffer_for_index(&mut self, device: &RenderDevice, queue: &RenderQueue, data: &[u8]) -> Option<EVertexBufferRange> {
+        let size = data.len() as u32;
+        let mut level = 0;
+        let mut level_size = self.base_size;
+        loop {
+            if level_size >= size {
+                break;
+            }
+            level_size *= 2;
+            level += 1;
+
+            // 基础为 64 = 2^6, u32 还可以有 25 个 level - 最大 2048 M
+            if level > 25 {
+                return None;
+            }
+        }
+
+        let old_count = self.unupdatables.len();
+        let new_count = level + 1;
+        if old_count < new_count {
+            let usage = wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::INDEX;
+            for level in old_count..new_count {
+                self.unupdatables.push(
+                    FixedSizeBufferPoolNotUpdatable::new(self.base_size * 2_i32.pow(level as u32) as u32, usage)
+                );
+            }
+        }
+        // log::info!("size: {}, level: {}, old_count: {}, new: {}", size, level, old_count, new_count);
+
+        if let Some(range) = self.unupdatables.get_mut(level).unwrap().allocate(&self.asset_mgr_2, device, queue, data) {
+            Some(EVertexBufferRange::NotUpdatable(range))
+        } else {
+            None
+        }
+    }
 }
 
 pub struct FixedSizeBufferPoolNotUpdatable {
@@ -356,7 +439,8 @@ impl FixedSizeBufferPoolNotUpdatable {
                     NotUpdatableBufferRange {
                         used_size: data.len() as u32,
                         id_buffer: key_buffer.clone(),
-                        buffer: use_buffer
+                        buffer: use_buffer,
+                        usage: self.usage
                     }
                 );
             } else {
@@ -378,7 +462,8 @@ impl FixedSizeBufferPoolNotUpdatable {
                 NotUpdatableBufferRange {
                     used_size: data.len() as u32,
                     id_buffer: key_buffer.clone(),
-                    buffer: use_buffer
+                    buffer: use_buffer,
+                    usage: self.usage,
                 }
             );
         } else {
@@ -404,7 +489,7 @@ impl UseNotUpdatableBuffer {
     }
 }
 
-pub struct NotUpdatableBuffer(Buffer, u32, bool);
+pub struct NotUpdatableBuffer(Buffer, u32, bool, wgpu::BufferUsages);
 impl Asset for NotUpdatableBuffer {
     type Key = IDNotUpdatableBuffer;
     fn size(&self) -> usize {
@@ -425,7 +510,7 @@ impl NotUpdatableBuffer {
             }
         );
 
-        Self(buffer, size, true)
+        Self(buffer, size, true, usage)
     }
     pub(crate) fn write_buffer(&self, queue: &RenderQueue, data: &[u8]) {
         // let mut temp = vec![];
@@ -449,6 +534,7 @@ pub struct NotUpdatableBufferRange {
     used_size: u32,
     id_buffer: IDNotUpdatableBuffer,
     buffer: Arc<UseNotUpdatableBuffer>,
+    usage: wgpu::BufferUsages,
 }
 impl Debug for NotUpdatableBufferRange {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -477,11 +563,12 @@ impl Drop for NotUpdatableBufferRange {
 impl Hash for NotUpdatableBufferRange {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.id_buffer.hash(state);
+        self.usage.hash(state);
     }
 }
 impl PartialEq for NotUpdatableBufferRange {
     fn eq(&self, other: &Self) -> bool {
-        self.id_buffer == other.id_buffer
+        self.id_buffer == other.id_buffer && self.usage == other.usage
     }
 }
 impl Eq for NotUpdatableBufferRange {
