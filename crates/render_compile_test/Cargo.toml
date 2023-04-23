@@ -13,7 +13,7 @@ pi_render = {path = "../render_core", package="render_core"}
 pi_atom={version="0.2", features = ["serde"]}
 render_derive = {path="../render_derive"}
 render_compile = {path="../render_compile"}
-wgpu = { version = "0.15", features = ["spirv", "glsl", "webgl"] }
+wgpu = { version = "0.15", default-features = false, features = ["glsl"] }
 pi_map="0.1"
 bytemuck = { version = "1.4", features = ["derive"] }
 cargo-manifest = "0.2.6"
@@ -27,11 +27,5 @@ pi_map = { path = "../pi_map" }
 
 [build-dependencies]
 render_compile = {path="../render_compile"}
-naga = { version = "0.11", features = [
-    "glsl-in",
-    "spv-in",
-    "spv-out",
-    "wgsl-in",
-    "wgsl-out",
-] }
+naga = { version = "0.11"}
 
