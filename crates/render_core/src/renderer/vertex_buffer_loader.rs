@@ -37,9 +37,8 @@ impl SingleVertexBufferDataMap {
         result
     }
     pub fn add_instance(&mut self, key: &KeyVertexBuffer, data: Vec<u8>) {
-        if !self.instance.contains_key(key) {
-            self.instance.insert(key.clone(), data);
-        }
+        // log::info!("add_instance >>>>>>>>>>>>>>>>>>>>> {:?}", key);
+        self.instance.insert(key.clone(), data);
     }
     pub fn single_create_instance(
         &mut self,
