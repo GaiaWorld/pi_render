@@ -1,6 +1,6 @@
-use std::{num::NonZeroU8, sync::Arc, hash::Hash, fmt::Debug};
+use std::{hash::Hash, fmt::Debug};
 
-use pi_assets::{asset::{Asset, Handle}, mgr::AssetMgr};
+use pi_assets::{asset::{Handle}, mgr::AssetMgr};
 use pi_share::Share;
 
 use crate::rhi::{device::RenderDevice, sampler::{Sampler, sampler_array::EKeySamplerArray, SamplerDesc}};

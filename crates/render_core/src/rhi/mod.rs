@@ -16,6 +16,7 @@ pub mod texture;
 pub mod uniform_vec;
 pub mod draw_obj;
 pub mod sampler;
+pub mod small_struct_allocator;
 
 use self::device::RenderDevice;
 use pi_share::Share;

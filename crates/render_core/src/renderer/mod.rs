@@ -4,8 +4,6 @@ use pi_assets::{asset::{Handle, Asset}, mgr::AssetMgr};
 use pi_hash::XHashMap;
 use pi_share::Share;
 
-use crate::rhi::{device::RenderDevice, RenderQueue};
-
 pub mod draw_obj;
 pub mod draw_sort;
 pub mod draw_obj_list;

@@ -12,7 +12,7 @@ use render_core::{
         bind_buffer::BindBufferAllocator,
         sampler::SamplerRes,
         buildin_data::{DefaultTexture, EDefaultTexture},
-        bind_group::{BindGroupLayout, BindGroupUsage, BindGroup},
+        bind_group::{BindGroupLayout, BindGroupUsage, BindGroup, BindsRecorder},
         attributes::{ShaderAttribute, EVertexDataKind, KeyShaderFromAttributes},
         shader_stage::EShaderStage
     },
@@ -286,6 +286,7 @@ pub(crate) fn main() {
     let mut asset_sampler: Share<AssetMgr<SamplerRes>> = AssetMgr::<SamplerRes>::new(GarbageEmpty(), false, 60 * 1024 * 1024, 1000);
     let mut asset_bind_group: Share<AssetMgr<BindGroup>> = AssetMgr::<BindGroup>::new(GarbageEmpty(), false, 60 * 1024 * 1024, 1000);
     let mut asset_bind_group_layout: Share<AssetMgr<BindGroupLayout>> = AssetMgr::<BindGroupLayout>::new(GarbageEmpty(), false, 60 * 1024 * 1024, 1000);
+    let mut bindsrecorder = BindsRecorder::new();
 
     let white = DefaultTexture::create(&device, &queue, EDefaultTexture::White, wgpu::TextureDimension::D2);
     let texture = white.create_view(&wgpu::TextureViewDescriptor {
@@ -436,9 +437,10 @@ gl_FragColor = vec4(baseColor.rgb, alpha);
         bind_model,
         None,
         Some(bind_effect_value),
+        &mut bindsrecorder
     );
     let key_bind_group = key.key_bind_group();
-    let key_bind_group_layout = key_bind_group.key_bind_group_layout();
+    let key_bind_group_layout = key.key_bind_group_layout();
     let bind_group_layout = BindGroupLayout::new(&device, &key_bind_group_layout);
     let bind_group_layout = asset_bind_group_layout.insert(key_bind_group_layout.asset_u64(), bind_group_layout).unwrap();
     let bind_group = BindGroup::new(&device, &key_bind_group, bind_group_layout);
@@ -448,9 +450,10 @@ gl_FragColor = vec4(baseColor.rgb, alpha);
     let key = KeyBindGroupScene::new(
         bind_camera, 
         Some(bind_effect),
+        &mut bindsrecorder
     );
     let key_bind_group = key.key_bind_group();
-    let key_bind_group_layout = key_bind_group.key_bind_group_layout();
+    let key_bind_group_layout = key.key_bind_group_layout();
     let bind_group_layout = BindGroupLayout::new(&device, &key_bind_group_layout);
     let bind_group_layout = asset_bind_group_layout.insert(key_bind_group_layout.asset_u64(), bind_group_layout).unwrap();
     let bind_group = BindGroup::new(&device, &key_bind_group, bind_group_layout);
@@ -472,4 +475,6 @@ gl_FragColor = vec4(baseColor.rgb, alpha);
         None,
         None,
     );
+
+    println!("Shader End.")
 }

@@ -3,7 +3,7 @@ use std::{hash::Hash, sync::Arc};
 use pi_assets::asset::Handle;
 use pi_slotmap::DefaultKey;
 
-use crate::{rhi::{texture::TextureView, asset::{TextureRes, RenderRes}}, components::view::target_alloc::ShareTargetView};
+use crate::{rhi::{texture::TextureView, asset::{TextureRes, RenderRes}}, components::view::target_alloc::ShareTargetView, asset::TAssetKeyU64};
 
 use super::{image_texture_view::{ImageTextureView, EImageTextureViewUsage}, render_target::{ERenderTargetViewUsage}, TextureRect};
 
@@ -94,3 +94,4 @@ impl From<ERenderTargetViewUsage> for ETextureViewUsage {
         Self::Render(value)
     }
 }
+impl TAssetKeyU64 for ETextureViewUsage {}

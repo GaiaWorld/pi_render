@@ -1,5 +1,7 @@
 use std::{num::{NonZeroU64, NonZeroU32}, fmt::Debug, hash::Hash, sync::Arc};
 
+use pi_hash::XHashMap;
+
 use super::{
     texture::{BindDataTextureArray, BindDataTexture2D},
     sampler::{BindDataSampler},
@@ -93,7 +95,7 @@ impl KeyBindLayout {
     }
 }
 
-pub(crate) enum EBindResource<'a> {
+pub enum EBindResource<'a> {
     Buffer(u32, &'a wgpu::Buffer, u32),
     Texture2D(u32, &'a wgpu::TextureView),
     Sampler(u32, &'a wgpu::Sampler),

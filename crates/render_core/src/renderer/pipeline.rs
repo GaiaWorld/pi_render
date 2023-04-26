@@ -1,8 +1,7 @@
-use std::{sync::Arc, marker::PhantomData, hash::{Hash, Hasher}};
+use std::{hash::{Hash, Hasher}};
 
-use pi_assets::{asset::{Asset, Handle}, mgr::AssetMgr};
+use pi_assets::{asset::{Handle}};
 use pi_hash::DefaultHasher;
-use pi_share::Share;
 
 use crate::{rhi::{device::RenderDevice, asset::RenderRes, pipeline::RenderPipeline}, asset::ASSET_SIZE_FOR_UNKOWN};
 

@@ -1,4 +1,4 @@
-use std::{ops::Range, mem::{size_of, replace}, hash::Hash, sync::Arc, fmt::Debug};
+use std::{ops::Range, mem::{size_of}, hash::Hash, sync::Arc, fmt::Debug};
 
 use pi_assets::{asset::{Asset, GarbageEmpty, Handle}, mgr::AssetMgr};
 use pi_share::{Share, ShareMutex};
@@ -376,6 +376,7 @@ impl VertexBufferAllocator {
                 self.unupdatables_for_index.push(
                     FixedSizeBufferPoolNotUpdatable::new(self.base_size * 2_i32.pow(level as u32) as u32, usage)
                 );
+                // log::warn!("New Buffer {:?}", usage);
             }
         }
         // log::info!("size: {}, level: {}, old_count: {}, new: {}", size, level, old_count, new_count);
@@ -417,10 +418,10 @@ impl FixedSizeBufferPoolNotUpdatable {
         for i in 0..len {
             if let Some(use_buffer) = self.buffers.get(i) {
                 // 有数据的情况一定是正在使用的
-                if let Some(asset_buffer) = &use_buffer.0 {
+                if let Some(_) = &use_buffer.0 {
                     //
                 } else {
-                    key_buffer = Some(IDNotUpdatableBuffer { index: i as u32, size: self.block_size },);
+                    key_buffer = Some(IDNotUpdatableBuffer { index: i as u32, size: self.block_size, usage: self.usage },);
                 }
             }
         }
@@ -448,7 +449,7 @@ impl FixedSizeBufferPoolNotUpdatable {
             }
         } else {
             self.buffers.push(Arc::new(UseNotUpdatableBuffer(None)));
-            IDNotUpdatableBuffer { index: len as u32, size: self.block_size }
+            IDNotUpdatableBuffer { index: len as u32, size: self.block_size, usage: self.usage }
         };
 
         // 创建块
@@ -477,6 +478,7 @@ impl FixedSizeBufferPoolNotUpdatable {
 pub struct IDNotUpdatableBuffer {
     pub index: u32,
     pub size: u32,
+    pub usage: wgpu::BufferUsages,
 }
 
 pub struct UseNotUpdatableBuffer(Option<Handle<NotUpdatableBuffer>>);
