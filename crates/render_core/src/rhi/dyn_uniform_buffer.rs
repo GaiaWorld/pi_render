@@ -368,7 +368,7 @@ impl GroupBuffersAlloter {
 #[derive(Deref)]
 pub struct MulBufferAlloter {
     buffer_maps: Vec<BufferMap>,
-	// 空位标识
+	// id分配器
 	#[deref]
     id_alloter: IdAlloterWithCountLimit,
 }
@@ -417,7 +417,7 @@ pub struct SingleBufferAlloter {
     buffer_map: BufferMap,
 	// 空位标识
 	#[deref]
-    occupied_mark: IdAlloterWithCountLimit,
+    id_alloter: IdAlloterWithCountLimit,
 }
 
 impl SingleBufferAlloter {
@@ -427,7 +427,7 @@ impl SingleBufferAlloter {
     pub fn new(block_count: usize, block_size: u32, usage: wgpu::BufferUsages) -> Self {
         Self {
             buffer_map: BufferMap::new(block_size as usize * block_count, usage),
-            occupied_mark: IdAlloterWithCountLimit::new(block_count as u32),
+            id_alloter: IdAlloterWithCountLimit::new(block_count as u32),
         }
     }
 
@@ -448,6 +448,7 @@ impl SingleBufferAlloter {
         self.buffer_map.write_buffer(device, queue, info)
     }
 
+	#[inline]
 	pub fn wgpu_buffer(&self) -> Option<&Buffer> {
 		self.buffer_map.wgpu_buffer()
 	}

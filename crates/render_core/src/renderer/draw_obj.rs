@@ -129,7 +129,9 @@ impl DrawObj {
 					renderpass.draw_indexed(indices.value_range(), 0 as i32, instance_range);
 				},
 				None => {
-					renderpass.draw(self.vertex.clone(), instance_range);
+					if !self.vertex.is_empty() {
+						renderpass.draw(self.vertex.clone(), instance_range);
+					}
 				},
 			}
 		}
