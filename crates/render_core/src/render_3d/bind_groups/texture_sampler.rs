@@ -1,23 +1,22 @@
 
 
-use std::hash::Hash;
+use std::{hash::Hash, sync::Arc};
 
-use pi_assets::{asset::Handle, mgr::AssetMgr};
-use pi_share::Share;
+use pi_assets::{asset::Handle};
 
 use crate::{
     renderer::{
-        bind_group::{BindGroupUsage, BindGroupLayout, KeyBindGroup, BindGroup},
+        bind_group::*,
         shader::TShaderSetBlock,
     },
     render_3d::{
         binds::{
-            effect_texture2d::{EffectBindTexture2D01, EffectBindTexture2D02, EffectBindTexture2D03, EffectBindTexture2D04, EffectBindTexture2D05, EffectBindTexture2D06, TEffectBindTexture2D, TEffectBindTexture2DData},
-            effect_sampler2d::{EffectBindSampler2D01, EffectBindSampler2D02, EffectBindSampler2D03, EffectBindSampler2D04, EffectBindSampler2D05, EffectBindSampler2D06, TEffectBindSampler2D, TEffectBindSampler2DData}
+            effect_texture2d::*,
+            effect_sampler2d::*
         },
         shader::*
     },
-    rhi::{device::RenderDevice}
+    asset::TAssetKeyU64
 };
 
 
@@ -36,6 +35,7 @@ pub struct EffectTextureSamplers {
         Option<EffectBindSampler2D01>, Option<EffectBindSampler2D02>, Option<EffectBindSampler2D03>,
         Option<EffectBindSampler2D04>, Option<EffectBindSampler2D05>, Option<EffectBindSampler2D06>,
     ),
+    pub binding_count: u32,
 }
 
 #[derive(Debug, Clone)]
@@ -43,63 +43,72 @@ pub struct KeyBindGroupTextureSamplers {
     pub key: KeyShaderSetTextureSamplers,
     pub effect_texture_samplers: EffectTextureSamplers,
     pub meta: Handle<ShaderEffectMeta>,
+    key_binds: Option<Arc<IDBinds>>,
 }
 impl KeyBindGroupTextureSamplers {
     pub fn new(
         key: KeyShaderSetTextureSamplers,
         effect_texture_samplers: EffectTextureSamplers,
         meta: Handle<ShaderEffectMeta>,
+        recorder: &mut BindsRecorder,
     ) -> Self {
-        Self { key, effect_texture_samplers, meta  }
+        let idbinds = if let Some(mut binds) = EBinds::new(effect_texture_samplers.binding_count) {
+            let mut error = false;
+            let mut binding = 0;
+
+            if let Some(val) = &effect_texture_samplers.textures.0 {
+                if let Some(layout) = val.key_bind(&meta, binding as u16) {  binds.set(binding, Some(layout)); binding += 1; } else { error = true; };
+            }
+            if let Some(val) = &effect_texture_samplers.textures.1 {
+                if let Some(layout) = val.key_bind(&meta, binding as u16) { binds.set(binding, Some(layout)); binding += 1; } else { error = true; };
+            }
+            if let Some(val) = &effect_texture_samplers.textures.2 {
+                if let Some(layout) = val.key_bind(&meta, binding as u16) { binds.set(binding, Some(layout)); binding += 1; } else { error = true; };
+            }
+            if let Some(val) = &effect_texture_samplers.textures.3 {
+                if let Some(layout) = val.key_bind(&meta, binding as u16) { binds.set(binding, Some(layout)); binding += 1; } else { error = true; };
+            }
+            if let Some(val) = &effect_texture_samplers.textures.4 {
+                if let Some(layout) = val.key_bind(&meta, binding as u16) { binds.set(binding, Some(layout)); binding += 1; } else { error = true; };
+            }
+            if let Some(val) = &effect_texture_samplers.textures.5 {
+                if let Some(layout) = val.key_bind(&meta, binding as u16) { binds.set(binding, Some(layout)); binding += 1; } else { error = true; };
+            }
+            
+            if let Some(val) = &effect_texture_samplers.samplers.0 {
+                if let Some(layout) = val.key_bind(&meta, binding as u16) { binds.set(binding, Some(layout)); binding += 1; } else { error = true; };
+            }
+            if let Some(val) = &effect_texture_samplers.samplers.1 {
+                if let Some(layout) = val.key_bind(&meta, binding as u16) { binds.set(binding, Some(layout)); binding += 1; } else { error = true; };
+            }
+            if let Some(val) = &effect_texture_samplers.samplers.2 {
+                if let Some(layout) = val.key_bind(&meta, binding as u16) { binds.set(binding, Some(layout)); binding += 1; } else { error = true; };
+            }
+            if let Some(val) = &effect_texture_samplers.samplers.3 {
+                if let Some(layout) = val.key_bind(&meta, binding as u16) { binds.set(binding, Some(layout)); binding += 1; } else { error = true; };
+            }
+            if let Some(val) = &effect_texture_samplers.samplers.4 {
+                if let Some(layout) = val.key_bind(&meta, binding as u16) { binds.set(binding, Some(layout)); binding += 1; } else { error = true; };
+            }
+            if let Some(val) = &effect_texture_samplers.samplers.5 {
+                if let Some(layout) = val.key_bind(&meta, binding as u16) { binds.set(binding, Some(layout)); binding += 1; } else { error = true; };
+            }
+            if !error {
+                Some(binds.record(recorder))
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        Self { key, effect_texture_samplers, meta, key_binds: idbinds  }
     }
     pub fn key_bind_group(&self) -> Option<KeyBindGroup> {
-        let mut binds = BindGroupUsage::none_binds();
-
-        let mut binding = 0;
-
-        if let Some(val) = &self.effect_texture_samplers.textures.0 {
-            if let Some(layout) = val.key_bind(&self.meta, binding as u16) {  binds[binding] = Some(layout); binding += 1; } else { return None; };
-        }
-        if let Some(val) = &self.effect_texture_samplers.textures.1 {
-            if let Some(layout) = val.key_bind(&self.meta, binding as u16) {  binds[binding] = Some(layout); binding += 1; } else { return None; };
-        }
-        if let Some(val) = &self.effect_texture_samplers.textures.2 {
-            if let Some(layout) = val.key_bind(&self.meta, binding as u16) {  binds[binding] = Some(layout); binding += 1; } else { return None; };
-        }
-        if let Some(val) = &self.effect_texture_samplers.textures.3 {
-            if let Some(layout) = val.key_bind(&self.meta, binding as u16) {  binds[binding] = Some(layout); binding += 1; } else { return None; };
-        }
-        if let Some(val) = &self.effect_texture_samplers.textures.4 {
-            if let Some(layout) = val.key_bind(&self.meta, binding as u16) {  binds[binding] = Some(layout); binding += 1; } else { return None; };
-        }
-        if let Some(val) = &self.effect_texture_samplers.textures.5 {
-            if let Some(layout) = val.key_bind(&self.meta, binding as u16) {  binds[binding] = Some(layout); binding += 1; } else { return None; };
-        }
-        
-        if let Some(val) = &self.effect_texture_samplers.samplers.0 {
-            if let Some(layout) = val.key_bind(&self.meta, binding as u16) {  binds[binding] = Some(layout); binding += 1; } else { return None; };
-        }
-        if let Some(val) = &self.effect_texture_samplers.samplers.1 {
-            if let Some(layout) = val.key_bind(&self.meta, binding as u16) {  binds[binding] = Some(layout); binding += 1; } else { return None; };
-        }
-        if let Some(val) = &self.effect_texture_samplers.samplers.2 {
-            if let Some(layout) = val.key_bind(&self.meta, binding as u16) {  binds[binding] = Some(layout); binding += 1; } else { return None; };
-        }
-        if let Some(val) = &self.effect_texture_samplers.samplers.3 {
-            if let Some(layout) = val.key_bind(&self.meta, binding as u16) {  binds[binding] = Some(layout); binding += 1; } else { return None; };
-        }
-        if let Some(val) = &self.effect_texture_samplers.samplers.4 {
-            if let Some(layout) = val.key_bind(&self.meta, binding as u16) {  binds[binding] = Some(layout); binding += 1; } else { return None; };
-        }
-        if let Some(val) = &self.effect_texture_samplers.samplers.5 {
-            if let Some(layout) = val.key_bind(&self.meta, binding as u16) {  binds[binding] = Some(layout); binding += 1; } else { return None; };
-        }
-
-        if binding == 0 {
-            None
-        } else {
-            Some(KeyBindGroup(binds))
-        }
+        self.key_binds.clone()
+    }
+    pub fn key_bind_group_layout(&self) -> Option<KeyBindGroupLayout> {
+        self.key_binds.clone()
     }
 }
 impl Hash for KeyBindGroupTextureSamplers {
@@ -117,6 +126,7 @@ impl PartialEq for KeyBindGroupTextureSamplers {
 impl Eq for KeyBindGroupTextureSamplers {
     fn assert_receiver_is_total_eq(&self) {}
 }
+impl TAssetKeyU64 for KeyBindGroupTextureSamplers {}
 
 #[derive(Debug, Clone)]
 pub struct BindGroupTextureSamplers {

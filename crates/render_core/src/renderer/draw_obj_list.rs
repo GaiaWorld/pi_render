@@ -43,6 +43,7 @@ impl DrawList {
                 match &draw.indices {
                     Some(indices) => {
                         if temp_vertex_record.record_indices_and_check_diff_with_last(indices) {
+                            // log::warn!("Buffer  {:?}", indices.buffer.buffer());
                             renderpass.set_index_buffer(indices.slice(), indices.format);
                         }
                         // log::info!("indices {:?}", indices.value_range());

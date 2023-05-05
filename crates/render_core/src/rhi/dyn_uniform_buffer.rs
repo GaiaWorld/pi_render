@@ -455,7 +455,7 @@ impl SingleBufferAlloter {
 }
 use crossbeam::queue::SegQueue;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Index {
 	version: u32,
 	index: u32,

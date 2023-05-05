@@ -1,6 +1,6 @@
 use std::{marker::PhantomData, hash::Hash, sync::Arc};
 
-use pi_assets::{asset::Handle, mgr::AssetMgr};
+use pi_assets::{mgr::AssetMgr};
 use pi_hash::XHashMap;
 use pi_share::Share;
 
@@ -12,11 +12,17 @@ use super::{vertex_buffer::{KeyVertexBuffer, EVertexBufferRange, VertexBufferAll
 pub struct SingleVertexBufferDataMap {
     vertices: XHashMap<KeyVertexBuffer, Vec<u8>>,
     instance: XHashMap<KeyVertexBuffer, Vec<u8>>,
+    indices: XHashMap<KeyVertexBuffer, Vec<u8>>,
 }
 impl SingleVertexBufferDataMap {
     pub fn add(&mut self, key: &KeyVertexBuffer, data: Vec<u8>) {
         if !self.vertices.contains_key(key) {
             self.vertices.insert(key.clone(), data);
+        }
+    }
+    pub fn add_indices(&mut self, key: &KeyVertexBuffer, data: Vec<u8>) {
+        if !self.indices.contains_key(key) {
+            self.indices.insert(key.clone(), data);
         }
     }
     pub fn single_create(
@@ -30,6 +36,25 @@ impl SingleVertexBufferDataMap {
         self.vertices.drain().for_each(|(key, data)| {
             if let Some(bufferrange) = allocator.create_not_updatable_buffer(device, queue, &data) {
                 if let Ok(range) = asset_mgr.insert(key.clone(), bufferrange) {
+                    result.insert(key, EVerticesBufferUsage::Other(range));
+                }
+            }
+        });
+        result
+    }
+    pub fn single_create_indices(
+        &mut self,
+        device: &RenderDevice,
+        queue: &RenderQueue,
+        allocator: &mut VertexBufferAllocator,
+        asset_mgr: &Share<AssetMgr<EVertexBufferRange>>,
+    ) -> XHashMap<KeyVertexBuffer, EVerticesBufferUsage> {
+        let mut result = XHashMap::default();
+        self.indices.drain().for_each(|(key, data)| {
+            if let Some(bufferrange) = allocator.create_not_updatable_buffer_for_index(device, queue, &data) {
+                // log::warn!("create_indices {:?}, {:?}", key, bufferrange.buffer());
+                if let Ok(range) = asset_mgr.insert(key.clone(), bufferrange) {
+                    // log::warn!("create_indices {:?}, {:?}", key, range.buffer());
                     result.insert(key, EVerticesBufferUsage::Other(range));
                 }
             }
@@ -110,7 +135,7 @@ impl<T: Clone + Hash + PartialEq + Eq, D: From<EVerticesBufferUsage>> VertexBuff
     ) -> Vec<(T, D)> {
         let mut result = vec![];
         if let Some(list) = self.range_waits.get_mut(&key) {
-            log::info!(" success  {:?}", list.len());
+            // log::info!(" success  {:?}", list.len());
             list.drain().for_each(|(_, id)| {
                 result.push((id, D::from(range.clone())))
             });

@@ -3,6 +3,7 @@ use std::ops::Deref;
 use pi_assets::asset::Handle;
 use pi_atom::Atom;
 
+use crate::asset::TAssetKeyU64;
 use crate::rhi::asset::TextureRes;
 use crate::rhi::texture::TextureView;
 
@@ -67,6 +68,7 @@ impl Deref for BindDataTexture2D {
         self.0.view()
     }
 }
+impl TAssetKeyU64 for BindDataTexture2D {}
 
 #[derive(Clone)]
 pub struct BindDataTextureArrayN<const N: usize>(pub [BindDataTexture2D;N]);

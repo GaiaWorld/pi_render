@@ -1,10 +1,11 @@
 use std::sync::Arc;
 
-use pi_assets::{mgr::AssetMgr};
-use pi_share::Share;
-
 use crate::{
-    renderer::{bind_group::{BindGroupUsage, BindGroupLayout, KeyBindGroup}, bind::{EKeyBind, KeyBindBuffer}, shader::{TShaderSetBlock, TShaderBindCode}},
+    renderer::{
+        bind_group::*,
+        shader::{TShaderSetBlock, TShaderBindCode},
+        bind::*
+    },
     render_3d::{
         shader::*,
         binds::{
@@ -12,7 +13,7 @@ use crate::{
             effect_value::{ShaderBindEffectValue, BindUseEffectValue}
         }
     },
-    rhi::{device::RenderDevice, bind_group::BindGroup}
+    asset::TAssetKeyU64
 };
 
 #[derive(Debug, Default, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
@@ -26,12 +27,15 @@ pub struct KeyBindGroupModel {
     pub skin: Option<BindUseSkinValue>,
     pub effect_value: Option<BindUseEffectValue>,
     pub key: KeyShaderSetModel,
+    bind_count: u32,
+    key_binds: Arc<IDBinds>,
 }
 impl KeyBindGroupModel {
     pub fn new(
         bind_matrix: Arc<ShaderBindModelAboutMatrix>,
         bind_skin: Option<Arc<ShaderBindModelAboutSkinValue>>,
         bind_effect_value: Option<Arc<ShaderBindEffectValue>>,
+        recorder: &mut BindsRecorder
     ) -> Self {
         let mut key = KeyShaderSetModel::default();
         
@@ -50,41 +54,65 @@ impl KeyBindGroupModel {
 
         if let Some(bind_effect_value) = bind_effect_value {
             effect_value = Some(BindUseEffectValue { data: bind_effect_value.clone(), bind: binding as u32 });
-            // binding += 1;
+            binding += 1;
         }
 
-        Self {
+        let mut result = Self {
             matrix,
             skin,
             effect_value,
             key,
+            bind_count: binding,
+            key_binds: Arc::new(IDBinds::Binds00())
+        };
+        result.key_binds = result.binds(recorder);
+
+        result
+    }
+    
+    pub fn binds(&self, recorder: &mut BindsRecorder) -> Arc<IDBinds> {
+        log::warn!("Model Binds {:?} {:?}", self.key_binds, self.bind_count);
+        if let Some(mut binds) = EBinds::new(self.bind_count) {
+            binds.set(
+                self.matrix.bind as usize, 
+                Some(EKeyBind::Buffer(KeyBindBuffer {
+                    data: self.matrix.data.data.clone(),
+                    layout: Arc::new(self.matrix.data.key_layout(self.matrix.bind as u16)),
+                }))
+            );
+
+            if let Some(bind) = &self.skin {
+                binds.set(
+                    bind.bind as usize,
+                    Some(EKeyBind::Buffer(KeyBindBuffer {
+                        data: bind.data.data.clone(),
+                        layout: Arc::new(bind.data.key_layout(bind.bind as u16)),
+                    }))
+                );
+            }
+            
+            if let Some(bind) = &self.effect_value {
+                binds.set(
+                    bind.bind as usize,
+                    Some(EKeyBind::Buffer(KeyBindBuffer {
+                        data: bind.data.data.clone(),
+                        layout: Arc::new(bind.data.key_layout(bind.bind as u16)),
+                    }))
+                );
+            }
+            binds.record(recorder)
+        } else {
+            Arc::new(IDBinds::Binds00())
         }
     }
     pub fn key_bind_group(&self) -> KeyBindGroup {
-        let mut binds = BindGroupUsage::none_binds();
-        binds[self.matrix.bind as usize] = Some(EKeyBind::Buffer(KeyBindBuffer {
-            data: self.matrix.data.data.clone(),
-            layout: Arc::new(self.matrix.data.key_layout(self.matrix.bind as u16)),
-        }));
-
-        if let Some(bind) = &self.skin {
-            binds[bind.bind as usize] = Some(EKeyBind::Buffer(KeyBindBuffer {
-                data: bind.data.data.clone(),
-                layout: Arc::new(bind.data.key_layout(bind.bind as u16)),
-            }));
-        }
-        
-        if let Some(bind) = &self.effect_value {
-            binds[bind.bind as usize] = Some(EKeyBind::Buffer(KeyBindBuffer {
-                data: bind.data.data.clone(),
-                layout: Arc::new(bind.data.key_layout(bind.bind as u16)),
-            }));
-            // binding += 1;
-        }
-
-        KeyBindGroup(binds)
+        self.key_binds.clone()
+    }
+    pub fn key_bind_group_layout(&self) -> KeyBindGroupLayout {
+        self.key_binds.clone()
     }
 }
+impl TAssetKeyU64 for KeyBindGroupModel {}
 
 #[derive(Debug, Clone)]
 pub struct BindGroupModel {

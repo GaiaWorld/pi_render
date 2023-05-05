@@ -18,7 +18,7 @@ use thiserror::Error;
 use uuid::Uuid;
 #[cfg(feature="wgpu/spirv")]
 use wgpu::util::make_spirv;
-use wgpu::{ShaderModuleDescriptor, ShaderSource};
+use wgpu::{ShaderModuleDescriptor};
 
 pub trait Input {
     fn location() -> u32;
