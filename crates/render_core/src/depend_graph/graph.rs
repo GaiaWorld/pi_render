@@ -404,22 +404,22 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
 
 impl<Context: ThreadSync + 'static> DependGraph<Context> {
     /// 如果 finishes 节点数量 不等于1，返回 None，否则返回 ID
-    #[inline]
-    pub(crate) fn get_once_finsh_id(&mut self) -> Option<NodeId> {
-        if self.finish_nodes.len() != 1 {
-            None
-        } else {
-            self.finish_nodes.iter().next().copied()
-        }
-    }
+    // #[inline]
+    // pub(crate) fn get_once_finsh_id(&mut self) -> Option<NodeId> {
+    //     if self.finish_nodes.len() != 1 {
+    //         None
+    //     } else {
+    //         self.finish_nodes.iter().next().copied()
+    //     }
+    // }
 
-    /// 根据当前的 finishes 去取 ng 的 入度为0的节点
-    #[inline]
-    pub(crate) fn get_input_nodes(&mut self) -> &[NodeId] {
-        self.update_topo();
+    // /// 根据当前的 finishes 去取 ng 的 入度为0的节点
+    // #[inline]
+    // pub(crate) fn get_input_nodes(&mut self) -> &[NodeId] {
+    //     self.update_topo();
 
-        self.input_node_ids.as_slice()
-    }
+    //     self.input_node_ids.as_slice()
+    // }
 
     fn get_node_id(&self, label: &NodeLabel) -> Result<NodeId, GraphError> {
         match label {
@@ -453,13 +453,13 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
         Ok(Some(self.gen_sub()?))
     }
 
-    // 取 label 对应的 Name
-    fn get_node_name(&self, id: NodeId) -> Result<&str, GraphError> {
-        self.nodes
-            .get(id)
-            .map(|v| v.0.as_str())
-            .ok_or_else(|| GraphError::NoneNode(format!("id = {id:?}")))
-    }
+    // // 取 label 对应的 Name
+    // fn get_node_name(&self, id: NodeId) -> Result<&str, GraphError> {
+    //     self.nodes
+    //         .get(id)
+    //         .map(|v| v.0.as_str())
+    //         .ok_or_else(|| GraphError::NoneNode(format!("id = {id:?}")))
+    // }
 
     // 取 label 对应的 NodeState
     fn get_node_state(&self, label: &NodeLabel) -> Result<&NodeState<Context>, GraphError> {

@@ -1,6 +1,6 @@
-use std::{num::NonZeroU8, sync::Arc, hash::Hash, fmt::Debug};
+use std::{num::NonZeroU8, hash::Hash, fmt::Debug};
 
-use pi_assets::asset::{Asset, Handle};
+use pi_assets::asset::Asset;
 use wasm_bindgen::prelude::wasm_bindgen;
 
 use super::{device::RenderDevice};

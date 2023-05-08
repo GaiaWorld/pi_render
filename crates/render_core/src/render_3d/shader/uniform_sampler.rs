@@ -1,4 +1,4 @@
-use super::{UniformPropertyName, ShaderSetBind};
+use super::ShaderSetBind;
 
 
 fn sampler_ty_code(ty: wgpu::SamplerBindingType) -> String {

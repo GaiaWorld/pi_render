@@ -1,9 +1,9 @@
-use std::{sync::Arc, hash::Hash, fmt::Debug};
+use std::{hash::Hash, fmt::Debug};
 
 use pi_assets::{asset::{Asset, Handle}, mgr::AssetMgr};
 use pi_share::{Share, ShareMutex};
 
-use crate::{rhi::{dyn_uniform_buffer::{SingleBufferAlloter, Index}, shader::WriteBuffer, device::RenderDevice, RenderQueue, buffer::Buffer}, asset::bytes_write_to_memory};
+use crate::{rhi::{shader::WriteBuffer, device::RenderDevice, RenderQueue, buffer::Buffer, id_alloter::Index, buffer_alloc::SingleBufferAlloter}, asset::bytes_write_to_memory};
 
 
 pub struct AssetRWBuffer(SingleBufferAlloter, u32);
@@ -17,7 +17,7 @@ impl AssetRWBuffer {
     fn write_buffer(&self, device: &RenderDevice, queue: &RenderQueue,  info: &Option<String>) -> bool {
         unsafe {
             let temp = &mut *(self as *const Self as usize as *mut Self);
-            temp.0.write_buffer(device, queue, info)
+            temp.0.write_buffer(device, queue, info.as_deref())
         }
     }
     fn alloc(&self) -> Option<Index> {
@@ -128,7 +128,7 @@ impl FixedSizeBufferPool {
         };
 
         // 创建块
-        let mut buffer = SingleBufferAlloter::new(
+        let buffer = SingleBufferAlloter::new(
             (self.block_size * (key_buffer.index + 1) / self.fixed_size) as usize,
             self.fixed_size as u32,
             self.usage

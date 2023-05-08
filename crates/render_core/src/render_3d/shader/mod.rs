@@ -1,4 +1,3 @@
-use std::hash::Hash;
 
 use pi_atom::Atom;
 
