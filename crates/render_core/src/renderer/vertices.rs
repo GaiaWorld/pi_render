@@ -1,6 +1,5 @@
 use std::{ops::Range, hash::Hash, fmt::Debug, sync::Arc};
 
-use lazy_static::__Deref;
 use pi_assets::asset::Handle;
 
 use crate::rhi::{asset::RenderRes, buffer::Buffer};

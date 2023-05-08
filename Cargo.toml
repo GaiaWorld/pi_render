@@ -32,8 +32,12 @@ log = "0.4"
 wgpu = "0.15"
 env_logger = "0.9"
 float-ord = "0.3"
+lazy_static = "1.4"
 
 render_derive = {path = "crates/render_derive"}
+criterion = "0.4"
+render_core = {path = "crates/render_core"}
+pi_hal = { git = "https://github.com/GaiaWorld/pi_hal.git" }
 
 [[example]]
 name = "hello_winit"
@@ -48,3 +52,13 @@ pi_assets={ path = "../pi_assets" }
 
 # [patch."https://github.com/GaiaWorld/pi_hal"]
 # pi_hal = { path = "../pi_hal" }
+[[bench]]
+name = "id_alloter_bench"
+path = "benches/id_alloter_bench.rs"
+harness = false
+
+[[bench]]
+name = "buffer_alloter"
+path = "benches/buffer_alloter.rs"
+harness = false
+

@@ -1,4 +1,4 @@
-use derive_deref_rs::Deref;
+
 use pi_assets::{asset::{Asset, Garbageer, Handle}, mgr::{LoadResult, Receiver}};
 use pi_atom::Atom;
 use pi_futures::BoxFuture;

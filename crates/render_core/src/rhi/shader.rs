@@ -76,6 +76,20 @@ pub trait WriteBuffer {
     fn offset(&self) -> u32;
 }
 
+impl WriteBuffer for [u8] {
+	fn write_into(&self, index: u32, buffer: &mut [u8]) {
+		unsafe { self.as_ptr().copy_to_nonoverlapping(buffer.as_mut_ptr().add(index as usize), self.len()) };
+	}
+
+	fn byte_len(&self) -> u32 {
+		self.len() as u32
+	}
+
+	fn offset(&self) -> u32 {
+		0
+	}
+}
+
 pub trait ShaderProgram: Send + Sync + 'static {
 	fn create_meta() -> ShaderMeta;
 }

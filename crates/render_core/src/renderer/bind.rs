@@ -1,7 +1,5 @@
 use std::{num::{NonZeroU64, NonZeroU32}, fmt::Debug, hash::Hash, sync::Arc};
 
-use pi_hash::XHashMap;
-
 use super::{
     texture::{BindDataTextureArray, BindDataTexture2D},
     sampler::{BindDataSampler},

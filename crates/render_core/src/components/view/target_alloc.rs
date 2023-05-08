@@ -380,6 +380,7 @@ impl AtlasAllocator {
 			width,
 			height,
 		};
+
 		for i in 0..len {
 			let descriptor = &info.descript.texture_descriptor[i];
 			let r = self.get_or_create_texture(
@@ -407,7 +408,8 @@ impl AtlasAllocator {
 				unsafe{ transmute(&self.depth_descript)},
 				wgpu::TextureAspect::DepthOnly,
 				0, // 深度纹理共用，默认hash为0
-				1, // 
+				2, // 
+
 			);
 			target.depth = Some((r.0, r.1));
 		}
@@ -423,8 +425,11 @@ impl AtlasAllocator {
 		descript: &TextureDescriptor,
 		aspect: TextureAspect,
 		hash: u64,
-		len: usize) -> (Handle<RenderRes<wgpu::TextureView>>, Share<wgpu::Texture>, u32, u32) {
-		let unuse = self.unuse_textures.pop_by_filter(|t| {
+		len: usize,
+	) -> (Handle<RenderRes<wgpu::TextureView>>, Share<wgpu::Texture>, u32, u32) {
+		// 找到一个匹配的纹理，直接返回
+		let unuse =  self.unuse_textures.pop_by_filter(|t| {
+			
 			if t.hash == hash && 
 				(( // 只需要一张纹理，则只要该纹理的大小大于等于要求的大小即可
 					len == 1 &&
@@ -438,7 +443,7 @@ impl AtlasAllocator {
 			}
 			return false;
 		});
-		// 找到一个匹配的纹理，直接返回
+		
 		if let Some(r) = unuse {
 			return (r.view.clone(), r.texture.clone(), r.width, r.height);
 		}

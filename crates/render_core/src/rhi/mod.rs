@@ -17,6 +17,8 @@ pub mod uniform_vec;
 pub mod draw_obj;
 pub mod sampler;
 pub mod small_struct_allocator;
+pub mod buffer_alloc;
+pub mod id_alloter;
 
 use self::device::RenderDevice;
 use pi_share::Share;

@@ -1,12 +1,12 @@
-use std::{fmt::Debug, ops::Range, sync::atomic::{AtomicU32, Ordering}};
+use std::fmt::Debug;
 
-use bitvec::vec::BitVec;
 use derive_deref_rs::Deref;
 use pi_map::vecmap::VecMap;
 use pi_share::{Share, ShareMutex};
 use smallvec::{smallvec, SmallVec};
 use thiserror::Error;
-use wgpu::{util::BufferInitDescriptor, BufferUsages};
+use wgpu::BufferUsages;
+use super::{id_alloter::{IdAlloterWithCountLimit, Index}, buffer_alloc::BufferMap};
 
 use crate::renderer::draw_obj::DrawBindGroup;
 
@@ -90,10 +90,8 @@ impl GroupAlloter {
 
         Ok(GroupAlloter {
             buffers: Share::new(GroupBuffer {
-                values: smallvec![buffer_maps],
-                lately_use_buffer: 0,
                 binding_offset_map,
-                mutex: ShareMutex::new(()),
+				align_buffer_alloter: AlignBufferAlloter { mutex: ShareMutex::new(()), buffer_layers: smallvec![buffer_maps], lately_use_buffer: 0 }
             }),
             info: DynGroupBufferInfo {
                 entrys,
@@ -108,53 +106,21 @@ impl GroupAlloter {
 
     /// 为bindgroup分配索引
     pub fn alloc(&self) -> BufferGroup {
-        // 寻找一个可以分配的buffer
-        fn alloc(context: &GroupAlloter) -> (Index, usize) {
-
-            // 如果最近分配过的buffer能继续分配，则直接返回分配结果
-            if let Some(r) = context.buffers.values[context.buffers.lately_use_buffer].alloc() {
-                return (r, context.buffers.lately_use_buffer);
-            }
-
-			// 否则，解锁，找到一个有空位的buffer分配，会创建新的buffer，使用新的buffer分配
-			// SAFE: 这里转为可变，立即解锁，保证alloc在多线程下不冲突
-			let buffers =
-			unsafe { &mut *(Share::as_ptr(&context.buffers) as usize as *mut GroupBuffer) };
-			let _lock = buffers.mutex.lock();
-
-			// 再次尝试分配（多线程结构下需要重新检查）
-            if let Some(r) = context.buffers.values[context.buffers.lately_use_buffer].alloc() {
-                return (r, context.buffers.lately_use_buffer);
-            }
-
-			let info = &context.info;
-
-            // 找到一个存在空闲位置的buffer组
-            for (index, buffer) in buffers.values.iter_mut().enumerate() {
-                if let Some(r) = buffer.alloc() {
-                    buffers.lately_use_buffer = index;
-                    return (r, index);
-                }
-            }
-
-			// 如果未找到，则创建新的
-            let next_count = info
-                .limit_count
-                .min(buffers.values.last().unwrap().capacity() as usize * 2);
-            let buffer_maps = GroupBuffersAlloter::new(next_count, info.binding_size_list.as_slice());
-            let alloc_index = buffer_maps.alloc().unwrap();
-            buffers.values.push(buffer_maps);
-			buffers.lately_use_buffer = context.buffers.values.len() - 1;
-            (alloc_index, context.buffers.lately_use_buffer)
-        }
-        let (alloc_index, lately_use_buffer) = alloc(self);
+        
+		let (alloc_index, lately_use_buffer) = self.buffers.alloc(|capacity| {
+			let info = &self.info;
+			let next_count = info
+				.limit_count
+				.min(capacity);
+			GroupBuffersAlloter::new(next_count, info.binding_size_list.as_slice())
+		});
 
         // 返回分配的索引
         BufferGroup {
             index: alloc_index,
             bindings_index: lately_use_buffer,
             context: self.buffers.clone(),
-            group_offsets: self.buffers.values[lately_use_buffer].group_offsets.clone(),
+            group_offsets: self.buffers.buffer_layers[lately_use_buffer].group_offsets.clone(),
         }
     }
 
@@ -168,7 +134,7 @@ impl GroupAlloter {
         let _lock = self.buffers.mutex.lock();
 
         let buffer_lock = &mut *buffer_lock;
-        for buffers in buffer_lock.values.iter_mut() {
+        for buffers in buffer_lock.buffer_layers.iter_mut() {
             buffers.write_buffer(device, queue, &this.info, &this.info.layout);
         }
     }
@@ -216,16 +182,16 @@ impl BufferGroup {
             Some(r) => *r,
             None => return Err(DynBufferError::BindingNotFind(binding)),
         };
-        let buffers = &mut context.values[self.bindings_index];
+        let buffers = &mut context.buffer_layers[self.bindings_index];
         let offset = buffers.group_offsets.offsets.get_offsets(self.index.index() as usize)[index];
-        context.values[self.bindings_index].fill(index, offset, t);
+        context.buffer_layers[self.bindings_index].fill(index, offset, t);
         Ok(())
     }
 }
 
 impl Drop for BufferGroup {
     fn drop(&mut self) {
-        self.context.values[self.bindings_index].recycle(self.index);
+        self.context.buffer_layers[self.bindings_index].recycle(self.index);
     }
 }
 
@@ -288,14 +254,70 @@ pub struct DynGroupBufferInfo {
     group_label: Option<String>,
 }
 
+#[derive(Deref)]
 struct GroupBuffer {
-    mutex: ShareMutex<()>,
-    values: SmallVec<[GroupBuffersAlloter; 1]>,
-    // 最近使用的buffer索引（在buffers字段中的索引）
-    lately_use_buffer: usize,
+    // mutex: ShareMutex<()>,
+    // values: SmallVec<[GroupBuffersAlloter; 1]>,
+    // // 最近使用的buffer索引（在buffers字段中的索引）
+    // lately_use_buffer: usize,
+	#[deref]
+	align_buffer_alloter: AlignBufferAlloter<GroupBuffersAlloter>,
     // entry中描述的多个bingding将作为整体，分配一个块， 每个bingding在该块中，会对应一个偏移，该偏移存储在binding_offset_map中（VecMap的key为entry的binding值）
     binding_offset_map: VecMap<usize>,
 }
+
+pub trait Alloter {
+	fn alloc(&self) -> Option<Index>;
+	
+	fn capacity(&self) -> u32;
+}
+
+/// 对齐的buffer分配器
+/// 用于分配指定对齐值的buffer（如用于分配对齐值为256的buffer）
+pub struct AlignBufferAlloter<Inner: Alloter> {
+    mutex: ShareMutex<()>,
+	// 层列表，用于存储所有的buffer，保证已分配的buffer容量不变，当前所有层对应的buffer都不足以分配时，会创建新的层，
+    buffer_layers: SmallVec<[Inner; 1]>,
+    // 最近使用的buffer索引（在buffers字段中的索引）
+    lately_use_buffer: usize,
+}
+
+impl<Inner: Alloter> AlignBufferAlloter<Inner> {
+	// 分配， 返回分配索引和层索引
+	fn alloc<CF: Fn(usize)-> Inner>(&self, create_fn: CF) -> (Index, usize) {
+		 // 如果最近分配过的buffer能继续分配，则直接返回分配结果
+		 if let Some(r) = self.buffer_layers[self.lately_use_buffer].alloc() {
+			return (r, self.lately_use_buffer);
+		}
+
+		// 否则，解锁，找到一个有空位的buffer分配，会创建新的buffer，使用新的buffer分配
+		// SAFE: 这里转为可变，立即解锁，保证alloc在多线程下不冲突
+		let buffers =
+		unsafe { &mut *(self as *const Self as usize as *mut Self) };
+		let _lock = buffers.mutex.lock();
+
+		// 再次尝试分配（多线程结构下需要重新检查）
+		if let Some(r) = self.buffer_layers[self.lately_use_buffer].alloc() {
+			return (r, self.lately_use_buffer);
+		}
+
+		// 找到一个存在空闲位置的buffer组
+		for (index, buffer) in buffers.buffer_layers.iter_mut().enumerate() {
+			if let Some(r) = buffer.alloc() {
+				buffers.lately_use_buffer = index;
+				return (r, index);
+			}
+		}
+
+		// 如果未找到，则创建新的
+		let buffer_maps = create_fn(buffers.buffer_layers.last().unwrap().capacity() as usize * 2);
+		let alloc_index = buffer_maps.alloc().unwrap();
+		buffers.buffer_layers.push(buffer_maps);
+		buffers.lately_use_buffer = self.buffer_layers.len() - 1;
+		(alloc_index, self.lately_use_buffer)
+	}
+}
+
 
 
 /// BindGroup buffer分配器
@@ -305,6 +327,17 @@ pub struct GroupBuffersAlloter {
     buffers: MulBufferAlloter,
 	// 偏移
 	group_offsets: Share<GroupOffsets> 
+}
+
+impl Alloter for GroupBuffersAlloter {
+	#[inline]
+    fn alloc(&self) -> Option<Index> {
+        self.buffers.alloc()
+    }
+
+	fn capacity(&self) -> u32 {
+        self.buffers.capacity()
+    }
 }
 
 impl GroupBuffersAlloter {
@@ -368,7 +401,7 @@ impl GroupBuffersAlloter {
 #[derive(Deref)]
 pub struct MulBufferAlloter {
     buffer_maps: Vec<BufferMap>,
-	// 空位标识
+	// id分配器
 	#[deref]
     id_alloter: IdAlloterWithCountLimit,
 }
@@ -392,7 +425,7 @@ impl MulBufferAlloter {
 	/// 在buffer中填充数据
 	#[inline]
     pub fn fill<T: WriteBuffer>(&mut self, binding: usize, offset: u32, value: &T) {
-        self.buffer_maps[binding].cache_buffer.full(offset, value);
+        self.buffer_maps[binding].full(offset, value);
     }
 
 	/// 更新buffer到显存
@@ -405,383 +438,22 @@ impl MulBufferAlloter {
     ) -> bool {
         let mut buffer_is_create = false;
         for i in self.buffer_maps.iter_mut() {
-            buffer_is_create = i.write_buffer(device, queue, &info.label) || buffer_is_create;
+            buffer_is_create = i.write_buffer(device, queue, info.label.as_deref()) || buffer_is_create;
         }
 		buffer_is_create
     }
 }
 
-/// 单个buffer的分配器
-#[derive(Deref)]
-pub struct SingleBufferAlloter {
-    buffer_map: BufferMap,
-	// 空位标识
-	#[deref]
-    occupied_mark: IdAlloterWithCountLimit,
-}
-
-impl SingleBufferAlloter {
-	/// 创建 BindGroup Buffer分配器
-	/// -block_count：块数量
-	/// -block_size： 每块的大小（单位：字节）
-    pub fn new(block_count: usize, block_size: u32, usage: wgpu::BufferUsages) -> Self {
-        Self {
-            buffer_map: BufferMap::new(block_size as usize * block_count, usage),
-            occupied_mark: IdAlloterWithCountLimit::new(block_count as u32),
-        }
-    }
-
-	/// 在buffer中填充数据
+impl Alloter for MulBufferAlloter {
 	#[inline]
-    pub fn fill<T: WriteBuffer>(&mut self, offset: u32, value: &T) {
-        self.buffer_map.cache_buffer.full(offset, value);
-    }
-
-	/// 更新代码到显存
-	#[inline]
-    pub fn write_buffer(
-        &mut self,
-        device: &RenderDevice,
-        queue: &RenderQueue,
-        info: &Option<String>,
-    ) -> bool {
-        self.buffer_map.write_buffer(device, queue, info)
-    }
-
-	pub fn wgpu_buffer(&self) -> Option<&Buffer> {
-		self.buffer_map.wgpu_buffer()
-	}
-}
-use crossbeam::queue::SegQueue;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Index {
-	version: u32,
-	index: u32,
-}
-
-impl Index {
-	#[inline]
-	pub fn version(&self) -> u32 {
-		self.version
-	}
-	#[inline]
-	pub fn index(&self) -> u32 {
-		self.index
-	}
-}
-
-/// `IdAlloter` 结构体用于线程安全地分配和回收索引。
-/// 结构体包含两个字段，`max_index`表示已分配索引的最大值，`recycled`用于存储曾经分配出去，后又被回收的索引
-/// 分配索引时， 如果recycled长度大于0，将从recycled中弹出一个索引，否则，分配的索引值为`max_index`,并且`max_index`会自增1
-pub struct IndexAlloter {
-	max_index: AtomicU32,
-	recycled: SegQueue<Index>
-}
-
-impl IndexAlloter {
-	/// 构造方法
-	pub fn new() -> Self {
-		IndexAlloter {
-			max_index: AtomicU32::new(0),
-			recycled: SegQueue::new(),
-		}
-	}
-
-	/// 分配一个索引
-	pub fn alloc(&self) -> Index {
-		// 如果recycled中存在回收索引，将从recycled中弹出一个索引，否则，分配的索引值为`max_index`,并且`max_index`会自增1
-		match self.recycled.pop() {
-			Some(r) => Index{
-				index: r.index,
-				version: r.version + 1,
-			},
-			None => Index {
-				version: 0,
-				index: self.max_index.fetch_add(1, Ordering::Relaxed)
-			},
-		}
-	}
-
-	/// 回收一个索引
-	pub fn recycle(&self, id: Index) {
-		self.recycled.push(id);
-	}
-
-	
-	/// 已回收的索引个数
-	pub fn recycle_len(&self) -> u32 {
-		self.recycled.len() as u32
-	}
-
-	/// 当前已分配索引的最大值
-	pub fn cur_max(&self) -> u32 {
-		self.max_index.load(Ordering::Relaxed)
-	}
-}
-
-/// `IdAlloterWithCountLimit`一个有数量限制的索引分配器
-pub struct IdAlloterWithCountLimit {
-	id_alloter: IndexAlloter,
-	capacity: u32,
-}
-
-impl IdAlloterWithCountLimit {
-	/// 构造方法
-	pub fn new(capacity: u32) -> Self {
-		Self {
-			id_alloter: IndexAlloter::new(),
-			capacity,
-		}
-	}
-
-	/// 分配一个索引
-	pub fn alloc(&self) -> Option<Index> {
-		let id = self.id_alloter.alloc();
-		if id.index() >= self.capacity { 
-			// 如果已经分配到最大的id， 则返回None
-			// 并且分配到的id永不释放（无所谓，该id不占用内存）
-			None
-		} else {
-			Some(id)
-		}
-	}
-
-	/// 回收一个索引
-	#[inline]
-	pub fn recycle(&self, id: Index) {
-		self.id_alloter.recycle(id);
-	}
-	
-	// 是否为空（一个id也未分配, 或分配过但又全部回收了）
-	pub fn is_empty(&self) -> bool {
-		let cur_max = self.id_alloter.cur_max();
-		if cur_max >= self.capacity && self.id_alloter.recycle_len() == self.capacity{
-			return true;
-		}
-		false
-	}
-
-	pub fn capacity(&self) -> u32 {
-		self.capacity
-	}
-}
-
-
-/// `OccupiedMark` 结构体用于跟踪一个数据结构的占用情况，其中占用情况由位向量表示。
-/// 位向量有一个位的数组，每个位代表一个元素是否被占用，为 0 表示未被占用，为 1 表示已被占用。
-pub struct OccupiedMarker {
-    occupied_mark: BitVec,
-}
-
-impl OccupiedMarker {
-    /// 创建一个新的 `OccupiedMark` 结构体实例。
-    ///
-    /// # Arguments
-    ///
-    /// * `count` - 需要被跟踪占用情况的元素数量。
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use memory_allocator::occupied_mark::OccupiedMark;
-    ///
-    /// let mut mark = OccupiedMark::new(10);
-    /// ```
-    pub fn new(count: usize) -> Self {
-        // 创建一个指定容量的 BitVec，BitVec 内部使用一个 Vec<u64> 对象来存储位信息
-        let mut occupied_mark = BitVec::with_capacity(count);
-        // 设置 BitVec 的长度为 count，因为 BitVec 内部使用一个 Vec<u64> 对象来存储位信息，所以这里必须使用 unsafe，因为实际上，BitVec 内部存储的长度可能远远超过 count
-        unsafe { occupied_mark.set_len(count) };
-        // 初始化 BitVec 中所有的位都是 false，即没有被占用
-        occupied_mark[0..count].fill(false);
-        Self {
-            occupied_mark,
-        }
-    }
-
-    /// 分配一个未被占用的元素，将其占用并返回其下标。
-    ///
-    /// # Returns
-    ///
-    /// 返回未被占用的元素下标，如果不存在未被占用的元素，则返回 None。
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use pi_render::rhi::dyn_uniform_buffer::OccupiedMark;
-    ///
-    /// let mut mark = OccupiedMark::new(10);
-    /// let index = mark.alloc();
-    /// ```
-    #[inline]
-    pub fn alloc(&mut self) -> Option<usize> {
-        // 找到第一个为 0 的位，表示这个位可用，标记为 1，并返回该位的索引
-        let r = self.occupied_mark.first_zero();
-        if let Some(r) = r {
-            self.occupied_mark.set(r, true);
-        }
-        r
-    }
-
-    /// 释放指定下标的元素，将其标记为未被占用。
-    ///
-    /// # Arguments
-    ///
-    /// * `index` - 需要被释放的元素下标。
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use memory_allocator::occupied_mark::OccupiedMark;
-    ///
-    /// let mut mark = OccupiedMark::new(10);
-    /// let index = mark.alloc();
-    /// mark.free(index.unwrap());
-    /// ```
-    pub fn free(&mut self, index: usize) {
-        self.occupied_mark.set(index, false);
-    }
-
-    /// 返回跟踪占用情况的元素数量。
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use memory_allocator::occupied_mark::OccupiedMark;
-    ///
-    /// let mark = OccupiedMark::new(10);
-    /// let count = mark.len();
-    /// ```
-    #[inline]
-    pub fn len(&self) -> usize {
-        self.occupied_mark.len() as usize
-    }
-}
-
-/// buffer映射
-/// 内存buffer到wgpu buffer的映射
-pub struct BufferMap {
-    cache_buffer: BufferCache,
-    buffer: Option<Buffer>,
-	usage: wgpu::BufferUsages,
-}
-
-impl BufferMap {
-    pub fn new(len: usize, usage: wgpu::BufferUsages) -> Self {
-        Self {
-            cache_buffer: BufferCache::new(len),
-            buffer: None,
-			usage,
-        }
-    }
-
-    #[inline]
-    pub fn wgpu_buffer(&self) -> Option<&Buffer> {
-        self.buffer.as_ref()
-    }
-
-    /// 写入buffer到显存，返回是否重新创建了buffer
-    pub fn write_buffer(
-        &mut self,
-        device: &RenderDevice,
-        queue: &RenderQueue,
-        label: &Option<String>,
-    ) -> bool {
-        // 什么也没改变， 直接返回
-        if self.cache_buffer.change_range.len() == 0 {
-            return false;
-        }
-
-        let r = match &self.buffer {
-            Some(buffer) => {
-                queue.write_buffer(
-                    buffer,
-                    self.cache_buffer.change_range.start as u64,
-                    &self.cache_buffer.buffer()[self.cache_buffer.change_range.start as usize
-                        ..self.cache_buffer.change_range.end as usize],
-                );
-
-                false
-            }
-            None => {
-                self.buffer = Some(device.create_buffer_with_data(&BufferInitDescriptor {
-                    label: label.as_deref(),
-                    usage: self.usage,
-                    contents: self.cache_buffer.buffer(),
-                }));
-                // self.old_len = size;
-                true
-            }
-        };
-		self.cache_buffer.reset_change_range();
-        r
-    }
-}
-
-/// buffer缓存
-/// 包含一个内存的buffer和这段buffer的修改范围
-#[derive(Debug)]
-struct BufferCache {
-    buffer: Vec<u8>, // buffer
-    change_range: Range<u32>, // 修改范围
-}
-
-impl BufferCache {
-    #[inline]
-    pub fn new(len: usize) -> Self {
-        let mut buffer = Vec::with_capacity(len);
-        unsafe { buffer.set_len(len) };
-        Self {
-            buffer,
-            change_range: 0..0,
-        }
-    }
-
-    /// 在已分配位置上填充buffer
-    pub fn full<T: WriteBuffer>(&mut self, index: u32, t: &T) {
-        debug_assert!(self.buffer.len() >= (index + t.byte_len()) as usize);
-
-        t.write_into(index, self.buffer.as_mut_slice());
-
-        // 设置数据变化范围
-        let start = index + t.offset();
-        let end = start + t.byte_len();
-        if self.change_range.len() == 0 {
-            self.change_range.start = start;
-            self.change_range.end = end;
-            // println!(
-            //     "full1======{:?}, {:?}",
-            //     self.change_range,
-            //     bytemuck::cast_slice::<_, f32>(&self.buffer)
-            // );
-            return;
-        }
-        if self.change_range.start > start {
-            self.change_range.start = start;
-        }
-        if self.change_range.end < end {
-            self.change_range.end = end;
-        }
-
-        // println!(
-        //     "full======{:?}, {:?}, {}, {:?}",
-        //     self.change_range,
-        //     start,
-        //     end,
-        //     bytemuck::cast_slice::<_, f32>(&self.buffer),
-        // );
-    }
-
-    #[inline]
-    pub fn buffer(&self) -> &[u8] {
-        self.buffer.as_slice()
+    fn alloc(&self) -> Option<Index> {
+        self.id_alloter.alloc()
     }
 
 	#[inline]
-	pub fn reset_change_range(&mut self) {
-		self.change_range = 0..0;
-	}
+    fn capacity(&self) -> u32 {
+        self.id_alloter.capacity() as u32
+    }
 }
 
 #[derive(Error, Debug)]

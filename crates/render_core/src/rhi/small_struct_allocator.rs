@@ -4,7 +4,7 @@ use derive_deref_rs::Deref;
 use pi_assets::asset::{Asset};
 use pi_share::{Share, ShareMutex};
 
-use super::dyn_uniform_buffer::{IdAlloterWithCountLimit, Index};
+use super::id_alloter::{IdAlloterWithCountLimit, Index};
 
 
 /// 单个buffer的分配器

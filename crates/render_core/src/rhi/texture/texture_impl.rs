@@ -215,6 +215,8 @@ impl Deref for TextureView {
 
 pub trait PiRenderDefault {
     fn pi_render_default() -> Self;
+
+	fn is_srgb() -> bool;
 }
 
 impl PiRenderDefault for wgpu::TextureFormat {
@@ -224,6 +226,15 @@ impl PiRenderDefault for wgpu::TextureFormat {
             wgpu::TextureFormat::Rgba8UnormSrgb
         } else  {
             wgpu::TextureFormat::Bgra8Unorm
+        }
+    }
+
+	fn is_srgb() -> bool {
+        if cfg!(target_os = "android") || cfg!(target_arch = "wasm32") {
+            // Bgra8UnormSrgb texture missing on some Android devices
+            true
+        } else  {
+            false
         }
     }
 }

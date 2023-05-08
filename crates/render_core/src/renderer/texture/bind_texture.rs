@@ -1,11 +1,8 @@
 use std::{sync::Arc, fmt::Debug, hash::Hash};
 use std::ops::Deref;
-use pi_assets::asset::Handle;
 use pi_atom::Atom;
 
 use crate::asset::TAssetKeyU64;
-use crate::rhi::asset::TextureRes;
-use crate::rhi::texture::TextureView;
 
 use super::texture_view::ETextureViewUsage;
 

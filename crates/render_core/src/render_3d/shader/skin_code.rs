@@ -1,4 +1,3 @@
-use std::sync::Arc;
 
 use pi_atom::Atom;
 

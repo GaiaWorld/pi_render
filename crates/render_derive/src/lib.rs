@@ -2,18 +2,10 @@ mod enum_variant_meta;
 mod modules;
 mod shader_meta;
 
-use std::{collections::HashMap, error::Error, path::Path, str::FromStr};
-
 use proc_macro::TokenStream;
-use proc_macro2::{Ident, TokenStream as TokenStream2};
+use proc_macro2::{TokenStream as TokenStream2};
 use quote::quote;
 use syn::{
-    bracketed,
-    ext::IdentExt,
-    parenthesized,
-    parse::{Parse, ParseStream},
-    parse_macro_input,
-    token::Comma,
     Data, DataStruct, DeriveInput, Field, Fields,
 };
 
