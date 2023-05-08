@@ -63,7 +63,7 @@ impl KeyBindGroupModel {
             effect_value,
             key,
             bind_count: binding,
-            key_binds: Arc::new(IDBinds::Binds00())
+            key_binds: Arc::new(IDBinds::Binds00(vec![]))
         };
         result.key_binds = result.binds(recorder);
 
@@ -102,7 +102,7 @@ impl KeyBindGroupModel {
             }
             binds.record(recorder)
         } else {
-            Arc::new(IDBinds::Binds00())
+            Arc::new(IDBinds::Binds00(vec![]))
         }
     }
     pub fn key_bind_group(&self) -> KeyBindGroup {

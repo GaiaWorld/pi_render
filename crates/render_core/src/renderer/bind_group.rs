@@ -117,72 +117,72 @@ impl TSmallStructID for Binds16 { const ID: u32 = 16; }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum IDBinds {
-    Binds00(),
-    Binds01(IDSmallStruct<Binds01>),
-    Binds02(IDSmallStruct<Binds02>),
-    Binds04(IDSmallStruct<Binds04>),
-    Binds08(IDSmallStruct<Binds08>),
-    Binds16(IDSmallStruct<Binds16>),
+    Binds00(Vec<wgpu::DynamicOffset>),
+    Binds01(IDSmallStruct<Binds01>, Vec<wgpu::DynamicOffset>),
+    Binds02(IDSmallStruct<Binds02>, Vec<wgpu::DynamicOffset>),
+    Binds04(IDSmallStruct<Binds04>, Vec<wgpu::DynamicOffset>),
+    Binds08(IDSmallStruct<Binds08>, Vec<wgpu::DynamicOffset>),
+    Binds16(IDSmallStruct<Binds16>, Vec<wgpu::DynamicOffset>),
 }
 impl IDBinds {
     
     pub fn layout_entries(&self) -> Vec<wgpu::BindGroupLayoutEntry> {
         match self {
-            IDBinds::Binds00() => vec![],
-            IDBinds::Binds01(id) => {
+            IDBinds::Binds00(_) => vec![],
+            IDBinds::Binds01(id, _) => {
                 id.data().unwrap().entries()
             },
-            IDBinds::Binds02(id) =>  {
+            IDBinds::Binds02(id, _) =>  {
                 id.data().unwrap().entries()
             }
-            IDBinds::Binds04(id) =>  {
+            IDBinds::Binds04(id, _) =>  {
                 id.data().unwrap().entries()
             },
-            IDBinds::Binds08(id) =>  {
+            IDBinds::Binds08(id, _) =>  {
                 id.data().unwrap().entries()
             },
-            IDBinds::Binds16(id) =>  {
+            IDBinds::Binds16(id, _) =>  {
                 id.data().unwrap().entries()
             },
         }
     }
     pub fn bind_sources(&self) -> Vec<EBindResource> {
         match self {
-            IDBinds::Binds00() => vec![],
-            IDBinds::Binds01(id) => {
+            IDBinds::Binds00(_) => vec![],
+            IDBinds::Binds01(id, _) => {
                 id.data().unwrap().bind_sources()
             },
-            IDBinds::Binds02(id) =>  {
+            IDBinds::Binds02(id, _) =>  {
                 id.data().unwrap().bind_sources()
             }
-            IDBinds::Binds04(id) =>  {
+            IDBinds::Binds04(id, _) =>  {
                 id.data().unwrap().bind_sources()
             },
-            IDBinds::Binds08(id) =>  {
+            IDBinds::Binds08(id, _) =>  {
                 id.data().unwrap().bind_sources()
             },
-            IDBinds::Binds16(id) =>  {
+            IDBinds::Binds16(id, _) =>  {
                 id.data().unwrap().bind_sources()
             },
         }
     }
-    pub fn offsets(&self) -> Vec<wgpu::DynamicOffset> {
+    pub fn offsets(&self) -> &Vec<wgpu::DynamicOffset> {
         match self {
-            IDBinds::Binds00() => vec![],
-            IDBinds::Binds01(id) => {
-                id.data().unwrap().offsets()
+            IDBinds::Binds00(v) => v,
+            IDBinds::Binds01(id, v) => {
+                v
             },
-            IDBinds::Binds02(id) =>  {
-                id.data().unwrap().offsets()
+            IDBinds::Binds02(id, v) =>  {
+                v
             }
-            IDBinds::Binds04(id) =>  {
-                id.data().unwrap().offsets()
+            IDBinds::Binds04(id, v) =>  {
+                v
             },
-            IDBinds::Binds08(id) =>  {
-                id.data().unwrap().offsets()
+            IDBinds::Binds08(id, v) =>  {
+                v
             },
-            IDBinds::Binds16(id) =>  {
-                id.data().unwrap().offsets()
+            IDBinds::Binds16(id, v) =>  {
+                v
             },
         }
     }
@@ -265,7 +265,7 @@ impl EBinds {
         if let Some(id) = id {
             Arc::new(id)
         } else {
-            Arc::new(IDBinds::Binds00())
+            Arc::new(IDBinds::Binds00(vec![]))
         }
     }
 }
@@ -297,35 +297,40 @@ impl BindsRecorder {
     }
     pub fn record_01(&mut self, val: Binds01) -> Option<IDBinds> {
         if let Some(id) = self.pool_01.allocate(val) {
-            Some(IDBinds::Binds01(id))
+            let v = id.data().unwrap().offsets();
+            Some(IDBinds::Binds01(id, v))
         } else {
             None
         }
     }
     pub fn record_02(&mut self, val: Binds02) -> Option<IDBinds> {
         if let Some(id) = self.pool_02.allocate(val) {
-            Some(IDBinds::Binds02(id))
+            let v = id.data().unwrap().offsets();
+            Some(IDBinds::Binds02(id, v))
         } else {
             None
         }
     }
     pub fn record_04(&mut self, val: Binds04) -> Option<IDBinds> {
         if let Some(id) = self.pool_04.allocate(val) {
-            Some(IDBinds::Binds04(id))
+            let v = id.data().unwrap().offsets();
+            Some(IDBinds::Binds04(id, v))
         } else {
             None
         }
     }
     pub fn record_08(&mut self, val: Binds08) -> Option<IDBinds> {
         if let Some(id) = self.pool_08.allocate(val) {
-            Some(IDBinds::Binds08(id))
+            let v = id.data().unwrap().offsets();
+            Some(IDBinds::Binds08(id, v))
         } else {
             None
         }
     }
     pub fn record_16(&mut self, val: Binds16) -> Option<IDBinds> {
         if let Some(id) = self.pool_16.allocate(val) {
-            Some(IDBinds::Binds16(id))
+            let v = id.data().unwrap().offsets();
+            Some(IDBinds::Binds16(id, v))
         } else {
             None
         }
@@ -422,7 +427,7 @@ impl BindGroupUsage {
         self.bind_group.layout.clone()
     }
 
-    pub fn offsets(&self) -> Vec<wgpu::DynamicOffset> {
+    pub fn offsets(&self) -> &Vec<wgpu::DynamicOffset> {
         self.key_bind_group.offsets()
     }
 }
