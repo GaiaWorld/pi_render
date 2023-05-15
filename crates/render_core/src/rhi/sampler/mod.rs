@@ -138,11 +138,24 @@ impl SamplerDesc {
             EAnisotropyClamp::Sixteen   => NonZeroU8::new(16),
         }
     }
-    pub fn linear_default() -> Self {
+    pub fn linear_clamp() -> Self {
         Self {
             address_mode_u: EAddressMode::ClampToEdge,
             address_mode_v: EAddressMode::ClampToEdge,
             address_mode_w: EAddressMode::ClampToEdge,
+            mag_filter: EFilterMode::Linear,
+            min_filter: EFilterMode::Linear,
+            mipmap_filter: EFilterMode::Nearest,
+            compare: None,
+            anisotropy_clamp: EAnisotropyClamp::One,
+            border_color: None,
+        }
+    }
+    pub fn linear_repeat() -> Self {
+        Self {
+            address_mode_u: EAddressMode::Repeat,
+            address_mode_v: EAddressMode::Repeat,
+            address_mode_w: EAddressMode::Repeat,
             mag_filter: EFilterMode::Linear,
             min_filter: EFilterMode::Linear,
             mipmap_filter: EFilterMode::Nearest,

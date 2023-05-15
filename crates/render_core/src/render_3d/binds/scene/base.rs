@@ -41,7 +41,7 @@ impl ShaderBindSceneAboutBase {
     pub fn key_layout(&self, binding: u16) -> KeyBindLayoutBuffer {
         KeyBindLayoutBuffer {
             binding,
-            visibility: EShaderStage::VERTEX,
+            visibility: EShaderStage::VERTEXFRAGMENT,
             min_binding_size: self.data.size(),
         }
     }

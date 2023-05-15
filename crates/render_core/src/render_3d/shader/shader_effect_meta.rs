@@ -281,6 +281,12 @@ impl ShaderEffectMeta {
             define: String::from("#version 450\r\n"),
             running: String::from("void main() {\r\n"),
         });
+        
+        // SceneAbout
+        result.push(BlockCode {
+            define: scene_about.fs_define_code(),
+            running: String::from(""),
+        });
 
         // Model
         result.push(BlockCode {
@@ -322,7 +328,7 @@ impl ShaderEffectMeta {
 
         // SceneAbout
         result.push(BlockCode {
-            define: scene_about.fs_define_code(),
+            define: String::from(""),
             running: scene_about.fs_running_code(),
         });
 

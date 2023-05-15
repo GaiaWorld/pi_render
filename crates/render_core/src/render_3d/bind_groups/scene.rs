@@ -53,7 +53,7 @@ impl KeyBindGroupScene {
             bind_base_effect,
             key_set,
             bind_count: binding,
-            key_binds: Arc::new(IDBinds::Binds00())
+            key_binds: Arc::new(IDBinds::Binds00(vec![]))
         };
 
         result.key_binds = result.binds(recorder);
@@ -94,7 +94,7 @@ impl KeyBindGroupScene {
             }
             binds.record(recorder)
         } else {
-            Arc::new(IDBinds::Binds00())
+            Arc::new(IDBinds::Binds00(vec![]))
         }
     }
     pub fn key_bind_group(&self) -> KeyBindGroup {
