@@ -35,6 +35,7 @@ impl std::ops::Deref for KeyImageTexture {
     }
 }
 
+#[derive(Debug)]
 pub struct ImageTexture {
 	pub(crate) width: u32,
 	pub(crate) height: u32,

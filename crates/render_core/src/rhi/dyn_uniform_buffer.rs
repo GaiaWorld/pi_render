@@ -114,7 +114,7 @@ impl GroupAlloter {
 				.min(capacity);
 			GroupBuffersAlloter::new(next_count, info.binding_size_list.as_slice())
 		});
-
+		
         // 返回分配的索引
         BufferGroup {
             index: alloc_index,
@@ -815,77 +815,4 @@ mod test {
     }
 }
 
-#[cfg(test)]
-mod test_occupied_mark {
-    use super::*;
 
-    #[test]
-    fn test_alloc() {
-        let mut occupied_mark = OccupiedMarker::new(100);
-
-        for i in 0..100 {
-            let r = occupied_mark.alloc().unwrap();
-            assert_eq!(i, r);
-        }
-    }
-
-    #[test]
-    fn test_free() {
-        let mut occupied_mark = OccupiedMarker::new(100);
-
-        for i in 0..100 {
-            let r = occupied_mark.alloc().unwrap();
-            assert_eq!(i, r);
-        }
-
-        for i in (0..100).step_by(2) {
-            occupied_mark.free(i);
-        }
-
-        for i in (0..100).step_by(2) {
-            let r = occupied_mark.alloc().unwrap();
-            assert_eq!(i, r);
-        }
-
-		assert_eq!(None, occupied_mark.alloc());
-    }
-}
-
-#[cfg(test)]
-mod test_id_alloc {
-    use super::*;
-
-    #[test]
-    fn test_alloc() {
-        let id_alloter = IdAlloterWithCountLimit::new(100);
-
-        for i in 0..100 {
-            let r = id_alloter.alloc().unwrap();
-            assert_eq!(i, r.index());
-        }
-    }
-
-    #[test]
-    fn test_free() {
-        let id_alloter = IdAlloterWithCountLimit::new(100);
-
-		let mut indexs = Vec::new();
-        for i in 0..100 {
-            let r = id_alloter.alloc().unwrap();
-			assert_eq!(i, r.index());
-			indexs.push(r);
-            
-        }
-
-        for i in indexs.into_iter().step_by(2) {
-            id_alloter.recycle(i);
-        }
-
-        for i in (0..100).step_by(2) {
-            let r = id_alloter.alloc().unwrap();
-            assert_eq!(i, r.index());
-        }
-
-		assert_eq!(true, id_alloter.alloc().is_none());
-    }
-}

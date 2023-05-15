@@ -138,6 +138,7 @@ pub struct KeyRenderTargetView {
 impl TAssetKeyU64 for KeyRenderTargetView {}
 pub type KeyRenderTargetViewU64 = u64;
 
+#[derive(Debug)]
 pub struct RenderTargetView {
     pub(crate) texture: Handle<RenderTexture>,
     pub(crate) view: TextureView,
@@ -212,7 +213,7 @@ impl Asset for RenderTargetView {
 //     }
 // }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum ERenderTargetViewUsage {
     Handle(Handle<RenderTargetView>),
     Arc(Arc<RenderTargetView>, KeyRenderTargetViewU64),

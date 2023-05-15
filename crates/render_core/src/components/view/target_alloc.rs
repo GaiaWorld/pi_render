@@ -42,6 +42,7 @@ pub struct TargetDescriptor {
 }
 
 /// 渲染目标
+#[derive(Debug)]
 pub struct Fbo {
 	pub depth: Option<(Handle<RenderRes<wgpu::TextureView>>, Share<wgpu::Texture>)>,
 	pub colors: SmallVec<[(Handle<RenderRes<wgpu::TextureView>>, Share<wgpu::Texture>);1]>,
@@ -50,6 +51,7 @@ pub struct Fbo {
 }
 
 /// 渲染目标视图
+#[derive(Debug)]
 pub struct TargetView {
 	ty_index: DefaultKey,
 	index: DefaultKey, // 第几张纹理
@@ -92,6 +94,12 @@ pub struct TargetType(DefaultKey);
 
 #[derive(Clone)]
 pub struct ShareTargetView(Share<(TargetView, SafeAtlasAllocator)>);
+
+impl std::fmt::Debug for ShareTargetView {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("ShareTargetView").field(&self.0.0).finish()
+    }
+}
 
 impl Deref for ShareTargetView {
     type Target = TargetView;

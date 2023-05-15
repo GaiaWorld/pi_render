@@ -3,7 +3,7 @@ use std::{fmt::Debug, ops::Range};
 use derive_deref_rs::Deref;
 use pi_share::{Share, ShareMutex};
 use smallvec::{smallvec, SmallVec};
-use wgpu::{util::BufferInitDescriptor, BufferUsages};
+use wgpu::{util::BufferInitDescriptor, BufferUsages, BufferDescriptor};
 
 use super::{
     buffer::Buffer,
@@ -14,8 +14,29 @@ use super::{
 
 // Buffer索引
 pub enum BufferIndex {
-	Align {index: AlignBufferIndex, level: u32, align_buffer_alloter: Share<BufferContainer>}, // 对齐的buffer，与其他数据共享buffer， 延迟更新到显存，与显存对应的，在内存中也会存在一份
+	Align {index: AlignBufferIndex, level: u32, len: u32, align_buffer_alloter: Share<BufferContainer>}, // 对齐的buffer，与其他数据共享buffer， 延迟更新到显存，与显存对应的，在内存中也会存在一份
 	Alone {buffer: Buffer, range: Range<usize>} // 独立的buffer，不延迟更新到显存，不存在对应的内存， 只存在显存
+}
+
+impl BufferIndex {
+	pub fn range(&self) -> Range<wgpu::BufferAddress> {
+		match self {
+			BufferIndex::Align { level, len, index, .. } => {
+				let offset = (index.index.index() * calc_blocksize_from_level(*level)) as wgpu::BufferAddress;
+				offset..offset + *len as wgpu::BufferAddress
+			},
+			BufferIndex::Alone { range, .. } => range.start as wgpu::BufferAddress..range.end as wgpu::BufferAddress,
+		}
+	}
+
+	pub fn buffer(&self) -> &wgpu::Buffer {
+		match self {
+			BufferIndex::Align { index, level, align_buffer_alloter, .. } => {
+				align_buffer_alloter[*level as usize].buffer_layers[index.layer].wgpu_buffer().unwrap()
+			},
+			BufferIndex::Alone { buffer, .. } => buffer,
+		}
+	}
 }
 
 impl Debug for BufferIndex {
@@ -30,7 +51,7 @@ impl Debug for BufferIndex {
 impl Drop for BufferIndex {
     fn drop(&mut self) {
 		// 如果是对齐buffer的索引，需要在对齐分配器中释放
-        if let BufferIndex::Align { index, level, align_buffer_alloter } = self {
+        if let BufferIndex::Align { index, level, align_buffer_alloter, .. } = self {
 			align_buffer_alloter[*level as usize].buffer_layers[index.layer].recycle(index.index);
 		}
     }
@@ -38,16 +59,18 @@ impl Drop for BufferIndex {
 
 /// buffer分配器
 pub struct BufferAlloter {
-	mutex: ShareMutex<()>,
-	// 预备在栈上的分配器， 最小64， 最大 64 * Math.pow(2, 6)，即4k
+	// 预备在栈上的分配器， 最小MIN_ALIGN， 最大 MIN_ALIGN * Math.pow(2, 6)，即4k
 	align_buffer_alloter: Share<BufferContainer>,
-	device: RenderDevice,
-	queue: RenderQueue,
+
 	// 最大对齐，长度大于该值的buffer，不会在align_buffer_alloter中分配，而是创建一个单独的buffer
 	max_align: u32,
 	usages: BufferUsages,
 	init_size: u32,
 	label: Option<String>,
+
+	mutex: ShareMutex<()>,
+	device: RenderDevice,
+	queue: RenderQueue,
 }
 
 impl BufferAlloter {
@@ -66,79 +89,84 @@ impl BufferAlloter {
 		}
 	}
 
-	/// 分配或更新buffer
-	pub fn alloc_or_update(&self, old: Option<BufferIndex>, data: &[u8]) -> BufferIndex {
-		debug_assert!(calc_level(data.len()) <= 31);
+	/// 分配buffer
+	pub fn alloc(&self, data: &[u8]) -> BufferIndex {
+		debug_assert!(calc_level(data.len()) < 32);
+		// 不存在旧的索引，则直接创建
+		if data.len() <= self.max_align as usize {
+			// 长度在最大对齐范围内，则在align_buffer_alloter中分配
+			let new_level = calc_level(data.len());
+			let index = self.alloc_align(new_level);
+			self.update_buffer_to_align(&index, new_level, data);
+			BufferIndex::Align {
+				index, 
+				level: new_level,
+				len: data.len() as u32,
+				align_buffer_alloter: self.align_buffer_alloter.clone()
+			}
+		} else {
+			// 长度超出最大对齐，则创建单独的buffer(是否使用队列提交buffer？TODO)
+			let buffer = self.device.create_buffer_with_data(&wgpu::util::BufferInitDescriptor {
+				label: self.label.as_deref(),
+				contents: data,
+				usage: self.usages,
+			});
+			BufferIndex::Alone { range: 0..data.len() as usize, buffer, }
+		}
+	}
+
+	/// 更新buffer
+	pub fn update(&self, old: &mut BufferIndex, data: &[u8]) -> bool {
+		debug_assert!(calc_level(data.len()) < 32);
+		// 如果存在旧的索引， 检查当前buffer的长度是否小于等于旧的buffer长度
 		match old {
-			Some(mut r) => {
-				// 如果存在旧的索引， 检查当前buffer的长度是否小于等于旧的buffer长度
-				match &mut r {
-					BufferIndex::Align{index, level, ..} => {
-						if data.len() <= self.max_align as usize {
-							let new_level = calc_level(data.len());
-							if new_level <= *level {
-								// 如果就索引能容纳新buffer， 则直接更新buffer
-								self.update_buffer_to_align(index, *level, data);
-							} else {
-								// 否则，重新分配索引
-								let new_index = self.alloc_align(new_level);
-								self.update_buffer_to_align(&new_index, new_level, data);
-								*index = new_index;
-								*level = new_level;
-							}
-						} else {
-							// 长度超出最大对齐，则创建单独的buffer
-							let buffer = self.device.create_buffer_with_data(&wgpu::util::BufferInitDescriptor {
-								label: self.label.as_deref(),
-								contents: data,
-								usage: self.usages,
-							});
-							return BufferIndex::Alone { range: 0..data.len() as usize, buffer, }
-						}
-					},
-					BufferIndex::Alone{buffer, range} => {
-						if data.len() > buffer.size() as usize {
-							// 旧的buffer不能容纳新的数据， 则创建新的buffer
-							let new_buffer = self.device.create_buffer_with_data(&wgpu::util::BufferInitDescriptor {
-								label: self.label.as_deref(),
-								contents: data,
-								usage: self.usages,
-							});
-							*range = 0..data.len();
-							*buffer = new_buffer;
-						} else {
-							// 旧的buffer能容纳新的数据，则更新原有buffer(这里更新修改为maped buffer？TODO)
-							self.queue.write_buffer(
-								&buffer,
-								0,
-								data,
-							);
-							*range = 0..data.len() as usize;
-						}
-					},
-				}
-				r
-			},
-			None => {
-				// 不存在旧的索引，则直接创建
+			BufferIndex::Align{index, level, align_buffer_alloter, ..} => {
 				if data.len() <= self.max_align as usize {
-					// 长度在最大对齐范围内，则在align_buffer_alloter中分配
 					let new_level = calc_level(data.len());
-					let index = self.alloc_align(new_level);
-					self.update_buffer_to_align(&index, new_level, data);
-					BufferIndex::Align {
-						index, 
-						level: new_level,
-						align_buffer_alloter: self.align_buffer_alloter.clone()
+					if new_level <= *level {
+						// 如果就索引能容纳新buffer， 则直接更新buffer
+						self.update_buffer_to_align(index, *level, data);
+						false
+					} else {
+						// 释放旧的索引
+						align_buffer_alloter[*level as usize].buffer_layers[index.layer].recycle(index.index);
+						// 否则，重新分配索引
+						let new_index = self.alloc_align(new_level);
+						self.update_buffer_to_align(&new_index, new_level, data);
+						*index = new_index;
+						*level = new_level;
+						true
 					}
 				} else {
-					// 长度超出最大对齐，则创建单独的buffer
+					// 长度超出最大对齐，则创建单独的buffer(是否使用队列提交buffer？TODO)
 					let buffer = self.device.create_buffer_with_data(&wgpu::util::BufferInitDescriptor {
 						label: self.label.as_deref(),
 						contents: data,
 						usage: self.usages,
 					});
-					BufferIndex::Alone { range: 0..data.len() as usize, buffer, }
+					*old = BufferIndex::Alone { range: 0..data.len() as usize, buffer, };
+					true
+				}
+			},
+			BufferIndex::Alone{buffer, range} => {
+				if data.len() > buffer.size() as usize {
+					// 旧的buffer不能容纳新的数据， 则创建新的buffer(是否使用队列提交buffer？TODO)
+					let new_buffer = self.device.create_buffer_with_data(&wgpu::util::BufferInitDescriptor {
+						label: self.label.as_deref(),
+						contents: data,
+						usage: self.usages,
+					});
+					*old = BufferIndex::Alone { range: 0..data.len() as usize, buffer: new_buffer, };
+					true
+				} else {
+					// 旧的buffer能容纳新的数据，则更新原有buffer(这里更新修改为maped buffer？TODO)
+					self.queue.write_buffer(
+						&buffer,
+						0,
+						data,
+					);
+					*range = 0..data.len() as usize;
+					false
 				}
 			},
 		}
@@ -147,7 +175,8 @@ impl BufferAlloter {
 	/// 更新buffer到显存
 	/// 通常每帧调用一次
 	#[inline]
-    pub fn write_buffer(&mut self) {
+    pub fn write_buffer(&self) {
+		let _lock = self.mutex.lock();
 		// 迭代所有对齐类型的buffer，写入显存
 		for level_alloter in self.align_buffer_alloter.iter() {
 			for layer in level_alloter.iter() {
@@ -197,12 +226,16 @@ impl BufferAlloter {
 	}
 }
 
+// buffer最小对齐字节数
+const MIN_ALIGN: u32 = 64;
+// 最小等级（2^6 = MIN_ALIGN）
+const MIN_LEVEL: usize = 6;
+
+// 计算等级
 #[inline]
 fn calc_level(size: usize) -> u32 {
 	debug_assert!(size != 0);
-	// size.next_power_of_two()/64
-	(((size - 1) >> 6_usize << 1_usize).next_power_of_two()).trailing_zeros()
-	// (std::mem::size_of::<usize>() * 8) as u32 - ((size + 1) >> 6_usize).next_power_of_two().leading_zeros()
+	(((size - 1) >> MIN_LEVEL << 1_usize).next_power_of_two()).trailing_zeros()
 }
 
 // 根据level计算块大小
@@ -366,6 +399,15 @@ impl BufferMap {
     ) -> bool {
         // 什么也没改变， 直接返回
         if self.cache_buffer.change_range.len() == 0 {
+			if let None = &self.buffer {
+				self.buffer = Some(device.create_buffer(&BufferDescriptor {
+                    label,
+                    usage: self.usage,
+					size: self.cache_buffer.buffer().len() as wgpu::BufferAddress,
+					mapped_at_creation: false,
+                }));
+				return true;
+			}
             return false;
         }
 
@@ -410,7 +452,7 @@ impl BufferCache {
         unsafe { buffer.set_len(len) };
         Self {
             buffer,
-            change_range: 0..0,
+            change_range: 0..0, //
         }
     }
 
@@ -518,24 +560,24 @@ mod test {
 				level3_buffer.push(1)
 			}
 
-			// 测试分配在level0的情况
-			let r = alloter.alloc_or_update(None, &[0]);
-			println!("====测试分配在level0的情况====={:?}", r);
-			// 测试更新level0到level0的情况
-			let r = alloter.alloc_or_update(Some(r), &[1]);
-			println!("====测试更新level0到level0的情况====={:?}", r);
-			// 测试更新level0到level1的情况
-			let r = alloter.alloc_or_update(Some(r), level1_buffer.as_slice());
-			println!("====测试更新level0到level1的情况====={:?}", r);
-			// 测试更新level1到level2的情况
-			let r = alloter.alloc_or_update(Some(r), level2_buffer.as_slice());
-			println!("====测试更新level1到level2的情况====={:?}", r);
-			// 测试更新level2到level2的情况
-			let r = alloter.alloc_or_update(Some(r), level2_buffer.as_slice());
-			println!("====测试更新level2到level2的情况====={:?}", r);
-			// 测试更新level2到level3的情况
-			let r = alloter.alloc_or_update(Some(r), level3_buffer.as_slice());
-			println!("====测试更新level2到level3的情况====={:?}", r);
+			// // 测试分配在level0的情况
+			// let mut r = alloter.alloc_or_update(None, &[0]);
+			// println!("====测试分配在level0的情况====={:?}", r);
+			// // 测试更新level0到level0的情况
+			// let r = alloter.alloc_or_update(Some(r), &[1]);
+			// println!("====测试更新level0到level0的情况====={:?}", r);
+			// // 测试更新level0到level1的情况
+			// let r = alloter.alloc_or_update(Some(r), level1_buffer.as_slice());
+			// println!("====测试更新level0到level1的情况====={:?}", r);
+			// // 测试更新level1到level2的情况
+			// let r = alloter.alloc_or_update(Some(r), level2_buffer.as_slice());
+			// println!("====测试更新level1到level2的情况====={:?}", r);
+			// // 测试更新level2到level2的情况
+			// let r = alloter.alloc_or_update(Some(r), level2_buffer.as_slice());
+			// println!("====测试更新level2到level2的情况====={:?}", r);
+			// // 测试更新level2到level3的情况
+			// let r = alloter.alloc_or_update(Some(r), level3_buffer.as_slice());
+			// println!("====测试更新level2到level3的情况====={:?}", r);
 			is_end1.store(true, std::sync::atomic::Ordering::Relaxed);
 		});
 

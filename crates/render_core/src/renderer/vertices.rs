@@ -1,8 +1,9 @@
 use std::{ops::Range, hash::Hash, fmt::Debug, sync::Arc};
 
 use pi_assets::asset::Handle;
+use pi_share::Share;
 
-use crate::rhi::{asset::RenderRes, buffer::Buffer};
+use crate::rhi::{asset::RenderRes, buffer::Buffer, buffer_alloc::BufferIndex};
 
 use super::{vertex_buffer::EVertexBufferRange, vertex_format::TVertexFormatByteSize};
 
@@ -13,6 +14,7 @@ pub trait TKeyAttributes: Debug + Clone + PartialEq + Eq + Hash {
 #[derive(Clone)]
 pub enum EVerticesBufferUsage {
     GUI(Handle<RenderRes<Buffer>>),
+	Part(Share<BufferIndex>), // 改为Arc<RefCell<BufferIndex>>？TODO
     Other(Handle<EVertexBufferRange>),
     EVBRange(Arc<EVertexBufferRange>),
     Temp(Arc<Buffer>),
@@ -21,6 +23,7 @@ impl EVerticesBufferUsage {
     pub fn range(&self) -> Range<wgpu::BufferAddress> {
         match self {
             EVerticesBufferUsage::GUI(val) => Range { start: 0, end: val.size() },
+			EVerticesBufferUsage::Part(index) => index.range(),
             EVerticesBufferUsage::Other(val) => val.range(),
             EVerticesBufferUsage::EVBRange(val) => val.range(),
             EVerticesBufferUsage::Temp(val) => Range { start: 0, end: val.size() },
@@ -29,6 +32,7 @@ impl EVerticesBufferUsage {
     pub fn buffer(&self) -> &wgpu::Buffer {
         match self {
             EVerticesBufferUsage::GUI(val) => val,
+			EVerticesBufferUsage::Part(index) => index.buffer(),
             EVerticesBufferUsage::Other(val) => val.buffer(),
             EVerticesBufferUsage::EVBRange(val) => val.buffer(),
             EVerticesBufferUsage::Temp(val) => val,
@@ -58,6 +62,7 @@ impl Debug for EVerticesBufferUsage {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::GUI(arg0) => f.debug_tuple("GUI").field(arg0).finish(),
+			Self::Part(arg0) =>  f.debug_tuple("Part").field(arg0).finish(),
             Self::Other(arg0) => f.debug_tuple("Other").field(arg0).finish(),
             Self::EVBRange(arg0) => f.debug_tuple("EVBRange").field(arg0).finish(),
             Self::Temp(arg0) => f.debug_tuple("Temp").field(arg0).finish(),
@@ -171,4 +176,9 @@ impl Eq for RenderIndices {
     fn assert_receiver_is_total_eq(&self) {
         
     }
+}
+
+#[test]
+fn tt() {
+	println!("!!!===={:?}", std::mem::size_of::<RenderVertices>());
 }

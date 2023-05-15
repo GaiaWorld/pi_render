@@ -16,7 +16,7 @@ pub enum KeyTextureViewUsage {
     Temp(u64, TextureRect),
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum ETextureViewUsage {
     Tex(Handle<TextureRes>),
     Image(EImageTextureViewUsage),

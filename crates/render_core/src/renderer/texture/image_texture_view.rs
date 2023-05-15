@@ -13,6 +13,7 @@ pub struct KeyImageTextureView {
 }
 impl TAssetKeyU64 for KeyImageTextureView {}
 
+#[derive(Debug)]
 pub struct ImageTextureView {
     pub(crate) texture: Handle<ImageTexture>,
     pub(crate) view: TextureView,
