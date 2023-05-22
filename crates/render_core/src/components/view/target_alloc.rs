@@ -35,9 +35,26 @@ pub struct TextureDescriptor {
 /// 渲染目标描述
 #[derive(Debug, Hash, Clone)]
 pub struct TargetDescriptor {
-	pub texture_descriptor: SmallVec<[TextureDescriptor; 1]>,
+	/// 颜色纹理描述
+	pub colors_descriptor: SmallVec<[TextureDescriptor; 1]>,
 	pub need_depth: bool,
+	/// 深度纹理描述， 如果为None，则使用默认值，默认值为：
+	/// TextureDescriptor {
+	///		mip_level_count: 1,
+	///		sample_count: 1,
+	///		dimension: TextureDimension::D2,
+	///		format: TextureFormat::Depth32Float,
+	///		usage: TextureUsages::COPY_SRC | TextureUsages::COPY_DST | TextureUsages::RENDER_ATTACHMENT,
+
+	///		base_mip_level: 0,
+	///		base_array_layer: 0,
+	///		array_layer_count: None,
+	///		view_dimension: None,
+	///	}
+	pub depth_descriptor: Option<TextureDescriptor>,
+	/// 默认宽度（如果分配纹理宽度小于default_width，则会直接使用default_width）
 	pub default_width: u32,
+	/// 默认高度（如果分配纹理高度小于default_height，则会直接使用default_height）
 	pub default_height: u32,
 }
 
@@ -200,7 +217,8 @@ struct AtlasAllocator {
 	// 所有的AllocatorGroup（一个TargetDescriptor对应一个AllocatorGroup）
 	all_allocator: SlotMap<DefaultKey, AllocatorGroup>,
 	// 深度纹理描述，当前为内置固定描述，是否需要扩展？TODO
-	depth_descript: TextureDescriptor,
+	default_depth_descript: TextureDescriptor,
+	default_depth_hash: u64,
 	// // 未使用的纹理缓冲
 	// // 预计纹理格式和尺寸都不会有太大的差距（通常是屏幕大小、rgba格式），所以将所有的未使用纹理放在一起，而不分类
 	// unuse_textures: Vec<UnuseTexture>,
@@ -223,21 +241,12 @@ impl AtlasAllocator {
 		texture_assets_mgr: Share<AssetMgr<RenderRes<wgpu::TextureView>>>,
 		unuse_textures: Share<HomogeneousMgr<RenderRes<UnuseTexture>>>,
 	) -> Self {
+		let d = create_default_depth_descriptor();
 		Self {
 			type_map: XHashMap::default(),
 			all_allocator: SlotMap::default(),
-			depth_descript: TextureDescriptor {
-				mip_level_count: 1,
-				sample_count: 1,
-				dimension: TextureDimension::D2,
-				format: TextureFormat::Depth32Float,
-				usage: TextureUsages::COPY_SRC | TextureUsages::COPY_DST | TextureUsages::RENDER_ATTACHMENT,
-
-				base_mip_level: 0,
-				base_array_layer: 0,
-				array_layer_count: None,
-				view_dimension: None,
-			},
+			default_depth_hash: calc_hash(&d),
+			default_depth_descript: d,
 			unuse_textures,
 			texture_cur_index: 0,
 			device,
@@ -380,7 +389,7 @@ impl AtlasAllocator {
 		let info: &AllocatorGroupInfo = unsafe { transmute(&self.all_allocator[target_type.0].info) };
 		let mut width = info.descript.default_width.max(min_width);
 		let mut height = info.descript.default_height.max(min_height);
-		let len = info.descript.texture_descriptor.len();
+		let len = info.descript.colors_descriptor.len();
 
 		let mut target = Fbo {
 			depth: None,
@@ -390,7 +399,7 @@ impl AtlasAllocator {
 		};
 
 		for i in 0..len {
-			let descriptor = &info.descript.texture_descriptor[i];
+			let descriptor = &info.descript.colors_descriptor[i];
 			let r = self.get_or_create_texture(
 				width, 
 				height, 
@@ -410,12 +419,17 @@ impl AtlasAllocator {
 		}
 
 		if info.descript.need_depth {
+			let (descript, depth_hash) = if let Some(depth_descript) = &info.descript.depth_descriptor {
+				(depth_descript, info.depth_hash)
+			} else {
+				(&self.default_depth_descript, self.default_depth_hash)
+			};
 			let r = self.get_or_create_texture(
 				width,
 				height,
-				unsafe{ transmute(&self.depth_descript)},
+				unsafe{ transmute(descript)}, // SAFE： 生命周期问题， 这里是安全的，get_or_create_texture内部不会修改descript
 				wgpu::TextureAspect::DepthOnly,
-				0, // 深度纹理共用，默认hash为0
+				depth_hash,
 				2, // 
 
 			);
@@ -493,15 +507,20 @@ impl AtlasAllocator {
 
 	
 	fn create_type_inner(all_allocator: &mut SlotMap<DefaultKey, AllocatorGroup>, descript: TargetDescriptor) -> DefaultKey {
-		let mut texture_hashs = SmallVec::with_capacity(descript.texture_descriptor.len());
-		for i in descript.texture_descriptor.iter() {
+		let mut texture_hashs = SmallVec::with_capacity(descript.colors_descriptor.len());
+		for i in descript.colors_descriptor.iter() {
 			texture_hashs.push(calc_hash(i));
+		}
+		let mut depth_hash: u64 = 0;
+		if let Some(r) = &descript.depth_descriptor {
+			depth_hash = calc_hash(&descript.depth_descriptor);
 		}
 		let ty = all_allocator.insert(
 			AllocatorGroup { 
 				info: AllocatorGroupInfo { 
 					descript: descript, 
 					texture_hash: texture_hashs, 
+					depth_hash,
 					// hash: 0, // TODO
 				}, 
 				list: SlotMap::new() });
@@ -533,6 +552,7 @@ pub struct AllocatorGroup {
 pub struct AllocatorGroupInfo {
 	descript: TargetDescriptor,
 	texture_hash: SmallVec<[u64;1]>,
+	depth_hash: u64,
 	// hash: u64,
 }
 
@@ -540,6 +560,21 @@ fn calc_hash<T: Hash>(v: &T)-> u64 {
 	let mut hasher = DefaultHasher::default();
 	v.hash(&mut hasher);
 	hasher.finish()
+}
+
+fn create_default_depth_descriptor() -> TextureDescriptor {
+	TextureDescriptor {
+		mip_level_count: 1,
+		sample_count: 1,
+		dimension: TextureDimension::D2,
+		format: TextureFormat::Depth32Float,
+		usage: TextureUsages::COPY_SRC | TextureUsages::COPY_DST | TextureUsages::RENDER_ATTACHMENT,
+
+		base_mip_level: 0,
+		base_array_layer: 0,
+		array_layer_count: None,
+		view_dimension: None,
+	}
 }
 
 #[test]
