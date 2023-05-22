@@ -370,14 +370,17 @@ impl ShaderEffectMeta {
             set_3
         );
 
-        println!(">>>>>>>>>>>> Shader");
+        // println!(">>>>>>>>>>>> Shader");
 
-        let root_dir = std::env::current_dir().unwrap();
-        let file_name = "temp.vert";
-        std::fs::write(root_dir.join(file_name), vs.as_str());
-        
-        let file_name = "temp.frag";
-        std::fs::write(root_dir.join(file_name), fs.as_str());
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let root_dir = std::env::current_dir().unwrap();
+            let file_name = "temp.vert";
+            std::fs::write(root_dir.join(file_name), vs.as_str());
+            
+            let file_name = "temp.frag";
+            std::fs::write(root_dir.join(file_name), fs.as_str());
+        }
 
         let vs = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some((key_meta.to_string() + "-VS").as_str()),
