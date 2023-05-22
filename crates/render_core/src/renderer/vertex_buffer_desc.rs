@@ -90,6 +90,17 @@ impl VertexBufferDesc {
     pub fn update_range(&mut self, value: Option<Range<wgpu::BufferAddress>>) {
         let _ = replace(&mut self.range, value);
     }
+    pub fn instance_custom(kind: EVertexDataKind, format: wgpu::VertexFormat) -> Self {
+        Self {
+            key: KeyVertexBuffer::from("NullIntanceCustom"),
+            range: None,
+            attrs: vec![
+                VertexAttribute { kind, format },
+            ],
+            step_mode: wgpu::VertexStepMode::Instance,
+            kind: EInstanceKind::Color,
+        }
+    }
     pub fn instance_tilloff() -> Self {
         Self {
             key: KeyVertexBuffer::from("NullIntanceTillOff"),
