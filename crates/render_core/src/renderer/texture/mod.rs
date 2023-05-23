@@ -17,7 +17,7 @@ pub use texture_view::*;
 pub use texture_view_array::*;
 
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, Hash, PartialEq, Eq)]
 pub struct TextureViewDesc { 
     /// Aspect of the texture. Color textures must be [`TextureAspect::All`].
     pub aspect: wgpu::TextureAspect,
@@ -37,10 +37,10 @@ pub struct TextureViewDesc {
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub struct TextureRect {
-    pub(crate) x: u32,
-    pub(crate) y: u32,
-    pub(crate) w: u32,
-    pub(crate) h: u32,
+    pub(crate) x: u16,
+    pub(crate) y: u16,
+    pub(crate) w: u16,
+    pub(crate) h: u16,
 }
 impl Default for TextureRect {
     fn default() -> Self {

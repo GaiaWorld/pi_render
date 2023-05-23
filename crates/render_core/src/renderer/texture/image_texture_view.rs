@@ -12,6 +12,17 @@ pub struct KeyImageTextureView {
     pub(crate) desc: TextureViewDesc,
 }
 impl TAssetKeyU64 for KeyImageTextureView {}
+impl KeyImageTextureView {
+    pub fn new(tex: KeyImageTexture, desc: TextureViewDesc) -> Self {
+        Self { tex, desc }
+    }
+    pub fn url(&self) -> &KeyImageTexture {
+        &self.tex
+    }
+    pub fn view_desc(&self) -> &TextureViewDesc {
+        &self.desc
+    }
+}
 
 #[derive(Debug)]
 pub struct ImageTextureView {
@@ -30,7 +41,7 @@ impl ImageTextureView {
         texture: Handle<ImageTexture>,
     ) -> Self {
         let view = texture.texture.create_view(&wgpu::TextureViewDescriptor {
-            label: None,
+            label: Some(key.url().as_str()),
             format: Some(texture.format.clone()),
             dimension: Some(texture.dimension.clone()),
             aspect: key.desc.aspect,

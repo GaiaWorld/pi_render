@@ -146,13 +146,13 @@ pub async fn create_texture_from_image<G: Garbageer<ImageTexture>>(
 	};
 
 	let texture = (**device).create_texture(&wgpu::TextureDescriptor {
-		label: Some("first depth buffer"),
+		label: Some(key.as_str()),
 		size: texture_extent,
 		mip_level_count: 1,
 		sample_count: 1,
 		dimension: wgpu::TextureDimension::D2,
 		format: ty,
-		usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+		usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::COPY_SRC,
 		view_formats: &[],
 	});
 
