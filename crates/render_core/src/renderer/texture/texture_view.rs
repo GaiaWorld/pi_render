@@ -5,7 +5,7 @@ use pi_slotmap::DefaultKey;
 
 use crate::{rhi::{asset::TextureRes}, components::view::target_alloc::ShareTargetView, asset::TAssetKeyU64};
 
-use super::{image_texture_view::{ImageTextureView, EImageTextureViewUsage}, render_target::{ERenderTargetViewUsage}, TextureRect};
+use super::{image_texture_view::{ImageTextureView, EImageTextureViewUsage}, render_target::{ERenderTargetViewUsage}, TextureRect, KeyTexture, KeyImageTexture, KeyImageTextureView, TextureViewDesc, ImageTexture};
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub enum KeyTextureViewUsage {
@@ -14,6 +14,24 @@ pub enum KeyTextureViewUsage {
     Render(u64, TextureRect),
     SRT(DefaultKey, DefaultKey, TextureRect),
     Temp(u64, TextureRect),
+}
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub enum EKeyTexture {
+    Tex(KeyTexture),
+    Image(KeyImageTextureView),
+    SRT(u64),
+}
+impl EKeyTexture {
+    pub fn image(value: &str) -> Self {
+        EKeyTexture::Image(KeyImageTextureView { tex: KeyImageTexture::from(value), desc: TextureViewDesc::default() })
+    }
+}
+impl From<&str> for EKeyTexture {
+    fn from(value: &str) -> Self {
+        Self::image(value)
+        // EKeyTexture::Tex(KeyTexture::from(value))
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -28,20 +46,20 @@ impl ETextureViewUsage {
     pub fn key(&self) -> KeyTextureViewUsage {
         match self {
             ETextureViewUsage::Image(val) => {
-                KeyTextureViewUsage::Image(*val.key(), TextureRect::default()) 
+                KeyTextureViewUsage::Image(*val.key(), TextureRect { x: 0, y: 0, w: val.texture.width as u16, h: val.texture.height as u16 }) 
             },
             ETextureViewUsage::Render(val) => {
-                KeyTextureViewUsage::Render(val.key(), TextureRect::default()) 
+                KeyTextureViewUsage::Render(val.key(), TextureRect { x: 0, y: 0, w: 1, h: 1 }) 
             },
             ETextureViewUsage::Tex(val) => {
-                KeyTextureViewUsage::Tex(*val.key(), TextureRect::default()) 
+                KeyTextureViewUsage::Tex(*val.key(), TextureRect { x: 0, y: 0, w: val.width as u16, h: val.height as u16 })
             },
             ETextureViewUsage::SRT(val) => {
                 let rect = val.rect();
-                let x = rect.min.x as u32;
-                let y = rect.min.y as u32;
-                let w = (rect.max.x - rect.min.x) as u32;
-                let h = (rect.max.y - rect.min.y) as u32;
+                let x = rect.min.x as u16;
+                let y = rect.min.y as u16;
+                let w = (rect.max.x - rect.min.x) as u16;
+                let h = (rect.max.y - rect.min.y) as u16;
                 KeyTextureViewUsage::SRT(val.ty_index(), val.target_index(), TextureRect { x, y, w, h })
             },
             ETextureViewUsage::Temp(_, key) => {
