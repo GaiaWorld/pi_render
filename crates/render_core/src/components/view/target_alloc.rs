@@ -2,7 +2,7 @@
 
 use std::{hash::{Hash, Hasher}, collections::hash_map::Entry, intrinsics::transmute, num::NonZeroU32, ops::Deref, mem::size_of};
 
-use guillotiere::{Size, Allocation, Rectangle};
+use guillotiere::{Size, Allocation, Rectangle, Point};
 use pi_assets::{asset::{Handle, Droper}, mgr::AssetMgr, homogeneous::HomogeneousMgr};
 use pi_share::{Share, ShareRwLock};
 use pi_slotmap::{DefaultKey, SlotMap, SecondaryMap};
@@ -73,6 +73,7 @@ pub struct TargetView {
 	ty_index: DefaultKey,
 	index: DefaultKey, // 第几张纹理
 	info: Allocation,
+	rect: Rectangle,
 	target: Share<Fbo>,
 }
 
@@ -82,16 +83,20 @@ impl TargetView {
 		&self.target
 	}
 	/// 拿到分配的矩形信息
-	pub fn rect(&self) -> &Rectangle {
+	pub fn rect_with_border(&self) -> &Rectangle {
 		&self.info.rectangle
+	}
+
+	pub fn rect(&self) -> &Rectangle {
+		&self.rect
 	}
 	/// 拿到分配的uv
 	pub fn uv(&self) -> [f32;8] {
 		let (xmin, xmax, ymin, ymax) = (
-			self.info.rectangle.min.x as f32/self.target.width as f32,
-			self.info.rectangle.max.x as f32/self.target.width as f32,
-			self.info.rectangle.min.y as f32/self.target.height as f32,
-			self.info.rectangle.max.y as f32/self.target.height as f32,
+			self.rect.min.x as f32/self.target.width as f32,
+			self.rect.max.x as f32/self.target.width as f32,
+			self.rect.min.y as f32/self.target.height as f32,
+			self.rect.max.y as f32/self.target.height as f32,
 		);
 		// [xmin, ymax, xmin, ymin, xmax, ymin, xmax, ymax]
 		[xmin, ymin, xmin, ymax, xmax, ymax, xmax, ymin]
@@ -235,6 +240,9 @@ struct AtlasAllocator {
 	excludes: SecondaryMap<DefaultKey, bool>,
 }
 
+const PADDING: i32 = 1;
+const DOUBLE_PADDING: u32 = 2;
+
 impl AtlasAllocator {
 	fn new(
 		device: RenderDevice, 
@@ -289,12 +297,27 @@ impl AtlasAllocator {
 				continue;
 			}
 
+			// 数量等于0，保持原大小，否则需要padding
+			// 原因是，为了重用屏幕渲染使用的深度缓冲区，通常，fbo的大小与屏幕等大
+			// 同时，需要分配的矩形，也很可能与屏幕等大，如果这里不判断item.count == 0，大部分fbo无法容纳与屏幕等大的矩形
+			let (offset, width, height) = if item.count == 0 {
+				(0, width, height)
+			} else {
+				(PADDING, width + DOUBLE_PADDING, height + DOUBLE_PADDING)
+			};
+
 			match item.allocator.allocate(Size::new(width as i32, height as i32)) {
 				Some(allocation) => {
 					// 在已有的rendertarget中分配成功，直接返回
 					item.count += 1;
+					let rectangle = &allocation.rectangle;
+					let rect = Rectangle::new(
+						Point::new(rectangle.min.x + offset, rectangle.min.y + offset),
+						Point::new(rectangle.max.x - offset, rectangle.max.y - offset)
+					);
 					return TargetView {
 						info: allocation,
+						rect,
 						ty_index: target_type.0,
 						index,
 						target: item.target.clone(),
@@ -318,9 +341,10 @@ impl AtlasAllocator {
 			target: target.clone(),
 			count: 1,
 		});
-
+		let rect = allocation.rectangle.clone();
 		return TargetView {
 			info: allocation,
+			rect,
 			target,
 			index,
 			ty_index: target_type.0,
