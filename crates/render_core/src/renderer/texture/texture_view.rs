@@ -24,7 +24,7 @@ pub enum EKeyTexture {
 }
 impl EKeyTexture {
     pub fn image(value: &str) -> Self {
-        EKeyTexture::Image(KeyImageTextureView { tex: KeyImageTexture::from(value), desc: TextureViewDesc::default() })
+        EKeyTexture::Image(KeyImageTextureView { tex: KeyImageTexture::File(value.to_string(), true), desc: TextureViewDesc::default() })
     }
 }
 impl From<&str> for EKeyTexture {

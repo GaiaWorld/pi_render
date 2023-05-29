@@ -186,11 +186,14 @@ pub struct VertexBufferAllocator {
 
 impl Default for VertexBufferAllocator {
     fn default() -> Self {
-        Self::new()
+        Self::new(Self::DEFAULT_CAPACITY, Self::DEFAULT_TIMEOUT)
     }
 }
 
 impl VertexBufferAllocator {
+    pub const DEFAULT_CAPACITY: usize = 20 * 1024 * 1024;
+    pub const DEFAULT_TIMEOUT: usize = 60 * 1000;
+
     /// * 每 level 间 对齐尺寸比值为 2
     pub const LEVEL_COUNT: usize = 16;
     /// * 最小对齐尺寸
@@ -202,7 +205,7 @@ impl VertexBufferAllocator {
     /// * u16::MAX 个顶点 = 96 * 65536 = 6 * 1024 * 1024
     /// * LEVEL_COUNT = 16; MAX_BASE_SIZE = 64 * 2^16 = 4 * 1024 * 1024
     pub const MAX_BASE_SIZE: u32 = 64 * 2_i32.pow(Self::LEVEL_COUNT as u32) as u32;
-    pub fn new() -> Self {
+    pub fn new(capacity: usize, timeout: usize) -> Self {
         let base_size = Self::BAE_SIZE;
         let level = Self::LEVEL_COUNT;
         // let max_base_size = Self::MAX_BASE_SIZE;
@@ -247,8 +250,8 @@ impl VertexBufferAllocator {
             FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(15) as u32, usage),
         ];
 
-        let asset_mgr = AssetMgr::<AssetRWBuffer>::new(GarbageEmpty(), false, 16 * 1024 * 1024, 60 * 1000);
-        let asset_mgr_2 = AssetMgr::<NotUpdatableBuffer>::new(GarbageEmpty(), false, 32 * 1024 * 1024, 60 * 1000);
+        let asset_mgr = AssetMgr::<AssetRWBuffer>::new(GarbageEmpty(), false, (capacity / 8 * 1), timeout);
+        let asset_mgr_2 = AssetMgr::<NotUpdatableBuffer>::new(GarbageEmpty(), false, (capacity / 8 * 7), timeout);
 
         Self {
             base_size,

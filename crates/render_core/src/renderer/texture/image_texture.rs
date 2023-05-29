@@ -6,34 +6,42 @@ use pi_hal::{
 	image::DynamicImage,
 	loader::AsyncLoader,
 };
+use pi_hash::XHashMap;
+use pi_share::Share;
 
 use crate::{rhi::{device::RenderDevice, RenderQueue}, asset::TAssetKeyU64};
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub struct KeyImageTexture(String);
+pub enum KeyImageTexture {
+	File(String, bool),
+	Data(String, bool),
+}
 impl KeyImageTexture {
     pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-impl From<String> for KeyImageTexture {
-    fn from(value: String) -> Self {
-        Self(value)
-    }
-}
-impl From<&str> for KeyImageTexture {
-    fn from(value: &str) -> Self {
-        Self(String::from(value))
-    }
+		match self {
+			KeyImageTexture::File(val, _) => val.as_str(),
+			KeyImageTexture::Data(val, _) => val.as_str(),
+		}
+	}
+    pub fn as_srgb(&self) -> bool {
+		match self {
+			KeyImageTexture::File(val, srgb) => *srgb,
+			KeyImageTexture::Data(val, srgb) => *srgb,
+		}
+	}
 }
 impl TAssetKeyU64 for KeyImageTexture {}
 impl std::ops::Deref for KeyImageTexture {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+		match self {
+			KeyImageTexture::File(val, _) => val.as_str(),
+			KeyImageTexture::Data(val, _) => val.as_str(),
+		}
     }
 }
+
 
 #[derive(Debug)]
 pub struct ImageTexture {
@@ -49,6 +57,39 @@ pub struct ImageTexture {
 impl ImageTexture {
 	pub fn new(width: u32, height: u32, size: usize, texture: wgpu::Texture, format: wgpu::TextureFormat, dimension: wgpu::TextureViewDimension, is_opacity: bool) -> Self {
 		Self { width, height, size, texture, is_opacity, format, dimension }
+	}
+	pub fn create_data_texture(device: &RenderDevice, queue: &RenderQueue, key: &KeyImageTexture, data: &[u8], width: u32, height: u32, format: wgpu::TextureFormat, dimension: wgpu::TextureViewDimension, pre_pixel_size: u32, is_opacity: bool) -> Self {
+		let texture_extent = wgpu::Extent3d {
+			width,
+			height,
+			depth_or_array_layers: 1,
+		};
+
+		let texture = (**device).create_texture(&wgpu::TextureDescriptor {
+			label: Some(key.as_str()),
+			size: texture_extent,
+			mip_level_count: 1,
+			sample_count: 1,
+			dimension: wgpu::TextureDimension::D2,
+			format: format,
+			usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::COPY_SRC,
+			view_formats: &[],
+		});
+
+		queue.write_texture(
+			texture.as_image_copy(),
+			data,
+			wgpu::ImageDataLayout {
+				offset: 0,
+				bytes_per_row: Some(std::num::NonZeroU32::new(width * pre_pixel_size).unwrap()),
+				rows_per_image: None,
+			},
+			texture_extent,
+		);
+
+		let size = data.len();
+
+		Self::new(width, height, size, texture, format, dimension, is_opacity)
 	}
 }
 
@@ -78,14 +119,22 @@ impl Asset for ImageTexture{
 // 	}
 // }
 
-pub struct ImageTexture2DDesc<'a> {
-	pub url: &'a KeyImageTexture,
-	pub device: &'a RenderDevice,
-	pub queue: &'a RenderQueue,
+pub enum ErrorImageTexture {
+	LoadFail,
+	CacheError,
 }
 
-impl<'a, G: Garbageer<Self>> AsyncLoader<'a, Self, ImageTexture2DDesc<'a>, G> for ImageTexture  {
-	fn async_load(desc: ImageTexture2DDesc<'a>, result: LoadResult<'a, Self, G>) -> BoxFuture<'a, std::io::Result<Handle<Self>>> {
+pub struct ImageTextureErrorMap(pub XHashMap<KeyImageTexture, ErrorImageTexture>);
+
+#[derive(Clone)]
+pub struct ImageTexture2DDesc {
+	pub url: KeyImageTexture,
+	pub device: RenderDevice,
+	pub queue: RenderQueue,
+}
+
+impl<'a, G: Garbageer<Self>> AsyncLoader<'a, Self, ImageTexture2DDesc, G> for ImageTexture  {
+	fn async_load(desc: ImageTexture2DDesc, result: LoadResult<'a, Self, G>) -> BoxFuture<'a, std::io::Result<Handle<Self>>> {
 		Box::pin(async move { 
 			match result {
 				LoadResult::Ok(r) => Ok(r),
@@ -100,7 +149,7 @@ impl<'a, G: Garbageer<Self>> AsyncLoader<'a, Self, ImageTexture2DDesc<'a>, G> fo
 						},
 					};
 
-					let texture = create_texture_from_image(&image, &desc.device, &desc.queue, &Atom::from(desc.url.as_str()), recv).await;
+					let texture = create_texture_from_image(&image, desc, recv).await;
 					Ok(texture)
 				}
 			}
@@ -110,9 +159,7 @@ impl<'a, G: Garbageer<Self>> AsyncLoader<'a, Self, ImageTexture2DDesc<'a>, G> fo
 
 pub async fn create_texture_from_image<G: Garbageer<ImageTexture>>(
 	image: &DynamicImage, 
-	device: &RenderDevice, 
-	queue: &RenderQueue,
-	key: &Atom,
+	desc: ImageTexture2DDesc,
 	recv: Receiver<ImageTexture, G>
 ) -> Handle<ImageTexture> {
 	let buffer_temp;
@@ -120,10 +167,14 @@ pub async fn create_texture_from_image<G: Garbageer<ImageTexture>>(
 	let (width, height, buffer, ty, pre_pixel_size, is_opacity) = match image {
 		DynamicImage::ImageLuma8(image) => (image.width(), image.height(), image.as_raw(), wgpu::TextureFormat::R8Unorm, 1, true),
 		DynamicImage::ImageRgb8(r) => {
+			let format = if desc.url.as_srgb() { wgpu::TextureFormat::Rgba8UnormSrgb } else { wgpu::TextureFormat::Rgba8Unorm };
 			buffer_temp =  image.to_rgba8();
-			(r.width(), r.height(), buffer_temp.as_raw(), wgpu::TextureFormat::Rgba8Unorm, 4, true)
+			(r.width(), r.height(), buffer_temp.as_raw(), format, 4, false)
 		},
-		DynamicImage::ImageRgba8(image) => (image.width(), image.height(), image.as_raw(), wgpu::TextureFormat::Rgba8Unorm, 4, false),
+		DynamicImage::ImageRgba8(image) => {
+			let format = if desc.url.as_srgb() { wgpu::TextureFormat::Rgba8UnormSrgb } else { wgpu::TextureFormat::Rgba8Unorm };
+			(image.width(), image.height(), image.as_raw(), format, 4, true)
+		},
 		// DynamicImage::ImageBgr8(r) => {
 		// 	buffer_temp1 =  image.to_bgra8();
 		// 	(r.width(), r.height(), buffer_temp1.as_raw(), wgpu::TextureFormat::Bgra8Unorm, 4, true)
@@ -145,8 +196,8 @@ pub async fn create_texture_from_image<G: Garbageer<ImageTexture>>(
 		depth_or_array_layers: 1,
 	};
 
-	let texture = (**device).create_texture(&wgpu::TextureDescriptor {
-		label: Some(key.as_str()),
+	let texture = (**desc.device).create_texture(&wgpu::TextureDescriptor {
+		label: Some(desc.url.as_str()),
 		size: texture_extent,
 		mip_level_count: 1,
 		sample_count: 1,
@@ -156,7 +207,7 @@ pub async fn create_texture_from_image<G: Garbageer<ImageTexture>>(
 		view_formats: &[],
 	});
 
-	queue.write_texture(
+	desc.queue.write_texture(
 		texture.as_image_copy(),
 		buffer,
 		wgpu::ImageDataLayout {
@@ -167,5 +218,5 @@ pub async fn create_texture_from_image<G: Garbageer<ImageTexture>>(
 		texture_extent,
 	);
 
-	recv.receive(KeyImageTexture::from(key.as_str()), Ok(ImageTexture::new(width, height, (width * height * pre_pixel_size) as usize, texture, ty, wgpu::TextureViewDimension::D2, is_opacity))).await.unwrap()
+	recv.receive(desc.url, Ok(ImageTexture::new(width, height, (width * height * pre_pixel_size) as usize, texture, ty, wgpu::TextureViewDimension::D2, is_opacity))).await.unwrap()
 }

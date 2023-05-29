@@ -227,7 +227,7 @@ pub async fn  setup_render_context(
 }
 
 pub(crate) fn main() {
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("warn")).init();
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
     
 
     let event_loop = winit::event_loop::EventLoop::new();
@@ -258,7 +258,7 @@ pub(crate) fn main() {
 
     MULTI_MEDIA_RUNTIME
     .spawn(MULTI_MEDIA_RUNTIME.alloc(), async move {
-        let key = KeyImageTexture::from("E:/Rust/PI/pi_3d/assets/images/eff_ui_ll_085.png");
+        let key = KeyImageTexture::File(String::from("E:/Rust/PI/pi_3d/assets/images/eff_ui_ll_085.png"), true);
         let (device, queue, adapter_info) = setup_render_context(
             options,
             window
@@ -267,9 +267,9 @@ pub(crate) fn main() {
         let mgr = AssetMgr::<ImageTexture>::new(GarbageEmpty(), false, 1024, 1000);
 
         let desc = ImageTexture2DDesc {
-            url: &key,
-            device: &device,
-            queue: &queue,
+            url: key.clone(),
+            device: device.clone(),
+            queue: queue.clone(),
         };
 
         let result = AssetMgr::load(&mgr, &key);
