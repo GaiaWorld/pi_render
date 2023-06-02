@@ -51,12 +51,13 @@ pub struct TextureRes {
 	pub height: u32,
 	pub texture_view: TextureView,
 	pub is_opacity: bool,
+	pub format: wgpu::TextureFormat,
 	size: usize,
 }
 
 impl TextureRes {
-	pub fn new(width: u32, height: u32, size: usize, texture_view: TextureView, is_opacity: bool) -> Self {
-		Self { width, height, size, texture_view, is_opacity }
+	pub fn new(width: u32, height: u32, size: usize, texture_view: TextureView, is_opacity: bool, format: wgpu::TextureFormat) -> Self {
+		Self { width, height, size, texture_view, is_opacity, format }
 	}
 }
 
@@ -126,7 +127,7 @@ pub async fn create_texture_from_image<G: Garbageer<TextureRes>>(
 ) -> Handle<TextureRes> {
 	let buffer_temp;
 	// let buffer_temp1;
-	let (width, height, buffer, ty, pre_pixel_size, is_opacity) = match image {
+	let (width, height, buffer, format, pre_pixel_size, is_opacity) = match image {
 		DynamicImage::ImageLuma8(image) => (image.width(), image.height(), image.as_raw(), wgpu::TextureFormat::R8Unorm, 1, true),
 		DynamicImage::ImageRgb8(r) => {
 			buffer_temp =  image.to_rgba8();
@@ -161,7 +162,7 @@ pub async fn create_texture_from_image<G: Garbageer<TextureRes>>(
 		mip_level_count: 1,
 		sample_count: 1,
 		dimension: wgpu::TextureDimension::D2,
-		format: ty,
+		format,
 		usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
 		view_formats: &[],
 	});
@@ -178,5 +179,5 @@ pub async fn create_texture_from_image<G: Garbageer<TextureRes>>(
 		texture_extent,
 	);
 
-	recv.receive(key.get_hash() as u64, Ok(TextureRes::new(width, height, byte_size, texture_view, is_opacity))).await.unwrap()
+	recv.receive(key.get_hash() as u64, Ok(TextureRes::new(width, height, byte_size, texture_view, is_opacity, format))).await.unwrap()
 }

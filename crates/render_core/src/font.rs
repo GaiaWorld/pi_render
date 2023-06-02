@@ -47,7 +47,7 @@ impl FontSheet {
 		let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 		// let key = calc_hash(&"text texture view");
 		let key = Atom::from("_$text").get_hash() as u64;
-		let texture_view = if let Ok(r) = texture_asset_mgr.insert(key, TextureRes::new(1024, 1024, 1024 * 1024 * 4, texture_view, false)) {
+		let texture_view = if let Ok(r) = texture_asset_mgr.insert(key, TextureRes::new(1024, 1024, 1024 * 1024 * 4, texture_view, false, wgpu::TextureFormat::Rgba8Unorm)) {
 			r
 		} else {
 			panic!("insert asset fail");
