@@ -136,7 +136,7 @@ impl VertexBufferLayouts {
 pub enum EVertexBufferRange {
     /// * (BufferRange, 使用大小)
     Updatable(RWBufferRange, u32, wgpu::BufferUsages),
-    NotUpdatable(NotUpdatableBufferRange),
+    NotUpdatable(Arc<NotUpdatableBufferRange>),
 }
 impl EVertexBufferRange {
     pub fn buffer(&self) -> &Buffer {
@@ -348,7 +348,7 @@ impl VertexBufferAllocator {
         // log::info!("size: {}, level: {}, old_count: {}, new: {}", size, level, old_count, new_count);
 
         if let Some(range) = self.unupdatables.get_mut(level).unwrap().allocate(&self.asset_mgr_2, device, queue, data) {
-            Some(EVertexBufferRange::NotUpdatable(range))
+            Some(EVertexBufferRange::NotUpdatable(Arc::new(range)))
         } else {
             None
         }
@@ -385,7 +385,7 @@ impl VertexBufferAllocator {
         // log::info!("size: {}, level: {}, old_count: {}, new: {}", size, level, old_count, new_count);
 
         if let Some(range) = self.unupdatables_for_index.get_mut(level).unwrap().allocate(&self.asset_mgr_2, device, queue, data) {
-            Some(EVertexBufferRange::NotUpdatable(range))
+            Some(EVertexBufferRange::NotUpdatable(Arc::new(range)))
         } else {
             None
         }
