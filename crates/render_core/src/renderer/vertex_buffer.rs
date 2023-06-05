@@ -534,7 +534,6 @@ impl NotUpdatableBuffer {
     }
 }
 
-#[derive(Clone)]
 pub struct NotUpdatableBufferRange {
     used_size: u32,
     id_buffer: IDNotUpdatableBuffer,
