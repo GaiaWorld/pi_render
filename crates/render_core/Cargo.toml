@@ -33,7 +33,7 @@ pi_slotmap = "0.1"
 
 graphviz-rust = "0.6"
 
-normpath = "1.0"
+normpath = "1.1"
 tracing = { version = "0.1", default-features = false, features = ["std"] }
 
 bitvec = { version = "1.0", features = ["serde"] }
