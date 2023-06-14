@@ -160,17 +160,17 @@ impl TShaderSetBlock for BindGroupModel {
         result
     }
 
-    fn vs_running_code(&self) -> String {
-        let mut result = String::from("");
+    // fn vs_running_code(&self) -> String {
+    //     let mut result = String::from("");
 
-        if let Some(skin) = &self.key.skin {
-            result += skin.vs_running_code(self.bind_group.set).as_str();
-        }
+    //     if let Some(skin) = &self.key.skin {
+    //         result += skin.vs_running_code(self.bind_group.set).as_str();
+    //     }
 
-        result
-    }
+    //     result
+    // }
 
-    fn fs_running_code(&self) -> String {
-        String::from("")
-    }
+    // fn fs_running_code(&self) -> String {
+    //     String::from("")
+    // }
 }

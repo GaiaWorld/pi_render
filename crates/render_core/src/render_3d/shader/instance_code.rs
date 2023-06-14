@@ -3,9 +3,10 @@
 pub struct EInstanceCode(pub u32);
 impl EInstanceCode {
     pub const NONE: u32 = 0;
-    pub const BASE: u32 = 1;
-    pub const COLOR: u32 = 2;
-    pub const TILL_OFF_1: u32 = 4;
+    pub const BASE: u32         = 0b0000_0000_0000_0000_0000_0000_0000_0001;
+    pub const COLOR: u32        = 0b0000_0000_0000_0000_0000_0000_0000_0010;
+    pub const TILL_OFF_1: u32   = 0b0000_0000_0000_0000_0000_0000_0000_0100;
+    pub const VELOCITY: u32     = 0b0000_0000_0000_0000_0000_0000_0000_1000;
     pub fn vs_running_code(&self) -> String {
         let mut result = String::from("");
 
@@ -21,12 +22,16 @@ impl EInstanceCode {
         if (self.0 & Self::TILL_OFF_1) == Self::TILL_OFF_1 {
             result += Self::uv().as_str();
         }
+        if (self.0 & Self::VELOCITY) == Self::VELOCITY {
+            result += Self::velocity().as_str();
+        }
 
         result
     }
     fn none() -> String {
         String::from("
     mat4 PI_ObjectToWorld = U_PI_ObjectToWorld;
+    vec4 PI_ObjectVelocity = U_PI_ObjectVelocity;
         ")
     }
     fn base() -> String {
@@ -42,6 +47,11 @@ impl EInstanceCode {
     fn uv() -> String {
         String::from("
     A_UV = A_UV * A_INS_TillOff1.xy + A_INS_TillOff1.zw;
+        ")
+    }
+    fn velocity() -> String {
+        String::from("
+    PI_ObjectVelocity = A_INS_Velocity;
         ")
     }
 }

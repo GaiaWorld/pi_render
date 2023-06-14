@@ -2,6 +2,7 @@
 pub struct ShaderVarUniform;
 impl ShaderVarUniform {
     pub const VIEW_MATRIX               : &'static str = "PI_MATRIX_V"          ;
+    pub const VIEW_ROTATION_MATRIX_INV  : &'static str = "PI_MATRIX_V_R_INV"    ;
     pub const PROJECT_MATRIX            : &'static str = "PI_MATRIX_P"          ;
     pub const VIEW_PROJECT_MATRIX       : &'static str = "PI_MATRIX_VP"         ;
     pub const CAMERA_POSITION           : &'static str = "PI_CAMERA_POSITION"   ;
@@ -19,11 +20,16 @@ impl ShaderVarUniform {
     pub const _WORLD_MATRIX             : &'static str = "U_PI_ObjectToWorld"   ;
     pub const WORLD_MATRIX_INV          : &'static str = "PI_WorldToObject"     ;
     pub const _WORLD_MATRIX_INV         : &'static str = "U_PI_WorldToObject"   ;
+    pub const VELOCITY                  : &'static str = "PI_ObjectVelocity"    ;
+    pub const _VELOCITY                  : &'static str = "U_PI_ObjectVelocity" ;
     
     pub const BONE_MATRICES             : &'static str = "boneMatrices"         ;
     pub const BONE_TEX_SIZE             : &'static str = "bondTexSize"          ;
     pub const BONE_TEX                  : &'static str = "_boneTex"             ;
     pub const BONE_TEX_SAMPLER          : &'static str = "sampler_boneTex"      ;
+
+    pub const RENDER_ALIGNMENT          : &'static str = "RENDER_ALIGNMENT"     ;
+    pub const RENDER_PIVOT              : &'static str = "RENDER_PIVOT"         ;
 }
 
 pub struct ShaderVarVertices;
@@ -70,6 +76,15 @@ impl ShaderVarVertices {
     pub const MATRICES_WEIGHTS3         : &'static str = "A_JOINT_WEG3"        ;
     pub const MATRICES_INDICES_EXTRA3   : &'static str = "A_JOINT_INC_EX3"     ;
     pub const MATRICES_WEIGHTS_EXTRA3   : &'static str = "A_JOINT_WEG_EX3"     ;
+
+    pub const INS_VELOCITY              : &'static str = "A_INS_Velocity"      ;
+    pub const PARTICLE_AGE_LIFE         : &'static str = "PARTICLE_AGE_LIFE"    ;
+    pub const PARTICLE_POSITION         : &'static str = "PARTICLE_POSITION"    ;
+    pub const PARTICLE_SCALING          : &'static str = "PARTICLE_SCALING"     ;
+    pub const PARTICLE_ROTATION         : &'static str = "PARTICLE_ROTATION"    ;
+    pub const PARTICLE_DIRECTION        : &'static str = "PARTICLE_DIRECTION"   ;
+    pub const PARTICLE_COLOR            : &'static str = "PARTICLE_COLOR"       ;
+    pub const PARTICLE_TILLOFF          : &'static str = "PARTICLE_TILLOFF"     ;
 }
 
 pub struct ShaderDefaultTexture;

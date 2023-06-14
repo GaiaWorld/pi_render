@@ -20,8 +20,9 @@ impl ShaderBindModelAboutMatrix {
 
     pub const OFFSET_WORLD_MATRIX:          wgpu::DynamicOffset = 0;
     pub const OFFSET_WORLD_MATRIX_INV:      wgpu::DynamicOffset = 16 * 4;
+    pub const OFFSET_VELOCITY:              wgpu::DynamicOffset = 16 * 4 + 16 * 4;
 
-    pub const TOTAL_SIZE:                   wgpu::DynamicOffset = 16 * 4 + 16 * 4;
+    pub const TOTAL_SIZE:                   wgpu::DynamicOffset = 16 * 4 + 16 * 4 + 4;
 
     pub fn new(
         allocator: &mut BindBufferAllocator,
@@ -52,6 +53,7 @@ impl ShaderBindModelAboutMatrix {
         result += " Model {\r\n";
         result += ShaderSetBind::code_uniform("mat4", ShaderVarUniform::_WORLD_MATRIX).as_str();
         result += ShaderSetBind::code_uniform("mat4", ShaderVarUniform::_WORLD_MATRIX_INV).as_str();
+        result += ShaderSetBind::code_uniform("vec4", ShaderVarUniform::_VELOCITY).as_str();
         result += "};\r\n";
         result
     }
@@ -82,6 +84,7 @@ impl TShaderBindCode for BindUseModelMatrix {
         result += " Model {\r\n";
         result += ShaderSetBind::code_uniform("mat4", ShaderVarUniform::_WORLD_MATRIX).as_str();
         result += ShaderSetBind::code_uniform("mat4", ShaderVarUniform::_WORLD_MATRIX_INV).as_str();
+        result += ShaderSetBind::code_uniform("vec4", ShaderVarUniform::_VELOCITY).as_str();
         result += "};\r\n";
         result
     }

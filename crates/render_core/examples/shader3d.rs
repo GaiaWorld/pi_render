@@ -14,7 +14,7 @@ use render_core::{
         buildin_data::{DefaultTexture, EDefaultTexture},
         bind_group::{BindGroupLayout, BindGroupUsage, BindGroup, BindsRecorder},
         attributes::{ShaderAttribute, EVertexDataKind, KeyShaderFromAttributes},
-        shader_stage::EShaderStage
+        shader_stage::EShaderStage, shader::TShaderSetBlock
     },
     render_3d::{
         shader::*,
@@ -299,7 +299,7 @@ pub(crate) fn main() {
         base_array_layer: 0,
         array_layer_count: None,
     });
-    asset_tex.insert(Atom::from(DefaultTexture::WHITE_2D).get_hash() as u64, TextureRes::new(1, 1, 4, texture, true));
+    asset_tex.insert(Atom::from(DefaultTexture::WHITE_2D).get_hash() as u64, TextureRes::new(1, 1, 4, texture, true, wgpu::TextureFormat::Rgba8Unorm));
 
     let textures = vec![
         UniformTexture2DDesc::new(
@@ -465,16 +465,39 @@ gl_FragColor = vec4(baseColor.rgb, alpha);
         ShaderAttribute { kind: EVertexDataKind::Position, location: 0 },
         ShaderAttribute { kind: EVertexDataKind::Normal, location: 1 },
     ];
-    let shader = shader_meta.build::<BindGroupScene, BindGroupModel, BindGroupTextureSamplers>(
+    // let shader = shader_meta.build::<BindGroupScene, BindGroupModel, BindGroupTextureSamplers>(
+    //     &device,
+    //     &key_meta,
+    //     &KeyShaderFromAttributes(meshdes),
+    //     &EInstanceCode(EInstanceCode::NONE),
+    //     &ESkinCode::None,
+    //     &bindgroup_scene,
+    //     &bindgroup_model,
+    //     None,
+    //     None,
+    // );
+    let mut vs_defines = vec![];
+    vs_defines.push(bindgroup_scene.vs_define_code());
+    vs_defines.push(bindgroup_model.vs_define_code());
+    let mut fs_defines = vec![];
+    fs_defines.push(bindgroup_scene.fs_define_code());
+    fs_defines.push(bindgroup_model.fs_define_code());
+
+    let shader = shader_meta.build_2(
         &device,
         &key_meta,
         &KeyShaderFromAttributes(meshdes),
         &EInstanceCode(EInstanceCode::NONE),
-        &bindgroup_scene,
-        &bindgroup_model,
-        None,
-        None,
+        &ERenderAlignment::Facing,
+        &ESkinCode::None,
+        &vs_defines,
+        &vec![],
+        &vec![],
+        &fs_defines,
+        &vec![],
+        &vec![],
     );
+
 
     println!("Shader End.")
 }

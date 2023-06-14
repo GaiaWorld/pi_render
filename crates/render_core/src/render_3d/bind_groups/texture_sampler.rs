@@ -238,11 +238,11 @@ impl TShaderSetBlock for BindGroupTextureSamplers {
         result
     }
 
-    fn vs_running_code(&self) -> String {
-        String::from("")
-    }
+    // fn vs_running_code(&self) -> String {
+    //     String::from("")
+    // }
 
-    fn fs_running_code(&self) -> String {
-        String::from("")
-    }
+    // fn fs_running_code(&self) -> String {
+    //     String::from("")
+    // }
 }

@@ -27,8 +27,10 @@ impl ShaderBindSceneAboutBase {
     pub const SIZE_CAMERA_POSITION:         wgpu::DynamicOffset = 4 * 4;
     pub const OFFSET_CAMERA_DIRECTION:      wgpu::DynamicOffset = Self::OFFSET_CAMERA_POSITION + Self::SIZE_CAMERA_POSITION;
     pub const SIZE_CAMERA_DIRECTION:        wgpu::DynamicOffset = 4 * 4;
+    pub const OFFSET_CAMERA_ROTATION:       wgpu::DynamicOffset = Self::OFFSET_CAMERA_DIRECTION + Self::SIZE_CAMERA_DIRECTION;
+    pub const SIZE_CAMERA_ROTATION:         wgpu::DynamicOffset = 16 * 4;
     
-    pub const TOTAL_SIZE:                   wgpu::DynamicOffset = Self::OFFSET_CAMERA_DIRECTION + Self::SIZE_CAMERA_DIRECTION;
+    pub const TOTAL_SIZE:                   wgpu::DynamicOffset = Self::OFFSET_CAMERA_ROTATION + Self::SIZE_CAMERA_ROTATION;
     pub fn new(
         allocator: &mut BindBufferAllocator,
     ) -> Option<Self> {
@@ -57,6 +59,7 @@ impl ShaderBindSceneAboutBase {
         result += ShaderSetBind::code_uniform("mat4", ShaderVarUniform::VIEW_PROJECT_MATRIX).as_str();
         result += ShaderSetBind::code_uniform("vec4", ShaderVarUniform::CAMERA_POSITION).as_str();
         result += ShaderSetBind::code_uniform("vec4", ShaderVarUniform::CAMERA_DIRECTION).as_str();
+        result += ShaderSetBind::code_uniform("mat4", ShaderVarUniform::VIEW_ROTATION_MATRIX_INV).as_str();
         result += "};\r\n";
         result
     }

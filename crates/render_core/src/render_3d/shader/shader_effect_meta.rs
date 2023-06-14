@@ -9,7 +9,7 @@ use crate::{
         shader::{TShaderSetBlock, KeyShaderMeta},
         buildin_data::EDefaultTexture,
         shader_stage::EShaderStage,
-        attributes::KeyShaderFromAttributes
+        attributes::{KeyShaderFromAttributes, EVertexDataKind}, buildin_var::{ShaderVarUniform, ShaderVarVertices}
     },
     rhi::device::RenderDevice
 };
@@ -20,7 +20,7 @@ use super::{
     shader_defines::ShaderDefinesSet,
     uniform_value::{MaterialValueBindDesc, UniformPropertyMat4, UniformPropertyMat2, UniformPropertyVec4, UniformPropertyVec2, UniformPropertyFloat, UniformPropertyInt, UniformPropertyUint}, 
     uniform_texture::{UniformTexture2DDesc, EffectUniformTexture2DDescs},
-    instance_code::EInstanceCode, shader::{Shader3D, TShaderBlockCode}
+    instance_code::EInstanceCode, shader::{Shader3D, TShaderBlockCode}, CodeSnippet, ESkinCode, ERenderAlignment
 };
 
 /// 材质代码
@@ -185,10 +185,189 @@ impl ShaderEffectMeta {
         + self.uniforms.int_list.len()
         + self.uniforms.uint_list.len()
     }
+    pub fn vs_blocks_2(
+        &self,
+        name: &str,
+        vertex_layouts: &KeyShaderFromAttributes,
+        instance: &EInstanceCode,
+        render_alignment: &ERenderAlignment,
+        skin: &ESkinCode,
+        defined_snippets: &[String],
+        running_before_effect_snippets: &[String],
+        running_after_effect_snippets: &[String],
+    ) -> String {
+        // Start
+        let mut code = String::from("#version 450\r\n");
+
+        // DEFINES
+        // TODO
+
+        // Shader Name
+        code += "#define SHADER_NAME vertex:"; code += name; code += "\r\n";
+
+        code += "
+const float PI      = 3.1415926535898;
+const float HALF_PI = 1.5707963267949;
+const float HALF_MIN = 5.96046448e-08;
+";
+
+        // attribute
+        code += &vertex_layouts.vs_define_code();
+
+        // 功能块的定义代码 - 功能块的 Uniform 、常量 、 方法
+        defined_snippets.iter().for_each(|val| {
+            code += val;
+        });
+
+        // Shader 自带定义块代码 - 常量 、 方法, 不包含 Uniform 定义
+        code += self.vs.define.as_str();
+
+        // Shader 定义 Varying 代码
+        code += &VaryingCode::vs_code(&self.varyings);
+        
+        // ERenderAlignment
+        code += &render_alignment.define_code();
+
+        // Running Start
+        code += "void main() {\r\n";
+
+        // 预制内容
+        code += EVertexDataKind::Color4.kind();     code += " "; code += ShaderVarVertices::COLOR4 ;    code += " = vec4(1., 1., 1., 1.);\r\n";
+        code += EVertexDataKind::Normal.kind();     code += " "; code += ShaderVarVertices::NORMAL ;    code += " = vec3(0., 1., 0.);\r\n";
+        
+        // attribute
+        code += &vertex_layouts.vs_running_code();
+        
+        // 实例化 运行代码
+        code += &instance.vs_running_code();
+
+        // ERenderAlignment
+        code += &render_alignment.running_code();
+
+        // 粒子系统 运行代码
+        // code += &skin.running_code();
+
+        // 蒙皮 运行代码
+        code += &skin.running_code();
+
+        // 功能块的 运行代码
+        running_before_effect_snippets.iter().for_each(|val| {
+            code += val;
+        });
+
+        // Shader 的运行代码
+        code += self.vs.running.as_str();
+        
+        // 功能块的 运行代码
+        running_after_effect_snippets.iter().for_each(|val| {
+            code += val;
+        });
+        
+        code += "}\r\n";
+
+        return code;
+    }
+    pub fn fs_blocks_2(
+        &self,
+        name: &str,
+        defined_snippets: &[String],
+        running_before_effect_snippets: &[String],
+        running_after_effect_snippets: &[String],
+    ) -> String {
+        // Start
+        let mut code = String::from("#version 450\r\n");
+
+        // DEFINES
+        // TODO
+
+        // Shader Name
+        code += "#define SHADER_NAME fragment:"; code += name; code += "\r\n";
+
+        // 功能块的定义代码 - 功能块的 Uniform 、常量 、 方法
+        defined_snippets.iter().for_each(|val| {
+            code += val;
+        });
+
+        // Shader 自带定义块代码 - 常量 、 方法, 不包含 Uniform 定义
+        code += self.fs.define.as_str();
+
+        // Shader 定义 Varying 代码
+        code += &VaryingCode::fs_code(&self.varyings);
+
+        // Running Start
+        code += "void main() {\r\n";
+
+        // 功能块的 运行代码
+        running_before_effect_snippets.iter().for_each(|val| {
+            code += val;
+        });
+
+        // Shader 的运行代码
+        code += self.fs.running.as_str();
+        
+        // 功能块的 运行代码
+        running_after_effect_snippets.iter().for_each(|val| {
+            code += val;
+        });
+        
+        code += "}\r\n";
+
+        return code;
+    }
+    pub fn build_2(
+        &self,
+        device: &RenderDevice,
+        key_meta: &KeyShaderMeta,
+        vertex_layouts: &KeyShaderFromAttributes,
+        instance: &EInstanceCode,
+        render_alignment: &ERenderAlignment,
+        skin: &ESkinCode,
+        vs_defined_snippets: &[String],
+        vs_running_before_effect_snippets: &[String],
+        vs_running_after_effect_snippets: &[String],
+        fs_defined_snippets: &[String],
+        fs_running_before_effect_snippets: &[String],
+        fs_running_after_effect_snippets: &[String],
+    ) -> Shader3D {
+        let vs = self.vs_blocks_2(key_meta.as_str(), vertex_layouts, instance, render_alignment, skin, vs_defined_snippets, vs_running_before_effect_snippets, vs_running_after_effect_snippets);
+        let fs = self.fs_blocks_2(key_meta.as_str(), fs_defined_snippets, fs_running_before_effect_snippets, fs_running_after_effect_snippets);
+
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let root_dir = std::env::current_dir().unwrap();
+            let file_name = "temp.vert";
+            std::fs::write(root_dir.join(file_name), vs.as_str());
+            
+            let file_name = "temp.frag";
+            std::fs::write(root_dir.join(file_name), fs.as_str());
+        }
+
+        let vs = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some((key_meta.to_string() + "-VS").as_str()),
+            source: ShaderSource::Glsl {
+                shader: std::borrow::Cow::Borrowed(vs.as_str()),
+                stage: naga::ShaderStage::Vertex,
+                defines: naga::FastHashMap::default(),
+            },
+        });
+
+        let fs = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some((key_meta.to_string() + "-FS").as_str()),
+            source: ShaderSource::Glsl {
+                shader: std::borrow::Cow::Borrowed(fs.as_str()),
+                stage: naga::ShaderStage::Fragment,
+                defines: naga::FastHashMap::default(),
+            },
+        });
+
+        Shader3D { vs, vs_point: "main", fs, fs_point: "main", p: std::marker::PhantomData  }
+    }
+
     pub fn vs_blocks<T0: TShaderSetBlock, T1: TShaderSetBlock, T2: TShaderSetBlock, T3: TShaderSetBlock>(
         &self,
         vertex_layouts: &KeyShaderFromAttributes,
         instance: &EInstanceCode,
+        skin: &ESkinCode,
         scene_about: &T0,
         model_about: &T1,
         // effect_value_about: &ShaderSetEffectValueAbout,
@@ -220,11 +399,17 @@ impl ShaderEffectMeta {
             define: scene_about.vs_define_code(),
             running: String::from(""),
         });
+        
+        // Model
+        result.push(BlockCode {
+            define: String::from(""),
+            running: skin.running_code(), // model_about.vs_running_code(),
+        });
 
         // Model
         result.push(BlockCode {
             define: model_about.vs_define_code(),
-            running: model_about.vs_running_code(),
+            running: String::from(""), // model_about.vs_running_code(),
         });
         
         // // uniform value
@@ -239,14 +424,14 @@ impl ShaderEffectMeta {
         if let Some(set_2) = set_2 {
             result.push(BlockCode {
                 define: set_2.vs_define_code(),
-                running: set_2.vs_running_code(),
+                running: String::from(""), // set_2.vs_running_code(),
             });
         }
         
         if let Some(set_3) = set_3 {
             result.push(BlockCode {
                 define: set_3.vs_define_code(),
-                running: set_3.vs_running_code(),
+                running: String::from(""), // set_3.vs_running_code(),
             });
         }
 
@@ -291,7 +476,7 @@ impl ShaderEffectMeta {
         // Model
         result.push(BlockCode {
             define: model_about.fs_define_code(),
-            running: model_about.fs_running_code(),
+            running: String::from(""), // model_about.fs_running_code(),
         });
         
         // // uniform value
@@ -306,14 +491,14 @@ impl ShaderEffectMeta {
         if let Some(set_2) = set_2 {
             result.push(BlockCode {
                 define: set_2.fs_define_code(),
-                running: set_2.fs_running_code(),
+                running: String::from(""), // set_2.fs_running_code(),
             });
         }
         
         if let Some(set_3) = set_3 {
             result.push(BlockCode {
                 define: set_3.fs_define_code(),
-                running: set_3.fs_running_code(),
+                running: String::from(""), // set_3.fs_running_code(),
             });
         }
 
@@ -329,7 +514,7 @@ impl ShaderEffectMeta {
         // SceneAbout
         result.push(BlockCode {
             define: String::from(""),
-            running: scene_about.fs_running_code(),
+            running: String::from(""), // scene_about.fs_running_code(),
         });
 
         // EntryPoint
@@ -347,6 +532,7 @@ impl ShaderEffectMeta {
         key_meta: &KeyShaderMeta,
         key_attributes: &KeyShaderFromAttributes,
         instance: &EInstanceCode,
+        skin: &ESkinCode,
         set_0: &T0,
         set_1: &T1,
         // effect_value: &ShaderSetEffectValueAbout,
@@ -357,6 +543,7 @@ impl ShaderEffectMeta {
         let vs = self.vs_blocks(
             key_attributes,
             instance,
+            skin,
             set_0,
             set_1,
             // effect_value,

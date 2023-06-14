@@ -6,6 +6,7 @@ use crate::rhi::shader::BindingExpandDesc;
 mod block_code;
 mod instance_code;
 mod skin_code;
+mod render_alignment_code;
 mod varying_code;
 mod vs_begin_code;
 mod shader_defines;
@@ -26,6 +27,8 @@ pub use uniform_texture::*;
 pub use uniform_value::*;
 pub use shader::*;
 pub use shader_effect_meta::*;
+pub use render_alignment_code::*;
+
 
 pub type UniformPropertyName = Atom;
 

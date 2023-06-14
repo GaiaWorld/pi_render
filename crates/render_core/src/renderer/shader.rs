@@ -22,8 +22,8 @@ pub trait TShaderBindCode {
 pub trait TShaderSetBlock {
     fn fs_define_code(&self) -> String;
     fn vs_define_code(&self) -> String;
-    fn fs_running_code(&self) -> String;
-    fn vs_running_code(&self) -> String;
+    // fn fs_running_code(&self) -> String;
+    // fn vs_running_code(&self) -> String;
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
