@@ -70,7 +70,7 @@ bytemuck = { version = "1.4", features = ["derive"] }
 
 pi_hal = { git = "https://github.com/GaiaWorld/pi_hal.git" }
 
-wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
+# wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
 
 parking_lot = "0.12"
 crossbeam="0.8"
