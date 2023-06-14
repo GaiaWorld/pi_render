@@ -159,24 +159,34 @@ mat4 rotMatrixFromForward(mat4 m, mat4 vr, vec3 position, vec3 viewpos) {
     fn stretched_running_code() -> String {
         String::from(
 "
-PI_ObjectToWorld = rotMatrixStretched(PI_ObjectToWorld, PI_ObjectVelocity, (PI_ObjectToWorld * vec4(0., 0., 0., 1.)).xyz, PI_CAMERA_POSITION.xyz);
+PI_ObjectToWorld = rotMatrixStretched(PI_ObjectToWorld, (PI_ObjectToWorld * vec4(0., 0., 0., 1.)).xyz, PI_CAMERA_POSITION.xyz);
 "            
         )
     }
     fn stretched_define_code() -> String {
         String::from(
 "
-mat4 rotMatrixStretched(mat4 m, vec4 velocity, vec3 position, vec3 viewpos) {
-    vec3 zAxis = normalize(position - viewpos);
-    vec3 xAxis = normalize(velocity.xyz) * -1;
-    vec3 yAxis = cross(zAxis, xAxis);
-    zAxis = cross(xAxis, yAxis);
+mat4 rotMatrixStretched(mat4 m, vec3 position, vec3 viewpos) {
+    vec3 oldz = normalize((m * vec4(0., 0., 1., 1.)).xyz);
+    vec3 oldx = normalize((m * vec4(1., 0., 0., 1.)).xyz);
+    vec3 newz = normalize(position - viewpos);
+    float d = dot(oldz, newz);
+    vec3 n = cross(oldz, newz);
+    float dd = dot(n, oldx);
+    float angle = acos(dd);
+    vec3 yAxis = vec3(0., d, sin(angle));
+    if (dd < 0.) {
+        yAxis.z = -1. * yAxis.z;
+    }
 
-    float len = velocity.w;
-    mat4 rot = mat4(vec4(xAxis, 0.), vec4(yAxis, 0.), vec4(zAxis, 0.), vec4(0., 0.,0., 1.));
-    mat4 scl = mat4(vec4(len, 0., 0., 0.), vec4(0., 1., 0., 0.), vec4(0., 0., 1., 0.), vec4(0.5 * len, 0., 0., 1.));
+    vec3 xAxis = vec3(1., 0., 0.);
+    vec3 zAxis = cross(xAxis, yAxis);
+    zAxis = normalize(zAxis);
 
-    return m * rot * scl; 
+    mat4 rot = mat4(vec4(xAxis, 0.), vec4(yAxis, 0.), vec4(zAxis, 0.), vec4(0., 0., 0., 1.));
+
+    return m * rot;
+    // return m; 
 }
 "            
         )

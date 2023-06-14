@@ -36,7 +36,7 @@ impl EInstanceCode {
     }
     fn base() -> String {
         String::from("
-    mat4 PI_ObjectToWorld = U_PI_ObjectToWorld * mat4(A_INS_World1, A_INS_World2, A_INS_World3, A_INS_World4); 
+    mat4 PI_ObjectToWorld = mat4(A_INS_World1, A_INS_World2, A_INS_World3, A_INS_World4); 
         ")
     }
     fn color() -> String {
