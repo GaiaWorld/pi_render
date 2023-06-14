@@ -137,11 +137,11 @@ impl TShaderSetBlock for BindGroupScene {
         self.vs_define_code()
     }
 
-    fn vs_running_code(&self) -> String {
-        String::from("")
-    }
+    // fn vs_running_code(&self) -> String {
+    //     String::from("")
+    // }
 
-    fn fs_running_code(&self) -> String {
-        String::from("")
-    }
+    // fn fs_running_code(&self) -> String {
+    //     String::from("")
+    // }
 }

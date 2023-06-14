@@ -3,7 +3,7 @@ use std::{marker::PhantomData, hash::Hash, fmt::Debug};
 use pi_assets::asset::Asset;
 use pi_atom::Atom;
 
-use crate::asset::ASSET_SIZE_FOR_UNKOWN;
+use crate::{asset::ASSET_SIZE_FOR_UNKOWN, render_3d::shader::ERenderAlignment};
 
 use super::{attributes::KeyShaderFromAttributes};
 
@@ -22,8 +22,8 @@ pub trait TShaderBindCode {
 pub trait TShaderSetBlock {
     fn fs_define_code(&self) -> String;
     fn vs_define_code(&self) -> String;
-    fn fs_running_code(&self) -> String;
-    fn vs_running_code(&self) -> String;
+    // fn fs_running_code(&self) -> String;
+    // fn vs_running_code(&self) -> String;
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -35,6 +35,7 @@ pub struct KeyShader<const MAX_SET_COUNT: usize, K: TKeyShaderSetBlock> {
     pub key_attributes: KeyShaderFromAttributes,
     pub key_set_blocks: KeyShaderSetBlocks<MAX_SET_COUNT, K>,
     pub defines: u128,
+    pub renderalignment: ERenderAlignment,
 }
 
 #[derive(Debug)]

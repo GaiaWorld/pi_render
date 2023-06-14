@@ -56,3 +56,12 @@ impl BlockCode {
         self.define.as_bytes().len() + self.running.as_bytes().len()
     }
 }
+
+/// 代码片段
+#[derive(Debug, Clone)]
+pub struct CodeSnippet(pub String);
+impl CodeSnippet {
+    pub fn size(&self) -> usize {
+        self.0.as_bytes().len()
+    }
+}
