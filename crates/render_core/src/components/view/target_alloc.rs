@@ -229,7 +229,7 @@ struct AtlasAllocator {
 	// unuse_textures: Vec<UnuseTexture>,
 	
 	unuse_textures: Share<HomogeneousMgr<RenderRes<UnuseTexture>>>,
-	// 纹理资源管理器，将纹理资源放入资源管理器，未只用的纹理不立即销毁
+	// 纹理资源管理器，将纹理资源放入资源管理器，未使用的纹理不立即销毁
 	texture_assets_mgr: Share<AssetMgr<RenderRes<wgpu::TextureView>>>,
 	// 递增的数字，用于缓存纹理创建的纹理（纹理本身描述会重复，不能以描述的hash值作为key，而是以描述hash+ texture_cur_index作为纹理的key）
 	texture_cur_index: usize,
@@ -267,7 +267,7 @@ impl AtlasAllocator {
 	fn get_or_create_type(&mut self, descript: TargetDescriptor) -> TargetType {
 		match self.type_map.entry(calc_hash(&descript)) {
 			Entry::Vacant(r) => {
-				TargetType(r.insert(Self::create_type_inner(&mut self.all_allocator, descript)).clone())
+				TargetType(r.insert(Self::create_type_inner(&mut self.all_allocator, descript, self.default_depth_hash)).clone())
 			},
 			Entry::Occupied(r) => TargetType(r.get().clone())
 		}
@@ -276,7 +276,7 @@ impl AtlasAllocator {
 	/// 创建一个渲染目标类型，并且不共享（get_or_create_type无法通过hash命中该类型）
 	#[inline]
 	fn create_type(&mut self, descript: TargetDescriptor) -> TargetType {
-		TargetType(Self::create_type_inner(&mut self.all_allocator, descript))
+		TargetType(Self::create_type_inner(&mut self.all_allocator, descript, self.default_depth_hash))
 	}
 
 	/// 分配TargetView
@@ -361,6 +361,7 @@ impl AtlasAllocator {
 			let t = self.all_allocator[view.ty_index].list.remove(view.index).unwrap();
 			// 缓冲深度纹理
 			if let Some(r) = &t.target.depth {
+				// log::warn!("drop depth====={:?}, {:?}, ty: {:?}, {:?},", t.target.width, t.target.height, view.ty_index, self.all_allocator[view.ty_index].info.depth_hash);
 				self.unuse_textures.create(RenderRes::new(UnuseTexture { 
 					view: r.0.clone(),
 					texture: r.1.clone(),
@@ -368,7 +369,7 @@ impl AtlasAllocator {
 					// weak_texture: Share::downgrade(&r.1),
 					width: t.target.width, 
 					height: t.target.height, 
-					hash: 0, // 深度hash为0，是否需要修改为其他数字，TODO 
+					hash: self.all_allocator[view.ty_index].info.depth_hash, // 深度hash为0，是否需要修改为其他数字，TODO 
 				}, size_of::<UnuseTexture>())); 
 				// self.unuse_textures.push(
 				// 	UnuseTexture { 
@@ -384,7 +385,8 @@ impl AtlasAllocator {
 
 			// 缓冲颜色纹理
 			for color_index in 0..t.target.colors.len() {
-				// log::info!("unuse_textures====={:?}, {:?}, {:?}", t.target.width, t.target.height, self.all_allocator[view.ty_index].info.texture_hash[color_index]);
+				// log::warn!("drop====== width: {}, height: {}, hash: {}, len: {}, {:?}", width, height, hash, len);
+				// log::warn!("drop====={:?}, {:?}, {:?}", t.target.width, t.target.height, self.all_allocator[view.ty_index].info.texture_hash[color_index]);
 				self.unuse_textures.create(RenderRes::new(UnuseTexture { 
 					view: t.target.colors[color_index].0.clone(),
 					texture: t.target.colors[color_index].1.clone(), 
@@ -475,7 +477,6 @@ impl AtlasAllocator {
 	) -> (Handle<RenderRes<wgpu::TextureView>>, Share<wgpu::Texture>, u32, u32) {
 		// 找到一个匹配的纹理，直接返回
 		let unuse =  self.unuse_textures.pop_by_filter(|t| {
-			
 			if t.hash == hash && 
 				(( // 只需要一张纹理，则只要该纹理的大小大于等于要求的大小即可
 					len == 1 &&
@@ -530,21 +531,20 @@ impl AtlasAllocator {
 	}
 
 	
-	fn create_type_inner(all_allocator: &mut SlotMap<DefaultKey, AllocatorGroup>, descript: TargetDescriptor) -> DefaultKey {
+	fn create_type_inner(all_allocator: &mut SlotMap<DefaultKey, AllocatorGroup>, descript: TargetDescriptor, mut default_depth_hash: u64) -> DefaultKey {
 		let mut texture_hashs = SmallVec::with_capacity(descript.colors_descriptor.len());
 		for i in descript.colors_descriptor.iter() {
 			texture_hashs.push(calc_hash(i));
 		}
-		let mut depth_hash: u64 = 0;
 		if let Some(r) = &descript.depth_descriptor {
-			depth_hash = calc_hash(&descript.depth_descriptor);
+			default_depth_hash = calc_hash(&descript.depth_descriptor);
 		}
 		let ty = all_allocator.insert(
 			AllocatorGroup { 
 				info: AllocatorGroupInfo { 
 					descript: descript, 
 					texture_hash: texture_hashs, 
-					depth_hash,
+					depth_hash: default_depth_hash,
 					// hash: 0, // TODO
 				}, 
 				list: SlotMap::new() });
@@ -558,6 +558,7 @@ struct SingleAllocator {
 	count: usize,
 }
 
+#[derive(Debug)]
 pub struct UnuseTexture {
 	// weak: ShareWeak<Droper<RenderRes<wgpu::TextureView>>>,
 	// weak_texture: ShareWeak<wgpu::Texture>,
