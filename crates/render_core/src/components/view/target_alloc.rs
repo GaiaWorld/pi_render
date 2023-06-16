@@ -281,7 +281,10 @@ impl AtlasAllocator {
 
 	/// 分配TargetView
 	fn allocate<G: GetTargetView, T: Iterator<Item=G>>(&mut self, width: u32, height: u32, target_type: TargetType, exclude: T) -> TargetView {
-		let list = self.all_allocator.get_mut(target_type.0).unwrap();
+		let list = match self.all_allocator.get_mut(target_type.0) {
+			Some(r) => r,
+			None => panic!("TargetType is not exist: {:?}", target_type),
+		};
 		// 将需要排除的渲染目标插入到slotmap中，后续可以更快的判断一个纹理是否需要排除
 		for i in exclude {
 			let i = i.get_target_view();
@@ -334,7 +337,10 @@ impl AtlasAllocator {
 		let mut atlas_allocator= guillotiere::AtlasAllocator::new(
 			guillotiere::Size::new(target.width as i32, target.height as i32));
 		// self.debugList.push(Cmd::Allocate(self.cur_allocator_index, width as i32 , height as i32));
-		let allocation= atlas_allocator.allocate(guillotiere::Size::new(width as i32, height as i32)).unwrap();
+		let allocation= match atlas_allocator.allocate(guillotiere::Size::new(width as i32, height as i32)) {
+			Some(r) => r,
+			None => panic!("AtlasAllocator allocate first fail, width: {:?}, height: {:?}, target_width : {:?}, target_height: {:?}", width, height, target.width, target.height),
+		};
 		let list = &mut self.all_allocator[target_type.0];
 		let index = list.list.insert(SingleAllocator {
 			allocator:atlas_allocator,
@@ -520,10 +526,14 @@ impl AtlasAllocator {
 
 		self.texture_cur_index += 1;
 		let key = calc_hash(&(hash, self.texture_cur_index, width, height));
-		(AssetMgr::insert(
-			&self.texture_assets_mgr, 
-			key, 
-			RenderRes::new(texture_view, calc_texture_size(desc))).unwrap(),
+		(
+			match AssetMgr::insert(
+				&self.texture_assets_mgr, 
+				key, 
+				RenderRes::new(texture_view, calc_texture_size(desc))) {
+					Ok(r) => r,
+					_ => panic!("alloc fbo key is exist: {:?}", key),
+				},
 			Share::new(texture),
 			width,
 			height
