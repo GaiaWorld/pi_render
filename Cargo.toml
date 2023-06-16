@@ -47,11 +47,11 @@ path = "examples/hello_winit/main.rs"
 name = "clean"
 path = "examples/clean/main.rs"
 
-[patch.crates-io]
-pi_assets={ path = "../pi_assets" }
+# [patch.crates-io]
+# pi_assets={ path = "../pi_assets" }
 
-[patch."https://github.com/GaiaWorld/pi_hal"]
-pi_hal = { path = "../pi_hal" }
+# [patch."https://github.com/GaiaWorld/pi_hal"]
+# pi_hal = { path = "../pi_hal" }
 
 [[bench]]
 name = "id_alloter_bench"
