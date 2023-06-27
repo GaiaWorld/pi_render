@@ -140,6 +140,42 @@ impl TEffectBindTexture2D for EffectBindTexture2D06 {
 impl TEffectBindTexture2DData for EffectBindTexture2D06 {
     fn data(&self) -> &BindDataTexture2D { &self }
 }
+
+#[derive(Debug, Clone, Deref, Hash, PartialEq, Eq)]
+pub struct EffectBindTexture2D07(pub BindDataTexture2D);
+impl From<ETextureViewUsage> for EffectBindTexture2D07 {
+    fn from(value: ETextureViewUsage) -> Self { Self( BindDataTexture2D(value) ) }
+}
+impl From<Handle<ImageTextureView>> for EffectBindTexture2D07 {
+    fn from(value: Handle<ImageTextureView>) -> Self { Self( BindDataTexture2D(ETextureViewUsage::Image(value)) ) }
+}
+impl From<ShareTargetView> for EffectBindTexture2D07 {
+    fn from(value: ShareTargetView) -> Self { Self( BindDataTexture2D(ETextureViewUsage::SRT(value)) ) }
+}
+impl TEffectBindTexture2D for EffectBindTexture2D07 {
+    const INDEX: usize = 7 - 1;
+}
+impl TEffectBindTexture2DData for EffectBindTexture2D07 {
+    fn data(&self) -> &BindDataTexture2D { &self }
+}
+
+#[derive(Debug, Clone, Deref, Hash, PartialEq, Eq)]
+pub struct EffectBindTexture2D08(pub BindDataTexture2D);
+impl From<ETextureViewUsage> for EffectBindTexture2D08 {
+    fn from(value: ETextureViewUsage) -> Self { Self( BindDataTexture2D(value) ) }
+}
+impl From<Handle<ImageTextureView>> for EffectBindTexture2D08 {
+    fn from(value: Handle<ImageTextureView>) -> Self { Self( BindDataTexture2D(ETextureViewUsage::Image(value)) ) }
+}
+impl From<ShareTargetView> for EffectBindTexture2D08 {
+    fn from(value: ShareTargetView) -> Self { Self( BindDataTexture2D(ETextureViewUsage::SRT(value)) ) }
+}
+impl TEffectBindTexture2D for EffectBindTexture2D08 {
+    const INDEX: usize = 8 - 1;
+}
+impl TEffectBindTexture2DData for EffectBindTexture2D08 {
+    fn data(&self) -> &BindDataTexture2D { &self }
+}
     
 fn vs_define(meta: &ShaderEffectMeta, index: usize, set: u32, bind: u32) -> String {
     let mut result = String::from("");
