@@ -34,7 +34,7 @@ impl SingleVertexBufferDataMap {
     ) -> XHashMap<KeyVertexBuffer, EVerticesBufferUsage> {
         let mut result = XHashMap::default();
         self.vertices.drain().for_each(|(key, data)| {
-            if let Some(bufferrange) = allocator.create_not_updatable_buffer(device, queue, &data) {
+            if let Some(bufferrange) = allocator.create_not_updatable_buffer(device, queue, &data, None) {
                 if let Ok(range) = asset_mgr.insert(key.clone(), bufferrange) {
                     result.insert(key, EVerticesBufferUsage::Other(range));
                 }
@@ -73,7 +73,7 @@ impl SingleVertexBufferDataMap {
     ) -> XHashMap<KeyVertexBuffer, EVerticesBufferUsage> {
         let mut result = XHashMap::default();
         self.instance.drain().for_each(|(key, data)| {
-            if let Some(bufferrange) = allocator.create_not_updatable_buffer(device, queue, &data) {
+            if let Some(bufferrange) = allocator.create_not_updatable_buffer(device, queue, &data, None) {
                 result.insert(key, EVerticesBufferUsage::EVBRange(Arc::new(bufferrange)) );
             }
         });

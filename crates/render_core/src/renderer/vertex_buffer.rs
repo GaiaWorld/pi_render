@@ -318,8 +318,29 @@ impl VertexBufferAllocator {
             pool.write_buffer(device, queue);
         });
     }
-    pub fn create_not_updatable_buffer(&mut self, device: &RenderDevice, queue: &RenderQueue, data: &[u8]) -> Option<EVertexBufferRange> {
+    ///
+    /// * `old` 仅当更新 Instance 实例化buffer时使用, 此时 NotUpdatableBufferRange 在逻辑上是唯一的,没有共用
+    pub fn create_not_updatable_buffer(&mut self, device: &RenderDevice, queue: &RenderQueue, data: &[u8], old_single_used: Option<&NotUpdatableBufferRange>) -> Option<EVertexBufferRange> {
         let size = data.len() as u32;
+
+        // 如果传入旧 NotUpdatableBufferRange, 且 对应 buffer 大小足够存放新数据 则重复利用该 NotUpdatableBufferRange 中的 buffer
+        if let Some(old) = old_single_used {
+            if old.id_buffer.size >= size {
+                let buffer = old.unuse();
+                if let Some(wbuffer) = &buffer.0 {
+                    wbuffer.write_buffer(queue, data);
+                    let buffer = NotUpdatableBufferRange {
+                        used_size: data.len() as u32,
+                        id_buffer: old.id_buffer,
+                        buffer: buffer,
+                        usage: old.usage,
+                        unused: false,
+                    };
+                    return Some(EVertexBufferRange::NotUpdatable(Arc::new(buffer)));
+                }
+            }
+        }
+
         let mut level = 0;
         let mut level_size = self.base_size;
         loop {
@@ -393,9 +414,9 @@ impl VertexBufferAllocator {
 }
 
 pub struct FixedSizeBufferPoolNotUpdatable {
-    /// * 大内存块列表 (第i个的尺寸为 i*block_size)
+    /// * 大内存块列表
     buffers: Vec<Arc<UseNotUpdatableBuffer>>,
-    /// * 目标尺寸
+    /// * 此处分配出去的每个Buffer大小均为 block_size
     pub(crate) block_size: u32,
     mutex: ShareMutex<()>,
     usage: wgpu::BufferUsages,
@@ -444,7 +465,8 @@ impl FixedSizeBufferPoolNotUpdatable {
                         used_size: data.len() as u32,
                         id_buffer: key_buffer.clone(),
                         buffer: use_buffer,
-                        usage: self.usage
+                        usage: self.usage,
+                        unused: false,
                     }
                 );
             } else {
@@ -468,6 +490,7 @@ impl FixedSizeBufferPoolNotUpdatable {
                     id_buffer: key_buffer.clone(),
                     buffer: use_buffer,
                     usage: self.usage,
+                    unused: false,
                 }
             );
         } else {
@@ -479,17 +502,24 @@ impl FixedSizeBufferPoolNotUpdatable {
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct IDNotUpdatableBuffer {
+    /// 在 FixedSizeBufferPoolNotUpdatable 中是第几个
     pub index: u32,
+    /// Buffer 大小 也是 所属 FixedSizeBufferPoolNotUpdatable 的 block_size
     pub size: u32,
     pub usage: wgpu::BufferUsages,
 }
 
+/// 在 FixedSizeBufferPoolNotUpdatable 中保存以记录 NotUpdatableBuffer
+/// * FixedSizeBufferPoolNotUpdatable 中分配并包装为 NotUpdatableBufferRange
+/// * 当 NotUpdatableBufferRange 释放时 置 UseNotUpdatableBuffer 内容为 None 以释放 Handle<NotUpdatableBuffer>
 pub struct UseNotUpdatableBuffer(Option<Handle<NotUpdatableBuffer>>);
 impl UseNotUpdatableBuffer {
-    pub fn none(&self) {
+    pub fn none(&self) -> Option<Handle<NotUpdatableBuffer>> {
         unsafe {
             let temp = &mut *(self as *const Self as usize as *mut Self);
+            let result = temp.0.clone();
             temp.0 = None;
+            result
         }
     }
 }
@@ -502,6 +532,7 @@ impl Asset for NotUpdatableBuffer {
     }
 }
 impl NotUpdatableBuffer {
+    /// * `size` 请求的 buffer 大小 
     pub fn new(device: &RenderDevice, size: u32, usage: wgpu::BufferUsages) -> Self {
         let mut data = vec![];
         for _ in 0..size {
@@ -517,6 +548,8 @@ impl NotUpdatableBuffer {
 
         Self(buffer, size, true, usage)
     }
+    /// 写入Buffer 数据
+    /// * `data` data 长度 不应超过 self.size()
     pub(crate) fn write_buffer(&self, queue: &RenderQueue, data: &[u8]) {
         // let mut temp = vec![];
         // data.iter().for_each(|v| { temp.push(*v) });
@@ -534,11 +567,14 @@ impl NotUpdatableBuffer {
     }
 }
 
+/// NotUpdatableBufferRange 在外部应当具有唯一性, 但由于应用层使用限制, 可能被包装为 Arc, 所以 只能是逻辑上保证维护其唯一性,
+/// * 
 pub struct NotUpdatableBufferRange {
     used_size: u32,
     id_buffer: IDNotUpdatableBuffer,
     buffer: Arc<UseNotUpdatableBuffer>,
     usage: wgpu::BufferUsages,
+    unused: bool,
 }
 impl Debug for NotUpdatableBufferRange {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -558,10 +594,19 @@ impl NotUpdatableBufferRange {
     pub fn id_buffer(&self) -> IDNotUpdatableBuffer {
         self.id_buffer
     }
+    pub fn unuse(&self) -> Arc<UseNotUpdatableBuffer> {
+        unsafe {
+            let temp = &mut *(self as *const Self as usize as *mut Self);
+            temp.unused = true;
+            temp.buffer.clone()
+        }
+    }
 }
 impl Drop for NotUpdatableBufferRange {
     fn drop(&mut self) {
-        self.buffer.none();
+        if !self.unused {
+            self.buffer.none();
+        }
     }
 }
 impl Hash for NotUpdatableBufferRange {
