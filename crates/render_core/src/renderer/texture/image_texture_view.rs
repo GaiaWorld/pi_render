@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use pi_assets::asset::{Handle, Asset};
+use pi_assets::asset::{Handle, Asset, Size};
 
 use crate::{asset::TAssetKeyU64, rhi::texture::TextureView};
 
@@ -31,6 +31,9 @@ pub struct ImageTextureView {
 }
 impl Asset for ImageTextureView {
     type Key = u64;
+}
+
+impl Size for ImageTextureView {
     fn size(&self) -> usize {
         8 + 64
     }

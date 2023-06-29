@@ -1,6 +1,6 @@
 use std::{num::NonZeroU8, hash::Hash, fmt::Debug};
 
-use pi_assets::asset::Asset;
+use pi_assets::asset::{Asset, Size};
 
 use super::{device::RenderDevice};
 
@@ -11,10 +11,14 @@ pub type KeySampler = SamplerDesc;
 pub struct Sampler(pub crate::rhi::texture::Sampler);
 impl Asset for Sampler {
     type Key = KeySampler;
+}
+
+impl Size for Sampler {
     fn size(&self) -> usize {
         256
     }
 }
+
 impl Sampler {
     pub fn new(device: &RenderDevice, key: &KeySampler) -> Self {
         Self(

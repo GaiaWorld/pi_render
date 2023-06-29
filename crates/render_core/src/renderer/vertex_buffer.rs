@@ -1,6 +1,6 @@
 use std::{ops::Range, mem::{size_of}, hash::Hash, sync::Arc, fmt::Debug};
 
-use pi_assets::{asset::{Asset, GarbageEmpty, Handle}, mgr::AssetMgr};
+use pi_assets::{asset::{Asset, GarbageEmpty, Handle, Size}, mgr::AssetMgr};
 use pi_share::{Share, ShareMutex};
 use wgpu::util::BufferInitDescriptor;
 
@@ -164,6 +164,9 @@ impl EVertexBufferRange {
 }
 impl Asset for EVertexBufferRange {
     type Key = KeyVertexBuffer;
+}
+
+impl Size for EVertexBufferRange {
     fn size(&self) -> usize {
         32
     }
@@ -527,6 +530,8 @@ impl UseNotUpdatableBuffer {
 pub struct NotUpdatableBuffer(Buffer, u32, bool, wgpu::BufferUsages);
 impl Asset for NotUpdatableBuffer {
     type Key = IDNotUpdatableBuffer;
+}
+impl Size for NotUpdatableBuffer {
     fn size(&self) -> usize {
         self.1 as usize
     }

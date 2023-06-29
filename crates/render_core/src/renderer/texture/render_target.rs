@@ -1,6 +1,6 @@
 use std::{sync::Arc, hash::Hash};
 
-use pi_assets::asset::{Handle, Asset};
+use pi_assets::asset::{Handle, Asset, Size};
 
 use crate::{rhi::{device::RenderDevice, texture::{Texture, TextureView}}, renderer::texture::{texture_format::TTextureFormatPixelByte}, asset::{ASSET_SIZE_FOR_UNKOWN, TAssetKeyU64}};
 
@@ -125,6 +125,10 @@ impl RenderTexture {
 
 impl Asset for RenderTexture {
     type Key = KeyRenderTexture;
+}
+
+
+impl Size for RenderTexture {
     fn size(&self) -> usize {
         self.size
     }
@@ -150,6 +154,9 @@ impl RenderTargetView {
 }
 impl Asset for RenderTargetView {
     type Key = u64;
+}
+
+impl Size for RenderTargetView {
     fn size(&self) -> usize {
         ASSET_SIZE_FOR_UNKOWN
     }

@@ -1,7 +1,7 @@
 use std::{fmt::Debug, hash::Hash};
 
 use derive_deref_rs::Deref;
-use pi_assets::asset::{Asset};
+use pi_assets::asset::{Asset, Size};
 use pi_share::{Share, ShareMutex};
 
 use super::id_alloter::{IdAlloterWithCountLimit, Index};
@@ -55,6 +55,9 @@ pub struct AssetFixedSmallStructAllocator<T: Default + 'static>(SmallStructAllot
 impl<T: Default + 'static> Asset for AssetFixedSmallStructAllocator<T> {
     /// * 在 分配器池 中的序号
     type Key = usize;
+}
+
+impl<T: Default + 'static> Size for AssetFixedSmallStructAllocator<T> {
     fn size(&self) -> usize {
         self.1 as usize
     }

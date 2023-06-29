@@ -1,5 +1,5 @@
 
-use pi_assets::{asset::{Asset, Garbageer, Handle}, mgr::{LoadResult, Receiver}};
+use pi_assets::{asset::{Asset, Garbageer, Handle, Size}, mgr::{LoadResult, Receiver}};
 use pi_atom::Atom;
 use pi_futures::BoxFuture;
 use pi_hal::{
@@ -93,9 +93,10 @@ impl ImageTexture {
 	}
 }
 
-impl Asset for ImageTexture{
+impl Asset for ImageTexture {
 	type Key = KeyImageTexture;
-
+}
+impl Size for ImageTexture {
 	fn size(&self) -> usize {
 		self.size
 	}

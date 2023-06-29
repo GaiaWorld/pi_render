@@ -1,6 +1,6 @@
 use std::{marker::PhantomData, hash::Hash, fmt::Debug};
 
-use pi_assets::asset::Asset;
+use pi_assets::asset::{Asset, Size};
 use pi_atom::Atom;
 
 use crate::{asset::ASSET_SIZE_FOR_UNKOWN, render_3d::shader::ERenderAlignment};
@@ -48,6 +48,9 @@ pub struct Shader<const MAX_SET_COUNT: usize, K: TKeyShaderSetBlock> {
 }
 impl<const MAX_SET_COUNT: usize, K: TKeyShaderSetBlock> Asset for Shader<MAX_SET_COUNT, K> {
     type Key = KeyShader<MAX_SET_COUNT, K>;
+}
+
+impl<const MAX_SET_COUNT: usize, K: TKeyShaderSetBlock> Size for Shader<MAX_SET_COUNT, K> {
     fn size(&self) -> usize {
         ASSET_SIZE_FOR_UNKOWN
     }

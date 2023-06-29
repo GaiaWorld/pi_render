@@ -1,6 +1,6 @@
 use std::{hash::Hash, fmt::Debug};
 
-use pi_assets::{asset::{Asset, Handle}, mgr::AssetMgr};
+use pi_assets::{asset::{Asset, Handle, Size}, mgr::AssetMgr};
 use pi_share::{Share, ShareMutex};
 
 use crate::{rhi::{shader::WriteBuffer, device::RenderDevice, RenderQueue, buffer::Buffer, id_alloter::Index, buffer_alloc::SingleBufferAlloter}, asset::bytes_write_to_memory};
@@ -9,6 +9,9 @@ use crate::{rhi::{shader::WriteBuffer, device::RenderDevice, RenderQueue, buffer
 pub struct AssetRWBuffer(SingleBufferAlloter, u32);
 impl Asset for AssetRWBuffer {
     type Key = IDRWBuffer;
+}
+
+impl Size for AssetRWBuffer {
     fn size(&self) -> usize {
         self.1 as usize
     }

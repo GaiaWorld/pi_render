@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use pi_assets::asset::{Asset};
+use pi_assets::asset::{Asset, Size};
 use pi_atom::Atom;
 use wgpu::ShaderSource;
 
@@ -142,6 +142,8 @@ impl From<(crate::rhi::shader::ShaderMeta, Vec<Atom>, Vec<Atom>)> for ShaderEffe
 }
 impl Asset for ShaderEffectMeta {
     type Key = KeyShaderMeta;
+}
+impl Size for ShaderEffectMeta {
     fn size(&self) -> usize {
         self.size
     }

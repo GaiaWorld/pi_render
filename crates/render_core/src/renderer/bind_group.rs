@@ -1,7 +1,7 @@
 
 use std::{sync::Arc, fmt::Debug, hash::{Hash}};
 
-use pi_assets::{asset::{Handle, Asset}};
+use pi_assets::{asset::{Handle, Asset, Size}};
 
 use crate::{rhi::{device::RenderDevice, small_struct_allocator::{SmallStructAllocatorPool, IDSmallStruct, TSmallStructID}}, asset::{TAssetKeyU64, ASSET_SIZE_FOR_UNKOWN}};
 
@@ -362,7 +362,9 @@ impl BindGroupLayout {
 }
 impl Asset for BindGroupLayout {
     type Key = u64;
+}
 
+impl Size for BindGroupLayout {
     fn size(&self) -> usize {
         ASSET_SIZE_FOR_UNKOWN
     }
@@ -391,7 +393,9 @@ impl BindGroup {
 }
 impl Asset for BindGroup {
     type Key = u64;
+}
 
+impl Size for BindGroup {
     fn size(&self) -> usize {
         ASSET_SIZE_FOR_UNKOWN
     }

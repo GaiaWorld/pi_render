@@ -1,5 +1,5 @@
 use derive_deref_rs::Deref;
-use pi_assets::{asset::{Asset, Garbageer, Handle}, mgr::{LoadResult, Receiver}};
+use pi_assets::{asset::{Asset,  Garbageer, Handle, Size}, mgr::{LoadResult, Receiver}};
 use pi_atom::Atom;
 use pi_futures::BoxFuture;
 use pi_hal::{
@@ -26,7 +26,9 @@ impl<T> RenderRes<T>  {
 
 impl<T: 'static> Asset for RenderRes<T>{
 	type Key = u64;
+}
 
+impl<T: 'static> Size for RenderRes<T>{
 	fn size(&self) -> usize {
 		self.size
 	}
@@ -64,7 +66,9 @@ impl TextureRes {
 
 impl Asset for TextureRes{
 	type Key = u64;
+}
 
+impl Size for TextureRes{
 	fn size(&self) -> usize {
 		self.size
 	}
