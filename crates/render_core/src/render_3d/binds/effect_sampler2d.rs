@@ -101,6 +101,30 @@ impl TEffectBindSampler2D for EffectBindSampler2D06 {
 impl TEffectBindSampler2DData for EffectBindSampler2D06 {
     fn data(&self) -> &BindDataSampler { &self }
 }
+
+#[derive(Debug, Clone, Deref, Hash, PartialEq, Eq)]
+pub struct EffectBindSampler2D07(pub BindDataSampler);
+impl From<Handle<SamplerRes>> for EffectBindSampler2D07 {
+    fn from(value: Handle<SamplerRes>) -> Self { Self( BindDataSampler(value) ) }
+}
+impl TEffectBindSampler2D for EffectBindSampler2D07 {
+    const INDEX: usize = 7 - 1;
+}
+impl TEffectBindSampler2DData for EffectBindSampler2D07 {
+    fn data(&self) -> &BindDataSampler { &self }
+}
+
+#[derive(Debug, Clone, Deref, Hash, PartialEq, Eq)]
+pub struct EffectBindSampler2D08(pub BindDataSampler);
+impl From<Handle<SamplerRes>> for EffectBindSampler2D08 {
+    fn from(value: Handle<SamplerRes>) -> Self { Self( BindDataSampler(value) ) }
+}
+impl TEffectBindSampler2D for EffectBindSampler2D08 {
+    const INDEX: usize = 8 - 1;
+}
+impl TEffectBindSampler2DData for EffectBindSampler2D08 {
+    fn data(&self) -> &BindDataSampler { &self }
+}
     
 fn vs_define(meta: &ShaderEffectMeta, index: usize, set: u32, bind: u32) -> String {
     let mut result = String::from("");

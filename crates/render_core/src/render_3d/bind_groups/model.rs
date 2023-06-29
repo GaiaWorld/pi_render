@@ -71,7 +71,7 @@ impl KeyBindGroupModel {
     }
     
     pub fn binds(&self, recorder: &mut BindsRecorder) -> Arc<IDBinds> {
-        log::warn!("Model Binds {:?} {:?}", self.key_binds, self.bind_count);
+        // log::warn!("Model Binds {:?} {:?}", self.key_binds, self.bind_count);
         if let Some(mut binds) = EBinds::new(self.bind_count) {
             binds.set(
                 self.matrix.bind as usize, 
