@@ -253,41 +253,51 @@ impl Ord for UniformPropertyUint {
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct MaterialValueBindDesc {
     pub stage: wgpu::ShaderStages,
-    pub mat4_list: Vec<UniformPropertyMat4>,
-    pub mat2_list: Vec<UniformPropertyMat2>,
+    // pub mat4_list: Vec<UniformPropertyMat4>,
+    // pub mat2_list: Vec<UniformPropertyMat2>,
     pub vec4_list: Vec<UniformPropertyVec4>,
     pub vec2_list: Vec<UniformPropertyVec2>,
     pub float_list: Vec<UniformPropertyFloat>,
-    pub int_list: Vec<UniformPropertyInt>,
+    // pub int_list: Vec<UniformPropertyInt>,
     pub uint_list: Vec<UniformPropertyUint>,
 }
 impl Default for MaterialValueBindDesc {
     fn default() -> Self {
-        Self { stage: wgpu::ShaderStages::VERTEX_FRAGMENT, mat4_list: vec![], mat2_list: vec![], vec4_list: vec![], vec2_list: vec![], float_list: vec![], int_list: vec![], uint_list: vec![] }
+        Self { stage: wgpu::ShaderStages::VERTEX_FRAGMENT, 
+            // mat4_list: vec![], mat2_list: vec![],
+            vec4_list: vec![], vec2_list: vec![], float_list: vec![],
+            // int_list: vec![],
+            uint_list: vec![]
+        }
     }
 }
 impl MaterialValueBindDesc {
     pub fn none(stage: wgpu::ShaderStages) -> Self {
-        Self { stage, mat4_list: vec![], mat2_list: vec![], vec4_list: vec![], vec2_list: vec![], float_list: vec![], int_list: vec![], uint_list: vec![] }
+        Self { stage, 
+            // mat4_list: vec![], mat2_list: vec![],
+            vec4_list: vec![], vec2_list: vec![], float_list: vec![],
+            // int_list: vec![],
+            uint_list: vec![]
+        }
     }
     pub fn sort(&mut self) {
-        self.mat4_list.sort_by(|a, b| { a.0.cmp(&b.0) });
-        self.mat2_list.sort_by(|a, b| { a.0.cmp(&b.0) });
+        // self.mat4_list.sort_by(|a, b| { a.0.cmp(&b.0) });
+        // self.mat2_list.sort_by(|a, b| { a.0.cmp(&b.0) });
         self.vec4_list.sort_by(|a, b| { a.0.cmp(&b.0) });
         self.vec2_list.sort_by(|a, b| { a.0.cmp(&b.0) });
         self.float_list.sort_by(|a, b| { a.0.cmp(&b.0) });
-        self.int_list.sort_by(|a, b| { a.0.cmp(&b.0) });
+        // self.int_list.sort_by(|a, b| { a.0.cmp(&b.0) });
         self.uint_list.sort_by(|a, b| { a.0.cmp(&b.0) });
     }
     pub fn size(&self) -> usize {
         let mut size = 0;
-        self.mat4_list.iter().for_each(|item| {
-            size += item.0.as_bytes().len();
-        });
+        // self.mat4_list.iter().for_each(|item| {
+        //     size += item.0.as_bytes().len();
+        // });
         
-        self.mat2_list.iter().for_each(|item| {
-            size += item.0.as_bytes().len();
-        });
+        // self.mat2_list.iter().for_each(|item| {
+        //     size += item.0.as_bytes().len();
+        // });
         
         self.vec4_list.iter().for_each(|item| {
             size += item.0.as_bytes().len();
@@ -301,9 +311,9 @@ impl MaterialValueBindDesc {
             size += item.0.as_bytes().len();
         });
         
-        self.int_list.iter().for_each(|item| {
-            size += item.0.as_bytes().len();
-        });
+        // self.int_list.iter().for_each(|item| {
+        //     size += item.0.as_bytes().len();
+        // });
         
         self.uint_list.iter().for_each(|item| {
             size += item.0.as_bytes().len();
@@ -314,15 +324,15 @@ impl MaterialValueBindDesc {
     pub fn label(&self) -> String {
         let mut result = String::from("");
 
-        self.mat4_list.iter().for_each(|name| {
-            result += "#";
-            result += name.0.as_str();
-        });
+        // self.mat4_list.iter().for_each(|name| {
+        //     result += "#";
+        //     result += name.0.as_str();
+        // });
         
-        self.mat2_list.iter().for_each(|name| {
-            result += "#";
-            result += name.0.as_str();
-        });
+        // self.mat2_list.iter().for_each(|name| {
+        //     result += "#";
+        //     result += name.0.as_str();
+        // });
 
         self.vec4_list.iter().for_each(|name| {
             result += "#";
@@ -360,19 +370,19 @@ impl MaterialValueBindDesc {
             result += index.to_string().as_str();
             result += ") uniform MatParam {\r\n";
     
-            self.mat4_list.iter().for_each(|name| {
-                result += "mat4 ";
-                result += &name.0;
-                result += ";\r\n";
-            });
-            total_num += self.mat4_list.len();
+            // self.mat4_list.iter().for_each(|name| {
+            //     result += "mat4 ";
+            //     result += &name.0;
+            //     result += ";\r\n";
+            // });
+            // total_num += self.mat4_list.len();
             
-            self.mat2_list.iter().for_each(|name| {
-                result += "mat2 ";
-                result += &name.0;
-                result += ";\r\n";
-            });
-            total_num += self.mat2_list.len();
+            // self.mat2_list.iter().for_each(|name| {
+            //     result += "mat2 ";
+            //     result += &name.0;
+            //     result += ";\r\n";
+            // });
+            // total_num += self.mat2_list.len();
             
             self.vec4_list.iter().for_each(|name| {
                 result += "vec4 ";
@@ -399,12 +409,12 @@ impl MaterialValueBindDesc {
             });
             total_num += self.float_list.len();
             
-            self.int_list.iter().for_each(|name| {
-                result += "int ";
-                result += &name.0;
-                result += ";\r\n";
-            });
-            total_num += self.int_list.len();
+            // self.int_list.iter().for_each(|name| {
+            //     result += "int ";
+            //     result += &name.0;
+            //     result += ";\r\n";
+            // });
+            // total_num += self.int_list.len();
             
             self.uint_list.iter().for_each(|name| {
                 result += "uint ";
@@ -412,7 +422,7 @@ impl MaterialValueBindDesc {
                 result += ";\r\n";
             });
             total_num += self.uint_list.len();
-            let fill_int_count    = (self.float_list.len() + self.int_list.len() + self.uint_list.len()) % 4;
+            let fill_int_count    = (self.float_list.len() /* + self.int_list.len()*/ + self.uint_list.len()) % 4;
             if fill_int_count > 0 {
                 for i in fill_int_count..4 {
                     result += "uint _placeholder_int_";
