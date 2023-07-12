@@ -30,7 +30,7 @@ impl ShaderBindModelAboutSkinValue {
     ) -> Option<Self> {
         let size = match skin {
             ESkinCode::None => 0,
-            ESkinCode::UBO(_, bones) => bones.use_bytes(),
+            ESkinCode::UBO(_, bones, cache) => bones.use_bytes() * (*cache as usize),
             ESkinCode::RowTexture(_) => ShaderBindModelAboutSkinValue::TOTAL_SIZE as usize,
             ESkinCode::FramesTexture(_) => ShaderBindModelAboutSkinValue::TOTAL_SIZE as usize,
         };
@@ -62,10 +62,10 @@ impl ShaderBindModelAboutSkinValue {
         let mut result = String::from("");
         match skin {
             ESkinCode::None => {},
-            ESkinCode::UBO(_, bone) => {
+            ESkinCode::UBO(_, bone, cache) => {
                 result += ShaderSetBind::code_set_bind_head(set, binding).as_str();
                 result += " Bone {\r\n";
-                result += ShaderSetBind::code_uniform_array("mat4", ShaderVarUniform::BONE_MATRICES, bone.count()).as_str();
+                result += ShaderSetBind::code_uniform_array("mat4", ShaderVarUniform::BONE_MATRICES, bone.count() * (*cache as u32)).as_str();
                 result += "};\r\n";
 
                 result += skin.define_code().as_str();
@@ -137,10 +137,10 @@ impl TShaderBindCode for BindUseSkinValue {
         let mut result = String::from("");
         match self.data.skin {
             ESkinCode::None => {},
-            ESkinCode::UBO(_, bone) => {
+            ESkinCode::UBO(_, bone, cache) => {
                 result += ShaderSetBind::code_set_bind_head(set, self.bind).as_str();
                 result += " Bone {\r\n";
-                result += ShaderSetBind::code_uniform_array("mat4", ShaderVarUniform::BONE_MATRICES, bone.count()).as_str();
+                result += ShaderSetBind::code_uniform_array("mat4", ShaderVarUniform::BONE_MATRICES, bone.count() * (cache as u32)).as_str();
                 result += "};\r\n";
 
                 result += self.data.skin.define_code().as_str();
