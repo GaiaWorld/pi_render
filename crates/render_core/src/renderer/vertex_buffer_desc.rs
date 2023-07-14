@@ -92,7 +92,7 @@ impl VertexBufferDesc {
     }
     pub fn instance_custom(kind: EVertexDataKind, format: wgpu::VertexFormat) -> Self {
         Self {
-            key: KeyVertexBuffer::from("NullIntanceCustom"),
+            key: KeyVertexBuffer::from(-1),
             range: None,
             attrs: vec![
                 VertexAttribute { kind, format },
@@ -103,7 +103,7 @@ impl VertexBufferDesc {
     }
     pub fn instance_tilloff() -> Self {
         Self {
-            key: KeyVertexBuffer::from("NullIntanceTillOff"),
+            key: KeyVertexBuffer::from(-1),
             range: None,
             attrs: vec![
                 VertexAttribute { kind: EVertexDataKind::InsTillOffset1, format: wgpu::VertexFormat::Float32x4 },
@@ -114,7 +114,7 @@ impl VertexBufferDesc {
     }
     pub fn instance_color() -> Self {
         Self {
-            key: KeyVertexBuffer::from("NullIntanceColor"),
+            key: KeyVertexBuffer::from(-1),
             range: None,
             attrs: vec![
                 VertexAttribute { kind: EVertexDataKind::InsColor, format: wgpu::VertexFormat::Float32x4 },
@@ -125,7 +125,7 @@ impl VertexBufferDesc {
     }
     pub fn instance_world_matrix() -> Self {
         Self {
-            key: KeyVertexBuffer::from("NullIntanceWM"),
+            key: KeyVertexBuffer::from(-1),
             range: None,
             attrs: vec![
                 VertexAttribute { kind: EVertexDataKind::InsWorldRow1, format: wgpu::VertexFormat::Float32x4 },

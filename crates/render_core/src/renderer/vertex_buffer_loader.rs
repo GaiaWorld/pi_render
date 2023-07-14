@@ -8,13 +8,30 @@ use crate::rhi::{device::RenderDevice, RenderQueue};
 
 use super::{vertex_buffer::{KeyVertexBuffer, EVertexBufferRange, VertexBufferAllocator}, vertices::EVerticesBufferUsage};
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct SingleVertexBufferDataMap {
     vertices: XHashMap<KeyVertexBuffer, Vec<u8>>,
     instance: XHashMap<KeyVertexBuffer, Vec<u8>>,
     indices: XHashMap<KeyVertexBuffer, Vec<u8>>,
+    counter: i64,
+    record: XHashMap<String, i64>,
+}
+impl Default for SingleVertexBufferDataMap {
+    fn default() -> Self {
+        Self { vertices: XHashMap::default(), instance: XHashMap::default(), indices: XHashMap::default(), counter: -10000_0000, record: XHashMap::default() }
+    }
 }
 impl SingleVertexBufferDataMap {
+    pub fn id(&mut self, name: &str) -> i64 {
+        if let Some(id) = self.record.get(name) {
+            *id
+        } else {
+            self.counter -= 1;
+            let id = self.counter;
+            self.record.insert(String::from(name), id);
+            id
+        }
+    }
     pub fn add(&mut self, key: &KeyVertexBuffer, data: Vec<u8>) {
         if !self.vertices.contains_key(key) {
             self.vertices.insert(key.clone(), data);
