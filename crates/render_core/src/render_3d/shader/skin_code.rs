@@ -22,7 +22,7 @@ impl ESkinBonesPerVertex {
             ESkinBonesPerVertex::One =>  {
                 String::from("
 
-    mat4 influence = boneMatrices[A_JOINT_INC1[0]];
+    mat4 influence = boneMatrices[A_JOINT_INC1[0] + PI_SkinBoneOffset0];
     PI_ObjectToWorld = PI_ObjectToWorld * influence; 
 
                 ")
@@ -30,8 +30,8 @@ impl ESkinBonesPerVertex {
             ESkinBonesPerVertex::Two =>  {
                 String::from("
 
-    mat4 influence   = boneMatrices[A_JOINT_INC2[0]] * A_JOINT_WEG2[0];
-    influence       += boneMatrices[A_JOINT_INC2[1]] * A_JOINT_WEG2[1];
+    mat4 influence   = boneMatrices[A_JOINT_INC2[0] + PI_SkinBoneOffset0] * A_JOINT_WEG2[0];
+    influence       += boneMatrices[A_JOINT_INC2[1] + PI_SkinBoneOffset0] * A_JOINT_WEG2[1];
     PI_ObjectToWorld = PI_ObjectToWorld * influence; 
 
                 ")
@@ -39,9 +39,9 @@ impl ESkinBonesPerVertex {
             ESkinBonesPerVertex::Three =>  {
                 String::from("
 
-    mat4 influence   = boneMatrices[A_JOINT_INC3[0]] * A_JOINT_WEG3[0];
-    influence       += boneMatrices[A_JOINT_INC3[0]] * A_JOINT_WEG3[1];
-    influence       += boneMatrices[A_JOINT_INC3[0]] * A_JOINT_WEG3[2];
+    mat4 influence   = boneMatrices[A_JOINT_INC3[0] + PI_SkinBoneOffset0] * A_JOINT_WEG3[0];
+    influence       += boneMatrices[A_JOINT_INC3[0] + PI_SkinBoneOffset0] * A_JOINT_WEG3[1];
+    influence       += boneMatrices[A_JOINT_INC3[0] + PI_SkinBoneOffset0] * A_JOINT_WEG3[2];
     PI_ObjectToWorld = PI_ObjectToWorld * influence; 
 
                 ")
@@ -49,10 +49,10 @@ impl ESkinBonesPerVertex {
             ESkinBonesPerVertex::Four => {
                 String::from("
 
-    mat4 influence   = boneMatrices[A_JOINT_INC[0]] * A_JOINT_WEG[0];
-    influence       += boneMatrices[A_JOINT_INC[1]] * A_JOINT_WEG[1];
-    influence       += boneMatrices[A_JOINT_INC[2]] * A_JOINT_WEG[2];
-    influence       += boneMatrices[A_JOINT_INC[3]] * A_JOINT_WEG[3];
+    mat4 influence   = boneMatrices[A_JOINT_INC[0] + PI_SkinBoneOffset0] * A_JOINT_WEG[0];
+    influence       += boneMatrices[A_JOINT_INC[1] + PI_SkinBoneOffset0] * A_JOINT_WEG[1];
+    influence       += boneMatrices[A_JOINT_INC[2] + PI_SkinBoneOffset0] * A_JOINT_WEG[2];
+    influence       += boneMatrices[A_JOINT_INC[3] + PI_SkinBoneOffset0] * A_JOINT_WEG[3];
     PI_ObjectToWorld = PI_ObjectToWorld * influence;
 
                 ")
@@ -123,7 +123,7 @@ mat4 readMatrixFromTex(texture2D tex, sampler samp, float index, float texWidth,
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum ESkinCode {
     None,
-    UBO(ESkinBonesPerVertex, EBoneCount),
+    UBO(ESkinBonesPerVertex, EBoneCount, u16),
     RowTexture(ESkinBonesPerVertex),
     FramesTexture(ESkinBonesPerVertex),
 }
@@ -136,7 +136,7 @@ impl ESkinCode {
     pub fn define_code(&self) -> String {
         match self {
             ESkinCode::None => String::from(""),
-            ESkinCode::UBO(temp, _) => temp.define_code_for_ubo(),
+            ESkinCode::UBO(temp, _, _) => temp.define_code_for_ubo(),
             ESkinCode::RowTexture(temp) => temp.define_code_for_tex(),
             ESkinCode::FramesTexture(temp) => temp.define_code_for_tex(),
         }
@@ -144,7 +144,7 @@ impl ESkinCode {
     pub fn running_code(&self) -> String {
         match self {
             ESkinCode::None => String::from(""),
-            ESkinCode::UBO(temp, _) => temp.running_code_for_ubo(),
+            ESkinCode::UBO(temp, _, _) => temp.running_code_for_ubo(),
             ESkinCode::RowTexture(temp) => temp.running_code_for_tex(),
             ESkinCode::FramesTexture(temp) => temp.running_code_for_tex(),
         }

@@ -21,7 +21,9 @@ impl ShaderVarUniform {
     pub const WORLD_MATRIX_INV          : &'static str = "PI_WorldToObject"     ;
     pub const _WORLD_MATRIX_INV         : &'static str = "U_PI_WorldToObject"   ;
     pub const VELOCITY                  : &'static str = "PI_ObjectVelocity"    ;
-    pub const _VELOCITY                  : &'static str = "U_PI_ObjectVelocity" ;
+    pub const _VELOCITY                 : &'static str = "U_PI_ObjectVelocity"  ;
+    pub const _SKIN_BONE_OFFSET0        : &'static str = "U_PI_SkinBoneOffset0" ;
+    pub const _SKIN_BONE_OFFSET1        : &'static str = "U_PI_SkinBoneOffset1" ;
     
     pub const BONE_MATRICES             : &'static str = "boneMatrices"         ;
     pub const BONE_TEX_SIZE             : &'static str = "bondTexSize"          ;
@@ -78,6 +80,8 @@ impl ShaderVarVertices {
     pub const MATRICES_WEIGHTS_EXTRA3   : &'static str = "A_JOINT_WEG_EX3"     ;
 
     pub const INS_VELOCITY              : &'static str = "A_INS_Velocity"      ;
+    pub const INS_SKIN_BONE_OFFSET0     : &'static str = "A_INS_SkinBoneOffset0";
+    pub const INS_SKIN_BONE_OFFSET1     : &'static str = "A_INS_SkinBoneOffset1";
     pub const PARTICLE_AGE_LIFE         : &'static str = "PARTICLE_AGE_LIFE"    ;
     pub const PARTICLE_POSITION         : &'static str = "PARTICLE_POSITION"    ;
     pub const PARTICLE_SCALING          : &'static str = "PARTICLE_SCALING"     ;

@@ -16,23 +16,23 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct ShaderBindEffectValue {
     pub total_size: usize,
-    pub mat4_count: u8,
-    pub mat2_count: u8,
+    // pub mat4_count: u8,
+    // pub mat2_count: u8,
     pub vec4_count: u8,
     pub vec2_count: u8,
     pub float_count: u8,
-    pub int_count: u8,
+    // pub int_count: u8,
     pub uint_count: u8,
 
     pub fill_vec2_count: u8,
     pub fill_int_count: u8,
     
-    pub mat4_begin: u32,
-    pub mat2_begin: u32,
+    // pub mat4_begin: u32,
+    // pub mat2_begin: u32,
     pub vec4_begin: u32,
     pub vec2_begin: u32,
     pub float_begin: u32,
-    pub int_begin: u32,
+    // pub int_begin: u32,
     pub uint_begin: u32,
     pub key_meta: KeyShaderMeta,
     pub meta: Handle<ShaderEffectMeta>,
@@ -57,12 +57,12 @@ impl ShaderBindEffectValue {
         allocator: &mut BindBufferAllocator,
     ) -> Option<Self> {
         let uniforms = &meta.uniforms;
-        let mat4_count      = uniforms.mat4_list.len() as u8;
-        let mat2_count      = uniforms.mat2_list.len() as u8;
+        // let mat4_count      = uniforms.mat4_list.len() as u8;
+        // let mat2_count      = uniforms.mat2_list.len() as u8;
         let vec4_count      = uniforms.vec4_list.len() as u8;
         let vec2_count      = uniforms.vec2_list.len() as u8;
         let float_count     = uniforms.float_list.len() as u8;
-        let int_count       = uniforms.int_list.len() as u8;
+        let int_count       = 0; // uniforms.int_list.len() as u8;
         let uint_count      = uniforms.uint_list.len() as u8;
         // let align_bytes     = 16;
         
@@ -73,11 +73,11 @@ impl ShaderBindEffectValue {
 
         let mut total_size = 0;
 
-        let mat4_begin: u32  = total_size;
-        total_size += mat4_count as u32 * Self::MAT4_BYTES;
+        // let mat4_begin: u32  = total_size;
+        // total_size += mat4_count as u32 * Self::MAT4_BYTES;
 
-        let mat2_begin: u32  = total_size;
-        total_size += mat2_count as u32 * Self::MAT2_BYTES;
+        // let mat2_begin: u32  = total_size;
+        // total_size += mat2_count as u32 * Self::MAT2_BYTES;
 
         let vec4_begin: u32  = total_size;
         total_size += vec4_count as u32 * Self::VEC4_BYTES;
@@ -88,8 +88,8 @@ impl ShaderBindEffectValue {
         let float_begin: u32 = total_size;
         total_size += float_count as u32 * Self::FLOAT_BYTES;
 
-        let int_begin: u32   = total_size;
-        total_size += int_count as u32 * Self::INT_BYTES;
+        // let int_begin: u32   = total_size;
+        // total_size += int_count as u32 * Self::INT_BYTES;
 
         let uint_begin: u32  = total_size;
         total_size += uint_count as u32 * Self::UINT_BYTES;
@@ -108,21 +108,21 @@ impl ShaderBindEffectValue {
                     Some(
                         Self {
                             total_size: total_size as usize,
-                            mat4_count,
-                            mat2_count,
+                            // mat4_count,
+                            // mat2_count,
                             vec4_count,
                             vec2_count,
                             float_count,
-                            int_count,
+                            // int_count,
                             uint_count,
                             fill_vec2_count,
                             fill_int_count,
-                            mat4_begin,
-                            mat2_begin,
+                            // mat4_begin,
+                            // mat2_begin,
                             vec4_begin,
                             vec2_begin,
                             float_begin,
-                            int_begin,
+                            // int_begin,
                             uint_begin,
                             key_meta,
                             meta,
@@ -138,12 +138,13 @@ impl ShaderBindEffectValue {
     pub fn label(
         &self
     ) -> String {
-        self.mat4_count.to_string() 
-        + Self::LABEL_MASK + &self.mat2_count.to_string() 
+        String::from("")
+        // + self.mat4_count.to_string() 
+        // + Self::LABEL_MASK + &self.mat2_count.to_string() 
         + Self::LABEL_MASK + &self.vec4_count.to_string() 
         + Self::LABEL_MASK + &self.vec2_count.to_string() 
         + Self::LABEL_MASK + &self.float_count.to_string() 
-        + Self::LABEL_MASK + &self.int_count.to_string()
+        // + Self::LABEL_MASK + &self.int_count.to_string()
         + Self::LABEL_MASK + &self.uint_count.to_string()
     }
 

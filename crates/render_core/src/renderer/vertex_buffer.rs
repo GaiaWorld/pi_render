@@ -13,21 +13,23 @@ use super::{
     buffer::{FixedSizeBufferPool, AssetRWBuffer, RWBufferRange},
 };
 
+pub type IDAssetVertexBuffer = i64;
+
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub struct KeyVertexBuffer(String);
+pub struct KeyVertexBuffer(IDAssetVertexBuffer);
 impl KeyVertexBuffer {
-    pub fn as_str(&self) -> &str {
+    pub fn as_str(&self) -> &IDAssetVertexBuffer {
         &self.0
     }
 }
-impl From<String> for KeyVertexBuffer {
-    fn from(value: String) -> Self {
+impl From<IDAssetVertexBuffer> for KeyVertexBuffer {
+    fn from(value: IDAssetVertexBuffer) -> Self {
         Self(value)
     }
 }
-impl From<&str> for KeyVertexBuffer {
-    fn from(value: &str) -> Self {
-        Self(String::from(value))
+impl From<&IDAssetVertexBuffer> for KeyVertexBuffer {
+    fn from(value: &IDAssetVertexBuffer) -> Self {
+        Self(*value)
     }
 }
 impl TAssetKeyU64 for KeyVertexBuffer {}

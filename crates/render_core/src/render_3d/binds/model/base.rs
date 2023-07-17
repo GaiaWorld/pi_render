@@ -19,10 +19,21 @@ pub struct ShaderBindModelAboutMatrix {
 impl ShaderBindModelAboutMatrix {
 
     pub const OFFSET_WORLD_MATRIX:          wgpu::DynamicOffset = 0;
-    pub const OFFSET_WORLD_MATRIX_INV:      wgpu::DynamicOffset = 16 * 4;
-    pub const OFFSET_VELOCITY:              wgpu::DynamicOffset = 16 * 4 + 16 * 4;
+    pub const SIZE_WORLD_MATRIX:            wgpu::DynamicOffset = 16 * 4;
+    pub const OFFSET_WORLD_MATRIX_INV:      wgpu::DynamicOffset = Self::OFFSET_WORLD_MATRIX + Self::SIZE_WORLD_MATRIX;
+    pub const SIZE_WORLD_MATRIX_INV:        wgpu::DynamicOffset = 16 * 4;
+    pub const OFFSET_VELOCITY:              wgpu::DynamicOffset = Self::OFFSET_WORLD_MATRIX_INV + Self::SIZE_WORLD_MATRIX_INV;
+    pub const SIZE_VELOCITY:                wgpu::DynamicOffset = 4 * 4;
+    pub const OFFSET_U32_A:                 wgpu::DynamicOffset = Self::OFFSET_VELOCITY + Self::SIZE_VELOCITY;
+    pub const SIZE_U32_A:                   wgpu::DynamicOffset = 1 * 4;
+    pub const OFFSET_U32_B:                 wgpu::DynamicOffset = Self::OFFSET_U32_A + Self::SIZE_U32_A;
+    pub const SIZE_U32_B:                   wgpu::DynamicOffset = 1 * 4;
+    pub const OFFSET_U32_C:                 wgpu::DynamicOffset = Self::OFFSET_U32_B + Self::SIZE_U32_B;
+    pub const SIZE_U32_C:                   wgpu::DynamicOffset = 1 * 4;
+    pub const OFFSET_U32_D:                 wgpu::DynamicOffset = Self::OFFSET_U32_C + Self::SIZE_U32_C;
+    pub const SIZE_U32_D:                   wgpu::DynamicOffset = 1 * 4;
 
-    pub const TOTAL_SIZE:                   wgpu::DynamicOffset = 16 * 4 + 16 * 4 + 4;
+    pub const TOTAL_SIZE:                   wgpu::DynamicOffset = Self::OFFSET_U32_D + Self::SIZE_U32_D;
 
     pub fn new(
         allocator: &mut BindBufferAllocator,
@@ -54,6 +65,10 @@ impl ShaderBindModelAboutMatrix {
         result += ShaderSetBind::code_uniform("mat4", ShaderVarUniform::_WORLD_MATRIX).as_str();
         result += ShaderSetBind::code_uniform("mat4", ShaderVarUniform::_WORLD_MATRIX_INV).as_str();
         result += ShaderSetBind::code_uniform("vec4", ShaderVarUniform::_VELOCITY).as_str();
+        result += ShaderSetBind::code_uniform("uint", ShaderVarUniform::_SKIN_BONE_OFFSET0).as_str();
+        result += ShaderSetBind::code_uniform("uint", ShaderVarUniform::_SKIN_BONE_OFFSET1).as_str();
+        result += ShaderSetBind::code_uniform("uint", "placeholder_0").as_str();
+        result += ShaderSetBind::code_uniform("uint", "placeholder_1").as_str();
         result += "};\r\n";
         result
     }
@@ -85,6 +100,10 @@ impl TShaderBindCode for BindUseModelMatrix {
         result += ShaderSetBind::code_uniform("mat4", ShaderVarUniform::_WORLD_MATRIX).as_str();
         result += ShaderSetBind::code_uniform("mat4", ShaderVarUniform::_WORLD_MATRIX_INV).as_str();
         result += ShaderSetBind::code_uniform("vec4", ShaderVarUniform::_VELOCITY).as_str();
+        result += ShaderSetBind::code_uniform("uint", ShaderVarUniform::_SKIN_BONE_OFFSET0).as_str();
+        result += ShaderSetBind::code_uniform("uint", ShaderVarUniform::_SKIN_BONE_OFFSET1).as_str();
+        result += ShaderSetBind::code_uniform("uint", "placeholder_0").as_str();
+        result += ShaderSetBind::code_uniform("uint", "placeholder_1").as_str();
         result += "};\r\n";
         result
     }

@@ -69,11 +69,11 @@ impl From<(crate::rhi::shader::ShaderMeta, Vec<Atom>, Vec<Atom>)> for ShaderEffe
                                             crate::rhi::shader::TypeKind::Float => {
                                                 match value.ty.size {
                                                     crate::rhi::shader::TypeSize::Mat { rows, columns: _ } => {
-                                                        if rows == 4 {
-                                                            uniforms.mat4_list.push(UniformPropertyMat4(uniform.name.clone(), crate::render_3d::vec_u8_to_f32_16(&value.default_value)));
-                                                        } else if rows == 2 {
-                                                            uniforms.mat2_list.push(UniformPropertyMat2(uniform.name.clone(), crate::render_3d::vec_u8_to_f32_4(&value.default_value)));
-                                                        }
+                                                        // if rows == 4 {
+                                                        //     uniforms.mat4_list.push(UniformPropertyMat4(uniform.name.clone(), crate::render_3d::vec_u8_to_f32_16(&value.default_value)));
+                                                        // } else if rows == 2 {
+                                                        //     uniforms.mat2_list.push(UniformPropertyMat2(uniform.name.clone(), crate::render_3d::vec_u8_to_f32_4(&value.default_value)));
+                                                        // }
                                                     },
                                                     crate::rhi::shader::TypeSize::Vec(v) => {
                                                         if v == 4 {
@@ -88,7 +88,7 @@ impl From<(crate::rhi::shader::ShaderMeta, Vec<Atom>, Vec<Atom>)> for ShaderEffe
                                                 }
                                             },
                                             crate::rhi::shader::TypeKind::Sint => {
-                                                uniforms.int_list.push(UniformPropertyInt(uniform.name.clone(), crate::render_3d::vec_u8_to_i32(&value.default_value)));
+                                                // uniforms.int_list.push(UniformPropertyInt(uniform.name.clone(), crate::render_3d::vec_u8_to_i32(&value.default_value)));
                                             },
                                             crate::rhi::shader::TypeKind::Uint => {
                                                 uniforms.uint_list.push(UniformPropertyUint(uniform.name.clone(), crate::render_3d::vec_u8_to_u32(&value.default_value)));
@@ -179,12 +179,13 @@ impl ShaderEffectMeta {
         }
     }
     pub fn uniform_count(&self) -> usize {
-        self.uniforms.mat4_list.len()
-        + self.uniforms.mat2_list.len()
+        0
+        // + self.uniforms.mat4_list.len()
+        // + self.uniforms.mat2_list.len()
         + self.uniforms.vec4_list.len()
         + self.uniforms.vec2_list.len()
         + self.uniforms.float_list.len()
-        + self.uniforms.int_list.len()
+        // + self.uniforms.int_list.len()
         + self.uniforms.uint_list.len()
     }
     pub fn vs_blocks_2(
