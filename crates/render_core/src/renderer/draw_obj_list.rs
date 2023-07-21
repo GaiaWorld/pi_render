@@ -46,7 +46,7 @@ impl DrawList {
                             // log::warn!("Buffer  {:?}", indices.buffer.buffer());
                             renderpass.set_index_buffer(indices.slice(), indices.format);
                         }
-                        // log::info!("indices {:?}", indices.value_range());
+                        // log::warn!("indices {:?}", indices.value_range());
                         renderpass.draw_indexed(indices.value_range(), 0 as i32, instance_range);
                     },
                     None => {

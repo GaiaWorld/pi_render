@@ -140,11 +140,8 @@ impl RenderIndices {
         let mut range0 = self.buffer.range();
     
         if let Some(range) = self.buffer_range.as_ref() {
-            range0.end = range.end - range.start;
+            range0.end = range.end;
             range0.start = range.start;
-        } else {
-            range0.end = range0.end - range0.start;
-            range0.start = 0;
         }
         
         Range {
