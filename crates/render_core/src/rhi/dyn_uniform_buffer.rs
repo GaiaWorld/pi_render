@@ -504,7 +504,7 @@ pub enum DynBufferError {
 #[cfg(test)]
 mod test {
     use crate::{self as pi_render, rhi::{dyn_uniform_buffer::GroupAlloter, options::{RenderOptions, RenderPriority}, device::RenderDevice, RenderQueue}};
-    use pi_async::rt::AsyncRuntime;
+    use pi_async_rt::rt::AsyncRuntime;
     use pi_share::Share;
     use render_derive::{BindLayout, BindingType, BufferSize, Uniform};
 	use winit::{event_loop::{EventLoopBuilder}, platform::windows::EventLoopBuilderExtWindows};

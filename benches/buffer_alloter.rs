@@ -3,7 +3,7 @@ use pi_share::{ShareMutex, Share};
 use render_core::rhi::{buffer_alloc::{BufferAlloter}, device::RenderDevice, RenderQueue};
 use std::sync::{Arc, atomic::AtomicBool};
 
-use pi_async::rt::AsyncRuntime;
+use pi_async_rt::rt::AsyncRuntime;
 use winit::{event_loop::{EventLoopBuilder, EventLoopWindowTarget}, platform::windows::EventLoopBuilderExtWindows};
 
 use render_core::rhi::{device::initialize_renderer, options::RenderOptions};

@@ -1,4 +1,4 @@
-use pi_async::rt::{AsyncRuntime, AsyncRuntimeBuilder};
+use pi_async_rt::rt::{AsyncRuntime, AsyncRuntimeBuilder};
 use pi_futures::BoxFuture;
 use pi_render::depend_graph::{
     graph::DependGraph,

@@ -508,7 +508,7 @@ type BufferContainer = SmallVec<[AlignBufferAlloter<SingleBufferAlloter>; 7]>;
 mod test {
     use std::sync::{Arc, atomic::AtomicBool};
 
-    use pi_async::rt::AsyncRuntime;
+    use pi_async_rt::rt::AsyncRuntime;
     use winit::{event_loop::EventLoopBuilder, platform::windows::EventLoopBuilderExtWindows};
 
     use crate::rhi::{device::initialize_renderer, options::RenderOptions};
