@@ -2,7 +2,7 @@
 use std::sync::Arc;
 
 use pi_assets::{mgr::AssetMgr, asset::{GarbageEmpty, Handle}};
-use pi_async::rt::serial::AsyncRuntime;
+use pi_async_rt::rt::serial::AsyncRuntime;
 use pi_atom::Atom;
 
 use pi_share::{Share, ShareRwLock};
@@ -193,7 +193,7 @@ pub fn setup_render_context(
     let backends = options.backends;
 
     
-    let runtime = pi_async::rt::serial::AsyncRuntimeBuilder::default_worker_thread(None, None, None, None);
+    let runtime = pi_async_rt::rt::serial::AsyncRuntimeBuilder::default_worker_thread(None, None, None, None);
 
     let mut result: Share<ShareRwLock<Option<(RenderDevice, RenderQueue, wgpu::AdapterInfo)>>> = Share::new(ShareRwLock::new(None));
     

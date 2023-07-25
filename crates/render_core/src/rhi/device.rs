@@ -160,7 +160,7 @@ impl RenderDevice {
         buffer: &wgpu::BufferSlice<'_>,
         map_mode: wgpu::MapMode,
     ) -> Result<(), BufferAsyncError> {
-		let var = pi_async::prelude::AsyncValue::new();
+		let var = pi_async_rt::prelude::AsyncValue::new();
 		let var1 = var.clone();
         buffer.map_async(map_mode, move |r| {
 			var1.set(r);

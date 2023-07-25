@@ -13,7 +13,7 @@ use super::{
     GraphError,
 };
 use log::error;
-use pi_async::prelude::AsyncRuntime;
+use pi_async_rt::prelude::AsyncRuntime;
 use pi_async_graph::{async_graph, ExecNode, RunFactory, Runner};
 use pi_futures::BoxFuture;
 use pi_graph::{DirectedGraph, DirectedGraphNode, NGraph, NGraphBuilder};
