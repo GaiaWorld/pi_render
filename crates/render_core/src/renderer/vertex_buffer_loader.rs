@@ -4,7 +4,7 @@ use pi_assets::{mgr::AssetMgr};
 use pi_hash::XHashMap;
 use pi_share::Share;
 
-use crate::rhi::{device::RenderDevice, RenderQueue};
+use crate::{rhi::{device::RenderDevice, RenderQueue}, asset::TAssetKeyU64};
 
 use super::{vertex_buffer::{KeyVertexBuffer, EVertexBufferRange, VertexBufferAllocator}, vertices::EVerticesBufferUsage};
 
@@ -13,25 +13,13 @@ pub struct SingleVertexBufferDataMap {
     vertices: XHashMap<KeyVertexBuffer, Vec<u8>>,
     instance: XHashMap<KeyVertexBuffer, Vec<u8>>,
     indices: XHashMap<KeyVertexBuffer, Vec<u8>>,
-    counter: i64,
-    record: XHashMap<String, i64>,
 }
 impl Default for SingleVertexBufferDataMap {
     fn default() -> Self {
-        Self { vertices: XHashMap::default(), instance: XHashMap::default(), indices: XHashMap::default(), counter: -10000_0000, record: XHashMap::default() }
+        Self { vertices: XHashMap::default(), instance: XHashMap::default(), indices: XHashMap::default(), }
     }
 }
 impl SingleVertexBufferDataMap {
-    pub fn id(&mut self, name: &str) -> i64 {
-        if let Some(id) = self.record.get(name) {
-            *id
-        } else {
-            self.counter -= 1;
-            let id = self.counter;
-            self.record.insert(String::from(name), id);
-            id
-        }
-    }
     pub fn add(&mut self, key: &KeyVertexBuffer, data: Vec<u8>) {
         if !self.vertices.contains_key(key) {
             self.vertices.insert(key.clone(), data);
@@ -52,7 +40,7 @@ impl SingleVertexBufferDataMap {
         let mut result = XHashMap::default();
         self.vertices.drain().for_each(|(key, data)| {
             if let Some(bufferrange) = allocator.create_not_updatable_buffer(device, queue, &data, None) {
-                if let Ok(range) = asset_mgr.insert(key.clone(), bufferrange) {
+                if let Ok(range) = asset_mgr.insert(key.asset_u64(), bufferrange) {
                     result.insert(key, EVerticesBufferUsage::Other(range));
                 }
             }
@@ -70,7 +58,7 @@ impl SingleVertexBufferDataMap {
         self.indices.drain().for_each(|(key, data)| {
             if let Some(bufferrange) = allocator.create_not_updatable_buffer_for_index(device, queue, &data) {
                 // log::warn!("create_indices {:?}, {:?}", key, bufferrange.buffer());
-                if let Ok(range) = asset_mgr.insert(key.clone(), bufferrange) {
+                if let Ok(range) = asset_mgr.insert(key.asset_u64(), bufferrange) {
                     // log::warn!("create_indices {:?}, {:?}", key, range.buffer());
                     result.insert(key, EVerticesBufferUsage::Other(range));
                 }

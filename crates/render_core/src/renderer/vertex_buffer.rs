@@ -1,6 +1,7 @@
 use std::{ops::Range, mem::{size_of}, hash::Hash, sync::Arc, fmt::Debug};
 
 use pi_assets::{asset::{Asset, GarbageEmpty, Handle, Size}, mgr::AssetMgr};
+use pi_atom::Atom;
 use pi_share::{Share, ShareMutex};
 use wgpu::util::BufferInitDescriptor;
 
@@ -13,23 +14,23 @@ use super::{
     buffer::{FixedSizeBufferPool, AssetRWBuffer, RWBufferRange},
 };
 
-pub type IDAssetVertexBuffer = i64;
+pub type IDAssetVertexBuffer = u64;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub struct KeyVertexBuffer(IDAssetVertexBuffer);
+pub struct KeyVertexBuffer(Atom);
 impl KeyVertexBuffer {
-    pub fn as_str(&self) -> &IDAssetVertexBuffer {
-        &self.0
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
     }
 }
-impl From<IDAssetVertexBuffer> for KeyVertexBuffer {
-    fn from(value: IDAssetVertexBuffer) -> Self {
-        Self(value)
+impl From<&str> for KeyVertexBuffer {
+    fn from(value: &str) -> Self {
+        Self(Atom::from(value))
     }
 }
-impl From<&IDAssetVertexBuffer> for KeyVertexBuffer {
-    fn from(value: &IDAssetVertexBuffer) -> Self {
-        Self(*value)
+impl From<&Atom> for KeyVertexBuffer {
+    fn from(value: &Atom) -> Self {
+        Self(value.clone())
     }
 }
 impl TAssetKeyU64 for KeyVertexBuffer {}
@@ -165,7 +166,7 @@ impl EVertexBufferRange {
     }
 }
 impl Asset for EVertexBufferRange {
-    type Key = KeyVertexBuffer;
+    type Key = IDAssetVertexBuffer;
 }
 
 impl Size for EVertexBufferRange {

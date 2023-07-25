@@ -1,6 +1,7 @@
 use std::{hash::Hash, sync::Arc};
 
 use pi_assets::asset::Handle;
+use pi_atom::Atom;
 use pi_slotmap::DefaultKey;
 
 use crate::{rhi::{asset::TextureRes}, components::view::target_alloc::ShareTargetView, asset::TAssetKeyU64};
@@ -24,7 +25,7 @@ pub enum EKeyTexture {
 }
 impl EKeyTexture {
     pub fn image(value: &str) -> Self {
-        EKeyTexture::Image(KeyImageTextureView { tex: KeyImageTexture::File(value.to_string(), true), desc: TextureViewDesc::default() })
+        EKeyTexture::Image(KeyImageTextureView { tex: KeyImageTexture::File(Atom::from(value), false), desc: TextureViewDesc::default() })
     }
 }
 impl From<&str> for EKeyTexture {

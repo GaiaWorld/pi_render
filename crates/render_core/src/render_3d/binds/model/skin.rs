@@ -27,6 +27,7 @@ impl ShaderBindModelAboutSkinValue {
         skin: &ESkinCode,
         _: &RenderDevice,
         allocator: &mut BindBufferAllocator,
+        cache: Option<BindBufferRange>,
     ) -> Option<Self> {
         let size = match skin {
             ESkinCode::None => 0,
@@ -35,17 +36,24 @@ impl ShaderBindModelAboutSkinValue {
             ESkinCode::FramesTexture(_) => ShaderBindModelAboutSkinValue::TOTAL_SIZE as usize,
         };
 
-        if size > 0 {
-            if let Some(buffer) = allocator.allocate(size as u32) {
-                Some(Self {
-                    skin: skin.clone(),
-                    data: buffer,
-                })
+        if let Some(cache) = cache {
+            Some(Self {
+                skin: skin.clone(),
+                data: cache,
+            })
+        } else {
+            if size > 0 {
+                if let Some(buffer) = allocator.allocate(size as u32) {
+                    Some(Self {
+                        skin: skin.clone(),
+                        data: buffer,
+                    })
+                } else {
+                    None
+                }
             } else {
                 None
             }
-        } else {
-            None
         }
     }
     pub fn key_layout(&self, binding: u16) -> KeyBindLayoutBuffer {

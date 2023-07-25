@@ -13,8 +13,8 @@ use crate::{rhi::{device::RenderDevice, RenderQueue}, asset::TAssetKeyU64};
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum KeyImageTexture {
-	File(String, bool),
-	Data(String, bool),
+	File(Atom, bool),
+	Data(Atom, bool),
 }
 impl KeyImageTexture {
     pub fn as_str(&self) -> &str {
