@@ -129,14 +129,14 @@ impl TextureView {
 }
 
 pub struct ScreenTexture {
-	surface: Share<wgpu::Surface>,
+	surface: wgpu::Surface,
 	texture: Option<Share<wgpu::SurfaceTexture>>,
 	pub view: Option<Share<wgpu::TextureView>>,
 }
 
 impl ScreenTexture {
 	#[inline]
-    pub fn with_surface(surface: Share<wgpu::Surface>) -> Self {
+    pub fn with_surface(surface: wgpu::Surface) -> Self {
         Self {
             surface,
             texture: None,
@@ -169,7 +169,7 @@ impl ScreenTexture {
             let t = match self.surface.get_current_texture() {
                 Ok(swap_chain_frame) => swap_chain_frame,
                 Err(wgpu::SurfaceError::Outdated) => {
-                    device.configure_surface(self.surface.as_ref(), config);
+                    device.configure_surface(&self.surface, config);
                     self.surface
                         .get_current_texture()
                         .expect("Error reconfiguring surface")
