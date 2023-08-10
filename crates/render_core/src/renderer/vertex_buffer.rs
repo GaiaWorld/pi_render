@@ -139,19 +139,19 @@ impl VertexBufferLayouts {
 pub enum EVertexBufferRange {
     /// * (BufferRange, 使用大小)
     Updatable(RWBufferRange, u32, wgpu::BufferUsages),
-    NotUpdatable(Arc<NotUpdatableBufferRange>),
+    NotUpdatable(Arc<NotUpdatableBufferRange>, u32, u32),
 }
 impl EVertexBufferRange {
     pub fn buffer(&self) -> &Buffer {
         match self {
             EVertexBufferRange::Updatable(val, _, _) => val.buffer(),
-            EVertexBufferRange::NotUpdatable(val) => val.buffer(),
+            EVertexBufferRange::NotUpdatable(val, start, end) => val.buffer(),
         }
     }
     pub fn size(&self) -> u32 {
         match self {
             EVertexBufferRange::Updatable(_, size, _) => *size,
-            EVertexBufferRange::NotUpdatable(val) => val.used_size,
+            EVertexBufferRange::NotUpdatable(val, start, end) => end - start,
         }
     }
     pub fn range(&self) -> Range<wgpu::BufferAddress> {
@@ -159,8 +159,8 @@ impl EVertexBufferRange {
             EVertexBufferRange::Updatable(val, size, _) => {
                 Range { start: val.offset() as u64, end: (val.offset() + size) as u64 }
             },
-            EVertexBufferRange::NotUpdatable(val) => {
-                Range { start: 0, end: val.used_size as u64 }
+            EVertexBufferRange::NotUpdatable(val, start, end) => {
+                Range { start: *start as u64, end: *end as u64 }
             },
         }
     }
@@ -327,6 +327,15 @@ impl VertexBufferAllocator {
     ///
     /// * `old` 仅当更新 Instance 实例化buffer时使用, 此时 NotUpdatableBufferRange 在逻辑上是唯一的,没有共用
     pub fn create_not_updatable_buffer(&mut self, device: &RenderDevice, queue: &RenderQueue, data: &[u8], old_single_used: Option<&NotUpdatableBufferRange>) -> Option<EVertexBufferRange> {
+        if let Some(buffer) = self.create_not_updatable_buffer_pre(device, queue, data, old_single_used) {
+            Some(EVertexBufferRange::NotUpdatable(buffer, 0, data.len() as u32))
+        } else {
+            None
+        }
+    }
+
+    /// * `old` 仅当更新 Instance 实例化buffer时使用, 此时 NotUpdatableBufferRange 在逻辑上是唯一的,没有共用
+    pub fn create_not_updatable_buffer_pre(&mut self, device: &RenderDevice, queue: &RenderQueue, data: &[u8], old_single_used: Option<&NotUpdatableBufferRange>) -> Option<Arc<NotUpdatableBufferRange>> {
         let size = data.len() as u32;
 
         // 如果传入旧 NotUpdatableBufferRange, 且 对应 buffer 大小足够存放新数据 则重复利用该 NotUpdatableBufferRange 中的 buffer
@@ -342,7 +351,7 @@ impl VertexBufferAllocator {
                         usage: old.usage,
                         unused: false,
                     };
-                    return Some(EVertexBufferRange::NotUpdatable(Arc::new(buffer)));
+                    return Some(Arc::new(buffer));
                 }
             }
         }
@@ -375,7 +384,7 @@ impl VertexBufferAllocator {
         // log::info!("size: {}, level: {}, old_count: {}, new: {}", size, level, old_count, new_count);
 
         if let Some(range) = self.unupdatables.get_mut(level).unwrap().allocate(&self.asset_mgr_2, device, queue, data) {
-            Some(EVertexBufferRange::NotUpdatable(Arc::new(range)))
+            Some(Arc::new(range))
         } else {
             None
         }
@@ -412,7 +421,7 @@ impl VertexBufferAllocator {
         // log::info!("size: {}, level: {}, old_count: {}, new: {}", size, level, old_count, new_count);
 
         if let Some(range) = self.unupdatables_for_index.get_mut(level).unwrap().allocate(&self.asset_mgr_2, device, queue, data) {
-            Some(EVertexBufferRange::NotUpdatable(Arc::new(range)))
+            Some(EVertexBufferRange::NotUpdatable(Arc::new(range), 0, data.len() as u32))
         } else {
             None
         }
@@ -565,7 +574,9 @@ impl NotUpdatableBuffer {
         //     temp.push(0);
         // }
         // queue.write_buffer(&self.0, 0, &temp);
-        queue.write_buffer(&self.0, 0, data);
+        if data.len() > 0 {
+            queue.write_buffer(&self.0, 0, data);
+        }
     }
     pub fn flag(&self, val: bool) {
         unsafe {

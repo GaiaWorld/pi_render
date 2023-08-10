@@ -91,6 +91,19 @@ impl ImageTexture {
 
 		Self::new(width, height, size, texture, format, dimension, is_opacity)
 	}
+
+	pub fn update(&self, queue: &RenderQueue, data: &[u8], xoffset: u32, yoffset: u32, width: u32, height: u32) {
+		let offset = (yoffset * self.width + xoffset) as u64;
+		let temp = self.texture.as_image_copy();
+		queue.write_texture(temp, data, wgpu::ImageDataLayout { offset, bytes_per_row: None, rows_per_image: None  }, wgpu::Extent3d { width, height, depth_or_array_layers: 1 });
+	}
+
+	pub fn width(&self) -> u32 {
+		self.width
+	}
+	pub fn height(&self) -> u32 {
+		self.height
+	}
 }
 
 impl Asset for ImageTexture {

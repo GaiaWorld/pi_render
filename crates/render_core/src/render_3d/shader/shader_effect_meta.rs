@@ -20,7 +20,7 @@ use super::{
     shader_defines::ShaderDefinesSet,
     uniform_value::{MaterialValueBindDesc, UniformPropertyMat4, UniformPropertyMat2, UniformPropertyVec4, UniformPropertyVec2, UniformPropertyFloat, UniformPropertyInt, UniformPropertyUint}, 
     uniform_texture::{UniformTexture2DDesc, EffectUniformTexture2DDescs},
-    instance_code::EInstanceCode, shader::{Shader3D, TShaderBlockCode}, CodeSnippet, ESkinCode, ERenderAlignment
+    instance_code::EVerticeExtendCode, shader::{Shader3D, TShaderBlockCode}, CodeSnippet, ESkinCode, ERenderAlignment
 };
 
 /// 材质代码
@@ -192,7 +192,7 @@ impl ShaderEffectMeta {
         &self,
         name: &str,
         vertex_layouts: &KeyShaderFromAttributes,
-        instance: &EInstanceCode,
+        instance: &EVerticeExtendCode,
         render_alignment: &ERenderAlignment,
         skin: &ESkinCode,
         defined_snippets: &[String],
@@ -322,7 +322,7 @@ const float HALF_MIN = 5.96046448e-08;
         device: &RenderDevice,
         key_meta: &KeyShaderMeta,
         vertex_layouts: &KeyShaderFromAttributes,
-        instance: &EInstanceCode,
+        instance: &EVerticeExtendCode,
         render_alignment: &ERenderAlignment,
         skin: &ESkinCode,
         vs_defined_snippets: &[String],
@@ -369,7 +369,7 @@ const float HALF_MIN = 5.96046448e-08;
     pub fn vs_blocks<T0: TShaderSetBlock, T1: TShaderSetBlock, T2: TShaderSetBlock, T3: TShaderSetBlock>(
         &self,
         vertex_layouts: &KeyShaderFromAttributes,
-        instance: &EInstanceCode,
+        instance: &EVerticeExtendCode,
         skin: &ESkinCode,
         scene_about: &T0,
         model_about: &T1,
@@ -534,7 +534,7 @@ const float HALF_MIN = 5.96046448e-08;
         device: &RenderDevice,
         key_meta: &KeyShaderMeta,
         key_attributes: &KeyShaderFromAttributes,
-        instance: &EInstanceCode,
+        instance: &EVerticeExtendCode,
         skin: &ESkinCode,
         set_0: &T0,
         set_1: &T1,

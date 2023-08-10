@@ -1,13 +1,14 @@
 
 #[derive(Debug, Clone, Copy)]
-pub struct EInstanceCode(pub u32);
-impl EInstanceCode {
+pub struct EVerticeExtendCode(pub u32);
+impl EVerticeExtendCode {
     pub const NONE: u32 = 0;
-    pub const BASE: u32         = 0b0000_0000_0000_0000_0000_0000_0000_0001;
-    pub const COLOR: u32        = 0b0000_0000_0000_0000_0000_0000_0000_0010;
-    pub const TILL_OFF_1: u32   = 0b0000_0000_0000_0000_0000_0000_0000_0100;
-    pub const VELOCITY: u32     = 0b0000_0000_0000_0000_0000_0000_0000_1000;
-    pub const SKIN: u32         = 0b0000_0000_0000_0000_0000_0000_0001_0000;
+    pub const INSTANCE_BASE: u32            = 0b0000_0000_0000_0000_0000_0000_0000_0001;
+    pub const INSTANCE_COLOR: u32           = 0b0000_0000_0000_0000_0000_0000_0000_0010;
+    pub const INSTANCE_TILL_OFF_1: u32      = 0b0000_0000_0000_0000_0000_0000_0000_0100;
+    pub const INSTANCE_VELOCITY: u32        = 0b0000_0000_0000_0000_0000_0000_0000_1000;
+    pub const INSTANCE_SKIN: u32            = 0b0000_0000_0000_0000_0000_0000_0001_0000;
+    pub const TRIAL: u32                    = 0b0000_0000_0000_0000_0000_0000_0010_0000;
     pub fn vs_running_code(&self) -> String {
         let mut result = String::from("
     mat4 PI_ObjectToWorld = U_PI_ObjectToWorld;
@@ -19,22 +20,26 @@ impl EInstanceCode {
         if self.0 == 0 {
             result += Self::none().as_str();
         }
-        else {
+        if (self.0 & Self::INSTANCE_BASE) == Self::INSTANCE_BASE {
             result += Self::base().as_str();
         }
-        if (self.0 & Self::COLOR) == Self::COLOR {
+        if (self.0 & Self::INSTANCE_COLOR) == Self::INSTANCE_COLOR {
             result += Self::color().as_str();
         }
-        if (self.0 & Self::TILL_OFF_1) == Self::TILL_OFF_1 {
+        if (self.0 & Self::INSTANCE_TILL_OFF_1) == Self::INSTANCE_TILL_OFF_1 {
             result += Self::uv().as_str();
         }
-        if (self.0 & Self::VELOCITY) == Self::VELOCITY {
+        if (self.0 & Self::INSTANCE_VELOCITY) == Self::INSTANCE_VELOCITY {
             result += Self::velocity().as_str();
         }
-        if (self.0 & Self::SKIN) == Self::SKIN {
+        if (self.0 & Self::INSTANCE_SKIN) == Self::INSTANCE_SKIN {
             result += Self::skin().as_str();
         }
 
+        if (self.0 & Self::TRIAL) == Self::TRIAL {
+            result += Self::trail().as_str();
+        }
+    
         result
     }
     fn none() -> String {
@@ -64,6 +69,18 @@ impl EInstanceCode {
     fn skin() -> String {
         String::from("
     PI_SkinBoneOffset0 = A_INS_SkinBoneOffset0;
+        ")
+    }
+    fn trail() -> String {
+        String::from("
+    vec2 A_UV = vec2(TRAIL_INFO.y, step(0., TRAIL_INFO.x));
+
+    vec3 zaxis = normalize(TRAIL_AXIS);
+    vec3 yaxis = normalize(PI_CAMERA_POSITION.xyz - worldPos.xyz);
+    vec3 xaxis = normalize(cross(yaxis, zaxis)) * TRAIL_INFO.x;
+    A_POSITION += xaxis;
+
+    vec3 A_NORMAL = yaxis;
         ")
     }
 }
