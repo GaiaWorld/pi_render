@@ -104,6 +104,8 @@ pub enum EVertexDataKind {
     ParticleDirection       ,
     ParticleColor           ,
     ParticleTilloff         ,
+    TrailAxis               ,
+    TrailInfo               ,
 }
 
 impl EVertexDataKind {
@@ -159,6 +161,8 @@ impl EVertexDataKind {
             EVertexDataKind::ParticleDirection      => ShaderVarVertices::PARTICLE_DIRECTION        ,
             EVertexDataKind::ParticleColor          => ShaderVarVertices::PARTICLE_COLOR            ,
             EVertexDataKind::ParticleTilloff        => ShaderVarVertices::PARTICLE_TILLOFF          ,
+            EVertexDataKind::TrailAxis              => ShaderVarVertices::PARTICLE_TILLOFF          ,
+            EVertexDataKind::TrailInfo              => ShaderVarVertices::PARTICLE_TILLOFF          ,
         }
     }
     pub fn kind(&self) -> &str {
@@ -213,6 +217,8 @@ impl EVertexDataKind {
             EVertexDataKind::ParticleDirection      => "vec3"       ,
             EVertexDataKind::ParticleColor          => "vec4"       ,
             EVertexDataKind::ParticleTilloff        => "vec4"       ,
+            EVertexDataKind::TrailAxis              => "vec3"       ,
+            EVertexDataKind::TrailInfo              => "vec2"       ,
         }
     }
 }
