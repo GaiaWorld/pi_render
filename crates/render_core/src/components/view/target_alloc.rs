@@ -1,7 +1,8 @@
 //! 渲染目标分配器
 
-use std::{hash::{Hash, Hasher}, collections::hash_map::Entry, intrinsics::transmute, num::NonZeroU32, ops::Deref, mem::size_of};
+use std::{hash::{Hash, Hasher}, collections::hash_map::Entry, intrinsics::transmute, num::NonZeroU32, mem::size_of};
 
+use derive_deref_rs::Deref;
 use guillotiere::{Size, Allocation, Rectangle, Point};
 use pi_assets::{asset::{Handle, Droper}, mgr::AssetMgr, homogeneous::HomogeneousMgr};
 use pi_share::{Share, ShareRwLock};
@@ -114,69 +115,43 @@ impl TargetView {
 #[derive(Debug, Clone, Copy, Hash)]
 pub struct TargetType(DefaultKey);
 
-#[derive(Clone)]
-pub struct ShareTargetView(Share<(TargetView, SafeAtlasAllocator)>);
-
-impl std::fmt::Debug for ShareTargetView {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("ShareTargetView").field(&self.0.0).finish()
-    }
+/// 安全的TargetView
+/// 当SafeTargetView销毁时， 会从纹理分配器中自动释放
+#[derive(Deref)]
+pub struct SafeTargetView {
+	#[deref]
+	value: TargetView,
+	allotor: SafeAtlasAllocator
 }
 
-impl Deref for ShareTargetView {
-    type Target = TargetView;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0.0
-    }
-}
-
-impl Drop for ShareTargetView {
+impl Drop for SafeTargetView {
     fn drop(&mut self) {
-		if Share::strong_count(&self.0) == 1 {
-			self.0.1.0.write().deallocate(&self.0.0);
-		}
+		self.allotor.0.write().deallocate(&self.value);
     }
 }
 
-impl GetTargetView for ShareTargetView {
-    fn get_target_view(&self) -> Option<&TargetView>{
-        Some(&self.0.0)
+impl std::fmt::Debug for SafeTargetView {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("SafeTargetView").field(&self.value).finish()
     }
 }
 
-// impl GetTargetView for &ShareTargetView {
-//     fn get_target_view(&self) -> Option<&TargetView>{
-//         Some(&self.0.0)
-//     }
-// }
-
-impl GetTargetView for Option<ShareTargetView> {
-    fn get_target_view(&self) -> Option<&TargetView>{
-		match self {
-			Some(r) => Some(&r.0.0),
-			None => None
-		}
-	}
-}
-
-// impl GetTargetView for &Option<ShareTargetView> {
-//     fn get_target_view(&self) -> Option<&TargetView>{
-// 		match self {
-// 			Some(r) => Some(&r.0.0),
-// 			None => None
-// 		}
-// 	}
-// }
+pub type ShareTargetView = Share<SafeTargetView>;
 
 pub trait GetTargetView {
 	fn get_target_view(&self) -> Option<&TargetView>;
 }
 
-impl<T: GetTargetView> GetTargetView for &T {
-	fn get_target_view(&self) -> Option<&TargetView> {
-		GetTargetView::get_target_view(*self)
-	}
+impl GetTargetView for TargetView {
+    fn get_target_view(&self) -> Option<&TargetView>{
+        Some(self)
+    }
+}
+
+impl<T: GetTargetView + 'static, O: std::ops::Deref<Target=T>> GetTargetView for O {
+    fn get_target_view(&self) -> Option<&TargetView>{
+		self.deref().get_target_view()
+    }
 }
 
 /// 线程安全的纹理分配器
@@ -206,12 +181,18 @@ impl SafeAtlasAllocator {
 	}
 
 	/// 分配矩形区域
+	#[inline]
 	pub fn allocate<G: GetTargetView, T: Iterator<Item=G>>(&self, width: u32, height: u32, target_type: TargetType, exclude: T) -> ShareTargetView {
-		ShareTargetView(
-			Share::new(
-				(self.0.write().allocate(width, height, target_type, exclude), self.clone())
-			)
-		)
+		Share::new(self.allocate_not_share(width, height, target_type, exclude))
+	}
+
+	/// 分配矩形区域
+	#[inline]
+	pub fn allocate_not_share<G: GetTargetView, T: Iterator<Item=G>>(&self, width: u32, height: u32, target_type: TargetType, exclude: T) -> SafeTargetView {
+		SafeTargetView{
+			value: self.0.write().allocate(width, height, target_type, exclude),
+			allotor: self.clone()
+		}
 	}
 }
 

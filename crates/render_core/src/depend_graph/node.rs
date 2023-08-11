@@ -52,6 +52,7 @@ pub trait DependNode<Context>: 'static + ThreadSync {
         context: &'a Context,
         input: &'a Self::Input,
         usage: &'a ParamUsage,
+		id: NodeId, from: &'static [NodeId], to: &'static [NodeId],
     ) -> BoxFuture<'a, Result<Self::Output, String>>;
 }
 
@@ -172,7 +173,7 @@ pub(crate) trait InternalNode<Context: ThreadSync + 'static>: OutParam {
     fn build<'a>(&'a mut self, context: &'a Context) -> Result<(), GraphError>;
 
     // 执行依赖图
-    fn run<'a>(&'a mut self, context: &'a Context) -> BoxFuture<'a, Result<(), GraphError>>;
+    fn run<'a>(&'a mut self, context: &'a Context, id: NodeId, from: &'static [NodeId], to: &'static [NodeId]) -> BoxFuture<'a, Result<(), GraphError>>;
 }
 
 /// 链接 NodeInteral 和 DependNode 的 结构体
@@ -274,7 +275,7 @@ where
             self.input
                 .can_fill(&mut self.param_usage.input_map_fill, node.0, n.deref());
         }
-
+		
         self.pre_nodes.push(node);
     }
 
@@ -300,18 +301,17 @@ where
             .map_err(GraphError::CustomBuildError)
     }
 
-    fn run<'a>(&'a mut self, context: &'a Context) -> BoxFuture<'a, Result<(), GraphError>> {
+    fn run<'a>(&'a mut self, context: &'a Context, id: NodeId, from: &'static [NodeId], to: &'static [NodeId]) -> BoxFuture<'a, Result<(), GraphError>> {
         Box::pin(async move {
             for (pre_id, pre_node) in &self.pre_nodes {
                 let p = pre_node.0.as_ref();
                 let p = p.borrow();
                 self.input.fill_from(*pre_id, p.deref());
-
                 // 用完了 一个前置，引用计数 减 1
                 p.deref().dec_curr_ref();
             }
 
-            let runner = self.node.run(context, &self.input, &self.param_usage);
+            let runner = self.node.run(context, &self.input, &self.param_usage, id, from, to);
 
             match runner.await {
                 Ok(output) => {
@@ -348,6 +348,7 @@ impl<Context: ThreadSync + 'static> Clone for NodeState<Context> {
         Self(self.0.clone())
     }
 }
+
 
 impl<Context: ThreadSync + 'static> NodeState<Context> {
     pub(crate) fn new<I, O, R>(node: R) -> Self

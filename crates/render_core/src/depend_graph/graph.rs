@@ -12,16 +12,19 @@ use super::{
     param::{InParam, OutParam},
     GraphError,
 };
+use graphviz_rust::dot_structures::Node;
 use log::error;
 use pi_async_rt::prelude::AsyncRuntime;
-use pi_async_graph::{async_graph, ExecNode, RunFactory, Runner};
+use pi_async_graph::{async_graph, ExecNode as ExecNode1, RunFactory, Runner, Runnble, GetRunnble};
 use pi_futures::BoxFuture;
-use pi_graph::{DirectedGraph, DirectedGraphNode, NGraph, NGraphBuilder};
+use pi_graph::{DirectedGraph, DirectedGraphNode, NGraph, NGraphBuilder, NGraphNode};
 use pi_hash::{XHashMap, XHashSet};
+use pi_map::vecmap::VecMap;
 use pi_share::{Share, ShareCell, ThreadSync};
-use pi_slotmap::SlotMap;
-use std::{borrow::Cow, marker::PhantomData};
+use pi_slotmap::{SlotMap, SecondaryMap};
+use std::{borrow::Cow, marker::PhantomData, sync::atomic::AtomicUsize, mem::{replace, size_of}};
 
+type ExecNode<Context> = ExecNode1<NodeId, Context, BuildSyncRun<Context>, BuildSyncRun<Context>>;
 /// 依赖图
 pub struct DependGraph<Context: ThreadSync + 'static> {
     // ================== 拓扑信息
@@ -29,11 +32,9 @@ pub struct DependGraph<Context: ThreadSync + 'static> {
     // 名字 和 NodeId 映射
     node_names: XHashMap<Cow<'static, str>, NodeId>,
 
-    // 所有 节点的 集合
-    nodes: SlotMap<NodeId, (String, NodeState<Context>)>,
 
-    // 边 (before, after)
-    edges: XHashMap<NodeId, NodeSlot>,
+    // // 边 (before, after)
+    // edges: XHashMap<NodeId, NodeSlot>,
 
     // 最终节点，渲染到屏幕的节点
     finish_nodes: XHashSet<NodeId>,
@@ -43,29 +44,45 @@ pub struct DependGraph<Context: ThreadSync + 'static> {
 
     // 拓扑图，is_topo_dirty 为 false 则 不会 构建
     // 注：ng 的 边 和 edges 的 (before, after) 是 相反的
-    topo_ng: Option<NGraph<NodeId, NodeId>>,
+    topo_graph: NGraphBuilder<NodeId, ()>,
+
+	edge_map: XHashSet<(NodeId, NodeId)>,
 
     // 有没有 修改 finish_nodes
     is_finish_dirty: bool,
 
     // ================== 运行信息
 
-    // 运行图 中 入度为0 的节点
-    input_node_ids: Vec<NodeId>,
+    // // 运行图 中 入度为0 的节点
+    // input_node_ids: Vec<NodeId>,
 
-    // 运行 节点 build 方法的图，当切仅当 图 有所变化时候，每个节点会重新运行一次；
-    // build_ng 如果为Some，这一帧会执行，紧接着 build_ng = None
-    // build_ng 边 和 edges 的 (before, after) 相同
-    build_ng: Option<
-        Share<NGraph<NodeId, ExecNode<Context, BuildSyncRun<Context>, BuildSyncRun<Context>>>>,
-    >,
 
-    // 录制渲染指令的 异步执行图，用于 更新 GPU 资源
-    // 当 渲染图 拓扑改变 或 finish 节点 改变后，会 重新 构建个 新的
-    // run_ng边 和 edges 的 (before, after) 相同
-    run_ng: Option<
-        Share<NGraph<NodeId, ExecNode<Context, BuildSyncRun<Context>, BuildSyncRun<Context>>>>,
-    >,
+
+	// // 构建执行方法，
+	// // 当切仅当 图 有所变化时候，每个节点会重新运行一次；
+	// build_runners: SecondaryMap<NodeId, >,
+	// // run执行方法
+	// // 录制渲染指令的, 用于 更新 GPU 资源
+	// // 每帧执行
+	// run_runners: SecondaryMap<NodeId, ExecNode<Context, BuildSyncRun<Context>>>,
+	
+	// 派发任务所依赖的图结构， 与topo_graph不同的是，topo_graph中包含所有节点， schedule_graph只包含需要执行的节点（这些节点必须流向某个终节点）
+	schedule_graph: ScheduleGraph<Context, RunType>,
+
+
+    // // 运行 节点 build 方法的图，当切仅当 图 有所变化时候，每个节点会重新运行一次；
+    // // build_ng 如果为Some，这一帧会执行，紧接着 build_ng = None
+    // // build_ng 边 和 edges 的 (before, after) 相同
+    // build_ng: Option<
+    //     Share<NGraph<NodeId, ExecNode<Context, BuildSyncRun<Context>, BuildSyncRun<Context>>>>,
+    // >,
+
+    // // 录制渲染指令的 异步执行图，用于 更新 GPU 资源
+    // // 当 渲染图 拓扑改变 或 finish 节点 改变后，会 重新 构建个 新的
+    // // run_ng边 和 edges 的 (before, after) 相同
+    // run_ng: Option<
+    //     Share<NGraph<NodeId, ExecNode<Context, BuildSyncRun<Context>, BuildSyncRun<Context>>>>,
+    // >,
 }
 
 impl<Context: ThreadSync + 'static> Default for DependGraph<Context> {
@@ -73,20 +90,22 @@ impl<Context: ThreadSync + 'static> Default for DependGraph<Context> {
         Self {
             node_names: XHashMap::default(),
 
-            nodes: SlotMap::default(),
-            edges: XHashMap::default(),
+            // edges: XHashMap::default(),
 
             finish_nodes: XHashSet::default(),
 
             is_topo_dirty: true,
-            topo_ng: None,
 
             is_finish_dirty: true,
 
-            input_node_ids: vec![],
+            // input_node_ids: vec![],
 
-            build_ng: None,
-            run_ng: None,
+			topo_graph: NGraphBuilder::new(),
+			edge_map: XHashSet::default(),
+			schedule_graph: ScheduleGraph {
+				graph: Default::default(),
+				nodes: Default::default(),
+			},
         }
     }
 }
@@ -137,41 +156,43 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
     /// 红色 是 结束 节点
     #[cfg(debug_assertions)]
     fn dump_graphviz_impl(&self) -> String {
-        let mut v = vec!["digraph Render {".into()];
+        // let mut v = vec!["digraph Render {".into()];
 
-        for (id, (name, _)) in self.nodes.iter() {
-            let color = if self.finish_nodes.get(&id).is_some() {
-                "red"
-            } else {
-                "white"
-            };
+        // for (id, (name, _)) in self.nodes.nodes.iter() {
+        //     let color = if self.finish_nodes.get(&id).is_some() {
+        //         "red"
+        //     } else {
+        //         "white"
+        //     };
 
-            v.push(format!(
-                "\t \"{id:?}\" [\"style\"=\"filled\" \"label\"={name} \"fillcolor\"=\"{color}\"]"
-            ));
-        }
+        //     v.push(format!(
+        //         "\t \"{id:?}\" [\"style\"=\"filled\" \"label\"={name} \"fillcolor\"=\"{color}\"]"
+        //     ));
+        // }
 
-        v.push("".into());
+        // v.push("".into());
 
-        for (id, slot) in self.edges.iter() {
-            for next_id in slot.next_nodes.iter() {
-                v.push(format!("\t \"{id:?}\" -> \"{next_id:?}\""));
-            }
-        }
+        // for (id, slot) in self.edges.iter() {
+        //     for next_id in slot.next_nodes.iter() {
+        //         v.push(format!("\t \"{id:?}\" -> \"{next_id:?}\""));
+        //     }
+        // }
 
-        v.push("}".into());
+        // v.push("}".into());
 
-        v.join("\n")
+        // v.join("\n")
+
+		"".to_string()
     }
 
     /// 查 指定节点 的 前驱节点
     pub fn get_prev_ids(&self, id: NodeId) -> Option<&[NodeId]> {
-        self.edges.get(&id).map(|v| v.prev_nodes.as_slice())
+        self.topo_graph.graph().get(id).map(|v| v.from())
     }
 
     /// 查 指定节点 的 后继节点
     pub fn get_next_ids(&self, id: NodeId) -> Option<&[NodeId]> {
-        self.edges.get(&id).map(|v| v.next_nodes.as_slice())
+        self.topo_graph.graph().get(id).map(|v| v.to())
     }
 
     /// 添加 名为 name 的 节点
@@ -196,11 +217,18 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
         self.is_topo_dirty = true;
 
         let node_state = NodeState::<Context>::new(node);
-
-        let node_id = self.nodes.insert((name.to_string(), node_state));
+		let run_node = self.create_run_node(node_state.clone())?;
+		let build_node = self.create_build_node(node_state.clone())?;
+        let node_id = self.schedule_graph.nodes.insert(ScheduleNode {
+            build_node,
+            run_node,
+            name: name.to_string(),
+            state: node_state,
+            mark: PhantomData,
+        });
 
         self.node_names.insert(name, node_id);
-        self.edges.insert(node_id, NodeSlot::default());
+		self.topo_graph.node(node_id, ());
 		
         Ok(node_id)
     }
@@ -214,32 +242,17 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
             Err(_) => return Err(GraphError::NoneNode(format!("{:?}", label))),
         };
 
-        // 拓扑结构改变
-        self.is_topo_dirty = true;
-
-        let node = match self.nodes.remove(id) {
-            Some(r) => r,
+        let node = match self.schedule_graph.remove(id) {
+            Some(r) => {
+				// 拓扑结构改变
+				self.is_topo_dirty = true;
+				r
+			},
             None => return Err(GraphError::NoneNode(format!("{:?}", label))),
         };
         self.finish_nodes.remove(&id);
-        self.node_names.remove(node.0.as_str());
-
-        // 图：删点 必 删边
-        if let Some(slot) = self.edges.remove(&id) {
-            for prev in slot.prev_nodes.iter() {
-                // 删除 所有 前驱节点 的 后继
-                self.edges
-                    .get_mut(prev)
-                    .and_then(|s| s.remove_next_slot(id));
-            }
-
-            for next in slot.next_nodes.iter() {
-                // 删除 所有 后继节点 的 前驱
-                self.edges
-                    .get_mut(next)
-                    .and_then(|s| s.remove_prev_slot(id));
-            }
-        }
+        self.node_names.remove(node.name.as_str());
+        self.topo_graph.remove_node(id);
 
         Ok(())
     }
@@ -284,28 +297,13 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
         let after_label = after_label.into();
 
         let before_node = self.get_node_id(&before_label)?;
-        let after_node = self.get_node_id(&after_label)?;
+        let after_node: NodeId = self.get_node_id(&after_label)?;
 
-        if self
-            .edges
-            .get_mut(&before_node)
-            .and_then(|slot| slot.add_next_slot(after_node))
-            .is_some()
-        {
-            // 拓扑结构改变
-            self.is_topo_dirty = true;
-        }
-
-        if self
-            .edges
-            .get_mut(&after_node)
-            .and_then(|slot| slot.add_prev_slot(before_node))
-            .is_some()
-        {
-            // 拓扑结构改变
-            self.is_topo_dirty = true;
-        }
-
+		if self.edge_map.insert((before_node, after_node)) {
+			self.topo_graph.edge(before_node, after_node);
+			self.is_topo_dirty = true;
+		}
+		
         Ok(())
     }
 
@@ -322,25 +320,9 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
         let before_node = self.get_node_id(&before_label)?;
         let after_node = self.get_node_id(&after_label)?;
 
-        if self
-            .edges
-            .get_mut(&after_node)
-            .and_then(|slot| slot.remove_prev_slot(before_node))
-            .is_some()
-        {
-            // 拓扑结构改变
-            self.is_topo_dirty = true;
-        }
-
-        if self
-            .edges
-            .get_mut(&before_node)
-            .and_then(|slot| slot.remove_next_slot(after_node))
-            .is_some()
-        {
-            // 拓扑结构改变
-            self.is_topo_dirty = true;
-        }
+		self.topo_graph.remove_edge(before_node, after_node);
+		// 拓扑结构改变
+		self.is_topo_dirty = true;
 
         Ok(())
     }
@@ -348,55 +330,56 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
 
 /// 渲染图的 执行 相关
 impl<Context: ThreadSync + 'static> DependGraph<Context> {
-    /// 构建图，不需要 运行时
-    pub fn build(&mut self) -> Result<(), GraphError> {
-        let sub_ng = match self.update_topo()? {
-            None => return Ok(()),
-            Some(g) => g,
-        };
-
-        // 构建 run_ng，返回 构建图
-        self.create_run_ng(sub_ng)?;
-
-        Ok(())
-    }
-
     /// 执行 渲染
     pub async fn run<A: 'static + AsyncRuntime + Send>(
         &mut self,
         rt: &A,
-        context: &'static Context,
+        context: &Context,
     ) -> Result<(), GraphError> {
-        // 注 构建 ng 只运行一次
-        match self.build_ng.take() {
-            None => {}
-            Some(g) => match async_graph(rt.clone(), g.clone(), context).await {
-                Ok(_) => {}
-                Err(e) => {
-                    let err = GraphError::RunNGraphError(format!("run_ng, {e:?}"));
+		let is_topo_dirty = self.is_topo_dirty;
 
-                    error!("{}", err);
-                    return Err(err);
-                }
-            },
-        }
+		// 检查图是否改变，如果改变， 需要重构图
+		let build_ret: Result<(), GraphError> = self.build();
+		self.is_finish_dirty = false;
+		self.is_topo_dirty = false;
+		build_ret?;
 
-        match self.run_ng {
-            None => {
-                let e = GraphError::NoneNGraph("run_ng".to_string());
-                error!("{}", e);
-                Err(e)
-            }
-            Some(ref g) => match async_graph(rt.clone(), g.clone(), context).await {
-                Ok(_) => Ok(()),
-                Err(e) => {
-                    let err = GraphError::RunNGraphError(format!("run_ng, {e:?}"));
+		// 运行所有图节点的build方法
+        // 只有topo图改变时需要运行一次
+		if is_topo_dirty {
+			let g = self.schedule_graph.transmute::<BuildType>();
+			match async_graph::<_, _, _, _, ExecNode<Context>, _>(rt.clone(), g, context).await {
+				Ok(_) => {}
+				Err(e) => {
+					let err = GraphError::RunNGraphError(format!("run_ng, {e:?}"));
 
-                    error!("{}", err);
-                    Err(err)
-                }
-            },
-        }
+					error!("{}", err);
+					return Err(err);
+				}
+			}
+		}
+
+		// 运行所有图节点的run方法
+        match async_graph::<_, _, _, _, ExecNode<Context>, _>(rt.clone(), &self.schedule_graph, context).await {
+			Ok(_) => Ok(()),
+			Err(e) => {
+				let err = GraphError::RunNGraphError(format!("run_ng, {e:?}"));
+
+				error!("{}", err);
+				Err(err)
+			}
+		}
+    }
+
+	/// 构建图，不需要 运行时
+    fn build(&mut self) -> Result<(), GraphError> {
+        self.update_graph()?;
+
+        // 构建 run_ng，返回 构建图
+		if self.is_topo_dirty {
+			self.update_run_ng()?;
+		}
+        Ok(())
     }
 }
 
@@ -432,25 +415,26 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
         }
     }
 
-    fn update_topo(&mut self) -> Result<Option<NGraph<NodeId, NodeId>>, GraphError> {
+    fn update_graph(&mut self) -> Result<bool, GraphError> {
+        // 有必要的话，修改 拓扑结构
+        // 拓扑 没修改，返回 原图
         if self.is_topo_dirty {
-            // 拓扑结构变，全部 需要 重构
-            self.is_finish_dirty = true;
-
-            self.topo_ng = None;
-            self.run_ng = None;
-        } else if self.is_finish_dirty {
-            // finish 变，子图 和 执行部分 需要 重构
-            self.run_ng = None;
-        } else {
-            // 都没改过，就认为 run_ng 全部就绪
-            return Ok(None);
+			self.topo_graph = NGraphBuilder::new_with_graph(match replace(&mut self.topo_graph, NGraphBuilder::new()).build(){
+				Ok(ng) => ng,
+				Err(e) => {
+					let msg = format!("ng build failed, e = {e:?}");
+					return Err(GraphError::BuildError(msg));
+				}
+			});
         }
 
-        // 有必要的话，修改 拓扑结构
-        self.change_topo()?;
+		if self.is_finish_dirty || self.is_topo_dirty {
+			// 以终为起，构建需要的 节点
+			let finishes: Vec<NodeId> = self.finish_nodes.iter().copied().collect();
 
-        Ok(Some(self.gen_sub()?))
+			self.schedule_graph.graph = self.topo_graph.graph().gen_graph_from_keys(&finishes);
+		}
+		Ok(true)
     }
 
     // // 取 label 对应的 Name
@@ -464,31 +448,24 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
     // 取 label 对应的 NodeState
     fn get_node_state(&self, label: &NodeLabel) -> Result<&NodeState<Context>, GraphError> {
         self.get_node_id(label).and_then(|id| {
-            self.nodes
+            self.schedule_graph.nodes
                 .get(id)
-                .map(|v| &v.1)
+                .map(|v| &v.state)
                 .ok_or_else(|| GraphError::NoneNode(label.into()))
         })
     }
 
-    // 生成 子图
-    fn gen_sub(&mut self) -> Result<NGraph<NodeId, NodeId>, GraphError> {
-        // 子图 一定是 修改过的
-        assert!(self.is_finish_dirty);
+    // // 根据finish，生成 子图
+    // fn gen_sub(&mut self, finish_nodes: graph: &mut NGraph<NodeId, NodeId>) -> Result<NGraph<NodeId, NodeId>, GraphError> {
+    //     // 以终为起，构建需要的 节点
+    //     let finishes: Vec<NodeId> = self.finish_nodes.iter().copied().collect();
 
-        self.is_finish_dirty = false;
+    //     let sub_ng = graph.gen_graph_from_keys(&finishes);
 
-        let ng = self.topo_ng.as_ref().unwrap();
+    //     // self.input_node_ids = sub_ng.from().to_vec();
 
-        // 以终为起，构建需要的 节点
-        let finishes: Vec<NodeId> = self.finish_nodes.iter().copied().collect();
-
-        let sub_ng = ng.gen_graph_from_keys(&finishes);
-
-        self.input_node_ids = sub_ng.from().to_vec();
-
-        Ok(sub_ng)
-    }
+    //     Ok(sub_ng)
+    // }
 
     // 取 拓扑图，有必要就重新构建
     fn change_topo(&mut self) -> Result<(), GraphError> {
@@ -497,149 +474,98 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
             return Ok(());
         }
         self.is_topo_dirty = false;
-
-        // 构建成功, ng_builder 就 删掉
-        let mut builder = NGraphBuilder::<NodeId, NodeId>::new();
-        // 节点 就是 高层添加 的 节点
-        for (node_id, _) in &self.nodes {
-            builder = builder.node(node_id, node_id);
-        }
-
-        {
-            let mut access_edges = XHashSet::<(NodeId, NodeId)>::default();
-            for (before, slot) in self.edges.iter() {
-                for after in slot.next_nodes.iter() {
-                    if !access_edges.contains(&(*before, *after)) {
-                        // 顺序 必须和 依赖图顺序 相反
-                        builder = builder.edge(*after, *before);
-
-                        access_edges.insert((*before, *after));
-                    }
-                }
-            }
-        }
-
-        let ng = match builder.build() {
-            Ok(ng) => ng,
+		Ok(match replace(&mut self.topo_graph, NGraphBuilder::new()).build(){
+			Ok(ng) => (),
             Err(e) => {
                 let msg = format!("ng build failed, e = {e:?}");
                 return Err(GraphError::BuildError(msg));
             }
-        };
+        })
 
-        self.topo_ng = Some(ng);
-        Ok(())
+        // // 构建成功, ng_builder 就 删掉
+        // let mut builder = NGraphBuilder::<NodeId, NodeId>::new();
+        // // 节点 就是 高层添加 的 节点
+        // for (node_id, _) in &self.nodes {
+        //     builder = builder.node(node_id, node_id);
+        // }
+
+        // {
+        //     let mut access_edges = XHashSet::<(NodeId, NodeId)>::default();
+        //     for (before, slot) in self.edges.iter() {
+        //         for after in slot.next_nodes.iter() {
+        //             if !access_edges.contains(&(*before, *after)) {
+        //                 // 顺序 必须和 依赖图顺序 相反
+        //                 builder = builder.edge(*after, *before);
+
+        //                 access_edges.insert((*before, *after));
+        //             }
+        //         }
+        //     }
+        // }
+
+        // let ng = match builder.build() {
+        //     Ok(ng) => ng,
+        //     Err(e) => {
+        //         let msg = format!("ng build failed, e = {e:?}");
+        //         return Err(GraphError::BuildError(msg));
+        //     }
+        // };
+
+        // self.topo_graph = Some(ng);
+        // Ok(())
     }
 
     // 创建真正的 运行图
     // 返回 构建 的 执行图
-    fn create_run_ng(&mut self, sub_ng: NGraph<NodeId, NodeId>) -> Result<(), GraphError> {
-        let mut build_builder = NGraphBuilder::<
-            NodeId,
-            ExecNode<Context, BuildSyncRun<Context>, BuildSyncRun<Context>>,
-        >::new();
-
-        let mut run_builder = NGraphBuilder::<
-            NodeId,
-            ExecNode<Context, BuildSyncRun<Context>, BuildSyncRun<Context>>,
-        >::new();
-
-        let topo_ids = sub_ng.topological_sort();
+    fn update_run_ng(&mut self) -> Result<(), GraphError> {
 
         // 异步图 节点
-        for id in topo_ids {
+        for (_, node) in &self.schedule_graph.nodes {
             // 先重置 节点
-            let n = self.get_node_state(&NodeLabel::from(*id)).unwrap();
-            n.0.as_ref().borrow_mut().reset();
+            node.state.0.as_ref().borrow_mut().reset();
+		}
 
-            let node = self.create_run_node(*id)?;
-            run_builder = run_builder.node(*id, node);
-
-            let node = self.create_build_node(*id)?;
-            build_builder = build_builder.node(*id, node);
-        }
-
-        // 异步图 边
-        // sub_ng 是 以终为起的，所以 sub_ng 的 from 和 to 和 执行顺序 相反；
-        for id in topo_ids {
-            let to = sub_ng.get(id).unwrap();
-            for from in to.to() {
-                let from = sub_ng.get(from).unwrap();
-
-                let from = *from.value();
-                let to = *to.value();
-
-                // 构造边
-                run_builder = run_builder.edge(from, to);
-                build_builder = build_builder.edge(from, to);
-
-                let f_n = self.nodes.get_mut(from).unwrap().1.clone();
-
-                // 为 to 天上 prenode = from
-                let t_n = self.nodes.get_mut(to).unwrap();
-                t_n.1 .0.as_ref().borrow_mut().add_pre_node((from, f_n));
+		for (id, node) in &self.schedule_graph.nodes {
+			let graph_node = self.topo_graph.graph().get(id).unwrap();
+			for from in graph_node.from() {
+                let from_node = self.schedule_graph.nodes.get(*from).unwrap();
+                node.state.0.as_ref().borrow_mut().add_pre_node((*from, from_node.state.clone()));
             }
         }
-
-        match run_builder.build() {
-            Ok(g) => {
-                self.run_ng = Some(Share::new(g));
-            }
-            Err(e) => {
-                let msg = format!("run_ng e = {e:?}");
-                error!("{}", msg);
-                return Err(GraphError::BuildError(msg));
-            }
-        }
-
-        // 构建图 只用 一次，用完 就 释放
-        match build_builder.build() {
-            Ok(g) => {
-                self.build_ng = Some(Share::new(g));
-                Ok(())
-            }
-            Err(e) => {
-                let msg = format!("build_builder e = {e:?}");
-                error!("{}", msg);
-                Err(GraphError::BuildError(msg))
-            }
-        }
+		Ok(())
     }
 
     // 创建 构建 节点
     fn create_build_node(
         &self,
-        node_id: NodeId,
-    ) -> Result<ExecNode<Context, BuildSyncRun<Context>, BuildSyncRun<Context>>, GraphError> {
-        let n = self.get_node_state(&NodeLabel::Id(node_id));
-        let node = n.unwrap().0.clone();
+        node_state: NodeState<Context>,
+    ) -> Result<ExecNode<Context>, GraphError> {
+        let node = node_state.0.clone();
 
         // 该函数 会在 ng 图上，每帧每节点 执行一次
         let f = BuildSyncRun::new(node);
 
-        Ok(ExecNode::Sync(f))
+        Ok(ExecNode1::new_sync(f))
     }
 
     // 创建 渲染 节点
     fn create_run_node(
         &self,
-        node_id: NodeId,
-    ) -> Result<ExecNode<Context, BuildSyncRun<Context>, BuildSyncRun<Context>>, GraphError> {
-        let n = self.get_node_state(&NodeLabel::Id(node_id));
-        let node = n.unwrap().0.clone();
-
+		node_state: NodeState<Context>,
+        // node_id: NodeId,
+    ) -> Result<ExecNode<Context>, GraphError> {
         // 该函数 会在 ng 图上，每帧每节点 执行一次
-        let f = move |context: &'static Context| -> BoxFuture<'static, std::io::Result<()>> {
-            let node = node.clone();
+        let f = move |context: &'static Context, id: NodeId, from: &'static [NodeId], to: &'static [NodeId]| -> BoxFuture<'static, std::io::Result<()>> {
+            let node_state = node_state.0.clone();
             Box::pin(async move {
                 // log::warn!("run graphnode start {:?}", node_id);
-                node.as_ref().borrow_mut().run(context).await.unwrap();
+                node_state.as_ref().borrow_mut().run(context, id, from, to).await.unwrap();
                 // log::warn!("run graphnode end {:?}", node_id);
                 Ok(())
             })
         };
 
-        Ok(ExecNode::Async(Box::new(f)))
+        Ok(ExecNode1::new_async(Box::new(f)))
     }
 }
 
@@ -666,13 +592,13 @@ impl<Context: 'static + ThreadSync> BuildSyncRun<Context> {
     }
 }
 
-impl<Context: 'static + ThreadSync> Runner<Context> for BuildSyncRun<Context> {
-    fn run(self, context: &'static Context) {
+impl<Context: 'static + ThreadSync> Runner<NodeId, Context> for BuildSyncRun<Context> {
+    fn run(self, context: &'static Context, id: NodeId, from: &[NodeId], to: &[NodeId]) {
         self.node.as_ref().borrow_mut().build(context).unwrap();
     }
 }
 
-impl<Context: 'static + ThreadSync> RunFactory<Context> for BuildSyncRun<Context> {
+impl<Context: 'static + ThreadSync> RunFactory<NodeId, Context> for BuildSyncRun<Context> {
     type R = BuildSyncRun<Context>;
 
     fn create(&self) -> Self::R {
@@ -680,59 +606,153 @@ impl<Context: 'static + ThreadSync> RunFactory<Context> for BuildSyncRun<Context
     }
 }
 
-#[derive(Default)]
-struct NodeSlot {
-    prev_nodes: Vec<NodeId>,
+struct BuildType;
+struct RunType;
+struct ScheduleNode<Context: 'static + ThreadSync, T> {
+	build_node: ExecNode<Context>,
+	run_node: ExecNode<Context>,
+	name: String,
+	state: NodeState<Context>,
+	mark: PhantomData<T>,
+}
+// impl<T> ScheduleNode<T> {
+// 	pub fn transmute<D>(&self) -> &ScheduleNode<D> {
+// 		const _: () = [()][(mem::size_of::<Self>() == mem::size_of::<ScheduleNode<D>>()) as usize];
+// 		unsafe { std::mem::transmute(self) }
+// 	}
+// }
 
-    next_nodes: Vec<NodeId>,
+impl<Context: 'static + ThreadSync> Runnble<NodeId, Context> for ScheduleNode<Context, BuildType> {
+    type R = BuildSyncRun<Context>;
+
+    fn is_sync(&self) -> Option<bool> {
+        self.build_node.is_sync()
+    }
+
+    fn get_sync(&self) -> Self::R {
+        self.build_node.get_sync()
+    }
+
+    fn get_async(&self, context: &'static Context, id: NodeId, from: &'static [NodeId], to: &'static [NodeId]) -> BoxFuture<'static, std::io::Result<()>> {
+		self.build_node.get_async(context, id, from, to)
+    }
+
+    fn load_ready_count(&self) -> usize {
+        self.build_node.load_ready_count()
+    }
+
+    fn add_ready_count(&self, count: usize) -> usize {
+        self.build_node.add_ready_count(count)
+    }
+
+    fn store_ready_count(&self, count: usize) {
+        self.build_node.store_ready_count(count)
+    }
 }
 
-impl NodeSlot {
-    // 添加 next 对应的 slot
-    #[inline]
-    fn add_next_slot(&mut self, next: NodeId) -> Option<()> {
-        match self.next_nodes.iter().position(|s| *s == next) {
-            Some(_) => None,
-            None => {
-                self.next_nodes.push(next);
-                Some(())
-            }
-        }
+impl<Context: 'static + ThreadSync> Runnble<NodeId, Context> for ScheduleNode<Context, RunType> {
+    type R = BuildSyncRun<Context>;
+
+    fn is_sync(&self) -> Option<bool> {
+        self.run_node.is_sync()
     }
 
-    // 到 id 的节点 添加 prev 对应的 slot
-    #[inline]
-    fn add_prev_slot(&mut self, prev: NodeId) -> Option<()> {
-        match self.prev_nodes.iter().position(|s| *s == prev) {
-            Some(_) => None,
-            None => {
-                self.prev_nodes.push(prev);
-                Some(())
-            }
-        }
+    fn get_sync(&self) -> Self::R {
+        self.run_node.get_sync()
     }
 
-    // 到 id 的节点 删除 next 对应的 slot
-    #[inline]
-    fn remove_next_slot(&mut self, next: NodeId) -> Option<()> {
-        self.next_nodes
-            .iter()
-            .position(|value| *value == next)
-            .map(|index| {
-                self.next_nodes.swap_remove(index);
-            })
-            .or(None)
+    fn get_async(&self, context: &'static Context, id: NodeId, from: &'static [NodeId], to: &'static [NodeId]) -> BoxFuture<'static, std::io::Result<()>> {
+		self.run_node.get_async(context, id, from, to)
     }
 
-    // 到 id 的节点 删除 prev 对应的 slot
-    #[inline]
-    fn remove_prev_slot(&mut self, prev: NodeId) -> Option<()> {
-        self.prev_nodes
-            .iter()
-            .position(|value| *value == prev)
-            .map(|index| {
-                self.prev_nodes.swap_remove(index);
-            })
-            .or(None)
+    fn load_ready_count(&self) -> usize {
+        self.run_node.load_ready_count()
+    }
+
+    fn add_ready_count(&self, count: usize) -> usize {
+		self.run_node.add_ready_count(count)
+    }
+
+    fn store_ready_count(&self, count: usize) {
+        self.run_node.store_ready_count(count)
     }
 }
+
+struct ScheduleGraph<Context: ThreadSync + 'static, T> {
+	graph: NGraph<NodeId, ()>,
+	nodes: SlotMap<NodeId, ScheduleNode<Context, T>>,
+}
+
+impl<Context: ThreadSync + 'static, T> ScheduleGraph<Context, T>{
+	pub fn new() -> Self{
+		ScheduleGraph {
+			graph: NGraph::default(),
+			nodes: SlotMap::default(),
+		}
+	}
+
+	pub fn remove(&mut self, id: NodeId) -> Option<ScheduleNode<Context, T>> {
+		self.nodes.remove(id)
+	}
+}
+
+impl<Context: ThreadSync + 'static, T> ScheduleGraph<Context, T>{
+	pub fn transmute<D>(&self) -> &ScheduleGraph<Context, D> {
+		// const _: () = [()][(std::mem::size_of::<T>() == std::mem::size_of::<D>()) as usize];
+		unsafe { std::mem::transmute(self) }
+	}
+}
+
+impl<Context: ThreadSync + 'static> GetRunnble<NodeId, Context, ExecNode<Context>> for ScheduleGraph<Context, BuildType>{
+	fn get_runnble(&self, id: NodeId) -> Option<&ExecNode<Context>> {
+		self.nodes.get(id).map(|r| {&r.build_node})
+	}
+}
+
+impl<Context: ThreadSync + 'static> GetRunnble<NodeId, Context, ExecNode<Context>> for ScheduleGraph<Context, RunType>{
+	fn get_runnble(&self, id: NodeId) -> Option<&ExecNode<Context>> {
+		self.nodes.get(id).map(|r| {&r.run_node})
+	}
+}
+
+
+impl<Context: ThreadSync + 'static, T> DirectedGraph<NodeId, ()> for ScheduleGraph<Context, T> {
+    type Node = NGraphNode<NodeId, ()>;
+
+    fn get(&self, key: NodeId) -> Option<&Self::Node> {
+        self.graph.get(key)
+    }
+
+    fn get_mut(&mut self, key: NodeId) -> Option<&mut Self::Node> {
+        self.graph.get_mut(key)
+    }
+
+    fn node_count(&self) -> usize {
+        self.graph.node_count()
+    }
+
+    fn from_len(&self) -> usize {
+        self.graph.from_len()
+    }
+
+    fn to_len(&self) -> usize {
+        self.graph.to_len()
+    }
+
+    fn from(&self) -> &[NodeId] {
+        self.graph.from()
+    }
+
+    fn to(&self) -> &[NodeId] {
+        self.graph.to()
+    }
+
+    fn topological_sort(&self) -> &[NodeId] {
+        self.graph.topological_sort()
+    }
+}
+
+
+
+
+
