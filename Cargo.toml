@@ -39,10 +39,6 @@ criterion = "0.4"
 render_core = {path = "crates/render_core"}
 pi_hal = { git = "https://github.com/GaiaWorld/pi_hal.git" }
 
-[patch.crates-io]
-pi_graph = { path = "../pi_graph" }
-pi_async_graph = { path = "../pi_async_graph" }
-
 [[example]]
 name = "hello_winit"
 path = "examples/hello_winit/main.rs"
