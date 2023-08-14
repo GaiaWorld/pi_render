@@ -53,15 +53,29 @@ pub struct KeyRenderPipelineState {
     pub primitive: wgpu::PrimitiveState,
     pub multisample: wgpu::MultisampleState,
     pub depth_stencil: Option<DepthStencilState>,
-    pub target_state: Vec<Option<wgpu::ColorTargetState>>,
+    pub target_state: Option<wgpu::ColorTargetState>,
 }
+impl KeyRenderPipelineState {
+    pub fn target_state(&self) -> Vec<Option<wgpu::ColorTargetState>> {
+        vec![self.target_state.clone()]
+    }
+}
+
+
+pub trait TKeyForPipeline {
+    fn hash_for_pipeline<H: std::hash::Hasher>(&self, state: &mut H);
+    fn eq_for_pipeline(&self, other: &Self) -> bool;
+}
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub struct KeyPipelineFromBindGroup<const MAX_BIND_GROUP_COUNT: usize>(pub [Option<u64>; MAX_BIND_GROUP_COUNT]);
 
 /// * Pipeline 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct KeyRenderPipeline<const MAX_BIND_GROUP_COUNT: usize, K: TKeyShaderSetBlock> {
     pub key_state: KeyRenderPipelineState,
     pub key_shader: KeyShader<MAX_BIND_GROUP_COUNT, K>,
-    pub key_bindgroup_layouts: [Option<KeyBindGroupLayout>; MAX_BIND_GROUP_COUNT],
+    pub key_bindgroup_layouts: KeyPipelineFromBindGroup<MAX_BIND_GROUP_COUNT>,
     pub key_vertex_layouts: KeyPipelineFromAttributes,
 }
 impl<const MAX_BIND_GROUP_COUNT: usize, K: TKeyShaderSetBlock> KeyRenderPipeline<MAX_BIND_GROUP_COUNT, K> {
@@ -90,7 +104,7 @@ impl<const MAX_BIND_GROUP_COUNT: usize, K: TKeyShaderSetBlock> KeyRenderPipeline
         let fs_state = wgpu::FragmentState {
             module: &shader.fs,
             entry_point: shader.fs_point,
-            targets: &key.key_state.target_state,
+            targets: &key.key_state.target_state(),
         };
 
         let pipeline_layout = device.create_pipeline_layout(

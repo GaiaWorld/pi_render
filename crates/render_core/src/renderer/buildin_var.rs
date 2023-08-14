@@ -89,7 +89,8 @@ impl ShaderVarVertices {
     pub const PARTICLE_DIRECTION        : &'static str = "PARTICLE_DIRECTION"   ;
     pub const PARTICLE_COLOR            : &'static str = "PARTICLE_COLOR"       ;
     pub const PARTICLE_TILLOFF          : &'static str = "PARTICLE_TILLOFF"     ;
-    pub const TRAIL_AXIS                : &'static str = "TRAIL_AXIS"     ;
+    pub const TRAIL_AXIS_X              : &'static str = "TRAIL_AXIS_X"     ;
+    pub const TRAIL_AXIS_Z              : &'static str = "TRAIL_AXIS_Z"     ;
     pub const TRAIL_INFO                : &'static str = "TRAIL_INFO"     ;
 }
 

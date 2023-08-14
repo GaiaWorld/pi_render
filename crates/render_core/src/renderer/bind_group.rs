@@ -186,8 +186,32 @@ impl IDBinds {
             },
         }
     }
+    pub fn binds(&self) -> Vec<Option<EKeyBind>> {
+        match self {
+            IDBinds::Binds00(v) => {
+                vec![]
+            },
+            IDBinds::Binds01(id, v) => {
+                id.data().unwrap().val().to_vec()
+            },
+            IDBinds::Binds02(id, v) =>  {
+                id.data().unwrap().val().to_vec()
+            }
+            IDBinds::Binds04(id, v) =>  {
+                id.data().unwrap().val().to_vec()
+            },
+            IDBinds::Binds08(id, v) =>  {
+                id.data().unwrap().val().to_vec()
+            },
+            IDBinds::Binds16(id, v) =>  {
+                id.data().unwrap().val().to_vec()
+            },
+        }
+    }
+} 
+impl TAssetKeyU64 for IDBinds {
+
 }
-impl TAssetKeyU64 for IDBinds {}
 
 pub enum EBinds {
     Binds01(Binds01),
@@ -337,7 +361,7 @@ impl BindsRecorder {
     }
 }
 
-pub type KeyBindGroupLayout = Arc<IDBinds>;
+pub type KeyBindGroupLayout = KeyBindGroup;
 
 #[derive(Debug)]
 pub struct BindGroupLayout {
@@ -346,9 +370,9 @@ pub struct BindGroupLayout {
 impl BindGroupLayout {
     pub fn new(
         device: &RenderDevice,
-        key: &IDBinds,
+        key: &KeyBindGroupLayout,
     ) -> Self {
-        let entries = key.layout_entries();
+        let entries = key.entries();
         // log::warn!("BindGroupLayout entries {:?}", entries.len());
         Self {
             layout: device.create_bind_group_layout(
@@ -376,7 +400,7 @@ pub struct BindGroup {
     pub(crate) layout: Handle<BindGroupLayout>,
 }
 impl BindGroup {
-    pub fn new(device: &RenderDevice, key: &IDBinds, bind_group_layout: Handle<BindGroupLayout>) -> Self {
+    pub fn new(device: &RenderDevice, key: &KeyBindGroup, bind_group_layout: Handle<BindGroupLayout>) -> Self {
         let resources: Vec<EBindResource> = key.bind_sources();
         let mut entries = vec![];
         resources.iter().for_each(|v| {
@@ -401,22 +425,53 @@ impl Size for BindGroup {
     }
 }
 
-pub type KeyBindGroup = Arc<IDBinds>;
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+pub struct KeyBindGroup(pub Vec<Option<EKeyBind>>);
+impl KeyBindGroup {
+    pub fn bind_sources(&self) -> Vec<EBindResource> {
+        let mut result = vec![];
+        let mut index = 0;
+        self.0.iter().for_each(|v| {
+            if let Some(v) = v {
+                result.push(v.bind_source(index));
+                index += 1;
+            }
+        });
+
+        result
+    }
+    pub fn entries(&self) -> Vec<wgpu::BindGroupLayoutEntry> {
+        let mut result = vec![];
+        let mut index = 0;
+        self.0.iter().for_each(|v| {
+            if let Some(v) = v {
+                result.push(v.key_bind_layout().layout_entry());
+                index += 1;
+            }
+        });
+
+        result
+    }
+}
+impl TAssetKeyU64 for KeyBindGroup {}
+
 pub type KeyBindGroupU64 = u64;
 
 #[derive(Debug, Clone)]
 pub struct BindGroupUsage {
     pub(crate) set: u32,
+    pub(crate) binds: Arc<IDBinds>,
     pub(crate) key_bind_group: KeyBindGroup,
     pub(crate) bind_group: Handle<BindGroup>,
 }
 impl BindGroupUsage {
     pub fn new(
         set: u32,
-        key_bind_group: KeyBindGroup,
+        binds: Arc<IDBinds>,
         bind_group: Handle<BindGroup>,
     ) -> Self {
-        Self { set, key_bind_group, bind_group }
+        let key_bind_group = KeyBindGroup(binds.binds());
+        Self { set, binds, key_bind_group, bind_group }
     }
 
     pub fn bind_group(&self) -> &wgpu::BindGroup {
@@ -424,7 +479,7 @@ impl BindGroupUsage {
     }
 
     pub fn key_layout(&self) -> KeyBindGroupLayout {
-        self.key_bind_group.clone()
+        KeyBindGroup(self.key_bind_group.0.clone())
     }
 
     pub fn layout(&self) -> Handle<BindGroupLayout> {
@@ -432,7 +487,7 @@ impl BindGroupUsage {
     }
 
     pub fn offsets(&self) -> &Vec<wgpu::DynamicOffset> {
-        self.key_bind_group.offsets()
+        self.binds.offsets()
     }
 }
 

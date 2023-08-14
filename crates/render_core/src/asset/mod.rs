@@ -83,6 +83,9 @@ impl<K: Clone + Hash + PartialEq + Eq, A: Asset<Key = K>, P: Clone> AssetDataCen
     pub fn datamap(&self) -> &XHashMap<K, (A, Option<P>)> {
         &self.datamap
     }
+    pub fn asset_mgr(&self) -> &AssetMgr<A> {
+        &self.asset_mgr
+    }
     pub fn single_create(
         &mut self,
     ) -> XHashMap<K, (Handle<A>, Option<P>)> {

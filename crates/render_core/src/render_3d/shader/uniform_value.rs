@@ -253,7 +253,7 @@ impl Ord for UniformPropertyUint {
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct MaterialValueBindDesc {
     pub stage: wgpu::ShaderStages,
-    // pub mat4_list: Vec<UniformPropertyMat4>,
+    pub mat4_list: Vec<UniformPropertyMat4>,
     // pub mat2_list: Vec<UniformPropertyMat2>,
     pub vec4_list: Vec<UniformPropertyVec4>,
     pub vec2_list: Vec<UniformPropertyVec2>,
@@ -264,7 +264,8 @@ pub struct MaterialValueBindDesc {
 impl Default for MaterialValueBindDesc {
     fn default() -> Self {
         Self { stage: wgpu::ShaderStages::VERTEX_FRAGMENT, 
-            // mat4_list: vec![], mat2_list: vec![],
+            mat4_list: vec![],
+            // mat2_list: vec![],
             vec4_list: vec![], vec2_list: vec![], float_list: vec![],
             // int_list: vec![],
             uint_list: vec![]
@@ -274,14 +275,15 @@ impl Default for MaterialValueBindDesc {
 impl MaterialValueBindDesc {
     pub fn none(stage: wgpu::ShaderStages) -> Self {
         Self { stage, 
-            // mat4_list: vec![], mat2_list: vec![],
+            mat4_list: vec![],
+            // mat2_list: vec![],
             vec4_list: vec![], vec2_list: vec![], float_list: vec![],
             // int_list: vec![],
             uint_list: vec![]
         }
     }
     pub fn sort(&mut self) {
-        // self.mat4_list.sort_by(|a, b| { a.0.cmp(&b.0) });
+        self.mat4_list.sort_by(|a, b| { a.0.cmp(&b.0) });
         // self.mat2_list.sort_by(|a, b| { a.0.cmp(&b.0) });
         self.vec4_list.sort_by(|a, b| { a.0.cmp(&b.0) });
         self.vec2_list.sort_by(|a, b| { a.0.cmp(&b.0) });
@@ -291,9 +293,9 @@ impl MaterialValueBindDesc {
     }
     pub fn size(&self) -> usize {
         let mut size = 0;
-        // self.mat4_list.iter().for_each(|item| {
-        //     size += item.0.as_bytes().len();
-        // });
+        self.mat4_list.iter().for_each(|item| {
+            size += item.0.as_bytes().len();
+        });
         
         // self.mat2_list.iter().for_each(|item| {
         //     size += item.0.as_bytes().len();
@@ -324,10 +326,10 @@ impl MaterialValueBindDesc {
     pub fn label(&self) -> String {
         let mut result = String::from("");
 
-        // self.mat4_list.iter().for_each(|name| {
-        //     result += "#";
-        //     result += name.0.as_str();
-        // });
+        self.mat4_list.iter().for_each(|name| {
+            result += "#";
+            result += name.0.as_str();
+        });
         
         // self.mat2_list.iter().for_each(|name| {
         //     result += "#";
@@ -370,12 +372,12 @@ impl MaterialValueBindDesc {
             result += index.to_string().as_str();
             result += ") uniform MatParam {\r\n";
     
-            // self.mat4_list.iter().for_each(|name| {
-            //     result += "mat4 ";
-            //     result += &name.0;
-            //     result += ";\r\n";
-            // });
-            // total_num += self.mat4_list.len();
+            self.mat4_list.iter().for_each(|name| {
+                result += "mat4 ";
+                result += &name.0;
+                result += ";\r\n";
+            });
+            total_num += self.mat4_list.len();
             
             // self.mat2_list.iter().for_each(|name| {
             //     result += "mat2 ";

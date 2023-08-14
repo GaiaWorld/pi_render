@@ -9,6 +9,7 @@ impl EVerticeExtendCode {
     pub const INSTANCE_VELOCITY: u32        = 0b0000_0000_0000_0000_0000_0000_0000_1000;
     pub const INSTANCE_SKIN: u32            = 0b0000_0000_0000_0000_0000_0000_0001_0000;
     pub const TRIAL: u32                    = 0b0000_0000_0000_0000_0000_0000_0010_0000;
+    pub const TRIAL_BILLBOARD: u32          = 0b0000_0000_0000_0000_0000_0000_0100_0000;
     pub fn vs_running_code(&self) -> String {
         let mut result = String::from("
     mat4 PI_ObjectToWorld = U_PI_ObjectToWorld;
@@ -38,6 +39,10 @@ impl EVerticeExtendCode {
 
         if (self.0 & Self::TRIAL) == Self::TRIAL {
             result += Self::trail().as_str();
+        }
+
+        if (self.0 & Self::TRIAL_BILLBOARD) == Self::TRIAL_BILLBOARD {
+            result += Self::trail_billboard().as_str();
         }
     
         result
@@ -75,12 +80,23 @@ impl EVerticeExtendCode {
         String::from("
     vec2 A_UV = vec2(TRAIL_INFO.y, step(0., TRAIL_INFO.x));
 
-    vec3 zaxis = normalize(TRAIL_AXIS);
-    vec3 yaxis = normalize(PI_CAMERA_POSITION.xyz - worldPos.xyz);
+    vec3 zaxis = normalize(TRAIL_AXIS_Z);
+    vec3 xaxis = normalize(TRAIL_AXIS_X);
+    A_POSITION += xaxis * TRAIL_INFO.x;
+
+    A_NORMAL = normalize(cross(zaxis, xaxis));
+        ")
+    }
+    fn trail_billboard() -> String {
+        String::from("
+    vec2 A_UV = vec2(TRAIL_INFO.y, step(0., TRAIL_INFO.x));
+
+    vec3 zaxis = normalize(TRAIL_AXIS_Z);
+    vec3 yaxis = normalize(PI_CAMERA_POSITION.xyz - A_POSITION.xyz);
     vec3 xaxis = normalize(cross(yaxis, zaxis)) * TRAIL_INFO.x;
     A_POSITION += xaxis;
 
-    vec3 A_NORMAL = yaxis;
+    A_NORMAL = yaxis;
         ")
     }
 }

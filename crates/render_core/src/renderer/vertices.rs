@@ -31,6 +31,15 @@ impl EVerticesBufferUsage {
             EVerticesBufferUsage::Temp(val) => Range { start: 0, end: val.size() },
         }
     }
+    pub fn active_range(&self) -> Range<wgpu::BufferAddress> {
+        match self {
+            EVerticesBufferUsage::GUI(val) => Range { start: 0, end: val.size() },
+			EVerticesBufferUsage::Part(index) => index.range(),
+            EVerticesBufferUsage::Other(val) => val.active_range(),
+            EVerticesBufferUsage::EVBRange(val) => val.active_range(),
+            EVerticesBufferUsage::Temp(val) => Range { start: 0, end: val.size() },
+        }
+    }
     pub fn buffer(&self) -> &wgpu::Buffer {
         match self {
             EVerticesBufferUsage::GUI(val) => val,
@@ -50,8 +59,8 @@ impl PartialEq for EVerticesBufferUsage {
             (Self::Other(l0), Self::Other(r0)) => {
                 l0.key() == r0.key() && l0.range() == r0.range()
             },
-            (Self::EVBRange(_), Self::EVBRange(_)) => {
-                false
+            (Self::EVBRange(v), Self::EVBRange(v2)) => {
+                v.as_ref() == v2.as_ref()
             },
             _ => false,
         }
@@ -72,7 +81,7 @@ impl Debug for EVerticesBufferUsage {
     }
 }
 
-
+///
 #[derive(Clone)]
 pub struct RenderVertices {
     pub slot: u32,
@@ -85,7 +94,7 @@ pub struct RenderVertices {
 }
 impl RenderVertices {
     pub fn value_range(&self) -> Range<u32> {
-        let mut range0 = self.buffer.range();
+        let mut range0 = self.buffer.active_range();
 
         if let Some(range) = self.buffer_range.as_ref() {
             range0.start    += range.start;
@@ -110,7 +119,7 @@ impl RenderVertices {
 }
 impl PartialEq for RenderVertices {
     fn eq(&self, other: &Self) -> bool {
-        &self.slot == &other.slot && &self.buffer == &other.buffer && &self.buffer_range == &other.buffer_range
+        &self.slot == &other.slot && &self.buffer == &other.buffer  // && &self.buffer_range == &other.buffer_range
     }
     fn ne(&self, other: &Self) -> bool {
         !self.eq(other)
@@ -137,7 +146,7 @@ pub struct RenderIndices {
 }
 impl RenderIndices {
     pub fn value_range(&self) -> Range<u32> {
-        let mut range0 = self.buffer.range();
+        let mut range0 = self.buffer.active_range();
     
         if let Some(range) = self.buffer_range.as_ref() {
             range0.end = range.end;

@@ -117,9 +117,24 @@ impl KeyBindGroupTextureSamplers {
         Self { key, effect_texture_samplers, meta, key_binds: idbinds  }
     }
     pub fn key_bind_group(&self) -> Option<KeyBindGroup> {
-        self.key_binds.clone()
+        if let Some(binds) = &self.key_binds {
+            Some(
+                KeyBindGroup(binds.binds())
+            )
+        } else {
+            None
+        }
     }
     pub fn key_bind_group_layout(&self) -> Option<KeyBindGroupLayout> {
+        if let Some(binds) = &self.key_binds {
+            Some(
+                KeyBindGroup(binds.binds())
+            )
+        } else {
+            None
+        }
+    }
+    pub fn binds(&self) -> Option<Arc<IDBinds>> {
         self.key_binds.clone()
     }
 }
