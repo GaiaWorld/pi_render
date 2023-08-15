@@ -283,6 +283,8 @@ impl ShaderAttribute {
             },
             EVertexDataKind::Color4 => {
             },
+            EVertexDataKind::UV => {
+            },
             _ => {
                 result += self.kind.kind();
                 result += " ";

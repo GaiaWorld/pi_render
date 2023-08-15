@@ -237,6 +237,7 @@ const float HALF_MIN = 5.96046448e-08;
         // 预制内容
         code += EVertexDataKind::Color4.kind();     code += " "; code += ShaderVarVertices::COLOR4 ;    code += " = vec4(1., 1., 1., 1.);\r\n";
         code += EVertexDataKind::Normal.kind();     code += " "; code += ShaderVarVertices::NORMAL ;    code += " = vec3(0., 1., 0.);\r\n";
+        code += EVertexDataKind::UV.kind();         code += " "; code += ShaderVarVertices::UV ;        code += " = vec2(0., 0.);\r\n";
         
         // attribute
         code += &vertex_layouts.vs_running_code();
@@ -382,7 +383,7 @@ const float HALF_MIN = 5.96046448e-08;
         // EntryPoint
         result.push(BlockCode {
             define: String::from("#version 450\r\n"),
-            running: String::from("void main() {\r\nvec4 A_COLOR4 = vec4(1., 1., 1., 1.);\r\nvec3 A_NORMAL = vec3(0., 1., 0.);\r\n"),
+            running: String::from("void main() {\r\nvec4 A_COLOR4 = vec4(1., 1., 1., 1.);\r\nvec3 A_NORMAL = vec3(0., 1., 0.);\r\nvec3 A_UV = vec2(0., 0.);\r\n"),
         });
         
         // attributes
