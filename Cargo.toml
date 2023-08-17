@@ -20,16 +20,16 @@ render_core = { path = "crates/render_core" }
 
 [dev-dependencies]
 pi_futures = "0.1"
-pi_slotmap = "0.1"
+pi_slotmap = "0.2"
 pi_share = "0.4"
 pi-async-rt = "0.1"
-pi_map = "0.1"
+pi_map = "0.2"
 pi_hash = "0.1"
 
 nalgebra = "0.32"
 winit = { registry = "yn", version = "0.27"}
 log = "0.4"
-wgpu = "0.15"
+wgpu = "0.16"
 env_logger = "0.9"
 float-ord = "0.3"
 lazy_static = "1.4"
@@ -51,8 +51,8 @@ path = "examples/clean/main.rs"
 # pi_async_graph = { path = "../pi_async_graph" }
 # pi_assets = { path = "../pi_assets" }
 
-# [patch."https://github.com/GaiaWorld/pi_hal"]
-# pi_hal = { path = "../pi_hal" }
+[patch."https://github.com/GaiaWorld/pi_hal"]
+pi_hal = { path = "../pi_hal" }
 
 [[bench]]
 name = "id_alloter_bench"

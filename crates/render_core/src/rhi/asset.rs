@@ -151,9 +151,9 @@ pub async fn create_texture_from_image<G: Garbageer<TextureRes>>(
 		DynamicImage::ImageLuma8(image) => (image.width(), image.height(), image.as_raw(), wgpu::TextureFormat::R8Unorm, 1, true),
 		DynamicImage::ImageRgb8(r) => {
 			buffer_temp =  image.to_rgba8();
-			(r.width(), r.height(), buffer_temp.as_raw(), if wgpu::TextureFormat::is_srgb() { wgpu::TextureFormat::Rgba8UnormSrgb } else { wgpu::TextureFormat::Rgba8Unorm }, 4, true)
+			(r.width(), r.height(), buffer_temp.as_raw(), if <wgpu::TextureFormat as PiRenderDefault>::is_srgb() { wgpu::TextureFormat::Rgba8UnormSrgb } else { wgpu::TextureFormat::Rgba8Unorm }, 4, true)
 		},
-		DynamicImage::ImageRgba8(image) => (image.width(), image.height(), image.as_raw(), if wgpu::TextureFormat::is_srgb() { wgpu::TextureFormat::Rgba8UnormSrgb } else { wgpu::TextureFormat::Rgba8Unorm }, 4, false),
+		DynamicImage::ImageRgba8(image) => (image.width(), image.height(), image.as_raw(), if <wgpu::TextureFormat as PiRenderDefault>::is_srgb() { wgpu::TextureFormat::Rgba8UnormSrgb } else { wgpu::TextureFormat::Rgba8Unorm }, 4, false),
 		// DynamicImage::ImageBgr8(r) => {
 		// 	buffer_temp1 =  image.to_bgra8();
 		// 	(r.width(), r.height(), buffer_temp1.as_raw(), wgpu::TextureFormat::Bgra8Unorm, 4, true)
@@ -193,7 +193,7 @@ pub async fn create_texture_from_image<G: Garbageer<TextureRes>>(
 		buffer,
 		wgpu::ImageDataLayout {
 			offset: 0,
-			bytes_per_row: Some(std::num::NonZeroU32::new(width * pre_pixel_size).unwrap()),
+			bytes_per_row: Some(width * pre_pixel_size),
 			rows_per_image: None,
 		},
 		texture_extent,

@@ -13,7 +13,6 @@ use crate::renderer::draw_obj::DrawBindGroup;
 use super::{
     bind_group::BindGroup,
     bind_group_layout::BindGroupLayout,
-    buffer::Buffer,
     device::RenderDevice,
     shader::{BindLayout, Uniform, WriteBuffer},
     RenderQueue,
@@ -507,7 +506,7 @@ mod test {
     use pi_async_rt::rt::AsyncRuntime;
     use pi_share::Share;
     use render_derive::{BindLayout, BindingType, BufferSize, Uniform};
-	use winit::{event_loop::{EventLoopBuilder}, platform::windows::EventLoopBuilderExtWindows};
+	use winit::{event_loop::EventLoopBuilder, platform::windows::EventLoopBuilderExtWindows};
 	use std::sync::{Arc, atomic::AtomicBool};
 
 	/// Initializes the renderer by retrieving and preparing the GPU instance, device and queue
@@ -710,7 +709,7 @@ mod test {
 		let surface = unsafe {instance.create_surface(&window).unwrap()};
 		
 
-		pi_hal::runtime::MULTI_MEDIA_RUNTIME.spawn(pi_hal::runtime::MULTI_MEDIA_RUNTIME.alloc(), async move {
+		pi_hal::runtime::MULTI_MEDIA_RUNTIME.spawn(async move {
 			let request_adapter_options = wgpu::RequestAdapterOptions {
 				power_preference: options.power_preference,
 				compatible_surface: Some(&surface),

@@ -29,7 +29,7 @@ pub struct TextureDescriptor {
 
 	pub base_mip_level: u32,
     pub base_array_layer: u32,
-    pub array_layer_count: Option<NonZeroU32>,
+    pub array_layer_count: Option<u32>,
 	pub view_dimension: Option<TextureViewDimension>,
 }
 
@@ -500,7 +500,7 @@ impl AtlasAllocator {
 			dimension: descript.view_dimension,
 			aspect,
 			base_mip_level: descript.base_mip_level,
-			mip_level_count:  NonZeroU32::new(descript.mip_level_count),
+			mip_level_count: if descript.mip_level_count == 0 {None}else {Some(descript.mip_level_count)},
 			base_array_layer: descript.base_array_layer,
 			array_layer_count: descript.array_layer_count,
 		});

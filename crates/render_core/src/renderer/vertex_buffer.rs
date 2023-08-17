@@ -515,7 +515,7 @@ impl FixedSizeBufferPoolNotUpdatable {
 }
 
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub struct IDNotUpdatableBuffer {
     /// 在 FixedSizeBufferPoolNotUpdatable 中是第几个
     pub index: u32,

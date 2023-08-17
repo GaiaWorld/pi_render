@@ -81,7 +81,7 @@ impl ImageTexture {
 			data,
 			wgpu::ImageDataLayout {
 				offset: 0,
-				bytes_per_row: Some(std::num::NonZeroU32::new(width * pre_pixel_size).unwrap()),
+				bytes_per_row: Some(width * pre_pixel_size),
 				rows_per_image: None,
 			},
 			texture_extent,
@@ -226,7 +226,7 @@ pub async fn create_texture_from_image<G: Garbageer<ImageTexture>>(
 		buffer,
 		wgpu::ImageDataLayout {
 			offset: 0,
-			bytes_per_row: Some(std::num::NonZeroU32::new(width * pre_pixel_size).unwrap()),
+			bytes_per_row: Some(width * pre_pixel_size),
 			rows_per_image: None,
 		},
 		texture_extent,
