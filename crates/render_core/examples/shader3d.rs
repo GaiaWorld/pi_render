@@ -200,7 +200,7 @@ pub fn setup_render_context(
     let result1 = result.clone();
     let rt = runtime.clone();
 
-    let _ = runtime.spawn(runtime.alloc(), async move {
+    let _ = runtime.spawn(async move {
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
 			/// Which `Backends` to enable.
 			backends: options.backends,
@@ -327,11 +327,11 @@ pub(crate) fn main() {
     let valuedesc = MaterialValueBindDesc {
         stage: wgpu::ShaderStages::VERTEX_FRAGMENT,
         mat4_list: vec![UniformPropertyMat4(Atom::from("emissiveMatrics"), [0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,])],
-        mat2_list: vec![],
+        // mat2_list: vec![],
         vec4_list: vec![UniformPropertyVec4(Atom::from("emissiveColor"), [1., 1., 1., 1.])],
         vec2_list: vec![],
         float_list: vec![],
-        int_list: vec![],
+        // int_list: vec![],
         uint_list: vec![],
     };
 
@@ -487,7 +487,7 @@ gl_FragColor = vec4(baseColor.rgb, alpha);
         &device,
         &key_meta,
         &KeyShaderFromAttributes(meshdes),
-        &EInstanceCode(EInstanceCode::NONE),
+        &EVerticeExtendCode(EVerticeExtendCode::NONE),
         &ERenderAlignment::Facing,
         &ESkinCode::None,
         &vs_defines,

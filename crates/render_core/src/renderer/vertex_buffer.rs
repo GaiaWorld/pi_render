@@ -135,7 +135,7 @@ impl VertexBufferLayouts {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Hash)]
 pub enum EVertexBufferRange {
     /// * (BufferRange, 使用大小)
     Updatable(RWBufferRange, u32, wgpu::BufferUsages),
@@ -161,9 +161,37 @@ impl EVertexBufferRange {
             },
             EVertexBufferRange::NotUpdatable(val, start, end) => {
                 Range { start: *start as u64, end: *end as u64 }
+                // Range { start: 0 as u64, end: val.size() as u64 }
             },
         }
     }
+    pub fn active_range(&self) -> Range<wgpu::BufferAddress> {
+        match self {
+            EVertexBufferRange::Updatable(val, size, _) => {
+                Range { start: val.offset() as u64, end: (val.offset() + size) as u64 }
+            },
+            EVertexBufferRange::NotUpdatable(val, start, end) => {
+                Range { start: 0 as u64, end: (end - start) as u64 }
+                // Range { start: *start as u64, end: *end as u64 }
+            },
+        }
+    }
+}
+impl PartialEq for EVertexBufferRange {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (EVertexBufferRange::Updatable(buffer, s0, e0), EVertexBufferRange::Updatable(buffer2, s1, e1)) => {
+                buffer == buffer2 && s0 == s1 && e0 == e1
+            },
+            (EVertexBufferRange::NotUpdatable(buffer, s0, e0), EVertexBufferRange::NotUpdatable(buffer2, s1, e1)) => {
+                buffer.as_ref() == buffer2.as_ref() && s0 == s1 && e0 == e1
+            },
+            _ => false,
+        }
+    }
+}
+impl Eq for EVertexBufferRange {
+    fn assert_receiver_is_total_eq(&self) {}
 }
 impl Asset for EVertexBufferRange {
     type Key = IDAssetVertexBuffer;

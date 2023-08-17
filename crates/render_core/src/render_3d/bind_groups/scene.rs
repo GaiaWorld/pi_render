@@ -56,11 +56,11 @@ impl KeyBindGroupScene {
             key_binds: Arc::new(IDBinds::Binds00(vec![]))
         };
 
-        result.key_binds = result.binds(recorder);
+        result.key_binds = result._binds(recorder);
 
         result
     }
-    fn binds(&self, recorder: &mut BindsRecorder) -> Arc<IDBinds> {
+    fn _binds(&self, recorder: &mut BindsRecorder) -> Arc<IDBinds> {
         if let Some(mut binds) = EBinds::new(self.bind_count) {
             binds.set(
                 self.bind_base.bind as usize,
@@ -98,9 +98,12 @@ impl KeyBindGroupScene {
         }
     }
     pub fn key_bind_group(&self) -> KeyBindGroup {
-        self.key_binds.clone()
+        KeyBindGroup(self.key_binds.binds())
     }
     pub fn key_bind_group_layout(&self) -> KeyBindGroupLayout {
+        KeyBindGroup(self.key_binds.binds())
+    }
+    pub fn binds(&self) -> Arc<IDBinds> {
         self.key_binds.clone()
     }
 }

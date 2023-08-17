@@ -16,7 +16,7 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct ShaderBindEffectValue {
     pub total_size: usize,
-    // pub mat4_count: u8,
+    pub mat4_count: u8,
     // pub mat2_count: u8,
     pub vec4_count: u8,
     pub vec2_count: u8,
@@ -27,7 +27,7 @@ pub struct ShaderBindEffectValue {
     pub fill_vec2_count: u8,
     pub fill_int_count: u8,
     
-    // pub mat4_begin: u32,
+    pub mat4_begin: u32,
     // pub mat2_begin: u32,
     pub vec4_begin: u32,
     pub vec2_begin: u32,
@@ -57,7 +57,7 @@ impl ShaderBindEffectValue {
         allocator: &mut BindBufferAllocator,
     ) -> Option<Self> {
         let uniforms = &meta.uniforms;
-        // let mat4_count      = uniforms.mat4_list.len() as u8;
+        let mat4_count      = uniforms.mat4_list.len() as u8;
         // let mat2_count      = uniforms.mat2_list.len() as u8;
         let vec4_count      = uniforms.vec4_list.len() as u8;
         let vec2_count      = uniforms.vec2_list.len() as u8;
@@ -73,8 +73,8 @@ impl ShaderBindEffectValue {
 
         let mut total_size = 0;
 
-        // let mat4_begin: u32  = total_size;
-        // total_size += mat4_count as u32 * Self::MAT4_BYTES;
+        let mat4_begin: u32  = total_size;
+        total_size += mat4_count as u32 * Self::MAT4_BYTES;
 
         // let mat2_begin: u32  = total_size;
         // total_size += mat2_count as u32 * Self::MAT2_BYTES;
@@ -108,7 +108,7 @@ impl ShaderBindEffectValue {
                     Some(
                         Self {
                             total_size: total_size as usize,
-                            // mat4_count,
+                            mat4_count,
                             // mat2_count,
                             vec4_count,
                             vec2_count,
@@ -117,7 +117,7 @@ impl ShaderBindEffectValue {
                             uint_count,
                             fill_vec2_count,
                             fill_int_count,
-                            // mat4_begin,
+                            mat4_begin,
                             // mat2_begin,
                             vec4_begin,
                             vec2_begin,
@@ -139,7 +139,7 @@ impl ShaderBindEffectValue {
         &self
     ) -> String {
         String::from("")
-        // + self.mat4_count.to_string() 
+        + Self::LABEL_MASK + &self.mat4_count.to_string() 
         // + Self::LABEL_MASK + &self.mat2_count.to_string() 
         + Self::LABEL_MASK + &self.vec4_count.to_string() 
         + Self::LABEL_MASK + &self.vec2_count.to_string() 

@@ -248,7 +248,7 @@ pub(crate) fn main() {
 
     init_load_cb(Arc::new(|path: String| {
         MULTI_MEDIA_RUNTIME
-            .spawn(MULTI_MEDIA_RUNTIME.alloc(), async move {
+            .spawn(async move {
                 log::debug!("Load {}", path);
                 let r = std::fs::read(path.clone()).unwrap();
                 on_load(&path, r);
@@ -257,8 +257,8 @@ pub(crate) fn main() {
     }));
 
     MULTI_MEDIA_RUNTIME
-    .spawn(MULTI_MEDIA_RUNTIME.alloc(), async move {
-        let key = KeyImageTexture::File(String::from("E:/Rust/PI/pi_3d/assets/images/eff_ui_ll_085.png"), true);
+    .spawn(async move {
+        let key = KeyImageTexture::File(Atom::from("E:/Rust/PI/pi_3d/assets/images/eff_ui_ll_085.png"), true);
         let (device, queue, adapter_info) = setup_render_context(
             options,
             window
