@@ -16,7 +16,7 @@ members = ["crates/*"]
 
 
 [dependencies]
-render_core = { path = "crates/render_core" }
+render_core = { path = "crates/render_core", version = "0.1", registry = "yn" }
 
 [dev-dependencies]
 pi_futures = "0.1"
