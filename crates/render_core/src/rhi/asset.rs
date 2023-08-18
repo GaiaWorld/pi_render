@@ -34,7 +34,7 @@ impl<T: 'static> Size for RenderRes<T>{
 	}
 }
 
-pub fn calc_texture_size(desc: wgpu::TextureDescriptor) -> usize {
+pub fn calc_texture_size(desc: &wgpu::TextureDescriptor) -> usize {
 	let size = (desc.size.width * desc.size.height * desc.size.depth_or_array_layers) as usize;
 	// TODO
 	match desc.format {

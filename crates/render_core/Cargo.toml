@@ -21,14 +21,14 @@ paste = "1.0"
 pi_futures = "0.1"
 pi-async-rt = "0.1"
 pi_share = "0.4"
-pi_async_graph = "0.7"
+pi_async_graph = "0.6"
 pi_assets = "0.13"
-pi_graph = "0.2"
+pi_graph = "0.1"
 pi_hash = "0.1"
-pi_map = "0.2"
-pi_null = "0.2"
+pi_map = "0.1"
+pi_null = "0.1"
 pi_ecs_macros = "0.1"
-pi_slotmap = "0.2"
+pi_slotmap = "0.1"
 
 graphviz-rust = "0.6"
 
@@ -36,8 +36,8 @@ normpath = "1.1.1"
 tracing = { version = "0.1", default-features = false, features = ["std"] }
 
 bitvec = { version = "1.0", features = ["serde"] }
-render_utils = { version = "0.1", path = "../render_utils" }
-render_crevice = { version = "0.1", path = "../render_crevice", features = [
+render_utils = { version = "0.1", path = "../render_utils", registry = "yn" }
+render_crevice = { version = "0.1", registry = "yn", path = "../render_crevice", features = [
     "nalgebra",
 ] }
 uuid = { version = "1", features = ["v4", "serde"] }
@@ -56,10 +56,6 @@ wgpu = { version = "0.16", default-features = false, features = ["glsl"] }
 derive-deref-rs = "0.1"
 pi_any = "0.1"
 pi_time = "0.3"
-# pi_res_loader = {  git = "https://github.com/GaiaWorld/pi_res_loader.git" }
-# pi_res_loader = { path = "../../../pi_res_loader" }
-# pi_res = { path = "../../../pi_res" }
-# pi_res_macros = { path = "../../../pi_res/macros" }
 futures = "0.3"
 guillotiere = { version = "0.6" }
 smallvec = "1.8"
@@ -77,7 +73,7 @@ ktx = "0.3"
 
 [dev-dependencies]
 bytemuck = { version = "1.4", features = ["derive"] }
-render_derive={path="../render_derive"}
+render_derive={path="../render_derive", version = "0.1", registry = "yn"}
 env_logger = "0.9"
 winit = { registry = "yn", version = "0.27"}
 

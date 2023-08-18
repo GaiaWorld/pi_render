@@ -11,7 +11,7 @@ keywords = ["pi"]
 [features]
 
 [dependencies]
-render_derive = { path = "../render_derive" }
+render_derive = { path = "../render_derive", version = "0.1", registry = "yn" }
 ahash = "0.7"
 
 [dev-dependencies]

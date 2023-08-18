@@ -14,7 +14,7 @@ pi_atom={version="0.2", features = ["serde"]}
 render_derive = {path="../render_derive"}
 render_compile = {path="../render_compile"}
 wgpu = { version = "0.16", default-features = false, features = ["glsl"] }
-pi_map="0.2"
+pi_map="0.1"
 bytemuck = { version = "1.4", features = ["derive"] }
 cargo-manifest = "0.2.6"
 cargo_metadat = {version="0.15", package="cargo_metadata"}

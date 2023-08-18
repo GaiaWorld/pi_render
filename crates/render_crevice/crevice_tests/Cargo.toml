@@ -12,8 +12,8 @@ keywords = ["pi"]
 wgpu-validation = ["wgpu", "naga", "futures"]
 
 [dependencies]
-render_crevice = { path = ".." }
-render_crevice_derive = { path = "../render_crevice_derive", features = [
+render_crevice = { path = "..", version = "0.1", registry = "yn" }
+render_crevice_derive = { path = "../render_crevice_derive", version="0.1", registry = "yn", features = [
     "debug-methods",
 ] }
 

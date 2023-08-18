@@ -20,10 +20,10 @@ render_core = { path = "crates/render_core" }
 
 [dev-dependencies]
 pi_futures = "0.1"
-pi_slotmap = "0.2"
+pi_slotmap = "0.1"
 pi_share = "0.4"
 pi-async-rt = "0.1"
-pi_map = "0.2"
+pi_map = "0.1"
 pi_hash = "0.1"
 
 nalgebra = "0.32"

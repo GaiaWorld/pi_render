@@ -1,6 +1,6 @@
 //! 渲染目标分配器
 
-use std::{hash::{Hash, Hasher}, collections::hash_map::Entry, intrinsics::transmute, num::NonZeroU32, mem::size_of};
+use std::{hash::{Hash, Hasher}, collections::hash_map::Entry, intrinsics::transmute, mem::size_of};
 
 use derive_deref_rs::Deref;
 use guillotiere::{Size, Allocation, Rectangle, Point};
@@ -74,7 +74,7 @@ pub struct TargetView {
 	ty_index: DefaultKey,
 	index: DefaultKey, // 第几张纹理
 	info: Allocation,
-	rect: Rectangle,
+	rect: Rectangle, // target的宽高（不包含边框）
 	target: Share<Fbo>,
 }
 
@@ -122,6 +122,13 @@ pub struct SafeTargetView {
 	#[deref]
 	value: TargetView,
 	allotor: SafeAtlasAllocator
+}
+
+impl SafeTargetView {
+	#[inline]
+	pub fn size(&self) -> usize {
+		self.allotor.targetview_size(&self.value)
+	}
 }
 
 impl Drop for SafeTargetView {
@@ -193,6 +200,11 @@ impl SafeAtlasAllocator {
 			value: self.0.write().allocate(width, height, target_type, exclude),
 			allotor: self.clone()
 		}
+	}
+	
+	#[inline]
+	pub fn targetview_size(&self, target: &TargetView) -> usize {
+		self.0.read().targetview_size(target)
 	}
 }
 
@@ -340,7 +352,7 @@ impl AtlasAllocator {
 
 	/// 取消TargetView分配
 	fn deallocate(&mut self, view: &TargetView) {
-		let mut alloctor = &mut self.all_allocator[view.ty_index].list[view.index];
+		let alloctor = &mut self.all_allocator[view.ty_index].list[view.index];
 		alloctor.allocator.deallocate(view.info.id);
 		alloctor.count -= 1;
 
@@ -391,6 +403,50 @@ impl AtlasAllocator {
 				// 	});
 			}
 		}
+	}
+
+	// 渲染目标视图的二进制大小
+	fn targetview_size(&self, target: &TargetView) -> usize {
+		let info = &self.all_allocator[target.ty_index].info;
+		let len = info.descript.colors_descriptor.len();
+		let rect = target.rect_with_border();
+		let (width, height) = (rect.max.x - rect.min.x, rect.max.y - rect.min.y);
+
+		let mut size = 0;
+		for i in 0..len {
+			let descriptor = &info.descript.colors_descriptor[i];
+			let desc = wgpu::TextureDescriptor {
+				label: None,
+				size: wgpu::Extent3d {width: width as u32, height: height as u32, depth_or_array_layers: 1},
+				mip_level_count: descriptor.mip_level_count,
+				sample_count: descriptor.sample_count,
+				dimension: descriptor.dimension,
+				format: descriptor.format,
+				usage: descriptor.usage,
+				view_formats: &[],
+			};
+			size += calc_texture_size(&desc);
+		}
+
+		if info.descript.need_depth {
+			let descriptor = if let Some(depth_descript) = &info.descript.depth_descriptor {
+				depth_descript
+			} else {
+				&self.default_depth_descript
+			};
+			let desc = wgpu::TextureDescriptor {
+				label: None,
+				size: wgpu::Extent3d {width: width as u32, height: height as u32, depth_or_array_layers: 1},
+				mip_level_count: descriptor.mip_level_count,
+				sample_count: descriptor.sample_count,
+				dimension: descriptor.dimension,
+				format: descriptor.format,
+				usage: descriptor.usage,
+				view_formats: &[],
+			};
+			size += calc_texture_size(&desc);
+		}
+		size
 	}
 
 	fn create_target(
@@ -511,7 +567,7 @@ impl AtlasAllocator {
 			match AssetMgr::insert(
 				&self.texture_assets_mgr, 
 				key, 
-				RenderRes::new(texture_view, calc_texture_size(desc))) {
+				RenderRes::new(texture_view, calc_texture_size(&desc))) {
 					Ok(r) => r,
 					_ => panic!("alloc fbo key is exist: {:?}", key),
 				},
@@ -528,7 +584,7 @@ impl AtlasAllocator {
 			texture_hashs.push(calc_hash(i));
 		}
 		if let Some(r) = &descript.depth_descriptor {
-			default_depth_hash = calc_hash(&descript.depth_descriptor);
+			default_depth_hash = calc_hash(r);
 		}
 		let ty = all_allocator.insert(
 			AllocatorGroup { 
