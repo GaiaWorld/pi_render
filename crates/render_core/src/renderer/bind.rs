@@ -2,7 +2,7 @@ use std::{num::{NonZeroU64, NonZeroU32}, fmt::Debug, hash::Hash, sync::Arc};
 
 use super::{
     texture::{BindDataTextureArray, BindDataTexture2D},
-    sampler::{BindDataSampler},
+    sampler::BindDataSampler,
     shader_stage::EShaderStage,
     bind_buffer::BindBufferRange
 };

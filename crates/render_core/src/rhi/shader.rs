@@ -18,7 +18,7 @@ use thiserror::Error;
 use uuid::Uuid;
 #[cfg(feature="wgpu/spirv")]
 use wgpu::util::make_spirv;
-use wgpu::{ShaderModuleDescriptor};
+use wgpu::ShaderModuleDescriptor;
 
 pub trait Input {
     fn location() -> u32;
@@ -719,7 +719,7 @@ impl ProcessedShader {
     /// 反射
     pub fn reflect(&self) -> Result<ShaderReflection, ShaderReflectError> {
         let module = match &self {
-            ProcessedShader::Wgsl(source) => {todo!()}//naga::front::wgsl::parse_str(source)?,
+            ProcessedShader::Wgsl(_source) => {todo!()}//naga::front::wgsl::parse_str(source)?,
             ProcessedShader::Glsl(source, shader_stage) => {
                 let mut parser = naga::front::glsl::Frontend::default();
                 parser
@@ -751,10 +751,11 @@ impl ProcessedShader {
 
     /// 取对应的 描述符
     pub fn get_module_descriptor(&self) -> Result<ShaderModuleDescriptor, AsModuleDescriptorError> {
+		#[allow(unreachable_code)]
         Ok(ShaderModuleDescriptor {
             label: None,
             source: match self {
-                ProcessedShader::Wgsl(source) => {
+                ProcessedShader::Wgsl(_source) => {
                     // This isn't neccessary, but catches errors early during hot reloading of invalid wgsl shaders.
                     // Eventually, wgpu will have features that will make this unneccessary like compilation info or error scopes, but until then parsing the shader twice during development the easiest solution.
                     #[cfg(debug_assertions)]
@@ -764,7 +765,7 @@ impl ProcessedShader {
                     // ShaderSource::Wgsl(source.clone())
                 }
                 ProcessedShader::Glsl(_source, _stage) => {
-                    let reflection = self.reflect()?;
+                    let _reflection = self.reflect()?;
 
                     // 通过 反射信息 转换成 wgsl
                     // let wgsl = reflection.get_wgsl()?;

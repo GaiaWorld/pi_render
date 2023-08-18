@@ -6,7 +6,7 @@ use std::{
 	str::FromStr, borrow::Cow, mem::replace, cmp::Ordering, sync::Arc,
 };
 
-use inflector::{Inflector};
+use inflector::Inflector;
 use once_cell::sync::Lazy;
 use pi_naga::{ScalarKind, ShaderStage, Binding, AddressSpace, ImageDimension, ImageClass, ArraySize, Interpolation, Sampling, Module, Type, Constant, UniqueArena, TypeInner, ConstantInner, ScalarValue, Arena, front};
 use pi_hash::{XHashMap, XHashSet};

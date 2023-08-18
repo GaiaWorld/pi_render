@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 
 use render_compile::{CompileShaderError, Parser};
@@ -42,19 +42,19 @@ fn main() -> Result<(), CompileShaderError> {
     Ok(())
 }
 
-fn visit_dirs<F: FnMut(&PathBuf), P: AsRef<Path>>(path: P, cb: &mut F) {
-    let path = path.as_ref();
-    if path.is_dir() {
-        for entry in std::fs::read_dir(path).unwrap() {
-            if let Ok(entry) = entry {
-                let path = entry.path();
-                if path.is_dir() {
-                    visit_dirs(&path, cb);
-                } else {
-                    cb(&path);
-                }
-            }
-        }
-    }
+// fn visit_dirs<F: FnMut(&PathBuf), P: AsRef<Path>>(path: P, cb: &mut F) {
+//     let path = path.as_ref();
+//     if path.is_dir() {
+//         for entry in std::fs::read_dir(path).unwrap() {
+//             if let Ok(entry) = entry {
+//                 let path = entry.path();
+//                 if path.is_dir() {
+//                     visit_dirs(&path, cb);
+//                 } else {
+//                     cb(&path);
+//                 }
+//             }
+//         }
+//     }
     
-}
+// }

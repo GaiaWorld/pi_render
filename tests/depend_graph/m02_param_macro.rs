@@ -4,7 +4,7 @@ use pi_render::depend_graph::{
     graph::DependGraph,
     node::{DependNode, ParamUsage},
 };
-use pi_share::Share;
+use render_core::depend_graph::NodeId;
 use render_derive::NodeParam;
 use std::{any::TypeId, time::Duration};
 
@@ -22,9 +22,10 @@ fn two_node_with_noslot() {
 
         fn run<'a>(
             &'a mut self,
-            context: &'a (),
+            _context: &'a (),
             input: &'a Self::Input,
             usage: &'a ParamUsage,
+			_id: NodeId, _from: &'static [NodeId], _to: &'static [NodeId],
         ) -> BoxFuture<'a, Result<Self::Output, String>> {
             println!("======== Enter Node1 Running");
 
@@ -51,9 +52,10 @@ fn two_node_with_noslot() {
 
         fn run<'a>(
             &'a mut self,
-            context: &'a (),
+            _context: &'a (),
             input: &'a Self::Input,
             usage: &'a ParamUsage,
+			_id: NodeId, _from: &'static [NodeId], _to: &'static [NodeId],
         ) -> BoxFuture<'a, Result<Self::Output, String>> {
             println!("======== Enter Node2 Running");
 
@@ -74,17 +76,16 @@ fn two_node_with_noslot() {
 
     let mut g = DependGraph::<()>::default();
 
-    g.add_node("Node1", Node1);
-    g.add_node("Node2", Node2);
+    let _ = g.add_node("Node1", Node1);
+    let _ = g.add_node("Node2", Node2);
 
-    g.add_depend("Node1", "Node2");
+    let _ = g.add_depend("Node1", "Node2");
 
     g.set_finish("Node2", true).unwrap();
     g.dump_graphviz();
 
     let rt = runtime.clone();
-    let _ = runtime.spawn(runtime.alloc(), async move {
-        g.build().unwrap();
+    let _ = runtime.spawn(async move {
 
         println!("======== 1 run graph");
         g.run(&rt, &()).await.unwrap();
@@ -107,6 +108,7 @@ fn two_node_with_slot() {
         pub b: u32,
         pub c: String,
 
+		#[allow(dead_code)]
         d: f32,
     }
 
@@ -125,9 +127,10 @@ fn two_node_with_slot() {
 
         fn run<'a>(
             &'a mut self,
-            context: &'a (),
+            _context: &'a (),
             input: &'a Self::Input,
             usage: &'a ParamUsage,
+			_id: NodeId, _from: &'static [NodeId], _to: &'static [NodeId],
         ) -> BoxFuture<'a, Result<Self::Output, String>> {
             println!("======== Enter Node1 Running");
 
@@ -160,9 +163,10 @@ fn two_node_with_slot() {
 
         fn run<'a>(
             &'a mut self,
-            context: &'a (),
+            _context: &'a (),
             input: &'a Self::Input,
             usage: &'a ParamUsage,
+			_id: NodeId, _from: &'static [NodeId], _to: &'static [NodeId],
         ) -> BoxFuture<'a, Result<Self::Output, String>> {
             println!("======== Enter Node2 Running");
 
@@ -186,17 +190,16 @@ fn two_node_with_slot() {
 
     let mut g = DependGraph::default();
 
-    g.add_node("Node1", Node1);
-    g.add_node("Node2", Node2);
+    let _ = g.add_node("Node1", Node1);
+    let _ = g.add_node("Node2", Node2);
 
-    g.add_depend("Node1", "Node2");
+    let _ = g.add_depend("Node1", "Node2");
 
     g.set_finish("Node2", true).unwrap();
     g.dump_graphviz();
 
     let rt = runtime.clone();
-    let _ = runtime.spawn(runtime.alloc(), async move {
-        g.build().unwrap();
+    let _ = runtime.spawn(async move {
 
         println!("======== 1 run graph");
         g.run(&rt, &()).await.unwrap();

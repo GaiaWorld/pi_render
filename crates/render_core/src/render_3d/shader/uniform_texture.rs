@@ -111,7 +111,7 @@ impl UniformTexture2DDesc {
     }
     fn _ty_code(&self) -> String {
         match self.tex_sampler_type {
-            wgpu::TextureSampleType::Float { filterable } => String::from(" texture2D "),
+            wgpu::TextureSampleType::Float { .. } => String::from(" texture2D "),
             wgpu::TextureSampleType::Depth => String::from(" texture2DShadow "),
             wgpu::TextureSampleType::Sint => String::from(" itexture2D "),
             wgpu::TextureSampleType::Uint => String::from(" utexture2D "),

@@ -4,7 +4,7 @@ use pi_render::depend_graph::{
     graph::DependGraph,
     node::{DependNode, ParamUsage},
 };
-use pi_share::Share;
+use render_core::depend_graph::NodeId;
 use render_derive::NodeParam;
 use std::{any::TypeId, time::Duration};
 
@@ -15,31 +15,29 @@ fn multi_node() {
 
     let mut g = DependGraph::default();
 
-    g.add_node("Node1", Node1);
-    g.add_node("Node2", Node2);
-    g.add_node("Node3", Node3);
-    g.add_node("Node4", Node4);
-    g.add_node("Node5", Node5);
-    g.add_node("Node6", Node6);
+    let _ = g.add_node("Node1", Node1);
+    let _ = g.add_node("Node2", Node2);
+    let _ = g.add_node("Node3", Node3);
+    let _ = g.add_node("Node4", Node4);
+    let _ = g.add_node("Node5", Node5);
+    let _ = g.add_node("Node6", Node6);
 
-    g.add_depend("Node1", "Node4");
-    g.add_depend("Node2", "Node4");
+    let _ = g.add_depend("Node1", "Node4");
+    let _ = g.add_depend("Node2", "Node4");
 
-    g.add_depend("Node2", "Node5");
-    g.add_depend("Node3", "Node5");
+    let _ = g.add_depend("Node2", "Node5");
+    let _ = g.add_depend("Node3", "Node5");
 
-    g.add_depend("Node4", "Node6");
-    g.add_depend("Node5", "Node6");
+    let _ = g.add_depend("Node4", "Node6");
+    let _ = g.add_depend("Node5", "Node6");
 
     g.set_finish("Node6", true).unwrap();
     
     g.dump_graphviz();
     
     let rt = runtime.clone();
-    let _ = runtime.spawn(runtime.alloc(), async move {
+    let _ = runtime.spawn(async move {
         let rt = rt.clone();
-
-        g.build().unwrap();
 
         println!("======== 1 run graph");
         g.run(&rt, &()).await.unwrap();
@@ -129,9 +127,10 @@ impl DependNode<()> for Node1 {
 
     fn run<'a>(
         &'a mut self,
-        context: &'a (),
+        _context: &'a (),
         input: &'a Self::Input,
         usage: &'a ParamUsage,
+		_id: NodeId, _from: &'static [NodeId], _to: &'static [NodeId],
     ) -> BoxFuture<'a, Result<Self::Output, String>> {
         println!("======== Enter Node1 Running");
 
@@ -157,9 +156,10 @@ impl DependNode<()> for Node2 {
 
     fn run<'a>(
         &'a mut self,
-        context: &'a (),
-        input: &'a Self::Input,
+        _context: &'a (),
+        _input: &'a Self::Input,
         usage: &'a ParamUsage,
+		_id: NodeId, _from: &'static [NodeId], _to: &'static [NodeId],
     ) -> BoxFuture<'a, Result<Self::Output, String>> {
         println!("======== Enter Node2 Running");
 
@@ -186,9 +186,10 @@ impl DependNode<()> for Node3 {
 
     fn run<'a>(
         &'a mut self,
-        context: &'a (),
-        input: &'a Self::Input,
+        _context: &'a (),
+        _input: &'a Self::Input,
         usage: &'a ParamUsage,
+		_id: NodeId, _from: &'static [NodeId], _to: &'static [NodeId],
     ) -> BoxFuture<'a, Result<Self::Output, String>> {
         println!("======== Enter Node3 Running");
 
@@ -212,9 +213,10 @@ impl DependNode<()> for Node4 {
 
     fn run<'a>(
         &'a mut self,
-        context: &'a (),
+        _context: &'a (),
         input: &'a Self::Input,
         usage: &'a ParamUsage,
+		_id: NodeId, _from: &'static [NodeId], _to: &'static [NodeId],
     ) -> BoxFuture<'a, Result<Self::Output, String>> {
         println!("======== Enter Node4 Running");
 
@@ -241,9 +243,10 @@ impl DependNode<()> for Node5 {
 
     fn run<'a>(
         &'a mut self,
-        context: &'a (),
+        _context: &'a (),
         input: &'a Self::Input,
         usage: &'a ParamUsage,
+		_id: NodeId, _from: &'static [NodeId], _to: &'static [NodeId],
     ) -> BoxFuture<'a, Result<Self::Output, String>> {
         println!("======== Enter Node5 Running");
 
@@ -270,9 +273,10 @@ impl DependNode<()> for Node6 {
 
     fn run<'a>(
         &'a mut self,
-        context: &'a (),
+        _context: &'a (),
         input: &'a Self::Input,
         usage: &'a ParamUsage,
+		_id: NodeId, _from: &'static [NodeId], _to: &'static [NodeId],
     ) -> BoxFuture<'a, Result<Self::Output, String>> {
         println!("======== Enter Node6 Running");
 

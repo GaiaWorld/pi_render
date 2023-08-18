@@ -1,10 +1,8 @@
-use criterion::{criterion_group, criterion_main, Criterion, BenchmarkGroup};
+use criterion::{criterion_group, criterion_main, Criterion};
 use pi_share::{ShareMutex, Share};
-use render_core::rhi::{buffer_alloc::{BufferAlloter}, device::RenderDevice, RenderQueue};
-use std::sync::{Arc, atomic::AtomicBool};
-
+use render_core::rhi::{buffer_alloc::BufferAlloter, device::RenderDevice, RenderQueue};
 use pi_async_rt::rt::AsyncRuntime;
-use winit::{event_loop::{EventLoopBuilder, EventLoopWindowTarget}, platform::windows::EventLoopBuilderExtWindows};
+use winit::{event_loop::EventLoopBuilder, platform::windows::EventLoopBuilderExtWindows};
 
 use render_core::rhi::{device::initialize_renderer, options::RenderOptions};
 
@@ -25,7 +23,7 @@ fn buffer_alloter(c: &mut Criterion) {
 	let result: Share<ShareMutex<Option<(RenderDevice, RenderQueue)>>> = Share::new(ShareMutex::new(None));
 	let result1 = result.clone();
 
-	pi_hal::runtime::MULTI_MEDIA_RUNTIME.spawn(pi_hal::runtime::MULTI_MEDIA_RUNTIME.alloc(), async move {
+	let _ = pi_hal::runtime::MULTI_MEDIA_RUNTIME.spawn( async move {
 		let request_adapter_options = wgpu::RequestAdapterOptions {
 			power_preference: options.power_preference,
 			compatible_surface: Some(&surface),
@@ -45,12 +43,12 @@ fn buffer_alloter(c: &mut Criterion) {
 		if let Some((device, queue)) = &*lock {
 			// level2， 由于max_align为128， 该buffer应该创建独立的buffer
 			let mut level2_buffer = Vec::new();
-			for i in 0..max_align{
+			for _i in 0..max_align{
 				level2_buffer.push(1)
 			}
 
 			let mut level3_buffer = Vec::new();
-			for i in 0..max_align + 4 {
+			for _i in 0..max_align + 4 {
 				level3_buffer.push(1)
 			}
 
@@ -58,12 +56,12 @@ fn buffer_alloter(c: &mut Criterion) {
 				
 			group.bench_function("alloter_align_bench", |b| {
 				b.iter(|| {
-					alloter.alloc_or_update(None, level2_buffer.as_slice());
+					alloter.alloc(level2_buffer.as_slice());
 				})
 			});
 			group.bench_function("alloter_not_align", |b| {
 				b.iter(|| {
-					alloter.alloc_or_update(None, level3_buffer.as_slice());
+					alloter.alloc(level3_buffer.as_slice());
 				})
 			});
 			group.bench_function("copy_to_nonoverlapping", |b| {

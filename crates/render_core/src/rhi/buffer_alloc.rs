@@ -227,7 +227,7 @@ impl BufferAlloter {
 }
 
 // buffer最小对齐字节数
-const MIN_ALIGN: u32 = 64;
+// const MIN_ALIGN: u32 = 64;
 // 最小等级（2^6 = MIN_ALIGN）
 const MIN_LEVEL: usize = 6;
 

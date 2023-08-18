@@ -1,37 +1,16 @@
 
 use std::{sync::Arc, thread::sleep, time::Duration};
 
-use pi_assets::{mgr::{AssetMgr, LoadResult}, asset::{GarbageEmpty, Handle}};
-use pi_async_rt::rt::{ AsyncRuntime};
+use pi_assets::{mgr::AssetMgr, asset::GarbageEmpty};
+use pi_async_rt::rt::AsyncRuntime;
 use pi_atom::Atom;
 
 use pi_hal::{loader::AsyncLoader, runtime::MULTI_MEDIA_RUNTIME, init_load_cb, on_load};
-use pi_share::{Share, ShareRwLock};
+use pi_share::Share;
 use render_core::{
-    rhi::{device::RenderDevice, options::{RenderOptions, RenderPriority}, RenderQueue, asset::TextureRes},
-    renderer::{
-        bind_buffer::BindBufferAllocator,
-        sampler::SamplerRes,
-        buildin_data::{DefaultTexture, EDefaultTexture},
-        bind_group::{BindGroupLayout, BindGroupUsage, BindGroup, BindsRecorder},
-        attributes::{ShaderAttribute, EVertexDataKind, KeyShaderFromAttributes},
-        shader_stage::EShaderStage, texture::{ImageTexture, ImageTexture2DDesc, KeyImageTexture}
-    },
-    render_3d::{
-        shader::*,
-        bind_groups::{
-            texture_sampler::{BindGroupTextureSamplers},
-            model::{BindGroupModel, KeyBindGroupModel},
-            scene::{BindGroupScene, KeyBindGroupScene}
-        },
-        binds::{
-            model::*,
-            effect_value::ShaderBindEffectValue,
-            scene::*,
-        }
-    }, asset::TAssetKeyU64
+    rhi::{device::RenderDevice, options::{RenderOptions, RenderPriority}, RenderQueue},
+    renderer::texture::{ImageTexture, ImageTexture2DDesc, KeyImageTexture},
 };
-use wgpu::{Device, Instance};
 
 /// Initializes the renderer by retrieving and preparing the GPU instance, device and queue
 /// for the specified backend.
@@ -191,7 +170,7 @@ pub async fn  setup_render_context(
     options: RenderOptions,
     window: Arc<winit::window::Window>,
 ) -> (RenderDevice, RenderQueue, wgpu::AdapterInfo) {
-    let backends = options.backends;
+    // let backends = options.backends;
 
     
     // let runtime = pi_async_rt::rt::serial::AsyncRuntimeBuilder::default_worker_thread(None, None, None, None);
@@ -237,14 +216,14 @@ pub(crate) fn main() {
         power_preference: wgpu::PowerPreference::HighPerformance,
         ..Default::default()
     };
-    let backends = options.backends;
-    let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-		/// Which `Backends` to enable.
-		backends: options.backends,
-		/// Which DX12 shader compiler to use.
-		dx12_shader_compiler: wgpu::Dx12Compiler::Fxc,
-	});
-    let surface = unsafe { instance.create_surface(window.as_ref()) };
+    // let backends = options.backends;
+    // let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+	// 	/// Which `Backends` to enable.
+	// 	backends: options.backends,
+	// 	/// Which DX12 shader compiler to use.
+	// 	dx12_shader_compiler: wgpu::Dx12Compiler::Fxc,
+	// });
+    // let surface = unsafe { instance.create_surface(window.as_ref()) };
 
     init_load_cb(Arc::new(|path: String| {
         MULTI_MEDIA_RUNTIME
@@ -259,7 +238,7 @@ pub(crate) fn main() {
     MULTI_MEDIA_RUNTIME
     .spawn(async move {
         let key = KeyImageTexture::File(Atom::from("E:/Rust/PI/pi_3d/assets/images/eff_ui_ll_085.png"), true);
-        let (device, queue, adapter_info) = setup_render_context(
+        let (device, queue, _adapter_info) = setup_render_context(
             options,
             window
         ).await;

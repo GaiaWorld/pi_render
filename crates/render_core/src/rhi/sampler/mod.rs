@@ -1,8 +1,8 @@
-use std::{num::NonZeroU8, hash::Hash, fmt::Debug};
+use std::{hash::Hash, fmt::Debug};
 
 use pi_assets::asset::{Asset, Size};
 
-use super::{device::RenderDevice};
+use super::device::RenderDevice;
 
 pub mod sampler_array;
 

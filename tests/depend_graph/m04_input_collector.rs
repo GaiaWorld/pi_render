@@ -5,7 +5,7 @@ use pi_render::depend_graph::{
     node::{DependNode, ParamUsage},
     param::InParamCollector,
 };
-use pi_share::Share;
+use render_core::depend_graph::NodeId;
 use render_derive::NodeParam;
 use std::{any::TypeId, time::Duration};
 
@@ -22,7 +22,7 @@ fn input_collector() {
     let n14 = g.add_node("Node14", Node1(14)).unwrap();
     let n15 = g.add_node("Node15", Node1(15)).unwrap();
 
-    let n2 = g.add_node("Node2", Node2).unwrap();
+    let _n2 = g.add_node("Node2", Node2).unwrap();
 
     println!("node11 id = {:?}", n11);
     println!("node12 id = {:?}", n12);
@@ -30,17 +30,16 @@ fn input_collector() {
     println!("node14 id = {:?}", n14);
     println!("node15 id = {:?}", n15);
 
-    g.add_depend("Node11", "Node2");
-    g.add_depend("Node12", "Node2");
-    g.add_depend("Node13", "Node2");
-    g.add_depend("Node14", "Node2");
-    g.add_depend("Node15", "Node2");
+    let _ = g.add_depend("Node11", "Node2");
+    let _ = g.add_depend("Node12", "Node2");
+    let _ = g.add_depend("Node13", "Node2");
+    let _ = g.add_depend("Node14", "Node2");
+    let _ = g.add_depend("Node15", "Node2");
 
     g.set_finish("Node2", true).unwrap();
 
     let rt = runtime.clone();
-    let _ = runtime.spawn(runtime.alloc(), async move {
-        g.build().unwrap();
+    let _ = runtime.spawn(async move {
 
         println!("======== run graph");
         g.run(&rt, &()).await.unwrap();
@@ -82,9 +81,10 @@ impl DependNode<()> for Node1 {
 
     fn run<'a>(
         &'a mut self,
-        context: &'a (),
+        _context: &'a (),
         input: &'a Self::Input,
         usage: &'a ParamUsage,
+		_id: NodeId, _from: &'static [NodeId], _to: &'static [NodeId],
     ) -> BoxFuture<'a, Result<Self::Output, String>> {
         println!("======== Enter Node1 Running");
 
@@ -113,9 +113,10 @@ impl DependNode<()> for Node2 {
 
     fn run<'a>(
         &'a mut self,
-        context: &'a (),
+        _context: &'a (),
         input: &'a Self::Input,
         usage: &'a ParamUsage,
+		_id: NodeId, _from: &'static [NodeId], _to: &'static [NodeId],
     ) -> BoxFuture<'a, Result<Self::Output, String>> {
         println!("======== Enter Node2 Running");
 

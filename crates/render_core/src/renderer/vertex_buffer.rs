@@ -1,4 +1,4 @@
-use std::{ops::Range, mem::{size_of}, hash::Hash, sync::Arc, fmt::Debug};
+use std::{ops::Range, mem::size_of, hash::Hash, sync::Arc, fmt::Debug};
 
 use pi_assets::{asset::{Asset, GarbageEmpty, Handle, Size}, mgr::AssetMgr};
 use pi_atom::Atom;
@@ -145,13 +145,13 @@ impl EVertexBufferRange {
     pub fn buffer(&self) -> &Buffer {
         match self {
             EVertexBufferRange::Updatable(val, _, _) => val.buffer(),
-            EVertexBufferRange::NotUpdatable(val, start, end) => val.buffer(),
+            EVertexBufferRange::NotUpdatable(val, ..) => val.buffer(),
         }
     }
     pub fn size(&self) -> u32 {
         match self {
             EVertexBufferRange::Updatable(_, size, _) => *size,
-            EVertexBufferRange::NotUpdatable(val, start, end) => end - start,
+            EVertexBufferRange::NotUpdatable(_val, start, end) => end - start,
         }
     }
     pub fn range(&self) -> Range<wgpu::BufferAddress> {
@@ -159,7 +159,7 @@ impl EVertexBufferRange {
             EVertexBufferRange::Updatable(val, size, _) => {
                 Range { start: val.offset() as u64, end: (val.offset() + size) as u64 }
             },
-            EVertexBufferRange::NotUpdatable(val, start, end) => {
+            EVertexBufferRange::NotUpdatable(_val, start, end) => {
                 Range { start: *start as u64, end: *end as u64 }
                 // Range { start: 0 as u64, end: val.size() as u64 }
             },
@@ -170,7 +170,7 @@ impl EVertexBufferRange {
             EVertexBufferRange::Updatable(val, size, _) => {
                 Range { start: val.offset() as u64, end: (val.offset() + size) as u64 }
             },
-            EVertexBufferRange::NotUpdatable(val, start, end) => {
+            EVertexBufferRange::NotUpdatable(_val, start, end) => {
                 Range { start: 0 as u64, end: (end - start) as u64 }
                 // Range { start: *start as u64, end: *end as u64 }
             },
@@ -284,8 +284,8 @@ impl VertexBufferAllocator {
             FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(15) as u32, usage),
         ];
 
-        let asset_mgr = AssetMgr::<AssetRWBuffer>::new(GarbageEmpty(), false, (capacity / 8 * 1), timeout);
-        let asset_mgr_2 = AssetMgr::<NotUpdatableBuffer>::new(GarbageEmpty(), false, (capacity / 8 * 7), timeout);
+        let asset_mgr = AssetMgr::<AssetRWBuffer>::new(GarbageEmpty(), false, capacity / 8 * 1, timeout);
+        let asset_mgr_2 = AssetMgr::<NotUpdatableBuffer>::new(GarbageEmpty(), false, capacity / 8 * 7, timeout);
 
         Self {
             base_size,
@@ -461,6 +461,7 @@ pub struct FixedSizeBufferPoolNotUpdatable {
     buffers: Vec<Arc<UseNotUpdatableBuffer>>,
     /// * 此处分配出去的每个Buffer大小均为 block_size
     pub(crate) block_size: u32,
+	#[allow(dead_code)]
     mutex: ShareMutex<()>,
     usage: wgpu::BufferUsages,
 }

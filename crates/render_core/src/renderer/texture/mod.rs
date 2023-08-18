@@ -6,8 +6,6 @@ mod render_target;
 pub mod texture_view;
 mod texture_view_array;
 
-use std::num::NonZeroU32;
-
 pub use bind_texture::*;
 pub use texture_format::*;
 pub use image_texture::*;

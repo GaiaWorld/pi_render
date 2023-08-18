@@ -8,7 +8,6 @@ use crate::{
         texture::*,
         bind::{KeyBindLayoutTexture2D, EKeyBind, KeyBindTexture2D},
     },
-    rhi::{asset::TextureRes},
     render_3d::shader::*, components::view::target_alloc::ShareTargetView
 };
 

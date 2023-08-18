@@ -7,7 +7,6 @@ use pi_hal::{
 	loader::AsyncLoader,
 };
 use pi_hash::XHashMap;
-use pi_share::Share;
 
 use crate::{rhi::{device::RenderDevice, RenderQueue}, asset::TAssetKeyU64};
 
@@ -25,8 +24,8 @@ impl KeyImageTexture {
 	}
     pub fn as_srgb(&self) -> bool {
 		match self {
-			KeyImageTexture::File(val, srgb) => *srgb,
-			KeyImageTexture::Data(val, srgb) => *srgb,
+			KeyImageTexture::File(_val, srgb) => *srgb,
+			KeyImageTexture::Data(_val, srgb) => *srgb,
 		}
 	}
 }
@@ -48,6 +47,7 @@ pub struct ImageTexture {
 	pub(crate) width: u32,
 	pub(crate) height: u32,
 	pub(crate) texture: wgpu::Texture,
+	#[allow(dead_code)]
 	pub(crate) is_opacity: bool,
 	pub(crate) size: usize,
 	pub(crate) format: wgpu::TextureFormat,
