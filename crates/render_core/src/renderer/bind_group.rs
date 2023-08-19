@@ -1,11 +1,11 @@
 
-use std::{sync::Arc, fmt::Debug, hash::{Hash}};
+use std::{sync::Arc, fmt::Debug, hash::Hash};
 
-use pi_assets::{asset::{Handle, Asset, Size}};
+use pi_assets::asset::{Handle, Asset, Size};
 
 use crate::{rhi::{device::RenderDevice, small_struct_allocator::{SmallStructAllocatorPool, IDSmallStruct, TSmallStructID}}, asset::{TAssetKeyU64, ASSET_SIZE_FOR_UNKOWN}};
 
-use super::{bind::{EKeyBind, EBindResource}};
+use super::bind::{EKeyBind, EBindResource};
 
 pub const MAX_BIND_COUNT: usize = 16;
 
@@ -169,41 +169,41 @@ impl IDBinds {
     pub fn offsets(&self) -> &Vec<wgpu::DynamicOffset> {
         match self {
             IDBinds::Binds00(v) => v,
-            IDBinds::Binds01(id, v) => {
+            IDBinds::Binds01(_id, v) => {
                 v
             },
-            IDBinds::Binds02(id, v) =>  {
+            IDBinds::Binds02(_id, v) =>  {
                 v
             }
-            IDBinds::Binds04(id, v) =>  {
+            IDBinds::Binds04(_id, v) =>  {
                 v
             },
-            IDBinds::Binds08(id, v) =>  {
+            IDBinds::Binds08(_id, v) =>  {
                 v
             },
-            IDBinds::Binds16(id, v) =>  {
+            IDBinds::Binds16(_id, v) =>  {
                 v
             },
         }
     }
     pub fn binds(&self) -> Vec<Option<EKeyBind>> {
         match self {
-            IDBinds::Binds00(v) => {
+            IDBinds::Binds00(_v) => {
                 vec![]
             },
-            IDBinds::Binds01(id, v) => {
+            IDBinds::Binds01(id, _v) => {
                 id.data().unwrap().val().to_vec()
             },
-            IDBinds::Binds02(id, v) =>  {
+            IDBinds::Binds02(id, _v) =>  {
                 id.data().unwrap().val().to_vec()
             }
-            IDBinds::Binds04(id, v) =>  {
+            IDBinds::Binds04(id, _v) =>  {
                 id.data().unwrap().val().to_vec()
             },
-            IDBinds::Binds08(id, v) =>  {
+            IDBinds::Binds08(id, _v) =>  {
                 id.data().unwrap().val().to_vec()
             },
-            IDBinds::Binds16(id, v) =>  {
+            IDBinds::Binds16(id, _v) =>  {
                 id.data().unwrap().val().to_vec()
             },
         }

@@ -1,8 +1,8 @@
-use std::{num::NonZeroU8, hash::Hash, fmt::Debug};
+use std::{hash::Hash, fmt::Debug};
 
 use pi_assets::asset::{Asset, Size};
 
-use super::{device::RenderDevice};
+use super::device::RenderDevice;
 
 pub mod sampler_array;
 
@@ -129,14 +129,14 @@ impl SamplerDesc {
             ..Default::default()
         }
     }
-    pub fn anisotropy_clamp(&self) -> Option<NonZeroU8> {
+    pub fn anisotropy_clamp(&self) -> u16 {
         match self.anisotropy_clamp {
-            EAnisotropyClamp::None      => None,
-            EAnisotropyClamp::One       => NonZeroU8::new(1 ),
-            EAnisotropyClamp::Two       => NonZeroU8::new(2 ),
-            EAnisotropyClamp::Four      => NonZeroU8::new(4 ),
-            EAnisotropyClamp::Eight     => NonZeroU8::new(8 ),
-            EAnisotropyClamp::Sixteen   => NonZeroU8::new(16),
+            EAnisotropyClamp::None      => 1,
+            EAnisotropyClamp::One       => 1,
+            EAnisotropyClamp::Two       => 2,
+            EAnisotropyClamp::Four      => 4,
+            EAnisotropyClamp::Eight     => 8,
+            EAnisotropyClamp::Sixteen   => 16,
         }
     }
     pub fn linear_clamp() -> Self {

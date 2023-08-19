@@ -12,8 +12,8 @@ keywords = ["pi"]
 wgpu-validation = ["wgpu", "naga", "futures"]
 
 [dependencies]
-render_crevice = { path = ".." }
-render_crevice_derive = { path = "../render_crevice_derive", features = [
+render_crevice = { path = "..", version = "0.1", registry = "yn" }
+render_crevice_derive = { path = "../render_crevice_derive", version="0.1", registry = "yn", features = [
     "debug-methods",
 ] }
 
@@ -23,5 +23,5 @@ memoffset = "0.6.4"
 mint = "0.5.5"
 
 futures = { version = "0.3.17", features = ["executor"], optional = true }
-naga = { version = "0.11", optional = true }
-wgpu = { version = "0.15", optional = true }
+naga = { version = "0.12", optional = true }
+wgpu = { version = "0.16", optional = true }

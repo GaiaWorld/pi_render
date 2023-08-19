@@ -191,7 +191,7 @@ impl Debug for RWBufferRange {
 impl RWBufferRange {
     pub fn write_data(&self, local_offset: usize, data: &[u8]) {
         let offset = self.index.index() * self.id_buffer.fixed_size;
-        let temp = TempWriteBuffer(local_offset, data);
+        // let temp = TempWriteBuffer(local_offset, data);
         self.buffer.fill(offset as u32, local_offset, data);
     }
     pub fn buffer(&self) -> &Buffer {

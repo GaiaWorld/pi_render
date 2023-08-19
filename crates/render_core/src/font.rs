@@ -1,7 +1,4 @@
-use std::{
-	num::NonZeroU32,
-	hash::{Hash, Hasher},
-};
+use std::hash::{Hash, Hasher};
 
 use pi_assets::{asset::Handle, mgr::AssetMgr};
 use pi_atom::Atom;
@@ -132,7 +129,7 @@ impl FontSheet {
 				image.buffer.as_slice(),
 				ImageDataLayout {
 					offset: 0,
-					bytes_per_row: NonZeroU32::new(image.width as u32 * 4), // 32 * 4
+					bytes_per_row: if image.width == 0 { None }else { Some(image.width as u32 * 4) }, // 32 * 4
 					rows_per_image: None,
 				},
 				Extent3d {

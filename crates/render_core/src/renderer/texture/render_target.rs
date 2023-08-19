@@ -2,7 +2,7 @@ use std::{sync::Arc, hash::Hash};
 
 use pi_assets::asset::{Handle, Asset, Size};
 
-use crate::{rhi::{device::RenderDevice, texture::{Texture, TextureView}}, renderer::texture::{texture_format::TTextureFormatPixelByte}, asset::{ASSET_SIZE_FOR_UNKOWN, TAssetKeyU64}};
+use crate::{rhi::{device::RenderDevice, texture::{Texture, TextureView}}, renderer::texture::texture_format::TTextureFormatPixelByte, asset::{ASSET_SIZE_FOR_UNKOWN, TAssetKeyU64}};
 
 use super::TextureViewDesc;
 
@@ -51,9 +51,13 @@ pub struct KeyRenderTexture {
 
 #[derive(Debug)]
 pub struct RenderTexture {
+	#[allow(dead_code)]
     pub(crate) width: u32,
+	#[allow(dead_code)]
     pub(crate) height: u32,
+	#[allow(dead_code)]
     pub(crate) texture: Texture,
+	#[allow(dead_code)]
     pub(crate) format: wgpu::TextureFormat,
     size: usize,
 }
@@ -144,6 +148,7 @@ pub type KeyRenderTargetViewU64 = u64;
 
 #[derive(Debug)]
 pub struct RenderTargetView {
+	#[allow(dead_code)]
     pub(crate) texture: Handle<RenderTexture>,
     pub(crate) view: TextureView,
 }
@@ -229,7 +234,7 @@ impl ERenderTargetViewUsage {
     pub fn key(&self) -> u64 {
         match self {
             ERenderTargetViewUsage::Handle(val) => *val.key(),
-            ERenderTargetViewUsage::Arc(val, key) => *key,
+            ERenderTargetViewUsage::Arc(_val, key) => *key,
         }
     }
     pub fn view(&self) -> &TextureView {
@@ -243,7 +248,7 @@ impl PartialEq for ERenderTargetViewUsage {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Handle(l0), Self::Handle(r0)) => l0.key() == r0.key(),
-            (Self::Arc(l0, l1), Self::Arc(r0, r1)) => l1 == r1,
+            (Self::Arc(_l0, l1), Self::Arc(_r0, r1)) => l1 == r1,
             _ => false,
         }
     }

@@ -6,8 +6,6 @@ mod render_target;
 pub mod texture_view;
 mod texture_view_array;
 
-use std::num::NonZeroU32;
-
 pub use bind_texture::*;
 pub use texture_format::*;
 pub use image_texture::*;
@@ -26,13 +24,13 @@ pub struct TextureViewDesc {
     /// Mip level count.
     /// If `Some(count)`, `base_mip_level + count` must be less or equal to underlying texture mip count.
     /// If `None`, considered to include the rest of the mipmap levels, but at least 1 in total.
-    pub mip_level_count: Option<NonZeroU32>,
+    pub mip_level_count: Option<u32>,
     /// Base array layer.
     pub base_array_layer: u32,
     /// Layer count.
     /// If `Some(count)`, `base_array_layer + count` must be less or equal to the underlying array count.
     /// If `None`, considered to include the rest of the array layers, but at least 1 in total.
-    pub array_layer_count: Option<NonZeroU32>,
+    pub array_layer_count: Option<u32>,
 }
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]

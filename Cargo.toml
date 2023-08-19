@@ -16,7 +16,7 @@ members = ["crates/*"]
 
 
 [dependencies]
-render_core = { path = "crates/render_core" }
+render_core = { path = "crates/render_core", version = "0.1", registry = "yn" }
 
 [dev-dependencies]
 pi_futures = "0.1"
@@ -29,15 +29,15 @@ pi_hash = "0.1"
 nalgebra = "0.32"
 winit = { registry = "yn", version = "0.27"}
 log = "0.4"
-wgpu = "0.15"
+wgpu = "0.16"
 env_logger = "0.9"
 float-ord = "0.3"
 lazy_static = "1.4"
 
-render_derive = {path = "crates/render_derive"}
+render_derive = {path = "crates/render_derive", version = "0.1", registry = "yn"}
 criterion = "0.4"
-render_core = {path = "crates/render_core"}
-pi_hal = { git = "https://github.com/GaiaWorld/pi_hal.git" }
+render_core = {path = "crates/render_core", version = "0.1", registry = "yn"}
+pi_hal = { version = "0.1", registry = "yn" }
 
 [[example]]
 name = "hello_winit"

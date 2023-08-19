@@ -13,7 +13,7 @@ default = ["std"]
 std = []
 
 [dependencies]
-render_crevice_derive= { version = "0.1.0", path = "render_crevice_derive" }
+render_crevice_derive= { version = "0.1.0", path = "render_crevice_derive", registry = "yn" }
 
 bytemuck = "1.4.1"
 mint = "0.5.8"

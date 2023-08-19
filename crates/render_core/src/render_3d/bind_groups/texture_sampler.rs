@@ -2,7 +2,7 @@
 
 use std::{hash::Hash, sync::Arc};
 
-use pi_assets::{asset::Handle};
+use pi_assets::asset::Handle;
 
 use crate::{
     renderer::{
@@ -103,7 +103,7 @@ impl KeyBindGroupTextureSamplers {
                 if let Some(layout) = val.key_bind(&meta, binding as u16) { binds.set(binding, Some(layout)); binding += 1; } else { error = true; };
             }
             if let Some(val) = &effect_texture_samplers.samplers.7 {
-                if let Some(layout) = val.key_bind(&meta, binding as u16) { binds.set(binding, Some(layout)); binding += 1; } else { error = true; };
+                if let Some(layout) = val.key_bind(&meta, binding as u16) { binds.set(binding, Some(layout)) } else { error = true; };
             }
             if !error {
                 Some(binds.record(recorder))

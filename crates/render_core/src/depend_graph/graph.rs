@@ -12,17 +12,15 @@ use super::{
     param::{InParam, OutParam},
     GraphError,
 };
-use graphviz_rust::dot_structures::Node;
 use log::error;
 use pi_async_rt::prelude::AsyncRuntime;
 use pi_async_graph::{async_graph, ExecNode as ExecNode1, RunFactory, Runner, Runnble, GetRunnble};
 use pi_futures::BoxFuture;
 use pi_graph::{DirectedGraph, DirectedGraphNode, NGraph, NGraphBuilder, NGraphNode};
 use pi_hash::{XHashMap, XHashSet};
-use pi_map::vecmap::VecMap;
 use pi_share::{Share, ShareCell, ThreadSync};
-use pi_slotmap::{SlotMap, SecondaryMap};
-use std::{borrow::Cow, marker::PhantomData, sync::atomic::AtomicUsize, mem::{replace, size_of}};
+use pi_slotmap::SlotMap;
+use std::{borrow::Cow, marker::PhantomData, mem::replace};
 
 type ExecNode<Context> = ExecNode1<NodeId, Context, BuildSyncRun<Context>, BuildSyncRun<Context>>;
 /// 依赖图
@@ -156,33 +154,30 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
     /// 红色 是 结束 节点
     #[cfg(debug_assertions)]
     fn dump_graphviz_impl(&self) -> String {
-        // let mut v = vec!["digraph Render {".into()];
+        let mut v = vec!["digraph Render {".into()];
 
-        // for (id, (name, _)) in self.nodes.nodes.iter() {
-        //     let color = if self.finish_nodes.get(&id).is_some() {
-        //         "red"
-        //     } else {
-        //         "white"
-        //     };
+        for (id, n) in self.schedule_graph.nodes.iter() {
+			let name = &n.name;
+            let color = if self.finish_nodes.get(&id).is_some() {
+                "red"
+            } else {
+                "white"
+            };
 
-        //     v.push(format!(
-        //         "\t \"{id:?}\" [\"style\"=\"filled\" \"label\"={name} \"fillcolor\"=\"{color}\"]"
-        //     ));
-        // }
+            v.push(format!(
+                "\t \"{id:?}\" [\"style\"=\"filled\" \"label\"={name} \"fillcolor\"=\"{color}\"]"
+            ));
+        }
 
-        // v.push("".into());
+        v.push("".into());
 
-        // for (id, slot) in self.edges.iter() {
-        //     for next_id in slot.next_nodes.iter() {
-        //         v.push(format!("\t \"{id:?}\" -> \"{next_id:?}\""));
-        //     }
-        // }
+        for (from, to) in self.edge_map.iter() {
+			v.push(format!("\t \"{from:?}\" -> \"{to:?}\""));
+        }
 
-        // v.push("}".into());
+        v.push("}".into());
 
-        // v.join("\n")
-
-		"".to_string()
+        v.join("\n")
     }
 
     /// 查 指定节点 的 前驱节点
@@ -445,15 +440,15 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
     //         .ok_or_else(|| GraphError::NoneNode(format!("id = {id:?}")))
     // }
 
-    // 取 label 对应的 NodeState
-    fn get_node_state(&self, label: &NodeLabel) -> Result<&NodeState<Context>, GraphError> {
-        self.get_node_id(label).and_then(|id| {
-            self.schedule_graph.nodes
-                .get(id)
-                .map(|v| &v.state)
-                .ok_or_else(|| GraphError::NoneNode(label.into()))
-        })
-    }
+    // // 取 label 对应的 NodeState
+    // fn get_node_state(&self, label: &NodeLabel) -> Result<&NodeState<Context>, GraphError> {
+    //     self.get_node_id(label).and_then(|id| {
+    //         self.schedule_graph.nodes
+    //             .get(id)
+    //             .map(|v| &v.state)
+    //             .ok_or_else(|| GraphError::NoneNode(label.into()))
+    //     })
+    // }
 
     // // 根据finish，生成 子图
     // fn gen_sub(&mut self, finish_nodes: graph: &mut NGraph<NodeId, NodeId>) -> Result<NGraph<NodeId, NodeId>, GraphError> {
@@ -467,53 +462,53 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
     //     Ok(sub_ng)
     // }
 
-    // 取 拓扑图，有必要就重新构建
-    fn change_topo(&mut self) -> Result<(), GraphError> {
-        // 拓扑 没修改，返回 原图
-        if !self.is_topo_dirty {
-            return Ok(());
-        }
-        self.is_topo_dirty = false;
-		Ok(match replace(&mut self.topo_graph, NGraphBuilder::new()).build(){
-			Ok(ng) => (),
-            Err(e) => {
-                let msg = format!("ng build failed, e = {e:?}");
-                return Err(GraphError::BuildError(msg));
-            }
-        })
+    // // 取 拓扑图，有必要就重新构建
+    // fn change_topo(&mut self) -> Result<(), GraphError> {
+    //     // 拓扑 没修改，返回 原图
+    //     if !self.is_topo_dirty {
+    //         return Ok(());
+    //     }
+    //     self.is_topo_dirty = false;
+	// 	Ok(match replace(&mut self.topo_graph, NGraphBuilder::new()).build(){
+	// 		Ok(ng) => (),
+    //         Err(e) => {
+    //             let msg = format!("ng build failed, e = {e:?}");
+    //             return Err(GraphError::BuildError(msg));
+    //         }
+    //     })
 
-        // // 构建成功, ng_builder 就 删掉
-        // let mut builder = NGraphBuilder::<NodeId, NodeId>::new();
-        // // 节点 就是 高层添加 的 节点
-        // for (node_id, _) in &self.nodes {
-        //     builder = builder.node(node_id, node_id);
-        // }
+    //     // // 构建成功, ng_builder 就 删掉
+    //     // let mut builder = NGraphBuilder::<NodeId, NodeId>::new();
+    //     // // 节点 就是 高层添加 的 节点
+    //     // for (node_id, _) in &self.nodes {
+    //     //     builder = builder.node(node_id, node_id);
+    //     // }
 
-        // {
-        //     let mut access_edges = XHashSet::<(NodeId, NodeId)>::default();
-        //     for (before, slot) in self.edges.iter() {
-        //         for after in slot.next_nodes.iter() {
-        //             if !access_edges.contains(&(*before, *after)) {
-        //                 // 顺序 必须和 依赖图顺序 相反
-        //                 builder = builder.edge(*after, *before);
+    //     // {
+    //     //     let mut access_edges = XHashSet::<(NodeId, NodeId)>::default();
+    //     //     for (before, slot) in self.edges.iter() {
+    //     //         for after in slot.next_nodes.iter() {
+    //     //             if !access_edges.contains(&(*before, *after)) {
+    //     //                 // 顺序 必须和 依赖图顺序 相反
+    //     //                 builder = builder.edge(*after, *before);
 
-        //                 access_edges.insert((*before, *after));
-        //             }
-        //         }
-        //     }
-        // }
+    //     //                 access_edges.insert((*before, *after));
+    //     //             }
+    //     //         }
+    //     //     }
+    //     // }
 
-        // let ng = match builder.build() {
-        //     Ok(ng) => ng,
-        //     Err(e) => {
-        //         let msg = format!("ng build failed, e = {e:?}");
-        //         return Err(GraphError::BuildError(msg));
-        //     }
-        // };
+    //     // let ng = match builder.build() {
+    //     //     Ok(ng) => ng,
+    //     //     Err(e) => {
+    //     //         let msg = format!("ng build failed, e = {e:?}");
+    //     //         return Err(GraphError::BuildError(msg));
+    //     //     }
+    //     // };
 
-        // self.topo_graph = Some(ng);
-        // Ok(())
-    }
+    //     // self.topo_graph = Some(ng);
+    //     // Ok(())
+    // }
 
     // 创建真正的 运行图
     // 返回 构建 的 执行图
@@ -593,7 +588,7 @@ impl<Context: 'static + ThreadSync> BuildSyncRun<Context> {
 }
 
 impl<Context: 'static + ThreadSync> Runner<NodeId, Context> for BuildSyncRun<Context> {
-    fn run(self, context: &'static Context, id: NodeId, from: &[NodeId], to: &[NodeId]) {
+    fn run(self, context: &'static Context, _id: NodeId, _from: &[NodeId], _to: &[NodeId]) {
         self.node.as_ref().borrow_mut().build(context).unwrap();
     }
 }
@@ -684,13 +679,6 @@ struct ScheduleGraph<Context: ThreadSync + 'static, T> {
 }
 
 impl<Context: ThreadSync + 'static, T> ScheduleGraph<Context, T>{
-	pub fn new() -> Self{
-		ScheduleGraph {
-			graph: NGraph::default(),
-			nodes: SlotMap::default(),
-		}
-	}
-
 	pub fn remove(&mut self, id: NodeId) -> Option<ScheduleNode<Context, T>> {
 		self.nodes.remove(id)
 	}

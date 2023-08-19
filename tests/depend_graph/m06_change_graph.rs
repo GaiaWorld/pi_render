@@ -4,7 +4,8 @@ use pi_render::depend_graph::{
     graph::DependGraph,
     node::{DependNode, ParamUsage},
 };
-use pi_share::{cell::TrustCell, Share};
+use pi_share::cell::TrustCell;
+use render_core::depend_graph::NodeId;
 use render_derive::NodeParam;
 use std::{any::TypeId, sync::Arc, time::Duration};
 
@@ -20,25 +21,23 @@ fn change_graph() {
     let n3 = Node3::default();
     let n4 = Node4::default();
 
-    g.add_node("Node1", n1.clone());
-    g.add_node("Node2", n2.clone());
-    g.add_node("Node3", n3.clone());
-    g.add_node("Node4", n4.clone());
+    let _ = g.add_node("Node1", n1.clone());
+    let _ = g.add_node("Node2", n2.clone());
+    let _ = g.add_node("Node3", n3.clone());
+    let _ = g.add_node("Node4", n4.clone());
 
-    g.add_depend("Node1", "Node3");
-    g.add_depend("Node2", "Node3");
+    let _ = g.add_depend("Node1", "Node3");
+    let _ = g.add_depend("Node2", "Node3");
 
     g.set_finish("Node3", true).unwrap();
 
     let rt = runtime.clone();
-    let _ = runtime.spawn(runtime.alloc(), async move {
+    let _ = runtime.spawn(async move {
         println!("======================== should build call ");
 
-        g.build().unwrap();
         g.run(&rt, &()).await.unwrap();
 
         println!("======================== shouldn't build call ");
-        g.build().unwrap();
         g.run(&rt, &()).await.unwrap();
 
         *n1.0.as_ref().borrow_mut() = false;
@@ -46,21 +45,19 @@ fn change_graph() {
         *n3.0.as_ref().borrow_mut() = false;
         *n4.0.as_ref().borrow_mut() = false;
 
-        g.remove_depend("Node1", "Node3");
-        g.remove_depend("Node2", "Node3");
+        let _ = g.remove_depend("Node1", "Node3");
+        let _ = g.remove_depend("Node2", "Node3");
 
-        g.add_depend("Node1", "Node4");
-        g.add_depend("Node2", "Node4");
+        let _ = g.add_depend("Node1", "Node4");
+        let _ = g.add_depend("Node2", "Node4");
 
         g.set_finish("Node3", false).unwrap();
         g.set_finish("Node4", true).unwrap();
 
         println!("======================== should build call ");
-        g.build().unwrap();
         g.run(&rt, &()).await.unwrap();
 
         println!("======================== shouldn't build call ");
-        g.build().unwrap();
         g.run(&rt, &()).await.unwrap();
     });
 
@@ -132,9 +129,10 @@ impl DependNode<()> for Node1 {
 
     fn run<'a>(
         &'a mut self,
-        context: &'a (),
-        input: &'a Self::Input,
+        _context: &'a (),
+        _input: &'a Self::Input,
         usage: &'a ParamUsage,
+		_id: NodeId, _from: &'static [NodeId], _to: &'static [NodeId],
     ) -> BoxFuture<'a, Result<Self::Output, String>> {
         let is_first_build = *self.0.as_ref().borrow();
         println!(
@@ -178,9 +176,10 @@ impl DependNode<()> for Node2 {
 
     fn run<'a>(
         &'a mut self,
-        context: &'a (),
-        input: &'a Self::Input,
+        _context: &'a (),
+        _input: &'a Self::Input,
         usage: &'a ParamUsage,
+		_id: NodeId, _from: &'static [NodeId], _to: &'static [NodeId],
     ) -> BoxFuture<'a, Result<Self::Output, String>> {
         let is_first_build = *self.0.as_ref().borrow();
         println!(
@@ -227,9 +226,10 @@ impl DependNode<()> for Node3 {
 
     fn run<'a>(
         &'a mut self,
-        context: &'a (),
-        input: &'a Self::Input,
+        _context: &'a (),
+        _input: &'a Self::Input,
         usage: &'a ParamUsage,
+		_id: NodeId, _from: &'static [NodeId], _to: &'static [NodeId],
     ) -> BoxFuture<'a, Result<Self::Output, String>> {
         println!("======== Enter Node3 Running");
         let is_first_build = *self.0.as_ref().borrow();
@@ -266,9 +266,10 @@ impl DependNode<()> for Node4 {
 
     fn run<'a>(
         &'a mut self,
-        context: &'a (),
+        _context: &'a (),
         input: &'a Self::Input,
         usage: &'a ParamUsage,
+		_id: NodeId, _from: &'static [NodeId], _to: &'static [NodeId],
     ) -> BoxFuture<'a, Result<Self::Output, String>> {
         println!("======== Enter Node4 Running");
 

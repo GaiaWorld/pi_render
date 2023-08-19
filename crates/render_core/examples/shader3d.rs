@@ -1,7 +1,7 @@
 
 use std::sync::Arc;
 
-use pi_assets::{mgr::AssetMgr, asset::{GarbageEmpty, Handle}};
+use pi_assets::{mgr::AssetMgr, asset::GarbageEmpty};
 use pi_async_rt::rt::serial::AsyncRuntime;
 use pi_atom::Atom;
 
@@ -19,7 +19,6 @@ use render_core::{
     render_3d::{
         shader::*,
         bind_groups::{
-            texture_sampler::{BindGroupTextureSamplers},
             model::{BindGroupModel, KeyBindGroupModel},
             scene::{BindGroupScene, KeyBindGroupScene}
         },
@@ -30,7 +29,6 @@ use render_core::{
         }
     }, asset::TAssetKeyU64
 };
-use wgpu::{Device, Instance};
 
 /// Initializes the renderer by retrieving and preparing the GPU instance, device and queue
 /// for the specified backend.

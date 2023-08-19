@@ -65,7 +65,8 @@ impl TTextureFormatPixelByte for wgpu::TextureFormat {
             wgpu::TextureFormat::Bc5RgUnorm             => 01,
             wgpu::TextureFormat::Bc5RgSnorm             => 01,
             wgpu::TextureFormat::Bc6hRgbUfloat          => 01,
-            wgpu::TextureFormat::Bc6hRgbSfloat          => 01,
+            // wgpu::TextureFormat::Bc6hRgbSfloat          => 01,
+			wgpu::TextureFormat::Bc6hRgbFloat          => 01,
             wgpu::TextureFormat::Bc7RgbaUnorm           => 01,
             wgpu::TextureFormat::Bc7RgbaUnormSrgb       => 01,
             wgpu::TextureFormat::Etc2Rgb8Unorm          => 01,
@@ -78,7 +79,7 @@ impl TTextureFormatPixelByte for wgpu::TextureFormat {
             wgpu::TextureFormat::EacR11Snorm            => 01,
             wgpu::TextureFormat::EacRg11Unorm           => 01,
             wgpu::TextureFormat::EacRg11Snorm           => 01,
-            wgpu::TextureFormat::Astc { block, channel } => 01,
+            wgpu::TextureFormat::Astc { .. } => 01,
         }
     }
 }

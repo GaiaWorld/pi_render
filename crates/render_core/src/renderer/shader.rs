@@ -5,7 +5,7 @@ use pi_atom::Atom;
 
 use crate::{asset::ASSET_SIZE_FOR_UNKOWN, render_3d::shader::ERenderAlignment};
 
-use super::{attributes::KeyShaderFromAttributes};
+use super::attributes::KeyShaderFromAttributes;
 
 
 pub type KeyShaderMeta = Atom;

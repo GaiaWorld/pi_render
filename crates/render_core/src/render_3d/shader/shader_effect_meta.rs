@@ -9,7 +9,7 @@ use crate::{
         shader::{TShaderSetBlock, KeyShaderMeta},
         buildin_data::EDefaultTexture,
         shader_stage::EShaderStage,
-        attributes::{KeyShaderFromAttributes, EVertexDataKind}, buildin_var::{ShaderVarUniform, ShaderVarVertices}
+        attributes::{KeyShaderFromAttributes, EVertexDataKind}, buildin_var::ShaderVarVertices
     },
     rhi::device::RenderDevice
 };
@@ -18,9 +18,9 @@ use super::{
     block_code::{BlockCode, BlockCodeAtom, TToBlockCodeAtom},
     varying_code::{VaryingCode, Varyings},
     shader_defines::ShaderDefinesSet,
-    uniform_value::{MaterialValueBindDesc, UniformPropertyMat4, UniformPropertyMat2, UniformPropertyVec4, UniformPropertyVec2, UniformPropertyFloat, UniformPropertyInt, UniformPropertyUint}, 
+    uniform_value::{MaterialValueBindDesc, UniformPropertyVec4, UniformPropertyVec2, UniformPropertyFloat,  UniformPropertyUint}, 
     uniform_texture::{UniformTexture2DDesc, EffectUniformTexture2DDescs},
-    instance_code::EVerticeExtendCode, shader::{Shader3D, TShaderBlockCode}, CodeSnippet, ESkinCode, ERenderAlignment
+    instance_code::EVerticeExtendCode, shader::{Shader3D, TShaderBlockCode}, ESkinCode, ERenderAlignment
 };
 
 /// 材质代码
@@ -68,7 +68,7 @@ impl From<(crate::rhi::shader::ShaderMeta, Vec<Atom>, Vec<Atom>)> for ShaderEffe
                                         match value.ty.ty {
                                             crate::rhi::shader::TypeKind::Float => {
                                                 match value.ty.size {
-                                                    crate::rhi::shader::TypeSize::Mat { rows, columns: _ } => {
+                                                    crate::rhi::shader::TypeSize::Mat {columns: _, .. } => {
                                                         // if rows == 4 {
                                                         //     uniforms.mat4_list.push(UniformPropertyMat4(uniform.name.clone(), crate::render_3d::vec_u8_to_f32_16(&value.default_value)));
                                                         // } else if rows == 2 {
@@ -340,10 +340,10 @@ const float HALF_MIN = 5.96046448e-08;
         {
             let root_dir = std::env::current_dir().unwrap();
             let file_name = "temp.vert";
-            std::fs::write(root_dir.join(file_name), vs.as_str());
+            let _ = std::fs::write(root_dir.join(file_name), vs.as_str());
             
             let file_name = "temp.frag";
-            std::fs::write(root_dir.join(file_name), fs.as_str());
+            let _ = std::fs::write(root_dir.join(file_name), fs.as_str());
         }
 
         let vs = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -567,10 +567,10 @@ const float HALF_MIN = 5.96046448e-08;
         {
             let root_dir = std::env::current_dir().unwrap();
             let file_name = "temp.vert";
-            std::fs::write(root_dir.join(file_name), vs.as_str());
+            let _ = std::fs::write(root_dir.join(file_name), vs.as_str());
             
             let file_name = "temp.frag";
-            std::fs::write(root_dir.join(file_name), fs.as_str());
+            let _ = std::fs::write(root_dir.join(file_name), fs.as_str());
         }
 
         let vs = device.create_shader_module(wgpu::ShaderModuleDescriptor {

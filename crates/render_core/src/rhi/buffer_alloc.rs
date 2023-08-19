@@ -227,7 +227,7 @@ impl BufferAlloter {
 }
 
 // buffer最小对齐字节数
-const MIN_ALIGN: u32 = 64;
+// const MIN_ALIGN: u32 = 64;
 // 最小等级（2^6 = MIN_ALIGN）
 const MIN_LEVEL: usize = 6;
 
@@ -532,7 +532,7 @@ mod test {
 
 		let surface = unsafe {instance.create_surface(&window).unwrap()};
 
-		pi_hal::runtime::MULTI_MEDIA_RUNTIME.spawn(pi_hal::runtime::MULTI_MEDIA_RUNTIME.alloc(), async move {
+		pi_hal::runtime::MULTI_MEDIA_RUNTIME.spawn(async move {
 			let request_adapter_options = wgpu::RequestAdapterOptions {
 				power_preference: options.power_preference,
 				compatible_surface: Some(&surface),
@@ -542,21 +542,21 @@ mod test {
 			let (device, queue, _adapter_info) =
 			initialize_renderer(&instance, &options, &request_adapter_options).await;
 			
-			let alloter = BufferAlloter::new(device, queue, 128, wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::VERTEX);
+			let _alloter = BufferAlloter::new(device, queue, 128, wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::VERTEX);
 			let mut level1_buffer = Vec::new();
-			for i in 0..68 {
+			for _i in 0..68 {
 				level1_buffer.push(1)
 			}
 
 			// level2， 由于max_align为128， 该buffer应该创建独立的buffer
 			let mut level2_buffer = Vec::new();
-			for i in 0..132 {
+			for _i in 0..132 {
 				level2_buffer.push(1)
 			}
 			
 			// level3， 由于max_align为128， 该buffer应该创建独立的buffer
 			let mut level3_buffer = Vec::new();
-			for i in 0..136 {
+			for _i in 0..136 {
 				level3_buffer.push(1)
 			}
 
@@ -579,7 +579,7 @@ mod test {
 			// let r = alloter.alloc_or_update(Some(r), level3_buffer.as_slice());
 			// println!("====测试更新level2到level3的情况====={:?}", r);
 			is_end1.store(true, std::sync::atomic::Ordering::Relaxed);
-		});
+		}).unwrap();
 
 		loop {
 			if is_end.load(std::sync::atomic::Ordering::Relaxed) {

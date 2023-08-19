@@ -4,9 +4,9 @@ use pi_assets::asset::Handle;
 use pi_atom::Atom;
 use pi_slotmap::DefaultKey;
 
-use crate::{rhi::{asset::TextureRes}, components::view::target_alloc::ShareTargetView, asset::TAssetKeyU64};
+use crate::{rhi::asset::TextureRes, components::view::target_alloc::ShareTargetView, asset::TAssetKeyU64};
 
-use super::{image_texture_view::{ImageTextureView, EImageTextureViewUsage}, render_target::{ERenderTargetViewUsage}, TextureRect, KeyTexture, KeyImageTexture, KeyImageTextureView, TextureViewDesc, ImageTexture};
+use super::{image_texture_view::{ImageTextureView, EImageTextureViewUsage}, render_target::ERenderTargetViewUsage, TextureRect, KeyTexture, KeyImageTexture, KeyImageTextureView, TextureViewDesc};
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub enum KeyTextureViewUsage {
