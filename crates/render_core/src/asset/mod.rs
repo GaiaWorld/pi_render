@@ -50,19 +50,36 @@ impl TAssetKeyU64 for Atom {
 
 pub struct AssetDataCenter<K: Clone + Hash + PartialEq + Eq, A: Asset<Key = K>, P: Clone> {
     datamap: XHashMap<K, (A, Option<P>)>,
+    datamap_ready: XHashMap<K, (Handle<A>, Option<P>)>,
     asset_mgr: Share<AssetMgr<A>>,
 }
 impl<K: Clone + Hash + PartialEq + Eq, A: Asset<Key = K>, P: Clone> AssetDataCenter<K, A, P> {
     pub fn new(ref_garbage: bool, capacity: usize, timeout: usize) -> Self {
         let asset_mgr = AssetMgr::<A>::new(GarbageEmpty(), ref_garbage, capacity, timeout);
 
-        Self { datamap: XHashMap::default(), asset_mgr }
+        Self { datamap: XHashMap::default(), datamap_ready: XHashMap::default(), asset_mgr }
     }
     pub fn get(
         &self,
         key: &K,
     ) -> Option<Handle<A>> {
         self.asset_mgr.get(key)
+    }
+    pub fn request(
+        &mut self,
+        key: &K,
+        param: Option<P>,
+    ) -> bool {
+        if self.datamap_ready.contains_key(key) {
+            return true;
+        } else {
+            if let Some(data) = self.asset_mgr.get(key) {
+                self.datamap_ready.insert(key.clone(), (data, param));
+                true
+            } else {
+                false
+            }
+        }
     }
     pub fn check(
         &self,
@@ -90,6 +107,9 @@ impl<K: Clone + Hash + PartialEq + Eq, A: Asset<Key = K>, P: Clone> AssetDataCen
         &mut self,
     ) -> XHashMap<K, (Handle<A>, Option<P>)> {
         let mut result = XHashMap::default();
+        self.datamap_ready.drain().for_each(|(key, data)| {
+            result.insert(key, data);
+        });
         self.datamap.drain().for_each(|(key, data)| {
             if let Ok(range) = self.asset_mgr.insert(key.clone(), data.0) {
                 result.insert(key, (range, data.1));

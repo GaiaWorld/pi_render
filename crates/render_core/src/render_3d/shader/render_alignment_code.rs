@@ -159,34 +159,60 @@ mat4 rotMatrixFromForward(mat4 m, mat4 vr, vec3 position, vec3 viewpos) {
     fn stretched_running_code() -> String {
         String::from(
 "
-PI_ObjectToWorld = rotMatrixStretched(PI_ObjectToWorld, (PI_ObjectToWorld * vec4(0., 0., 0., 1.)).xyz, PI_CAMERA_POSITION.xyz);
+PI_ObjectToWorld = rotMatrixStretched(
+    PI_ObjectToWorld, 
+    normalize(
+        PI_MATRIX_P[3][3] * PI_MATRIX_P[2].xyz + (1.0 - PI_MATRIX_P[3][3]) * (PI_CAMERA_POSITION.xyz - (PI_ObjectToWorld * vec4(0., 0., 0., 1.)).xyz)
+    )
+);
 "            
         )
     }
+    /// 全局X方向与看向相机方向 求出全局Y方向, 转换到局部空间, 求出局部旋转
     fn stretched_define_code() -> String {
         String::from(
 "
-mat4 rotMatrixStretched(mat4 m, vec3 position, vec3 viewpos) {
-    vec3 oldz = normalize((m * vec4(0., 0., 1., 1.)).xyz);
-    vec3 oldx = normalize((m * vec4(1., 0., 0., 1.)).xyz);
-    vec3 newz = normalize(position - viewpos);
-    float d = dot(oldz, newz);
+mat4 rotMatrixStretched(mat4 m, vec3 viewDirection) {
+    vec3 oldx = normalize((m * vec4(1., 0., 0., 0.)).xyz);
+    vec3 oldz = normalize((m * vec4(0., 0., 1., 0.)).xyz);
+    vec3 newz = viewDirection;
+
+    float vdot = max(-1.0, min(1.0, dot(oldz, newz)));
+    float angle = acos(vdot);
     vec3 n = cross(oldz, newz);
-    float dd = dot(n, oldx);
-    float angle = acos(dd);
-    vec3 yAxis = vec3(0., d, sin(angle));
-    if (dd < 0.) {
-        yAxis.z = -1. * yAxis.z;
-    }
+    angle = mix(
+        -1.0 * angle,
+        angle,
+        step(0., dot(n, oldx))
+    );
+    float vsin = sin(angle * 0.5);
+    float vcos = cos(angle * 0.5);
+    vec4 quat = vec4(1.0 * vsin, 0.0, 0.0, vcos);
 
-    vec3 xAxis = vec3(1., 0., 0.);
-    vec3 zAxis = cross(xAxis, yAxis);
-    zAxis = normalize(zAxis);
+    float xx = quat.x * quat.x;
+    // float yy = 0.0; // quat.y * quat.y;
+    // float zz = 0.0; // quat.z * quat.z;
+    // float xy = 0.0; // quat.x * quat.y;
+    // float zw = 0.0; // quat.z * quat.w;
+    // float zx = 0.0; // quat.z * quat.x;
+    // float yw = 0.0; // quat.y * quat.w;
+    // float yz = 0.0; // quat.y * quat.z;
+    float xw = quat.x * quat.w;
 
-    mat4 rot = mat4(vec4(xAxis, 0.), vec4(yAxis, 0.), vec4(zAxis, 0.), vec4(0., 0., 0., 1.));
+    // mat4 rot = mat4(
+    //     vec4(1.0 - 2.0 * (yy + zz), 2.0 * (xy + zw), 2.0 * (zx - yw), 0.),
+    //     vec4(2.0 * (xy - zw), 1.0 - 2.0 * (zz + xx), 2.0 * (yz + xw), 0.),
+    //     vec4(2.0 * (zx + yw), 2.0 * (yz - xw), 1.0 - 2.0 * (yy + xx), 0.),
+    //     vec4(0., 0., 0., 1.)
+    // );
+    mat4 rot = mat4(
+        vec4(1.0, 0.0, 0.0, 0.),
+        vec4(0.0, 1.0 - 2.0 * xx, 2.0 * xw, 0.),
+        vec4(0.0, 0.0 - 2.0 * xw, 1.0 - 2.0 * xx, 0.),
+        vec4(0., 0., 0., 1.)
+    );
 
     return m * rot;
-    // return m; 
 }
 "            
         )
@@ -194,19 +220,59 @@ mat4 rotMatrixStretched(mat4 m, vec3 position, vec3 viewpos) {
     fn vertical_running_code() -> String {
         String::from(
 "
-PI_ObjectToWorld = matrixVertical(PI_ObjectToWorld, (PI_ObjectToWorld * vec4(0., 0., 0., 1.)).xyz, PI_CAMERA_POSITION.xyz);
+PI_ObjectToWorld = matrixVertical(
+    PI_ObjectToWorld,
+    normalize(
+        PI_MATRIX_P[3][3] * PI_MATRIX_P[2].xyz + (1.0 - PI_MATRIX_P[3][3]) * (PI_CAMERA_POSITION.xyz - (PI_ObjectToWorld * vec4(0., 0., 0., 1.)).xyz)
+    )
+);
 "            
         )
     }
     fn vertical_define_code() -> String {
         String::from(
 "
-mat4 matrixVertical(mat4 m, vec3 position, vec3 viewpos) {
-    vec3 zAxis = vec3(position.x - viewpos.x, 0., position.x - viewpos.z);
-    zAxis = normalize(zAxis);
-    vec3 yAxis = vec3(0., 1., 0.);
-    vec3 xAxis = cross(yAxis, zAxis);
-    return m * mat4(vec4(xAxis, 0.), vec4(yAxis, 0.), vec4(zAxis, 0.), vec4(0., 0., 0., 1.));
+mat4 matrixVertical(mat4 m, vec3 viewDirection) {
+    vec3 oldy = vec3(0., 1., 0.);
+    vec3 oldz = vec3(0., 0., 1.);
+    vec3 newz = viewDirection;
+
+    float vdot = max(-1.0, min(1.0, dot(oldz, newz)));
+    float angle = acos(vdot);
+    vec3 n = cross(oldz, newz);
+    angle = mix(
+        -1.0 * angle,
+        angle,
+        step(0., dot(n, oldy))
+    );
+    float vsin = sin(angle * 0.5);
+    float vcos = cos(angle * 0.5);
+    vec4 quat = vec4(0., 1.0 * vsin, 0.0, vcos);
+
+    // float xx = quat.x * quat.x;
+    float yy = quat.y * quat.y;
+    // float zz = quat.z * quat.z;
+    // float xy = quat.x * quat.y;
+    // float zw = quat.z * quat.w;
+    // float zx = quat.z * quat.x;
+    float yw = quat.y * quat.w;
+    // float yz = quat.y * quat.z;
+    // float xw = quat.x * quat.w;
+
+    // mat4 rot = mat4(
+    //     vec4(1.0 - 2.0 * (yy + zz), 2.0 * (xy + zw), 2.0 * (zx - yw), 0.),
+    //     vec4(2.0 * (xy - zw), 1.0 - 2.0 * (zz + xx), 2.0 * (yz + xw), 0.),
+    //     vec4(2.0 * (zx + yw), 2.0 * (yz - xw), 1.0 - 2.0 * (yy + xx), 0.),
+    //     vec4(0., 0., 0., 1.)
+    // );
+    mat4 rot = mat4(
+        vec4(1.0 - 2.0 * yy, 0.0, 0.0 - 2.0 * yw, 0.),
+        vec4(0.0, 1.0, 0.0, 0.),
+        vec4(2.0 * yw, 0.0, 1.0 - 2.0 * yy, 0.),
+        vec4(0., 0., 0., 1.)
+    );
+
+    return m * rot;
 }
 "            
         )

@@ -91,6 +91,9 @@ impl BindBufferAllocator {
             pool.write_buffer(device, queue);
         });
     }
+    pub fn asset_mgr(&self) -> &AssetMgr<AssetRWBuffer> {
+        &self.asset_mgr
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Deref)]

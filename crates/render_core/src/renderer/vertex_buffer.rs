@@ -229,7 +229,7 @@ impl VertexBufferAllocator {
     pub const DEFAULT_TIMEOUT: usize = 60 * 1000;
 
     /// * 每 level 间 对齐尺寸比值为 2
-    pub const LEVEL_COUNT: usize = 16;
+    pub const LEVEL_COUNT: usize = 4;
     /// * 最小对齐尺寸
     /// * 一个 2D 三角形 顶点坐标 + UV 坐标: 3 * (2 + 2) * 4 = 48
     /// * 一个 2D 三角形 顶点坐标 + Color: 3 * (2 + 3) * 4 = 60
@@ -239,6 +239,32 @@ impl VertexBufferAllocator {
     /// * u16::MAX 个顶点 = 96 * 65536 = 6 * 1024 * 1024
     /// * LEVEL_COUNT = 16; MAX_BASE_SIZE = 64 * 2^16 = 4 * 1024 * 1024
     pub const MAX_BASE_SIZE: u32 = 64 * 2_i32.pow(Self::LEVEL_COUNT as u32) as u32;
+
+    pub fn total_buffer_count(&self) -> usize {
+        let mut result = self.asset_mgr.len() + self.asset_mgr_2.len();
+        self.unupdatables.iter().for_each(|item| {
+            result += item.total_buffer_count();
+        });
+        self.unupdatables_for_index.iter().for_each(|item| {
+            result += item.total_buffer_count();
+        });
+        result
+    }
+
+    pub fn total_buffer_size(&self) -> u64 {
+        let mut result = self.asset_mgr.size() as u64 + self.asset_mgr_2.size() as u64;
+        self.unupdatables.iter().for_each(|item| {
+            result += item.total_buffer_size();
+        });
+        let temp = result;
+        // log::warn!("VertexBuffer: {:?}", result);
+        self.unupdatables_for_index.iter().for_each(|item| {
+            result += item.total_buffer_size();
+        });
+        // log::warn!("VertexBuffer: {:?}", result - temp);
+        result
+    }
+
     pub fn new(capacity: usize, timeout: usize) -> Self {
         let base_size = Self::BAE_SIZE;
         let level = Self::LEVEL_COUNT;
@@ -251,18 +277,18 @@ impl VertexBufferAllocator {
             FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(01) as u32, usage),
             FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(02) as u32, usage),
             FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(03) as u32, usage),
-            FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(04) as u32, usage),
-            FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(05) as u32, usage),
-            FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(06) as u32, usage),
-            FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(07) as u32, usage),
-            FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(08) as u32, usage),
-            FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(09) as u32, usage),
-            FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(10) as u32, usage),
-            FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(11) as u32, usage),
-            FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(12) as u32, usage),
-            FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(13) as u32, usage),
-            FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(14) as u32, usage),
-            FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(15) as u32, usage),
+            // FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(04) as u32, usage),
+            // FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(05) as u32, usage),
+            // FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(06) as u32, usage),
+            // FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(07) as u32, usage),
+            // FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(08) as u32, usage),
+            // FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(09) as u32, usage),
+            // FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(10) as u32, usage),
+            // FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(11) as u32, usage),
+            // FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(12) as u32, usage),
+            // FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(13) as u32, usage),
+            // FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(14) as u32, usage),
+            // FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(15) as u32, usage),
         ];
         let usage = wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::INDEX;
         let pool_slots_for_index = [
@@ -270,18 +296,18 @@ impl VertexBufferAllocator {
             FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(01) as u32, usage),
             FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(02) as u32, usage),
             FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(03) as u32, usage),
-            FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(04) as u32, usage),
-            FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(05) as u32, usage),
-            FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(06) as u32, usage),
-            FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(07) as u32, usage),
-            FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(08) as u32, usage),
-            FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(09) as u32, usage),
-            FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(10) as u32, usage),
-            FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(11) as u32, usage),
-            FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(12) as u32, usage),
-            FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(13) as u32, usage),
-            FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(14) as u32, usage),
-            FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(15) as u32, usage),
+            // FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(04) as u32, usage),
+            // FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(05) as u32, usage),
+            // FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(06) as u32, usage),
+            // FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(07) as u32, usage),
+            // FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(08) as u32, usage),
+            // FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(09) as u32, usage),
+            // FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(10) as u32, usage),
+            // FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(11) as u32, usage),
+            // FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(12) as u32, usage),
+            // FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(13) as u32, usage),
+            // FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(14) as u32, usage),
+            // FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(15) as u32, usage),
         ];
 
         let asset_mgr = AssetMgr::<AssetRWBuffer>::new(GarbageEmpty(), false, (capacity / 8 * 1), timeout);
@@ -366,6 +392,7 @@ impl VertexBufferAllocator {
     pub fn create_not_updatable_buffer_pre(&mut self, device: &RenderDevice, queue: &RenderQueue, data: &[u8], old_single_used: Option<&NotUpdatableBufferRange>) -> Option<Arc<NotUpdatableBufferRange>> {
         let size = data.len() as u32;
 
+        // log::warn!("New Buffer: {:?}", size);
         // 如果传入旧 NotUpdatableBufferRange, 且 对应 buffer 大小足够存放新数据 则重复利用该 NotUpdatableBufferRange 中的 buffer
         if let Some(old) = old_single_used {
             if old.id_buffer.size >= size {
@@ -465,6 +492,20 @@ pub struct FixedSizeBufferPoolNotUpdatable {
     usage: wgpu::BufferUsages,
 }
 impl FixedSizeBufferPoolNotUpdatable {
+    pub fn total_buffer_count(&self) -> usize {
+        let mut result = 0;
+        self.buffers.iter().for_each(|v| {
+            if v.0.is_some() { result += 1; }
+        });
+        result
+    }
+    pub fn total_buffer_size(&self) -> u64 {
+        let mut result = 0;
+        self.buffers.iter().for_each(|v| {
+            if let Some(buffer) = &v.0 { result += buffer.0.size(); }
+        });
+        result
+    }
     /// * `block_size` 大内存块的基础尺寸
     /// * `fixed_size` 目标区间尺寸
     pub fn new(

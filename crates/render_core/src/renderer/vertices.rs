@@ -119,7 +119,7 @@ impl RenderVertices {
 }
 impl PartialEq for RenderVertices {
     fn eq(&self, other: &Self) -> bool {
-        &self.slot == &other.slot && &self.buffer == &other.buffer  // && &self.buffer_range == &other.buffer_range
+        &self.slot == &other.slot && &self.buffer == &other.buffer && &self.buffer_range == &other.buffer_range
     }
     fn ne(&self, other: &Self) -> bool {
         !self.eq(other)
