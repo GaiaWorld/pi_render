@@ -6,11 +6,7 @@ use crate::{
         bind::{EKeyBind, KeyBindBuffer},
         shader::{TShaderSetBlock, TShaderBindCode}
     },
-    render_3d::{
-        binds::{
-            scene::*
-        }
-    },
+    render_3d::binds::scene::*,
     asset::TAssetKeyU64
 };
 

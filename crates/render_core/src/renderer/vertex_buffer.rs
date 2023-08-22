@@ -256,7 +256,7 @@ impl VertexBufferAllocator {
         self.unupdatables.iter().for_each(|item| {
             result += item.total_buffer_size();
         });
-        let temp = result;
+        // let temp = result;
         // log::warn!("VertexBuffer: {:?}", result);
         self.unupdatables_for_index.iter().for_each(|item| {
             result += item.total_buffer_size();
