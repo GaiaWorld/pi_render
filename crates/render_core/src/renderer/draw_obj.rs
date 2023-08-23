@@ -163,24 +163,31 @@ impl DrawObj {
 
 #[derive(Debug, Default)]
 pub(crate) struct TempDrawInfoRecord<'a> {
-    vertices: Vec<Option<RenderVertices>>,
-    indices: Option<RenderIndices>,
-    bindgroups: [Option<&'a DrawBindGroup>;4],
+    vertices: [Option<&'a RenderVertices>; TempDrawInfoRecord::MAX_VERTICE_SLOT],
+    indices: Option<&'a RenderIndices>,
+    bindgroups: [Option<&'a DrawBindGroup>; TempDrawInfoRecord::MAX_BINDGROUP_SLOT],
 }
 impl<'a> TempDrawInfoRecord<'a> {
+    pub const MAX_VERTICE_SLOT: usize = 16;
+    pub const MAX_BINDGROUP_SLOT: usize = 4;
     pub(crate) fn record_vertex_and_check_diff_with_last(
         &mut self,
-        vertex: &RenderVertices,
+        vertex: &'a RenderVertices,
     ) -> bool {
-        if let Some(save) = self.get(vertex.slot as usize) {
-            if save == vertex {
+        let slot = vertex.slot as usize;
+        if Self::MAX_VERTICE_SLOT <= slot {
+            return true;
+        }
+        if let Some(save) = self.vertices.get(slot) {
+            let vertex = Some(vertex);
+            if *save == vertex {
                 return false;
             } else {
-                self.vertices[vertex.slot as usize] = Some(vertex.clone());
+                self.vertices[slot] = vertex;
                 return true;
             }
         } else {
-            self.vertices[vertex.slot as usize] = Some(vertex.clone());
+            self.vertices[slot] = Some(vertex);
             return true;
         }
     }
@@ -189,7 +196,7 @@ impl<'a> TempDrawInfoRecord<'a> {
         slot: usize,
         item: Option<&'a DrawBindGroup>,
     ) -> bool {
-        if 4 <= slot {
+        if Self::MAX_BINDGROUP_SLOT <= slot {
             return true;
         }
         if let Some(save) = self.bindgroups.get(slot) {
@@ -206,29 +213,29 @@ impl<'a> TempDrawInfoRecord<'a> {
     }
     pub(crate) fn record_indices_and_check_diff_with_last(
         &mut self,
-        indices: &RenderIndices,
+        indices: &'a RenderIndices,
     ) -> bool {
         let result = match &self.indices {
             Some(old) => {
-                old != indices
+                *old != indices
             },
             None => {
                 true
             },
         };
 
-        self.indices = Some(indices.clone());
+        self.indices = Some(indices);
         
         result
     }
-    fn get(&mut self, slot: usize) -> Option<&RenderVertices> {
-        let oldlen = self.vertices.len();
-        let mut addcount = 0;
-        while oldlen + addcount <= slot {
-            self.vertices.push(None);
-            addcount += 1;
-        }
+    // fn get(&mut self, slot: usize) -> Option<&'a RenderVertices> {
+    //     let oldlen = self.vertices.len();
+    //     let mut addcount = 0;
+    //     while oldlen + addcount <= slot {
+    //         self.vertices.push(None);
+    //         addcount += 1;
+    //     }
 
-        self.vertices.get(slot).unwrap().as_ref()
-    }
+    //     self.vertices.get(slot).unwrap().as_ref()
+    // }
 }
