@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::renderer::draw_obj::TempDrawInfoRecord;
 
-use super::{draw_obj::{DrawObj}};
+use super::draw_obj::DrawObj;
 
 #[derive(Default)]
 pub struct DrawList {
@@ -19,16 +19,26 @@ impl DrawList {
         let time = pi_time::Instant::now();
 
         let mut temp_vertex_record: TempDrawInfoRecord = TempDrawInfoRecord::default();
-
-        let mut draw_count = 0;
+        let mut pipelinekey = 0;
+        let mut draw_count: u64 = 0;
         draws.iter().for_each(|draw| {
             let draw = draw.as_ref();
             let vertex_range = draw.vertex.clone();
             let instance_range = draw.instances.clone();
 
             if let Some(pipeline) = &draw.pipeline {
-                renderpass.set_pipeline(pipeline);
-                draw.bindgroups.set(renderpass);
+                let key = pipeline.key().clone();
+                if key != pipelinekey {
+                    pipelinekey = key;
+                    renderpass.set_pipeline(pipeline);
+                }
+
+                // draw.bindgroups.set(renderpass);
+                for (item, idx) in draw.bindgroups.groups().iter() {
+                    if temp_vertex_record.record_bindgroup_and_check_diff_with_last(*idx as usize, Some(item)) {
+                        item.set(renderpass, *idx);
+                    }
+                }
 
                 draw.vertices.iter().for_each(|(item, _)| {
                     // log::info!("vertex_range {:?}", item.buffer_range.clone());

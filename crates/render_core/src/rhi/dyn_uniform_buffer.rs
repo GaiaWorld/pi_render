@@ -147,6 +147,15 @@ pub struct BufferGroup {
     group_offsets: Share<GroupOffsets>,
 }
 
+impl PartialEq for BufferGroup {
+	fn eq(&self, _other: &Self) -> bool {
+		// self.index == other.index
+		// && self.bindings_index == other.bindings_index
+		// && self.context
+		false
+	}
+}
+
 impl Into<DrawBindGroup> for BufferGroup {
 	#[inline]
     fn into(self) -> DrawBindGroup {

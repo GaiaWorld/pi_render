@@ -49,6 +49,28 @@ impl DrawBindGroup {
     }
 }
 
+impl PartialEq for DrawBindGroup {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (DrawBindGroup::Offset(a), DrawBindGroup::Offset(b)) => {
+                a == b
+            },
+            (DrawBindGroup::Independ(a), DrawBindGroup::Independ(b)) => {
+                a.key() == b.key()
+            },
+            (DrawBindGroup::GroupUsage(a), DrawBindGroup::GroupUsage(b)) => {
+                a.key_bind_group == b.key_bind_group && a.offsets() == b.offsets()
+            },
+            (DrawBindGroup::Arc(a), DrawBindGroup::Arc(b)) => {
+                a.id() == b.id()
+            },
+            _ => {
+                false
+            }
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct DrawBindGroups(SmallVecMap<DrawBindGroup, 4>);
 impl DrawBindGroups {
@@ -140,11 +162,12 @@ impl DrawObj {
 
 
 #[derive(Debug, Default)]
-pub(crate) struct TempDrawInfoRecord {
-    list: Vec<Option<RenderVertices>>,
+pub(crate) struct TempDrawInfoRecord<'a> {
+    vertices: Vec<Option<RenderVertices>>,
     indices: Option<RenderIndices>,
+    bindgroups: [Option<&'a DrawBindGroup>;4],
 }
-impl TempDrawInfoRecord {
+impl<'a> TempDrawInfoRecord<'a> {
     pub(crate) fn record_vertex_and_check_diff_with_last(
         &mut self,
         vertex: &RenderVertices,
@@ -153,11 +176,31 @@ impl TempDrawInfoRecord {
             if save == vertex {
                 return false;
             } else {
-                self.list[vertex.slot as usize] = Some(vertex.clone());
+                self.vertices[vertex.slot as usize] = Some(vertex.clone());
                 return true;
             }
         } else {
-            self.list[vertex.slot as usize] = Some(vertex.clone());
+            self.vertices[vertex.slot as usize] = Some(vertex.clone());
+            return true;
+        }
+    }
+    pub(crate) fn record_bindgroup_and_check_diff_with_last(
+        &mut self,
+        slot: usize,
+        item: Option<&'a DrawBindGroup>,
+    ) -> bool {
+        if 4 <= slot {
+            return true;
+        }
+        if let Some(save) = self.bindgroups.get(slot) {
+            if *save == item {
+                return false;
+            } else {
+                self.bindgroups[slot] = item;
+                return true;
+            }
+        } else {
+            self.bindgroups[slot] = item;
             return true;
         }
     }
@@ -179,13 +222,13 @@ impl TempDrawInfoRecord {
         result
     }
     fn get(&mut self, slot: usize) -> Option<&RenderVertices> {
-        let oldlen = self.list.len();
+        let oldlen = self.vertices.len();
         let mut addcount = 0;
         while oldlen + addcount <= slot {
-            self.list.push(None);
+            self.vertices.push(None);
             addcount += 1;
         }
 
-        self.list.get(slot).unwrap().as_ref()
+        self.vertices.get(slot).unwrap().as_ref()
     }
 }
