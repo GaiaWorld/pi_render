@@ -31,6 +31,7 @@ pub struct ImageTextureView {
 }
 impl Asset for ImageTextureView {
     type Key = u64;
+    // const TYPE: &'static str = "ImageTextureView";
 }
 
 impl Size for ImageTextureView {

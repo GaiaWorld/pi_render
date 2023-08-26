@@ -108,6 +108,7 @@ impl ImageTexture {
 
 impl Asset for ImageTexture {
 	type Key = KeyImageTexture;
+    // const TYPE: &'static str = "ImageTexture";
 }
 impl Size for ImageTexture {
 	fn size(&self) -> usize {

@@ -129,6 +129,7 @@ impl RenderTexture {
 
 impl Asset for RenderTexture {
     type Key = KeyRenderTexture;
+    // const TYPE: &'static str = "RenderTexture";
 }
 
 
@@ -159,6 +160,7 @@ impl RenderTargetView {
 }
 impl Asset for RenderTargetView {
     type Key = u64;
+    // const TYPE: &'static str = "RenderTargetView";
 }
 
 impl Size for RenderTargetView {

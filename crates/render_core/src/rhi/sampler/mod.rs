@@ -11,6 +11,7 @@ pub type KeySampler = SamplerDesc;
 pub struct Sampler(pub crate::rhi::texture::Sampler);
 impl Asset for Sampler {
     type Key = KeySampler;
+    // const TYPE: &'static str = "Sampler";
 }
 
 impl Size for Sampler {

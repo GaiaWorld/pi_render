@@ -36,6 +36,7 @@ impl ShaderVarUniform {
 
 pub struct ShaderVarVertices;
 impl ShaderVarVertices {
+    pub const OBJECT_INDEX              : &'static str = "PI_ObjectIndex"      ;
     pub const POSITION                  : &'static str = "A_POSITION"          ;
     pub const POSITION2D                : &'static str = "A_POSITION_2D"       ;
     pub const COLOR4                    : &'static str = "A_COLOR4"            ;
@@ -57,6 +58,7 @@ impl ShaderVarVertices {
     pub const CUSTOM_VEC3_B             : &'static str = "A_CustomV3B"         ;
     pub const CUSTOM_VEC2_A             : &'static str = "A_CustomV2A"         ;
     pub const CUSTOM_VEC2_B             : &'static str = "A_CustomV2B"         ;
+    pub const INSTANCE_INDEX            : &'static str = "A_INS_INDEX"         ;
     pub const INS_WORLD_ROW1            : &'static str = "A_INS_World1"        ;
     pub const INS_WORLD_ROW2            : &'static str = "A_INS_World2"        ;
     pub const INS_WORLD_ROW3            : &'static str = "A_INS_World3"        ;
