@@ -66,6 +66,7 @@ impl TextureRes {
 
 impl Asset for TextureRes{
 	type Key = u64;
+    // const TYPE: &'static str = "TextureRes";
 }
 
 impl Size for TextureRes{

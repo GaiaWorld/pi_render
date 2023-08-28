@@ -1,6 +1,6 @@
 use std::{ops::Range, hash::Hash, fmt::Debug, mem::replace};
 
-use super::{vertex_buffer::KeyVertexBuffer, attributes::{VertexAttribute, EVertexDataKind}, instance::EInstanceKind, vertex_format::TVertexFormatByteSize};
+use super::{vertex_buffer::KeyVertexBuffer, attributes::VertexAttribute, vertex_format::TVertexFormatByteSize};
 
 
 #[derive(Debug, Clone, Copy)]
@@ -84,58 +84,11 @@ pub struct VertexBufferDesc {
     pub range: Option<Range<wgpu::BufferAddress>>,
     pub attrs: Vec<VertexAttribute>,
     pub step_mode: wgpu::VertexStepMode,
-    pub kind: EInstanceKind,
+    pub instance: bool,
 }
 impl VertexBufferDesc {
     pub fn update_range(&mut self, value: Option<Range<wgpu::BufferAddress>>) {
         let _ = replace(&mut self.range, value);
-    }
-    pub fn instance_custom(kind: EVertexDataKind, format: wgpu::VertexFormat) -> Self {
-        Self {
-            key: KeyVertexBuffer::from(""),
-            range: None,
-            attrs: vec![
-                VertexAttribute { kind, format },
-            ],
-            step_mode: wgpu::VertexStepMode::Instance,
-            kind: EInstanceKind::Color,
-        }
-    }
-    pub fn instance_tilloff() -> Self {
-        Self {
-            key: KeyVertexBuffer::from(""),
-            range: None,
-            attrs: vec![
-                VertexAttribute { kind: EVertexDataKind::InsTillOffset1, format: wgpu::VertexFormat::Float32x4 },
-            ],
-            step_mode: wgpu::VertexStepMode::Instance,
-            kind: EInstanceKind::TillOffset,
-        }
-    }
-    pub fn instance_color() -> Self {
-        Self {
-            key: KeyVertexBuffer::from(""),
-            range: None,
-            attrs: vec![
-                VertexAttribute { kind: EVertexDataKind::InsColor, format: wgpu::VertexFormat::Float32x4 },
-            ],
-            step_mode: wgpu::VertexStepMode::Instance,
-            kind: EInstanceKind::Color,
-        }
-    }
-    pub fn instance_world_matrix() -> Self {
-        Self {
-            key: KeyVertexBuffer::from(""),
-            range: None,
-            attrs: vec![
-                VertexAttribute { kind: EVertexDataKind::InsWorldRow1, format: wgpu::VertexFormat::Float32x4 },
-                VertexAttribute { kind: EVertexDataKind::InsWorldRow2, format: wgpu::VertexFormat::Float32x4 },
-                VertexAttribute { kind: EVertexDataKind::InsWorldRow3, format: wgpu::VertexFormat::Float32x4 },
-                VertexAttribute { kind: EVertexDataKind::InsWorldRow4, format: wgpu::VertexFormat::Float32x4 },
-            ],
-            step_mode: wgpu::VertexStepMode::Instance,
-            kind: EInstanceKind::WorldMatrix,
-        }
     }
     pub fn vertices(bufferkey: KeyVertexBuffer, range: Option<Range<wgpu::BufferAddress>>, attrs: Vec<VertexAttribute>) -> Self {
         Self {
@@ -143,7 +96,7 @@ impl VertexBufferDesc {
             range,
             attrs,
             step_mode: wgpu::VertexStepMode::Vertex,
-            kind: EInstanceKind::None,
+            instance: false,
         }
     }
     pub fn bufferkey(&self) -> &KeyVertexBuffer {
@@ -152,8 +105,8 @@ impl VertexBufferDesc {
     pub fn range(&self) -> &Option<Range<wgpu::BufferAddress>> {
         &self.range
     }
-    pub fn instance_kind(&self) -> EInstanceKind {
-        self.kind
+    pub fn instance(&self) -> bool {
+        self.instance
     }
     pub fn attributes(&self) -> &Vec<VertexAttribute> {
         &self.attrs

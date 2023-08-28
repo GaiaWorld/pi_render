@@ -142,6 +142,7 @@ impl From<(crate::rhi::shader::ShaderMeta, Vec<Atom>, Vec<Atom>)> for ShaderEffe
 }
 impl Asset for ShaderEffectMeta {
     type Key = KeyShaderMeta;
+    // const TYPE: &'static str = "KeyShaderMeta";
 }
 impl Size for ShaderEffectMeta {
     fn size(&self) -> usize {

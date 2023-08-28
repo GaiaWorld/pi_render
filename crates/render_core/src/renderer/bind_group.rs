@@ -386,6 +386,7 @@ impl BindGroupLayout {
 }
 impl Asset for BindGroupLayout {
     type Key = u64;
+    // const TYPE: &'static str = "BindGroupLayout";
 }
 
 impl Size for BindGroupLayout {
@@ -417,6 +418,7 @@ impl BindGroup {
 }
 impl Asset for BindGroup {
     type Key = u64;
+    // const TYPE: &'static str = "BindGroup";
 }
 
 impl Size for BindGroup {

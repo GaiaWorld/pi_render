@@ -1,6 +1,7 @@
 use std::{ops::Range, mem::size_of, hash::Hash, sync::Arc, fmt::Debug};
 
-use pi_assets::{asset::{Asset, GarbageEmpty, Handle, Size}, mgr::AssetMgr};
+use crossbeam::queue::SegQueue;
+use pi_assets::{asset::{Asset, GarbageEmpty, Size}, mgr::AssetMgr};
 use pi_atom::Atom;
 use pi_share::{Share, ShareMutex};
 use wgpu::util::BufferInitDescriptor;
@@ -195,8 +196,8 @@ impl Eq for EVertexBufferRange {
 }
 impl Asset for EVertexBufferRange {
     type Key = IDAssetVertexBuffer;
+    // const TYPE: &'static str = "EVertexBufferRange";
 }
-
 impl Size for EVertexBufferRange {
     fn size(&self) -> usize {
         32
@@ -389,27 +390,27 @@ impl VertexBufferAllocator {
     }
 
     /// * `old` 仅当更新 Instance 实例化buffer时使用, 此时 NotUpdatableBufferRange 在逻辑上是唯一的,没有共用
-    pub fn create_not_updatable_buffer_pre(&mut self, device: &RenderDevice, queue: &RenderQueue, data: &[u8], old_single_used: Option<&NotUpdatableBufferRange>) -> Option<Arc<NotUpdatableBufferRange>> {
+    pub fn create_not_updatable_buffer_pre(&mut self, device: &RenderDevice, queue: &RenderQueue, data: &[u8], _old_single_used: Option<&NotUpdatableBufferRange>) -> Option<Arc<NotUpdatableBufferRange>> {
         let size = data.len() as u32;
 
-        // log::warn!("New Buffer: {:?}", size);
-        // 如果传入旧 NotUpdatableBufferRange, 且 对应 buffer 大小足够存放新数据 则重复利用该 NotUpdatableBufferRange 中的 buffer
-        if let Some(old) = old_single_used {
-            if old.id_buffer.size >= size {
-                let buffer = old.unuse();
-                if let Some(wbuffer) = &buffer.0 {
-                    wbuffer.write_buffer(queue, data);
-                    let buffer = NotUpdatableBufferRange {
-                        used_size: data.len() as u32,
-                        id_buffer: old.id_buffer,
-                        buffer: buffer,
-                        usage: old.usage,
-                        unused: false,
-                    };
-                    return Some(Arc::new(buffer));
-                }
-            }
-        }
+        // // log::warn!("New Buffer: {:?}", size);
+        // // 如果传入旧 NotUpdatableBufferRange, 且 对应 buffer 大小足够存放新数据 则重复利用该 NotUpdatableBufferRange 中的 buffer
+        // if let Some(old) = old_single_used {
+        //     if old.id_buffer.size >= size {
+        //         let buffer = old.unuse();
+        //         if let Some(wbuffer) = buffer.0.clone() {
+        //             wbuffer.write_buffer(queue, data);
+        //             let result = NotUpdatableBufferRange {
+        //                 used_size: data.len() as u32,
+        //                 id_buffer: old.id_buffer,
+        //                 buffer: buffer,
+        //                 usage: old.usage,
+        //                 unused: false,
+        //             };
+        //             return Some(Arc::new(result));
+        //         }
+        //     }
+        // }
 
         let mut level = 0;
         let mut level_size = self.base_size;
@@ -438,7 +439,7 @@ impl VertexBufferAllocator {
         }
         // log::info!("size: {}, level: {}, old_count: {}, new: {}", size, level, old_count, new_count);
 
-        if let Some(range) = self.unupdatables.get_mut(level).unwrap().allocate(&self.asset_mgr_2, device, queue, data) {
+        if let Some(range) = self.unupdatables.get_mut(level).unwrap().allocate(device, queue, data) {
             Some(Arc::new(range))
         } else {
             None
@@ -475,7 +476,7 @@ impl VertexBufferAllocator {
         }
         // log::info!("size: {}, level: {}, old_count: {}, new: {}", size, level, old_count, new_count);
 
-        if let Some(range) = self.unupdatables_for_index.get_mut(level).unwrap().allocate(&self.asset_mgr_2, device, queue, data) {
+        if let Some(range) = self.unupdatables_for_index.get_mut(level).unwrap().allocate(device, queue, data) {
             Some(EVertexBufferRange::NotUpdatable(Arc::new(range), 0, data.len() as u32))
         } else {
             None
@@ -485,26 +486,26 @@ impl VertexBufferAllocator {
 
 pub struct FixedSizeBufferPoolNotUpdatable {
     /// * 大内存块列表
-    buffers: Vec<Arc<UseNotUpdatableBuffer>>,
+    // buffers: Vec<Arc<UseNotUpdatableBuffer>>,
     /// * 此处分配出去的每个Buffer大小均为 block_size
     pub(crate) block_size: u32,
 	#[allow(dead_code)]
     mutex: ShareMutex<()>,
     usage: wgpu::BufferUsages,
+    pub(crate) counter: usize,
+    pub(crate) list: Vec<Buffer>,
+    pub(crate) pools: Share<SegQueue<(Buffer, usize)>>,
 }
 impl FixedSizeBufferPoolNotUpdatable {
     pub fn total_buffer_count(&self) -> usize {
-        let mut result = 0;
-        self.buffers.iter().for_each(|v| {
-            if v.0.is_some() { result += 1; }
-        });
+        let result = self.list.len();
         result
     }
     pub fn total_buffer_size(&self) -> u64 {
-        let mut result = 0;
-        self.buffers.iter().for_each(|v| {
-            if let Some(buffer) = &v.0 { result += buffer.0.size(); }
-        });
+        let result = self.list.len() as u64 * self.block_size  as u64;
+        // self.buffers.iter().for_each(|v| {
+        //     if let Some(buffer) = &v.0 { result += buffer.0.size(); }
+        // });
         result
     }
     /// * `block_size` 大内存块的基础尺寸
@@ -514,37 +515,67 @@ impl FixedSizeBufferPoolNotUpdatable {
         usage: wgpu::BufferUsages,
     ) -> Self {
         Self {
-            buffers: vec![],
+            // buffers: vec![],
             block_size,
             mutex: ShareMutex::new(()),
-            usage
+            usage,
+            counter: 0,
+            list: vec![],
+            pools: Share::new(SegQueue::new())
         }
     }
-    pub fn allocate(&mut self, asset_mgr: &Share<AssetMgr<NotUpdatableBuffer>>, device: &RenderDevice, queue: &RenderQueue, data: &[u8]) -> Option<NotUpdatableBufferRange> {
-        let len = self.buffers.len();
-        let mut key_buffer = None;
-        // 寻找可用区间
-        for i in 0..len {
-            if let Some(use_buffer) = self.buffers.get(i) {
-                // 有数据的情况一定是正在使用的
-                if let Some(_) = &use_buffer.0 {
-                    //
-                } else {
-                    key_buffer = Some(IDNotUpdatableBuffer { index: i as u32, size: self.block_size, usage: self.usage },);
-                }
-            }
-        }
+    pub fn allocate(&mut self, device: &RenderDevice, queue: &RenderQueue, data: &[u8]) -> Option<NotUpdatableBufferRange> {
+        // let len = self.buffers.len();
+        // let mut key_buffer = None;
+        // // 寻找可用区间
+        // for i in 0..len {
+        //     if let Some(use_buffer) = self.buffers.get(i) {
+        //         // 有数据的情况一定是正在使用的
+        //         if let Some(_) = &use_buffer.0 {
+        //             //
+        //         } else {
+        //             key_buffer = Some(IDNotUpdatableBuffer { index: i as u32, size: self.block_size, usage: self.usage },);
+        //         }
+        //     }
+        // }
 
-        // 寻找 是否有缓存 块
-        let key_buffer = if let Some(key_buffer) = key_buffer {
-            if let Some(asset_buffer) = asset_mgr.get(&key_buffer) {
-                let use_buffer = UseNotUpdatableBuffer(Some(asset_buffer.clone()));
+        // // 寻找 是否有缓存 块
+        // let key_buffer = if let Some(key_buffer) = key_buffer {
+        //     if let Some(asset_buffer) = asset_mgr.get(&key_buffer) {
+        //         let use_buffer = UseNotUpdatableBuffer(Some(asset_buffer.clone()));
+        //         let use_buffer = Arc::new(use_buffer);
+        //         self.buffers[key_buffer.index as usize] = use_buffer.clone();
+
+        //         let buffer = asset_buffer;
+        //         buffer.flag(true);
+        //         buffer.write_buffer(queue, data);
+        //         return Some(
+        //             NotUpdatableBufferRange {
+        //                 used_size: data.len() as u32,
+        //                 id_buffer: key_buffer.clone(),
+        //                 buffer: use_buffer,
+        //                 usage: self.usage,
+        //                 unused: false,
+        //             }
+        //         );
+        //     } else {
+        //         key_buffer
+        //     }
+        // } else {
+        //     self.buffers.push(Arc::new(UseNotUpdatableBuffer(None)));
+        //     IDNotUpdatableBuffer { index: len as u32, size: self.block_size, usage: self.usage }
+        // };
+
+
+        if let Some((buffer, index)) = self.pools.pop() {
+            // 创建块
+            let key_buffer = IDNotUpdatableBuffer { index: index as u32, size: self.block_size, usage: self.usage };
+            let buffer = NotUpdatableBuffer(buffer, self.block_size, true, self.usage, self.pools.clone());
+            buffer.write_buffer(queue, data);
+            // if let Ok(asset_buffer) = asset_mgr.insert(key_buffer, buffer) {
+                let use_buffer = UseNotUpdatableBuffer(Arc::new(buffer));
                 let use_buffer = Arc::new(use_buffer);
-                self.buffers[key_buffer.index as usize] = use_buffer.clone();
-
-                let buffer = asset_buffer;
-                buffer.flag(true);
-                buffer.write_buffer(queue, data);
+                // self.buffers[key_buffer.index as usize] = use_buffer.clone();
                 return Some(
                     NotUpdatableBufferRange {
                         used_size: data.len() as u32,
@@ -554,32 +585,32 @@ impl FixedSizeBufferPoolNotUpdatable {
                         unused: false,
                     }
                 );
-            } else {
-                key_buffer
-            }
+            // } else {
+            //     return None;
+            // }
         } else {
-            self.buffers.push(Arc::new(UseNotUpdatableBuffer(None)));
-            IDNotUpdatableBuffer { index: len as u32, size: self.block_size, usage: self.usage }
-        };
-
-        // 创建块
-        let buffer = NotUpdatableBuffer::new(device, self.block_size, self.usage);
-        buffer.write_buffer(queue, data);
-        if let Ok(asset_buffer) = asset_mgr.insert(key_buffer, buffer) {
-            let use_buffer = UseNotUpdatableBuffer(Some(asset_buffer.clone()));
-            let use_buffer = Arc::new(use_buffer);
-            self.buffers[key_buffer.index as usize] = use_buffer.clone();
-            return Some(
-                NotUpdatableBufferRange {
-                    used_size: data.len() as u32,
-                    id_buffer: key_buffer.clone(),
-                    buffer: use_buffer,
-                    usage: self.usage,
-                    unused: false,
-                }
-            );
-        } else {
-            return None;
+            // 创建块
+            self.counter += 1;
+            let key_buffer = IDNotUpdatableBuffer { index: self.counter as u32, size: self.block_size, usage: self.usage };
+            let buffer = NotUpdatableBuffer::new(device, self.block_size, self.usage, self.pools.clone());
+            self.list.push(buffer.0.clone());
+            buffer.write_buffer(queue, data);
+            // if let Ok(asset_buffer) = asset_mgr.insert(key_buffer, buffer) {
+                let use_buffer = UseNotUpdatableBuffer(Arc::new(buffer));
+                let use_buffer = Arc::new(use_buffer);
+                // self.buffers[key_buffer.index as usize] = use_buffer.clone();
+                return Some(
+                    NotUpdatableBufferRange {
+                        used_size: data.len() as u32,
+                        id_buffer: key_buffer.clone(),
+                        buffer: use_buffer,
+                        usage: self.usage,
+                        unused: false,
+                    }
+                );
+            // } else {
+            //     return None;
+            // }
         }
     }
 }
@@ -597,21 +628,32 @@ pub struct IDNotUpdatableBuffer {
 /// 在 FixedSizeBufferPoolNotUpdatable 中保存以记录 NotUpdatableBuffer
 /// * FixedSizeBufferPoolNotUpdatable 中分配并包装为 NotUpdatableBufferRange
 /// * 当 NotUpdatableBufferRange 释放时 置 UseNotUpdatableBuffer 内容为 None 以释放 Handle<NotUpdatableBuffer>
-pub struct UseNotUpdatableBuffer(Option<Handle<NotUpdatableBuffer>>);
+pub struct UseNotUpdatableBuffer(Arc<NotUpdatableBuffer>);
 impl UseNotUpdatableBuffer {
-    pub fn none(&self) -> Option<Handle<NotUpdatableBuffer>> {
-        unsafe {
-            let temp = &mut *(self as *const Self as usize as *mut Self);
-            let result = temp.0.clone();
-            temp.0 = None;
-            result
-        }
+    // pub fn none(&self) -> Arc<NotUpdatableBuffer> {
+    //     unsafe {
+    //         let temp = &mut *(self as *const Self as usize as *mut Self);
+    //         let result = temp.0.clone();
+    //         temp.0 = None;
+    //         result
+    //     }
+    // }
+}
+impl PartialEq for UseNotUpdatableBuffer {
+    fn eq(&self, other: &Self) -> bool {
+        // match (&self.0, &other.0) {
+        //     (None, None) => true,
+        //     (Some(a), Some(b)) => a.0.id() == b.0.id(),
+        //     _ => false
+        // }
+        self.0.0.id() == other.0.0.id()
     }
 }
 
-pub struct NotUpdatableBuffer(Buffer, u32, bool, wgpu::BufferUsages);
+pub struct NotUpdatableBuffer(Buffer, u32, bool, wgpu::BufferUsages, Share<SegQueue<(Buffer, usize)>>);
 impl Asset for NotUpdatableBuffer {
     type Key = IDNotUpdatableBuffer;
+    // const TYPE: &'static str = "NotUpdatableBuffer";
 }
 impl Size for NotUpdatableBuffer {
     fn size(&self) -> usize {
@@ -620,7 +662,7 @@ impl Size for NotUpdatableBuffer {
 }
 impl NotUpdatableBuffer {
     /// * `size` 请求的 buffer 大小 
-    pub fn new(device: &RenderDevice, size: u32, usage: wgpu::BufferUsages) -> Self {
+    pub fn new(device: &RenderDevice, size: u32, usage: wgpu::BufferUsages, pool: Share<SegQueue<(Buffer, usize)>>) -> Self {
         let mut data = vec![];
         for _ in 0..size {
             data.push(0)
@@ -633,7 +675,7 @@ impl NotUpdatableBuffer {
             }
         );
 
-        Self(buffer, size, true, usage)
+        Self(buffer, size, true, usage, pool)
     }
     /// 写入Buffer 数据
     /// * `data` data 长度 不应超过 self.size()
@@ -655,6 +697,11 @@ impl NotUpdatableBuffer {
         }
     }
 }
+impl Drop for NotUpdatableBuffer {
+    fn drop(&mut self) {
+        self.4.push((self.0.clone(), self.1 as usize));
+    }
+}
 
 /// NotUpdatableBufferRange 在外部应当具有唯一性, 但由于应用层使用限制, 可能被包装为 Arc, 所以 只能是逻辑上保证维护其唯一性,
 /// * 
@@ -672,7 +719,7 @@ impl Debug for NotUpdatableBufferRange {
 }
 impl NotUpdatableBufferRange {
     pub fn buffer(&self) -> &Buffer {
-        &self.buffer.0.as_ref().unwrap().0
+        &self.buffer.0.0
     }
     pub fn size(&self) -> u32 {
         self.used_size
@@ -693,9 +740,9 @@ impl NotUpdatableBufferRange {
 }
 impl Drop for NotUpdatableBufferRange {
     fn drop(&mut self) {
-        if !self.unused {
-            self.buffer.none();
-        }
+        // if !self.unused {
+        //     self.buffer.none();
+        // }
     }
 }
 impl Hash for NotUpdatableBufferRange {
@@ -706,7 +753,7 @@ impl Hash for NotUpdatableBufferRange {
 }
 impl PartialEq for NotUpdatableBufferRange {
     fn eq(&self, other: &Self) -> bool {
-        self.id_buffer == other.id_buffer && self.usage == other.usage
+        &self.id_buffer == &other.id_buffer && self.usage == other.usage && &self.buffer == &other.buffer
     }
 }
 impl Eq for NotUpdatableBufferRange {

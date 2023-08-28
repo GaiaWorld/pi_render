@@ -9,6 +9,7 @@ use crate::{rhi::{shader::WriteBuffer, device::RenderDevice, RenderQueue, buffer
 pub struct AssetRWBuffer(SingleBufferAlloter, u32);
 impl Asset for AssetRWBuffer {
     type Key = IDRWBuffer;
+    // const TYPE: &'static str = "AssetRWBuffer";
 }
 
 impl Size for AssetRWBuffer {

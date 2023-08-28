@@ -55,6 +55,7 @@ pub struct AssetFixedSmallStructAllocator<T: Default + 'static>(SmallStructAllot
 impl<T: Default + 'static> Asset for AssetFixedSmallStructAllocator<T> {
     /// * 在 分配器池 中的序号
     type Key = usize;
+    // const TYPE: &'static str = "AssetFixedSmallStructAllocator";
 }
 
 impl<T: Default + 'static> Size for AssetFixedSmallStructAllocator<T> {
