@@ -154,6 +154,8 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
     /// 红色 是 结束 节点
     #[cfg(debug_assertions)]
     fn dump_graphviz_impl(&self) -> String {
+        use pi_slotmap::Key;
+
         let mut v = vec!["digraph Render {".into()];
 
         for (id, n) in self.schedule_graph.nodes.iter() {
@@ -163,9 +165,10 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
             } else {
                 "white"
             };
+			let id1 = id.data();
 
             v.push(format!(
-                "\t \"{id:?}\" [\"style\"=\"filled\" \"label\"={name} \"fillcolor\"=\"{color}\"]"
+                "\t \"{id:?}\" [\"style\"=\"filled\" \"label\"={name}_{id1:?} \"fillcolor\"=\"{color}\"]"
             ));
         }
 
