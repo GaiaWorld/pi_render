@@ -36,7 +36,7 @@ impl Asset for ImageTextureView {
 
 impl Size for ImageTextureView {
     fn size(&self) -> usize {
-        8 + 64
+        self.texture.size() + 64
     }
 }
 impl ImageTextureView {

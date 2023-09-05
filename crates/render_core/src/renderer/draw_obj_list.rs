@@ -35,7 +35,7 @@ impl DrawList {
 
                 // draw.bindgroups.set(renderpass);
                 for (item, idx) in draw.bindgroups.groups().iter() {
-                    if temp_vertex_record.record_bindgroup_and_check_diff_with_last(*idx as usize, Some(item)) {
+                    if *idx > 1 || temp_vertex_record.record_bindgroup_and_check_diff_with_last(*idx as usize, Some(item)) {
                         item.set(renderpass, *idx);
                     }
                 }

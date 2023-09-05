@@ -159,7 +159,7 @@ impl<'a, G: Garbageer<Self>> AsyncLoader<'a, Self, ImageTexture2DDesc, G> for Im
 					let image = match image {
 						Ok(r) => r,
 						Err(_e) =>  {
-							log::error!("load image fail: {:?}", desc.url.as_str());
+							log::debug!("load image fail: {:?}", desc.url.as_str());
 							return Err(std::io::Error::new(std::io::ErrorKind::NotFound, ""));
 						},
 					};
