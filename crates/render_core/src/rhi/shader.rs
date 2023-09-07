@@ -18,7 +18,7 @@ use thiserror::Error;
 use uuid::Uuid;
 #[cfg(feature="wgpu/spirv")]
 use wgpu::util::make_spirv;
-use wgpu::ShaderModuleDescriptor;
+use wgpu::{ShaderModuleDescriptor, Device};
 
 pub trait Input {
     fn location() -> u32;
@@ -41,7 +41,7 @@ pub trait BindingType: BindLayout {
     fn binding_type() -> wgpu::BindingType;
 }
 
-/// 定义AsLayoutEntry，可以创建wgpu::BindGroupLayoutEntry
+/// 定义AsLayoutEntry，可以创建crate::wgpu::BindGroupLayoutEntry
 pub trait AsLayoutEntry {
     fn as_layout_entry(visibility: wgpu::ShaderStages) -> wgpu::BindGroupLayoutEntry;
 }
@@ -99,6 +99,8 @@ pub trait ShaderProgram: Send + Sync + 'static {
 /// 根据该结构体，可还原出shader代码
 #[derive(Debug, Clone, Default, Hash)]
 pub struct ShaderMeta {
+	// shader版本
+	pub version: String,
     /// binding描述
     pub bindings: ShaderBinding,
     /// 定义了Varying变量
@@ -134,6 +136,23 @@ impl ShaderMeta {
 
         code
     }
+	pub fn create_shader_module(&self, device: &Device, defines: &XHashSet<Atom>, stage: naga::ShaderStage) -> wgpu::ShaderModule {
+		let s = match stage {
+			naga::ShaderStage::Vertex => wgpu::ShaderStages::VERTEX,
+			naga::ShaderStage::Fragment => wgpu::ShaderStages::FRAGMENT,
+			naga::ShaderStage::Compute => wgpu::ShaderStages::COMPUTE,
+		};
+		let code = self.to_code(defines, s);
+		log::warn!("shader_code================\nstage={stage:?}\ndefines={defines:?}\ncode=\n{code}");
+		return device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some(&self.name),
+            source: wgpu::ShaderSource::Glsl {
+                shader: Cow::Borrowed(code.as_str()),
+                stage,
+                defines: naga::FastHashMap::default(),
+            },
+        });
+	}
 
     pub fn add_binding_entry(
         &mut self,
@@ -171,7 +190,7 @@ impl ShaderMeta {
 pub struct ShaderBinding {
     /// layout entry 描述
     pub bind_group_entrys: VecMap<Vec<wgpu::BindGroupLayoutEntry>>,
-    /// 除了glsl本省能描述的binding的属性外，pi_render扩展了一些其他的属性
+    /// 除了glsl本身能描述的binding的属性外，pi_render扩展了一些其他的属性
     /// 包括： bingding名称，如果是buffer类型，还包含buffer的默认值、buffer的类型
     pub buffer_uniform_expands: VecMap<Vec<BindingExpandDescList>>,
     /// 用于索引Binding在goup的binding数组中的位置
@@ -204,11 +223,8 @@ impl ShaderBinding {
 
                         match entry.ty {
                             wgpu::BindingType::Buffer { .. } => {
-                                code.push_str(") uniform M_");
-                                code.push_str(set.as_str());
-                                code.push_str("_");
-                                code.push_str(binding.as_str());
-								code.push_str("_M"); // 名字以数字结尾，naga存在bug，添加_M后缀先绕过
+                                code.push_str(") uniform ");
+								code.push_str(uniform_buffer_name(set.as_str(), binding.as_str()).as_str());
                                 code.push_str("{\n");
                                 for desc in expand.list.iter() {
                                     if let Some(r) = desc.buffer_expand.as_ref() {
@@ -273,6 +289,10 @@ impl ShaderBinding {
     }
 }
 
+fn uniform_buffer_name(set: &str, binding: &str) -> String {
+	"M_".to_string() + set + "_" + binding + "_M" // 名字以数字结尾，naga存在bug，添加_M后缀先绕过
+}
+
 /// shader输入
 #[derive(Debug, Clone, Default, Hash)]
 pub struct ShaderInput(pub Vec<InOut>);
@@ -309,7 +329,7 @@ fn inout_to_code(code: &mut String, defines: &XHashSet<Atom>, ty: &str, list: &V
 }
 
 /// 描述binding的其他信息
-/// 除了wgpu在创建布局时需要wgpu::BindGroupLayoutEntry信息外，shader中的binding还包含其他信息：
+/// 除了wgpu在创建布局时需要crate::wgpu::BindGroupLayoutEntry信息外，shader中的binding还包含其他信息：
 /// * bingding的宏开关
 /// * bingding内每个属性的名称，如果是buffer类型的属性，还包含buffer的默认值、类型、数组长度（可选）
 #[derive(Debug, Clone, Hash)]
@@ -531,7 +551,7 @@ impl BlockCodeAtom {
 }
 
 /// 代码片段
-#[derive(Debug, Clone, Default, Hash)]
+#[derive(Debug, Clone, Hash)]
 pub struct CodeSlice {
     /// 代码
     pub code: Atom,
@@ -539,13 +559,24 @@ pub struct CodeSlice {
     pub defines: Vec<Define>,
 }
 
+
+#[derive(Debug, Clone, Hash)]
+pub struct TextureCode {
+	pub ty: Atom, 
+	pub name: Atom, 
+	pub texture_name: Atom, 
+	pub sampler_name: Atom, 
+	pub uv_name: Atom, 
+	pub sampler_ty: Atom
+}
+
+
 impl CodeSlice {
     pub fn to_code(&self, code: &mut String, defines: &XHashSet<Atom>) {
         if !check_defined(&self.defines, defines) {
             return;
         }
-        code.push_str(self.code.as_str());
-        code.push_str("\n");
+		code.push_str(self.code.as_str());
     }
 
     pub fn push_defines_front(mut self, extends: &[Define]) -> Self {
