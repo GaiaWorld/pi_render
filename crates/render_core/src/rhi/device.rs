@@ -2,12 +2,12 @@ use super::{
     bind_group::BindGroup,
     bind_group_layout::BindGroupLayout,
     buffer::Buffer,
-    pipeline::{ComputePipeline, RenderPipeline},
+    pipeline::RenderPipeline,
     texture::{Sampler, Texture}, options::{RenderOptions, RenderPriority}, RenderQueue,
 };
 use derive_deref_rs::Deref;
 use pi_share::Share;
-use wgpu::{util::DeviceExt, BufferAsyncError};
+use wgpu::util::DeviceExt;
 
 /// This GPU device is responsible for the creation of most rendering and compute resources.
 #[derive(Clone, Deref)]
@@ -47,10 +47,10 @@ impl RenderDevice {
     /// Check for resource cleanups and mapping callbacks.
     ///
     /// no-op on the web, device is automatically polled.
-    #[inline]
-    pub fn poll(&self, maintain: wgpu::Maintain) -> bool {
-        self.0.poll(maintain)
-    }
+    // #[inline]
+    // pub fn poll(&self, maintain: wgpu::Maintain) -> bool {
+    //     self.0.poll(maintain)
+    // }
 
     /// Creates an empty [`CommandEncoder`](wgpu::CommandEncoder).
     #[inline]
@@ -62,13 +62,13 @@ impl RenderDevice {
     }
 
     /// Creates an empty [`RenderBundleEncoder`](wgpu::RenderBundleEncoder).
-    #[inline]
-    pub fn create_render_bundle_encoder(
-        &self,
-        desc: &wgpu::RenderBundleEncoderDescriptor,
-    ) -> wgpu::RenderBundleEncoder {
-        self.0.create_render_bundle_encoder(desc)
-    }
+    // #[inline]
+    // pub fn create_render_bundle_encoder(
+    //     &self,
+    //     desc: &wgpu::RenderBundleEncoderDescriptor,
+    // ) -> wgpu::RenderBundleEncoder {
+    //     self.0.create_render_bundle_encoder(desc)
+    // }
 
     /// Creates a new [`BindGroup`](wgpu::BindGroup).
     #[inline]
@@ -103,14 +103,14 @@ impl RenderDevice {
     }
 
     /// Creates a [`ComputePipeline`].
-    #[inline]
-    pub fn create_compute_pipeline(
-        &self,
-        desc: &wgpu::ComputePipelineDescriptor,
-    ) -> ComputePipeline {
-        let wgpu_compute_pipeline = self.0.create_compute_pipeline(desc);
-        ComputePipeline::from(wgpu_compute_pipeline)
-    }
+    // #[inline]
+    // pub fn create_compute_pipeline(
+    //     &self,
+    //     desc: &wgpu::ComputePipelineDescriptor,
+    // ) -> ComputePipeline {
+    //     let wgpu_compute_pipeline = self.0.create_compute_pipeline(desc);
+    //     ComputePipeline::from(wgpu_compute_pipeline)
+    // }
 
     /// Creates a [`Buffer`].
     pub fn create_buffer(&self, desc: &wgpu::BufferDescriptor) -> Buffer {
@@ -155,18 +155,18 @@ impl RenderDevice {
         &self.0
     }
 
-    pub async fn map_buffer(
-        &self,
-        buffer: &wgpu::BufferSlice<'_>,
-        map_mode: wgpu::MapMode,
-    ) -> Result<(), BufferAsyncError> {
-		let var = pi_async_rt::prelude::AsyncValue::new();
-		let var1 = var.clone();
-        buffer.map_async(map_mode, move |r| {
-			var1.set(r);
-		});
-		var.await
-    }
+    // pub async fn map_buffer(
+    //     &self,
+    //     buffer: &wgpu::BufferSlice<'_>,
+    //     map_mode: wgpu::MapMode,
+    // ) -> Result<(), BufferAsyncError> {
+	// 	let var = pi_async_rt::prelude::AsyncValue::new();
+	// 	let var1 = var.clone();
+    //     buffer.map_async(map_mode, move |r| {
+	// 		var1.set(r);
+	// 	});
+	// 	var.await
+    // }
 
     pub fn align_copy_bytes_per_row(row_bytes: usize) -> usize {
         let align = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT as usize;

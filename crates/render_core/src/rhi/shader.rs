@@ -143,7 +143,7 @@ impl ShaderMeta {
 			naga::ShaderStage::Compute => wgpu::ShaderStages::COMPUTE,
 		};
 		let code = self.to_code(defines, s);
-		log::warn!("shader_code================\nstage={stage:?}\ndefines={defines:?}\ncode=\n{code}");
+		log::debug!("shader_code================\nstage={stage:?}\ndefines={defines:?}\ncode=\n{code}");
 		return device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some(&self.name),
             source: wgpu::ShaderSource::Glsl {

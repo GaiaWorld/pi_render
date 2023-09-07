@@ -1,6 +1,4 @@
-use std::{
-    ops::{Bound, Deref, RangeBounds},
-};
+use std::ops::{Bound, Deref, RangeBounds};
 use pi_share::Share;
 use uuid::Uuid;
 
@@ -41,11 +39,11 @@ impl Buffer {
         }
     }
     
-    /// 取消 映射
-    #[inline]
-    pub fn unmap(&self) {
-        self.value.unmap()
-    }
+    // /// 取消 映射
+    // #[inline]
+    // pub fn unmap(&self) {
+    //     self.value.unmap()
+    // }
 }
 
 impl From<(wgpu::Buffer, wgpu::BufferAddress)> for Buffer {

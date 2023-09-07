@@ -110,14 +110,14 @@ impl<Context: ThreadSync + 'static> Default for DependGraph<Context> {
 
 /// 渲染图的 拓扑信息 相关 方法
 impl<Context: ThreadSync + 'static> DependGraph<Context> {
-    #[cfg(not(debug_assertions))]
-    pub fn dump_graphviz(&self) -> String {
-        "".into()
-    }
+    // #[cfg(not(debug_assertions))]
+    // pub fn dump_graphviz(&self) -> String {
+    //     "".into()
+    // }
 
     /// 将 渲染图 打印成 Graphviz (.dot) 格式
     /// 红色 是 结束 节点
-    #[cfg(debug_assertions)]
+    // #[cfg(debug_assertions)]
     pub fn dump_graphviz(&self) -> String {
         use log::warn;
 
@@ -152,7 +152,7 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
 
     /// 将 渲染图 打印成 Graphviz (.dot) 格式
     /// 红色 是 结束 节点
-    #[cfg(debug_assertions)]
+    // #[cfg(debug_assertions)]
     fn dump_graphviz_impl(&self) -> String {
         use pi_slotmap::Key;
 
