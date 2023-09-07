@@ -30,8 +30,6 @@ pi_null = "0.1"
 pi_ecs_macros = "0.1"
 pi_slotmap = "0.1"
 
-graphviz-rust = "0.6"
-
 normpath = "1.1.1"
 tracing = { version = "0.1", default-features = false, features = ["std"] }
 
@@ -52,7 +50,7 @@ once_cell = "1.4" # TODO: replace once_cell with std equivalent if/when this lan
 regex = "1.5"
 thiserror = "1.0"
 pi_slab = "0.1"
-wgpu = { version = "0.16", default-features = false, features = ["glsl"] }
+
 derive-deref-rs = "0.1"
 pi_any = "0.1"
 pi_time = "0.3"
@@ -64,7 +62,7 @@ pi_atom = "0.2"
 bytemuck = { version = "1.4", features = ["derive"] }
 
 pi_hal = { version = "0.1", registry = "yn" }
-
+wgpu = { version = "0.16", default-features = false, features = ["glsl"] }
 # wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
 
 parking_lot = "0.12"
