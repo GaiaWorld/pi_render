@@ -42,37 +42,37 @@ pub struct ComputePipelineId(Uuid);
 ///
 /// May be converted from and dereferences to a wgpu [`ComputePipeline`](wgpu::ComputePipeline).
 /// Can be created via [`RenderDevice::create_compute_pipeline`](crate::renderer::RenderDevice::create_compute_pipeline).
-#[derive(Clone, Debug)]
-pub struct ComputePipeline {
-    id: ComputePipelineId,
-    value: Share<wgpu::ComputePipeline>,
-}
+// #[derive(Clone, Debug)]
+// pub struct ComputePipeline {
+//     id: ComputePipelineId,
+//     value: Share<wgpu::ComputePipeline>,
+// }
 
-impl ComputePipeline {
-    /// Returns the [`ComputePipelineId`].
-    #[inline]
-    pub fn id(&self) -> ComputePipelineId {
-        self.id
-    }
-}
+// impl ComputePipeline {
+//     /// Returns the [`ComputePipelineId`].
+//     #[inline]
+//     pub fn id(&self) -> ComputePipelineId {
+//         self.id
+//     }
+// }
 
-impl From<wgpu::ComputePipeline> for ComputePipeline {
-    fn from(value: wgpu::ComputePipeline) -> Self {
-        ComputePipeline {
-            id: ComputePipelineId(Uuid::new_v4()),
-            value: Share::new(value),
-        }
-    }
-}
+// impl From<wgpu::ComputePipeline> for ComputePipeline {
+//     fn from(value: wgpu::ComputePipeline) -> Self {
+//         ComputePipeline {
+//             id: ComputePipelineId(Uuid::new_v4()),
+//             value: Share::new(value),
+//         }
+//     }
+// }
 
-impl Deref for ComputePipeline {
-    type Target = wgpu::ComputePipeline;
+// impl Deref for ComputePipeline {
+//     type Target = wgpu::ComputePipeline;
 
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.value
-    }
-}
+//     #[inline]
+//     fn deref(&self) -> &Self::Target {
+//         &self.value
+//     }
+// }
 
 /// Describes a render (graphics) pipeline.
 #[derive(Clone, Debug, PartialEq)]

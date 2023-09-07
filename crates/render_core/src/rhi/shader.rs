@@ -18,7 +18,7 @@ use thiserror::Error;
 use uuid::Uuid;
 #[cfg(feature="wgpu/spirv")]
 use wgpu::util::make_spirv;
-use wgpu::ShaderModuleDescriptor;
+use wgpu::{ShaderModuleDescriptor, Device, ShaderBindGroupInfo};
 
 pub trait Input {
     fn location() -> u32;
@@ -41,7 +41,7 @@ pub trait BindingType: BindLayout {
     fn binding_type() -> wgpu::BindingType;
 }
 
-/// 定义AsLayoutEntry，可以创建wgpu::BindGroupLayoutEntry
+/// 定义AsLayoutEntry，可以创建crate::wgpu::BindGroupLayoutEntry
 pub trait AsLayoutEntry {
     fn as_layout_entry(visibility: wgpu::ShaderStages) -> wgpu::BindGroupLayoutEntry;
 }
@@ -99,6 +99,8 @@ pub trait ShaderProgram: Send + Sync + 'static {
 /// 根据该结构体，可还原出shader代码
 #[derive(Debug, Clone, Default, Hash)]
 pub struct ShaderMeta {
+	// shader版本
+	pub version: String,
     /// binding描述
     pub bindings: ShaderBinding,
     /// 定义了Varying变量
@@ -134,6 +136,81 @@ impl ShaderMeta {
 
         code
     }
+
+	#[cfg(not(feature="wgpu"))]
+	pub fn create_shader_module(&self, device: &Device, defines: &XHashSet<Atom>, stage: wgpu::ShaderStages) -> wgpu::ShaderModule {
+		let code = self.to_code(defines, stage);
+		let bind_group_layout = self.bind_group_layout(defines, stage);
+		log::debug!("shader_code================\nstage={stage:?}\ndefines={defines:?}\ncode=\n{code:?},\nbind_group_layout=\n{bind_group_layout:?}");
+		return device.create_shader_module(wgpu::ShaderModuleDescriptor {
+			label: Some(&self.name),
+			source: wgpu::ShaderSource::Glsl {
+				shader: Cow::Borrowed(code.as_str()),
+				stage: naga::ShaderStage::Vertex,
+				defines: naga::FastHashMap::default(),
+				bind_group_layout,
+			},
+		});
+	}
+	#[cfg(feature="wgpu")]
+	pub fn create_shader_module(&self, device: &Device, defines: &XHashSet<Atom>, stage: wgpu::ShaderStages) -> wgpu::ShaderModule {
+		let code = self.to_code(defines, stage);
+		log::debug!("shader_code================\nstage={stage:?}\ndefines={defines:?}\ncode=\n{code:?}");
+		return device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some(&self.name),
+            source: wgpu::ShaderSource::Glsl {
+                shader: Cow::Borrowed(code.as_str()),
+                stage: naga::ShaderStage::Vertex,
+                defines: naga::FastHashMap::default(),
+            },
+        });
+	}
+
+	pub fn bind_group_layout(&self, defines: &XHashSet<Atom>, visibility: wgpu::ShaderStages) -> Vec<ShaderBindGroupInfo> {
+		let mut bind_group_layout = Vec::new();
+		for (set, entrys) in self.bindings.bind_group_entrys.iter().enumerate()  {
+			if let Some(entrys) = entrys {
+				let mut texture_or_sampler_index = None;
+				for (binding_index, entry) in entrys.iter().enumerate() {
+					if !(entry.visibility & visibility == visibility) {
+						continue;
+					}
+					let expand = &self.bindings.buffer_uniform_expands[set][binding_index];
+					if !check_defined(&expand.defines, defines) || expand.list.len() == 0 {
+						continue;
+					}
+					let ty = match entry.ty {
+						wgpu::BindingType::Buffer { .. } => wgpu::PiBindingType::Buffer,
+						wgpu::BindingType::Sampler(_) => wgpu::PiBindingType::Sampler,
+						wgpu::BindingType::Texture { .. } => wgpu::PiBindingType::Texture,
+						// wgpu::BindingType::StorageTexture { access, format, view_dimension } => todo!(),
+						_ => unimplemented!(),
+					};
+
+					let mut binding = entry.binding as usize;
+					let name = if let wgpu::PiBindingType::Buffer = ty {
+						uniform_buffer_name(set.to_string().as_str(), entry.binding.to_string().as_str())
+					} else {
+						match texture_or_sampler_index {
+							Some(r) => binding = r,
+							None => {
+								texture_or_sampler_index = Some(binding_index);
+							},
+						};
+						let expand = &self.bindings.buffer_uniform_expands[set][binding];
+						expand.list[0].name.to_string() 
+					};
+					bind_group_layout.push(wgpu::ShaderBindGroupInfo {
+						set,
+						binding: binding_index,
+						name,
+						ty,
+					});
+				}
+			}
+		};
+		bind_group_layout
+	}
 
     pub fn add_binding_entry(
         &mut self,
@@ -171,7 +248,7 @@ impl ShaderMeta {
 pub struct ShaderBinding {
     /// layout entry 描述
     pub bind_group_entrys: VecMap<Vec<wgpu::BindGroupLayoutEntry>>,
-    /// 除了glsl本省能描述的binding的属性外，pi_render扩展了一些其他的属性
+    /// 除了glsl本身能描述的binding的属性外，pi_render扩展了一些其他的属性
     /// 包括： bingding名称，如果是buffer类型，还包含buffer的默认值、buffer的类型
     pub buffer_uniform_expands: VecMap<Vec<BindingExpandDescList>>,
     /// 用于索引Binding在goup的binding数组中的位置
@@ -180,6 +257,7 @@ pub struct ShaderBinding {
 
 impl ShaderBinding {
     /// 转换为shader代码（数组， TODO）
+	#[cfg(feature="wgpu")]
     pub fn to_code(
         &self,
         code: &mut String,
@@ -204,11 +282,8 @@ impl ShaderBinding {
 
                         match entry.ty {
                             wgpu::BindingType::Buffer { .. } => {
-                                code.push_str(") uniform M_");
-                                code.push_str(set.as_str());
-                                code.push_str("_");
-                                code.push_str(binding.as_str());
-								code.push_str("_M"); // 名字以数字结尾，naga存在bug，添加_M后缀先绕过
+                                code.push_str(") uniform ");
+								code.push_str(uniform_buffer_name(set.as_str(), binding.as_str()).as_str());
                                 code.push_str("{\n");
                                 for desc in expand.list.iter() {
                                     if let Some(r) = desc.buffer_expand.as_ref() {
@@ -271,6 +346,96 @@ impl ShaderBinding {
             }
         }
     }
+
+	#[cfg(not(feature="wgpu"))]
+	pub fn to_code(
+        &self,
+        code: &mut String,
+        defines: &XHashSet<Atom>,
+        visibility: wgpu::ShaderStages,
+    ) {
+        for (set, entrys) in self.bind_group_entrys.iter().enumerate() {
+            if let Some(entrys) = entrys {
+                for (binding_index, entry) in entrys.iter().enumerate() {
+                    if entry.visibility & visibility == visibility {
+                        let expand = &self.buffer_uniform_expands[set][binding_index];
+                        if !check_defined(&expand.defines, defines) || expand.list.len() == 0 {
+                            continue;
+                        }
+
+                        let set = set.to_string();
+                        let binding = entry.binding.to_string();
+                        // code.push_str("layout(set=");
+                        // code.push_str(set.as_str());
+                        // code.push_str(",binding=");
+                        // code.push_str(binding.as_str());
+
+                        match entry.ty {
+                            wgpu::BindingType::Buffer { .. } => {
+                                code.push_str("uniform ");
+								code.push_str(uniform_buffer_name(set.as_str(), binding.as_str()).as_str());
+                                code.push_str("{\n");
+                                for desc in expand.list.iter() {
+                                    if let Some(r) = desc.buffer_expand.as_ref() {
+                                        r.ty.to_code(code);
+                                        code.push_str(" ");
+                                        code.push_str(&desc.name);
+                                        code.push_str(";\n");
+                                    }
+                                }
+                                code.push_str("};\n");
+                            }
+                            wgpu::BindingType::Sampler(_) => {
+                                let desc = &expand.list[0];
+                                code.push_str("uniform sampler ");
+                                code.push_str(&desc.name);
+                                code.push_str(";\n");
+                            }
+                            wgpu::BindingType::Texture {..} => {
+                                // let dimension_to_string = || match view_dimension {
+                                //     wgpu::TextureViewDimension::D1 => "1D",
+                                //     wgpu::TextureViewDimension::D2 => "2D",
+                                //     wgpu::TextureViewDimension::D2Array => "2DArray",
+                                //     wgpu::TextureViewDimension::Cube => "Cube",
+                                //     wgpu::TextureViewDimension::CubeArray => "CubeArray",
+                                //     wgpu::TextureViewDimension::D3 => "3D",
+                                // };
+                                // let sample_type_to_string = || match sample_type {
+                                //     wgpu::TextureSampleType::Float { .. } => "",
+                                //     wgpu::TextureSampleType::Depth => "", // TODO
+                                //     wgpu::TextureSampleType::Sint => "i",
+                                //     wgpu::TextureSampleType::Uint => "u",
+                                // };
+                                // let desc = &expand.list[0];
+                                // code.push_str(")");
+                                // code.push_str(sample_type_to_string());
+                                // code.push_str("uniform texture");
+                                // code.push_str(dimension_to_string());
+                                // if multisampled {
+                                //     code.push_str("MS ");
+                                // } else {
+                                //     code.push_str(" ");
+                                // }
+                                // code.push_str(&desc.name);
+                                // // 数组，TODO
+                                // code.push_str(";\n");
+                            }
+                            // wgpu::BindingType::StorageTexture {
+                            //     access,
+                            //     format,
+                            //     view_dimension,
+                            // }
+                            _ => todo!(),
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn uniform_buffer_name(set: &str, binding: &str) -> String {
+	"M_".to_string() + set + "_" + binding + "_M" // 名字以数字结尾，naga存在bug，添加_M后缀先绕过
 }
 
 /// shader输入
@@ -309,7 +474,7 @@ fn inout_to_code(code: &mut String, defines: &XHashSet<Atom>, ty: &str, list: &V
 }
 
 /// 描述binding的其他信息
-/// 除了wgpu在创建布局时需要wgpu::BindGroupLayoutEntry信息外，shader中的binding还包含其他信息：
+/// 除了wgpu在创建布局时需要crate::wgpu::BindGroupLayoutEntry信息外，shader中的binding还包含其他信息：
 /// * bingding的宏开关
 /// * bingding内每个属性的名称，如果是buffer类型的属性，还包含buffer的默认值、类型、数组长度（可选）
 #[derive(Debug, Clone, Hash)]
@@ -531,21 +696,84 @@ impl BlockCodeAtom {
 }
 
 /// 代码片段
-#[derive(Debug, Clone, Default, Hash)]
+#[derive(Debug, Clone, Hash)]
 pub struct CodeSlice {
     /// 代码
-    pub code: Atom,
+    pub code: CodeItem,
     /// #ifdef
     pub defines: Vec<Define>,
 }
+
+#[derive(Debug, Clone, Hash)]
+pub enum CodeItem {
+	String(Atom),
+	Texure(Box<TextureCode>), // 纹理采样（因为纹理采样在不同的shader版本中， 代码不同，这里需要做兼容）
+	Version(Atom), // 版本号
+}
+
+impl CodeItem {
+	pub fn to_code(&self, code: &mut String) {
+		match self {
+			CodeItem::String(c) => code.push_str(c.as_str()),
+			CodeItem::Texure(texture) => {
+				#[cfg(not(feature="wgpu"))]
+				code.push_str((
+					texture.ty.as_str().to_string() + 
+					" " +
+					texture.name.as_str() +
+					"=" +
+					"texture(" + 
+					texture.sampler_name.as_str() +
+					"," +
+					texture.uv_name.as_str() + 
+					");"
+				).as_str());
+				#[cfg(feature="wgpu")]
+				code.push_str((
+					texture.ty.as_str().to_string() + 
+					" " +
+					texture.name.as_str() +
+					"=" +
+					"texture(sampler(" +
+					texture.sampler_ty.as_str() +
+					texture.texture_name.as_str() +
+					"," +
+					texture.sampler_name.as_str() +
+					"),",
+					texture.uv_name.as_str() + 
+					");"
+				).as_str());
+			},
+			#[allow(unused_variables)]
+			CodeItem::Version(version) => {
+				#[cfg(not(feature="wgpu"))]
+				code.push_str("#version 300 es");
+
+				#[cfg(feature="wgpu")]
+				code.push_str(version.as_str());
+			}
+		};
+        code.push_str("\n");
+	}
+}
+
+#[derive(Debug, Clone, Hash)]
+pub struct TextureCode {
+	pub ty: Atom, 
+	pub name: Atom, 
+	pub texture_name: Atom, 
+	pub sampler_name: Atom, 
+	pub uv_name: Atom, 
+	pub sampler_ty: Atom
+}
+
 
 impl CodeSlice {
     pub fn to_code(&self, code: &mut String, defines: &XHashSet<Atom>) {
         if !check_defined(&self.defines, defines) {
             return;
         }
-        code.push_str(self.code.as_str());
-        code.push_str("\n");
+		self.code.to_code(code);
     }
 
     pub fn push_defines_front(mut self, extends: &[Define]) -> Self {

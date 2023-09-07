@@ -27,5 +27,5 @@ pi_map = { path = "../pi_map" }
 
 [build-dependencies]
 render_compile = {path="../render_compile"}
-naga = { version = "0.11"}
+naga = { version = "0.12"}
 

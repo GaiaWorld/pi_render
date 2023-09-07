@@ -8,12 +8,12 @@ impl TToBlockCodeAtom for crate::rhi::shader::BlockCodeAtom {
     fn to_block_code(&self) -> BlockCodeAtom {
         let mut code_define = String::from("");
         for c in self.define.iter() {
-            code_define += c.code.as_str();
+            c.code.to_code(&mut code_define);
         }
         
         let mut code_running = String::from("");
         for c in self.running.iter() {
-            code_running += c.code.as_str();
+            c.code.to_code(&mut code_running);
         }
         
         BlockCodeAtom {

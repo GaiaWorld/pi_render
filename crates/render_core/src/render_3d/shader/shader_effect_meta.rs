@@ -347,25 +347,26 @@ const float HALF_MIN = 5.96046448e-08;
             let _ = std::fs::write(root_dir.join(file_name), fs.as_str());
         }
 
-        let vs = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some((key_meta.to_string() + "-VS").as_str()),
-            source: ShaderSource::Glsl {
-                shader: std::borrow::Cow::Borrowed(vs.as_str()),
-                stage: naga::ShaderStage::Vertex,
-                defines: naga::FastHashMap::default(),
-            },
-        });
+        // let vs = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        //     label: Some((key_meta.to_string() + "-VS").as_str()),
+        //     source: ShaderSource::Glsl {
+        //         shader: std::borrow::Cow::Borrowed(vs.as_str()),
+        //         stage: naga::ShaderStage::Vertex,
+        //         defines: naga::FastHashMap::default(),
+        //     },
+        // });
 
-        let fs = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some((key_meta.to_string() + "-FS").as_str()),
-            source: ShaderSource::Glsl {
-                shader: std::borrow::Cow::Borrowed(fs.as_str()),
-                stage: naga::ShaderStage::Fragment,
-                defines: naga::FastHashMap::default(),
-            },
-        });
+        // let fs = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        //     label: Some((key_meta.to_string() + "-FS").as_str()),
+        //     source: ShaderSource::Glsl {
+        //         shader: std::borrow::Cow::Borrowed(fs.as_str()),
+        //         stage: naga::ShaderStage::Fragment,
+        //         defines: naga::FastHashMap::default(),
+        //     },
+        // });
 
-        Shader3D { vs, vs_point: "main", fs, fs_point: "main", p: std::marker::PhantomData  }
+        // Shader3D { vs, vs_point: "main", fs, fs_point: "main", p: std::marker::PhantomData  }
+		todo!()
     }
 
     pub fn vs_blocks<T0: TShaderSetBlock, T1: TShaderSetBlock, T2: TShaderSetBlock, T3: TShaderSetBlock>(
@@ -574,25 +575,26 @@ const float HALF_MIN = 5.96046448e-08;
             let _ = std::fs::write(root_dir.join(file_name), fs.as_str());
         }
 
-        let vs = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some((key_meta.to_string() + "-VS").as_str()),
-            source: ShaderSource::Glsl {
-                shader: std::borrow::Cow::Borrowed(vs.as_str()),
-                stage: naga::ShaderStage::Vertex,
-                defines: naga::FastHashMap::default(),
-            },
-        });
+        // let vs = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        //     label: Some((key_meta.to_string() + "-VS").as_str()),
+        //     source: ShaderSource::Glsl {
+        //         shader: std::borrow::Cow::Borrowed(vs.as_str()),
+        //         stage: naga::ShaderStage::Vertex,
+        //         defines: naga::FastHashMap::default(),
+        //     },
+        // });
 
-        let fs = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some((key_meta.to_string() + "-FS").as_str()),
-            source: ShaderSource::Glsl {
-                shader: std::borrow::Cow::Borrowed(fs.as_str()),
-                stage: naga::ShaderStage::Fragment,
-                defines: naga::FastHashMap::default(),
-            },
-        });
+        // let fs = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        //     label: Some((key_meta.to_string() + "-FS").as_str()),
+        //     source: ShaderSource::Glsl {
+        //         shader: std::borrow::Cow::Borrowed(fs.as_str()),
+        //         stage: naga::ShaderStage::Fragment,
+        //         defines: naga::FastHashMap::default(),
+        //     },
+        // });
 
-        Shader3D { vs, vs_point: "main", fs, fs_point: "main", p: std::marker::PhantomData  }
+        // Shader3D { vs, vs_point: "main", fs, fs_point: "main", p: std::marker::PhantomData  }
+		todo!()
     }
     
     pub fn define_code(

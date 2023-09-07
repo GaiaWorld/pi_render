@@ -52,7 +52,7 @@ pub use wgpu::{
     CommandEncoder,
     CommandEncoderDescriptor,
     CompareFunction,
-    ComputePassDescriptor,
+    // ComputePassDescriptor,
     // Pipeline
     DepthBiasState,
     DepthStencilState,
@@ -77,7 +77,7 @@ pub use wgpu::{
     // Command
     LoadOp,
     // Buffer
-    MapMode,
+    // MapMode,
     MultisampleState,
     // State
     Operations,

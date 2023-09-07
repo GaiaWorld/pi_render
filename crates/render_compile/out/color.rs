@@ -15,15 +15,15 @@ impl pi_render::rhi::dyn_uniform_buffer::Group for CameraMatrixGroup {
 		device: &pi_render::rhi::device::RenderDevice,
 		has_dynamic_offset: bool,
 	) -> pi_render::rhi::bind_group_layout::BindGroupLayout {
-		device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+		device.create_bind_group_layout(&pi_render::wgpu::BindGroupLayoutDescriptor {
 			label: Some("camera_matrix bindgroup layout"),
-			entries: &[wgpu::BindGroupLayoutEntry {
+			entries: &[pi_render::wgpu::BindGroupLayoutEntry {
 				binding: 0,
-				visibility: wgpu::ShaderStages::VERTEX,
-				ty: wgpu::BindingType::Buffer {
-					ty: wgpu::BufferBindingType::Uniform,
+				visibility: pi_render::wgpu::ShaderStages::VERTEX,
+				ty: pi_render::wgpu::BindingType::Buffer {
+					ty: pi_render::wgpu::BufferBindingType::Uniform,
 					has_dynamic_offset,
-					min_binding_size: wgpu::BufferSize::new(128),
+					min_binding_size: pi_render::wgpu::BufferSize::new(128),
 				},
 				count: None, // TODO
 			}],
@@ -37,11 +37,11 @@ impl pi_render::rhi::dyn_uniform_buffer::BufferGroup for CameraMatrixGroup {
 		layout: &pi_render::rhi::bind_group_layout::BindGroupLayout,
 		buffer: &pi_render::rhi::buffer::Buffer,
 	) -> pi_render::rhi::bind_group::BindGroup {
-		device.create_bind_group(&wgpu::BindGroupDescriptor {
+		device.create_bind_group(&pi_render::wgpu::BindGroupDescriptor {
 			layout,
-			entries: &[wgpu::BindGroupEntry {
+			entries: &[pi_render::wgpu::BindGroupEntry {
 				binding: 0,
-				resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+				resource: pi_render::wgpu::BindingResource::Buffer(pi_render::wgpu::BufferBinding {
 					buffer,
 					offset: 0,
 					size: Some(std::num::NonZeroU64::new(128).unwrap()),
@@ -62,15 +62,15 @@ impl pi_render::rhi::dyn_uniform_buffer::Group for ColorMaterialGroup {
 		device: &pi_render::rhi::device::RenderDevice,
 		has_dynamic_offset: bool,
 	) -> pi_render::rhi::bind_group_layout::BindGroupLayout {
-		device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+		device.create_bind_group_layout(&pi_render::wgpu::BindGroupLayoutDescriptor {
 			label: Some("color_material bindgroup layout"),
-			entries: &[wgpu::BindGroupLayoutEntry {
+			entries: &[pi_render::wgpu::BindGroupLayoutEntry {
 				binding: 0,
-				visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
-				ty: wgpu::BindingType::Buffer {
-					ty: wgpu::BufferBindingType::Uniform,
+				visibility: pi_render::wgpu::ShaderStages::VERTEX | pi_render::wgpu::ShaderStages::FRAGMENT,
+				ty: pi_render::wgpu::BindingType::Buffer {
+					ty: pi_render::wgpu::BufferBindingType::Uniform,
 					has_dynamic_offset,
-					min_binding_size: wgpu::BufferSize::new(128),
+					min_binding_size: pi_render::wgpu::BufferSize::new(128),
 				},
 				count: None, // TODO
 			}],
@@ -84,11 +84,11 @@ impl pi_render::rhi::dyn_uniform_buffer::BufferGroup for ColorMaterialGroup {
 		layout: &pi_render::rhi::bind_group_layout::BindGroupLayout,
 		buffer: &pi_render::rhi::buffer::Buffer,
 	) -> pi_render::rhi::bind_group::BindGroup {
-		device.create_bind_group(&wgpu::BindGroupDescriptor {
+		device.create_bind_group(&pi_render::wgpu::BindGroupDescriptor {
 			layout,
-			entries: &[wgpu::BindGroupEntry {
+			entries: &[pi_render::wgpu::BindGroupEntry {
 				binding: 0,
-				resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+				resource: pi_render::wgpu::BindingResource::Buffer(pi_render::wgpu::BufferBinding {
 					buffer,
 					offset: 0,
 					size: Some(std::num::NonZeroU64::new(128).unwrap()),

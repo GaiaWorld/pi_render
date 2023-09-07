@@ -29,7 +29,6 @@ pi_hash = "0.1"
 nalgebra = "0.32"
 winit = { registry = "yn", version = "0.27"}
 log = "0.4"
-wgpu = "0.16"
 env_logger = "0.9"
 float-ord = "0.3"
 lazy_static = "1.4"

@@ -412,7 +412,7 @@ impl Parser {
 
 			pub struct ProgramMeta;
 			impl ShaderProgram for ProgramMeta {{
-				fn create_meta() -> pi_render::rhi::shader::ShaderMeta {{
+				fn create_meta() -> ShaderMeta {{
 					let mut meta = ShaderMeta::default();
 					meta.name = std::any::type_name::<Self>().to_string();
 					let _defines: &[Define] = &[];
@@ -525,7 +525,7 @@ impl Parser {
 				&mut shader_import,
 			)?;
 			let compile_result =format!(r#"
-				use pi_render::rhi::shader::{{ ShaderMeta, CodeSlice, BlockCodeAtom, Define, {}}};
+				use pi_render::rhi::shader::{{ShaderMeta, CodeSlice, BlockCodeAtom, Define, {}}};
 				use render_derive::{{{}}};
 				{}
 				pub fn push_meta(_meta: &mut ShaderMeta, _visibility: wgpu::ShaderStages, _defines: &[Define]) {{
@@ -650,7 +650,23 @@ impl Parser {
                     return Err(CompileShaderError::TypeNotSupport("".to_string())); // TODO
                 }
 				defines.pop();
-            } else if let Some(cap) = SHADER_PROCESSOR.layout_struct_regex.captures(line) {
+            } else if let Some(cap) = SHADER_PROCESSOR.sampler_regex.captures(line) {
+				push_code(&mut run_code_list, &mut run_string, &mut cmd_list, &defines);
+
+				let ty = cap.get(1).unwrap().as_str().to_string();
+				let name = cap.get(2).unwrap().as_str().to_string();
+				let sampler_ty = cap.get(3).unwrap().as_str().to_string();
+				let texture_name = cap.get(4).unwrap().as_str().to_string();
+				let sampler_name: String = cap.get(5).unwrap().as_str().to_string();
+				let uv_name: String = cap.get(6).unwrap().as_str().to_string();
+				// 遇到sampler, 也需要分割代码
+				run_code_list.push(Code {content: CodeItem::Texture { ty, name, texture_name, sampler_name, uv_name, sampler_ty }, defines: defines.clone()});
+				last_code.push_str(line);
+				last_code.push_str("\n");
+			} else if let Some(cap) = SHADER_PROCESSOR.version_regex.captures(line) {
+				let version = cap.get(1).unwrap().as_str().to_string().trim().to_string();
+				run_code_list.push(Code {content: CodeItem::Version(version), defines: Vec::default()});
+			} else if let Some(cap) = SHADER_PROCESSOR.layout_struct_regex.captures(line) {
 				default_value = "".to_string();
 				uniform_scopes.push(true);
 				last_code.push_str(line);
@@ -833,6 +849,8 @@ pub struct Code {
 pub enum CodeItem {
 	Code{run_code: String, other_code: String}, // 代码字符串
 	Import(ShaderImport), // 导入路径
+	Texture{ty: String, name: String, texture_name: String, sampler_name: String, uv_name: String, sampler_ty: String}, // 采样纹理
+	Version(String),
 }
 
 #[derive(Default, Debug, Clone)]
@@ -878,6 +896,9 @@ pub struct ShaderProcessor1 {
 	else_regex: Regex,
 	endif_regex: Regex,
 	entry_regex: Regex,
+
+	sampler_regex: Regex,
+	version_regex: Regex,
 }
 
 impl Default for ShaderProcessor1 {
@@ -909,6 +930,9 @@ impl Default for ShaderProcessor1 {
             else_regex: Regex::new(r"^\s*#\s*else").unwrap(),
             endif_regex: Regex::new(r"^\s*#\s*endif").unwrap(),
 			entry_regex: Regex::new(r#"^\s*void\s*main\s*\(\s*\)\s*(.+)"#).unwrap(),
+
+			sampler_regex: Regex::new(r#"^\s*([a-zA-Z_0-9]+)\s+([a-zA-Z_0-9]+)\s*=\s*texture\(sampler([a-zA-Z0-9]+)\s*\(([a-zA-Z_0-9]+)\s*,\s*([a-zA-Z_0-9]+)\)\s*,\s*([a-zA-Z_0-9]+)\)\s*;"#).unwrap(),
+			version_regex: Regex::new(r#"^#version\s+([a-zA-Z_0-9]+\s*[a-zA-Z_0-9\s]*)"#).unwrap(),
 		 }
 	}
 }
@@ -1231,12 +1255,12 @@ fn compile_uniform(
 		match &code.content {
 			CodeItem::Code{run_code, other_code} => {
 				if run_code.as_str() != "" {
-					codes.push(format!(r#"CodeSlice{{code:pi_atom::Atom::from("{}"), defines: vec![{}]}}"#, &run_code, defines));
+					codes.push(format!(r#"CodeSlice{{code:pi_render::rhi::shader::CodeItem::String(pi_atom::Atom::from("{}")), defines: vec![{}]}}"#, &run_code, defines));
 					push_code.push(format!("_codes.running.push({}[{}].clone().push_defines_front(_defines));", code_name, j));
 					j += 1;
 				}
 				if other_code.as_str() != "" {
-					codes.push(format!(r#"CodeSlice{{code:pi_atom::Atom::from("{}"), defines: vec![{}]}}"#, &other_code, defines));
+					codes.push(format!(r#"CodeSlice{{code:pi_render::rhi::shader::CodeItem::String(pi_atom::Atom::from("{}")), defines: vec![{}]}}"#, &other_code, defines));
 					push_code.push(format!("_codes.define.push({}[{}].clone().push_defines_front(_defines));", code_name, j));
 					j += 1;
 				}
@@ -1247,6 +1271,23 @@ fn compile_uniform(
 					push_code.push(format!("{}::push_code(_codes, merge_defines(_defines, &[{}]).as_slice());", path, defines));
 					push_meta.push(format!("{}::push_meta(_meta, _visibility, merge_defines(_defines, &[{}]).as_slice()));", path, defines));
 				}
+			},
+			CodeItem::Texture { ty, name, texture_name, sampler_name, uv_name, sampler_ty } => {
+				codes.push(format!(r#"CodeSlice{{code:pi_render::rhi::shader::CodeItem::Texure(Box::new(pi_render::rhi::shader::TextureCode{{
+					ty: pi_atom::Atom::from("{ty}"),
+					name: pi_atom::Atom::from("{name}"),
+					texture_name: pi_atom::Atom::from("{texture_name}"),
+					sampler_name: pi_atom::Atom::from("{sampler_name}"),
+					uv_name: pi_atom::Atom::from("{uv_name}"),
+					sampler_ty: pi_atom::Atom::from("{sampler_ty}"),
+				}})), defines: vec![{defines}]}}"#));
+				push_code.push(format!("_codes.running.push({}[{}].clone().push_defines_front(_defines));", code_name, j));
+				j += 1;
+			},
+			CodeItem::Version(version) => {
+				codes.push(format!(r#"CodeSlice{{code:pi_render::rhi::shader::CodeItem::Version(pi_atom::Atom::from("{version}")), defines: vec![{defines}]}}"#));
+				push_code.push(format!("_codes.define.push({}[{}].clone().push_defines_front(_defines));", code_name, j));
+				j += 1;
 			},
 		}
 	}
@@ -2416,6 +2457,24 @@ int dd1;
 
 void main() {
 	gl_Position.z = dd1;
+}
+				"#);
+	println!("modle================={:?}, \nmodle================={:?}", modlue, parser);
+}
+
+
+#[test]
+fn test_sample() {
+
+	let mut parser = pi_naga::front::glsl::Parser::default();
+	let modlue = parser
+				.parse(&pi_naga::front::glsl::Options::from(pi_naga::ShaderStage::Vertex), r#"
+#version 450
+layout(set=3,binding=0)uniform sampler samp;
+layout(set=3,binding=1)uniform texture2D tex2d;
+
+void main() {
+	vec4 color=texture(sampler2D(tex2d,samp),vUv);
 }
 				"#);
 	println!("modle================={:?}, \nmodle================={:?}", modlue, parser);
