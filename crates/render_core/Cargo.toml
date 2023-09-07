@@ -1,6 +1,6 @@
 [package]
 name = "render_core"
-version = "0.1.4"
+version = "0.1.3"
 authors = ["moyy <myy412001799@gmail.com>"]
 edition = "2021"
 description = "Renderer for PI Engine"
@@ -30,6 +30,8 @@ pi_null = "0.1"
 pi_ecs_macros = "0.1"
 pi_slotmap = "0.1"
 
+graphviz-rust = "0.6"
+
 normpath = "1.1.1"
 tracing = { version = "0.1", default-features = false, features = ["std"] }
 
@@ -50,7 +52,7 @@ once_cell = "1.4" # TODO: replace once_cell with std equivalent if/when this lan
 regex = "1.5"
 thiserror = "1.0"
 pi_slab = "0.1"
-
+wgpu = { version = "0.16", default-features = false, features = ["glsl"] }
 derive-deref-rs = "0.1"
 pi_any = "0.1"
 pi_time = "0.3"
@@ -68,14 +70,6 @@ pi_hal = { version = "0.1", registry = "yn" }
 parking_lot = "0.12"
 crossbeam="0.8"
 ktx = "0.3"
-
-[target.'cfg(any(target_arch = "wasm32", target_os = "android"))'.dependencies]
-# pi_wgpu = {path = "../../../pi_wgpu"}
-wgpu = { version = "0.16", default-features = false, features = ["glsl"] }
-
-[target.'cfg(all(not(target_arch = "wasm32"), not(target_os = "android")))'.dependencies]
-# pi_wgpu = {path = "../../../pi_wgpu"}
-wgpu = { version = "0.16", default-features = false, features = ["glsl"] }
 
 [dev-dependencies]
 bytemuck = { version = "1.4", features = ["derive"] }

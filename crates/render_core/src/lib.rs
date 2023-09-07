@@ -10,5 +10,4 @@ pub mod rhi;
 pub mod renderer;
 pub mod render_3d;
 pub mod asset;
-pub mod wgpu;
 
