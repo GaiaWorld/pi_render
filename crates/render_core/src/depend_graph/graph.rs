@@ -232,7 +232,7 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
     }
 
     /// 移除 节点
-    pub fn remove_node(&mut self, label: impl Into<NodeLabel>) -> Result<(), GraphError> {
+    pub fn remove_node(&mut self, label: impl Into<NodeLabel>) -> Result<NodeId, GraphError> {
         let label = label.into();
 
         let id = match self.get_node_id(&label) {
@@ -252,7 +252,7 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
         self.node_names.remove(node.name.as_str());
         self.topo_graph.remove_node(id);
 
-        Ok(())
+        Ok(id)
     }
 
     /// 设置 是否 是 最终节点，默认值：false
