@@ -304,6 +304,7 @@ impl AtlasAllocator {
 
 			match item.allocator.allocate(Size::new(width as i32, height as i32)) {
 				Some(allocation) => {
+					// log::warn!("alloct========================{:?}, {:?}, {}, {:?}, {:?}, \n{:?}", std::thread::current().id(), &self.excludes.len(), ii, index, self.excludes.get(index).is_some(), &self.excludes);
 					// 在已有的rendertarget中分配成功，直接返回
 					item.count += 1;
 					let rectangle = &allocation.rectangle;
@@ -311,6 +312,7 @@ impl AtlasAllocator {
 						Point::new(rectangle.min.x + offset, rectangle.min.y + offset),
 						Point::new(rectangle.max.x - offset, rectangle.max.y - offset)
 					);
+					self.excludes.clear();
 					return TargetView {
 						info: allocation,
 						rect,

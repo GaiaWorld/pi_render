@@ -34,7 +34,7 @@ impl EVerticesBufferUsage {
     pub fn active_range(&self) -> Range<wgpu::BufferAddress> {
         match self {
             EVerticesBufferUsage::GUI(val) => Range { start: 0, end: val.size() },
-			EVerticesBufferUsage::Part(index) => index.range(),
+			EVerticesBufferUsage::Part(index) => {let r = index.range(); Range { start: 0, end: r.end - r.start }},
             EVerticesBufferUsage::Other(val) => val.active_range(),
             EVerticesBufferUsage::EVBRange(val) => val.active_range(),
             EVerticesBufferUsage::Temp(val) => Range { start: 0, end: val.size() },
