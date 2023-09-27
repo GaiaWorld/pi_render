@@ -250,6 +250,16 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
         };
         self.finish_nodes.remove(&id);
         self.node_names.remove(node.name.as_str());
+
+		// 移除边的索引
+		let n = self.topo_graph.graph().get(id).unwrap();
+		for from in n.from() {
+			self.edge_map.remove(&(*from, id));
+		}
+		for to in n.to() {
+			self.edge_map.remove(&(id, *to));
+		}
+
         self.topo_graph.remove_node(id);
 
         Ok(id)
@@ -319,6 +329,7 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
         let after_node = self.get_node_id(&after_label)?;
 
 		self.topo_graph.remove_edge(before_node, after_node);
+		self.edge_map.remove(&(before_node, after_node));
 		// 拓扑结构改变
 		self.is_topo_dirty = true;
 
