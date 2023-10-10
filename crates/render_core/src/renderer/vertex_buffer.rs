@@ -476,10 +476,23 @@ impl VertexBufferAllocator {
         }
         // log::info!("size: {}, level: {}, old_count: {}, new: {}", size, level, old_count, new_count);
 
-        if let Some(range) = self.unupdatables_for_index.get_mut(level).unwrap().allocate(device, queue, data) {
-            Some(EVertexBufferRange::NotUpdatable(Arc::new(range), 0, data.len() as u32))
+        let mod4 = data.len() % 4;
+        if mod4 > 0 {
+            let mut temp = data.to_vec();
+            for _ in mod4..4 {
+                temp.push(0);
+            }
+            if let Some(range) = self.unupdatables_for_index.get_mut(level).unwrap().allocate(device, queue, &temp) {
+                Some(EVertexBufferRange::NotUpdatable(Arc::new(range), 0, data.len() as u32))
+            } else {
+                None
+            }
         } else {
-            None
+            if let Some(range) = self.unupdatables_for_index.get_mut(level).unwrap().allocate(device, queue, data) {
+                Some(EVertexBufferRange::NotUpdatable(Arc::new(range), 0, data.len() as u32))
+            } else {
+                None
+            }
         }
     }
 }
