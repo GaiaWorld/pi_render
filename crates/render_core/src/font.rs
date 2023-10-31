@@ -24,9 +24,11 @@ impl FontSheet {
 		device: &RenderDevice,
 		texture_asset_mgr: &Share<AssetMgr<TextureRes>>,
 		queue: &RenderQueue,
+		max_texture_dimension_2d: u32,
 	) -> FontSheet {
-		let width = 1024;
-		let height = 1024;
+		let texture_max = max_texture_dimension_2d.min(4096);
+		let width = 1024.min(texture_max);
+		let height = texture_max;
 		let texture = (**device).create_texture(&wgpu::TextureDescriptor {
 			label: Some("first depth buffer"),
 			size: wgpu::Extent3d {
@@ -44,7 +46,7 @@ impl FontSheet {
 		let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 		// let key = calc_hash(&"text texture view");
 		let key = Atom::from("_$text").get_hash() as u64;
-		let texture_view = if let Ok(r) = texture_asset_mgr.insert(key, TextureRes::new(1024, 1024, 1024 * 1024 * 4, texture_view, false, wgpu::TextureFormat::Rgba8Unorm)) {
+		let texture_view = if let Ok(r) = texture_asset_mgr.insert(key, TextureRes::new(width, height, (width * height * 4) as usize, texture_view, false, wgpu::TextureFormat::Rgba8Unorm)) {
 			r
 		} else {
 			panic!("insert asset fail");

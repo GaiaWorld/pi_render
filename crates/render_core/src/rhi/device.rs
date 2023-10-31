@@ -15,7 +15,7 @@ pub struct RenderDevice(Share<wgpu::Device>);
 
 impl From<Share<wgpu::Device>> for RenderDevice {
     fn from(device: Share<wgpu::Device>) -> Self {
-        log::warn!("=============== limits = {:?}", device.limits());
+        log::info!("=============== limits = {:?}", device.limits());
 
         Self(device)
     }

@@ -177,8 +177,9 @@ pub async fn create_texture_from_image<G: Garbageer<TextureRes>>(
 	};
 	let byte_size = buffer.len();
 
+	// log::warn!("create_texture==========={:?}, {:?}", key, std::thread::current().id());
 	let texture = (**device).create_texture(&wgpu::TextureDescriptor {
-		label: Some("first depth buffer"),
+		label: Some("image texture"),
 		size: texture_extent,
 		mip_level_count: 1,
 		sample_count: 1,
