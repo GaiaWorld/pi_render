@@ -27,7 +27,7 @@ impl FontSheet {
 		max_texture_dimension_2d: u32,
 	) -> FontSheet {
 		let texture_max = max_texture_dimension_2d.min(4096);
-		let width = 1024.min(texture_max);
+		let width = 4096.min(texture_max);
 		let height = texture_max;
 		let texture = (**device).create_texture(&wgpu::TextureDescriptor {
 			label: Some("first depth buffer"),
