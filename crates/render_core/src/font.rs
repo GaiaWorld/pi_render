@@ -6,7 +6,7 @@ use pi_hash::DefaultHasher;
 use pi_share::{Share, ShareMutex};
 use wgpu::{Texture, ImageCopyTexture, TextureAspect, ImageDataLayout, Extent3d, Origin3d};
 use pi_hal::font::font::FontMgr;
-pub use pi_hal::font::font::{ Font, Size, GlyphId, FontId, Glyph};
+pub use pi_hal::font::font::{ Font, Size, GlyphId, FontFamilyId, Glyph};
 pub use pi_hal::font::text_split::*;
 
 use crate::rhi::{asset::TextureRes, device::RenderDevice, RenderQueue};
@@ -14,9 +14,17 @@ use crate::rhi::{asset::TextureRes, device::RenderDevice, RenderQueue};
 pub struct FontSheet {
 	font_mgr: FontMgr,
 	texture_version: Share<ShareMutex<usize>>,
-	texture_view: Handle<TextureRes>,
-	texture: Share<Texture>,
+	texture_view: Option<Handle<TextureRes>>,
+	texture: Option<Share<Texture>>,
+
+	sdf_texture_version: Share<ShareMutex<usize>>,
+	sdf_texture_view: Option<Handle<TextureRes>>,
+	sdf_texture: Option<Share<Texture>>,
+
 	queue: RenderQueue,
+	device: RenderDevice,
+
+	texture_asset_mgr: Share<AssetMgr<TextureRes>>,
 }
 
 impl FontSheet {
@@ -25,50 +33,51 @@ impl FontSheet {
 		texture_asset_mgr: &Share<AssetMgr<TextureRes>>,
 		queue: &RenderQueue,
 		max_texture_dimension_2d: u32,
+		use_sdf: bool,
 	) -> FontSheet {
 		let texture_max = max_texture_dimension_2d.min(4096);
 		let width = 4096.min(texture_max);
 		let height = texture_max;
-		let texture = (**device).create_texture(&wgpu::TextureDescriptor {
-			label: Some("first depth buffer"),
-			size: wgpu::Extent3d {
-				width,
-				height,
-				depth_or_array_layers: 1,
-			},
-			mip_level_count: 1,
-			sample_count: 1,
-			dimension: wgpu::TextureDimension::D2,
-			format: wgpu::TextureFormat::Rgba8Unorm,
-			view_formats: &[],
-			usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-		});
-		let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-		// let key = calc_hash(&"text texture view");
-		let key = Atom::from("_$text").get_hash() as u64;
-		let texture_view = if let Ok(r) = texture_asset_mgr.insert(key, TextureRes::new(width, height, (width * height * 4) as usize, texture_view, false, wgpu::TextureFormat::Rgba8Unorm)) {
-			r
-		} else {
-			panic!("insert asset fail");
-		};
 
 		// 宽高可能可变，TODO
-		Self { 
+		let mut r = Self { 
 			font_mgr: FontMgr::new(width as usize, height as usize),
-			texture_view: texture_view, 
-			texture: Share::new(texture),
+			texture_view: None, 
+			texture: None,
 			texture_version: Share::new(ShareMutex::new(0)),
+
+			sdf_texture_view: None, 
+			sdf_texture: None,
+			sdf_texture_version: Share::new(ShareMutex::new(0)),
+
 			queue: queue.clone(),
+			device: device.clone(),
+			texture_asset_mgr: texture_asset_mgr.clone(),
+		};
+		r.font_mgr.set_use_sdf(use_sdf);
+		if use_sdf {
+			r.init_sdf_texture()
+		} else {
+			r.init_texture()
 		}
+		r
+	}
+
+	pub fn font_mgr(&self) -> &FontMgr {
+		&self.font_mgr
+	}
+
+	pub fn font_mgr_mut(&mut self) -> &mut FontMgr {
+		&mut self.font_mgr
 	}
 
 	/// 纹理
-	pub fn texture(&self) -> &Share<Texture> {
+	pub fn texture(&self) -> &Option<Share<Texture>> {
 		&self.texture
 	}
 
 	/// 纹理
-	pub fn texture_view(&self) -> &Handle<TextureRes> {
+	pub fn texture_view(&self) -> &Option<Handle<TextureRes>> {
 		&self.texture_view
 	}
 
@@ -82,22 +91,37 @@ impl FontSheet {
 		self.font_mgr.size()
 	}
 
-	/// 字体id
-	pub fn font_id(&mut self, f: Font) -> FontId {
-		self.font_mgr.font_id(f)
+	/// 纹理
+	pub fn sdf_texture(&self) -> &Option<Share<Texture>> {
+		&self.sdf_texture
 	}
 
-	pub fn font_height(&self, f: FontId, font_size: usize) -> f32 {
+	/// 纹理
+	pub fn sdf_texture_view(&self) -> &Option<Handle<TextureRes>> {
+		&self.sdf_texture_view
+	}
+
+	/// 取到纹理版本
+	pub fn sdf_texture_version(&self) -> usize {
+		*self.sdf_texture_version.lock()
+	}
+
+	/// 字体id
+	pub fn font_id(&mut self, f: Font) -> FontFamilyId {
+		self.font_mgr.font_family_id(f)
+	}
+
+	pub fn font_height(&self, f: FontFamilyId, font_size: usize) -> f32 {
 		self.font_mgr.font_height(f, font_size)
 	}
 
 	/// 字形id, 纹理中没有更多空间容纳时，返回None
-	pub fn glyph_id(&mut self, f: FontId, char: char) -> Option<GlyphId> {
+	pub fn glyph_id(&mut self, f: FontFamilyId, char: char) -> Option<GlyphId> {
 		self.font_mgr.glyph_id(f, char)
 	}
 
 	/// 测量宽度
-	pub fn measure_width(&mut self, f: FontId, char: char) -> f32 {
+	pub fn measure_width(&mut self, f: FontFamilyId, char: char) -> f32 {
 		self.font_mgr.measure_width(f, char)
 	}
 
@@ -114,9 +138,27 @@ impl FontSheet {
 	/// 绘制文字
 	pub fn draw(&mut self) {
 		let texture = self.texture.clone();
+		let sdf_texture = self.sdf_texture.clone();
 		let queue = self.queue.clone();
 		let version = self.texture_version.clone();
+		let sdf_texture_version = self.sdf_texture_version.clone();
+		let use_sdf = self.font_mgr.use_sdf();
 		self.font_mgr.draw(move |block, image| {
+			let (texture, pixle_size) = if image.width * image.height == image.buffer.len() {
+				// sdf
+				match &sdf_texture {
+					Some(r) => (r, 1),
+					None => return,
+				}
+			} else {
+				match &texture {
+					Some(r) => (r, 4),
+					None => return,
+				}
+			};
+
+			// log::warn!("draw=-=============={}, {:?}, {:?}, {:?}, {:?}", image.buffer.len(), block.x, block.y, &image.width, image.height);
+			
 			queue.write_texture(
 				ImageCopyTexture {
 					texture: &texture,
@@ -131,7 +173,7 @@ impl FontSheet {
 				image.buffer.as_slice(),
 				ImageDataLayout {
 					offset: 0,
-					bytes_per_row: if image.width == 0 { None }else { Some(image.width as u32 * 4) }, // 32 * 4
+					bytes_per_row: if image.width == 0 { None }else { Some(image.width as u32 * pixle_size) }, // 32 * 4
 					rows_per_image: None,
 				},
 				Extent3d {
@@ -139,13 +181,70 @@ impl FontSheet {
 					height: image.height as u32,
 					depth_or_array_layers: 1,
 				});
-			let mut v = version.lock();
+			let mut v =  if use_sdf {sdf_texture_version.lock()} else { version.lock()};
 			*v = *v + 1;
 		})
 	}
 
 	// fn draw(&mut self) {
 	// }
+	fn init_texture(&mut self) {
+		let size = self.font_mgr.size();
+		let texture = (*self.device).create_texture(&wgpu::TextureDescriptor {
+			label: Some("first depth buffer"),
+			size: wgpu::Extent3d {
+				width: size.width as u32,
+				height: size.height as u32,
+				depth_or_array_layers: 1,
+			},
+			mip_level_count: 1,
+			sample_count: 1,
+			dimension: wgpu::TextureDimension::D2,
+			format: wgpu::TextureFormat::Rgba8Unorm,
+			view_formats: &[],
+			usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+		});
+		let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+		// let key = calc_hash(&"text texture view");
+		let key = Atom::from("_$text").get_hash() as u64;
+		let texture_view = if let Ok(r) = self.texture_asset_mgr.insert(key, TextureRes::new(size.width as u32, size.height as u32, (size.width * size.height * 4) as usize, texture_view, false, wgpu::TextureFormat::Rgba8Unorm)) {
+			r
+		} else {
+			panic!("insert asset fail");
+		};
+
+		self.texture = Some(Share::new(texture));
+		self.texture_view = Some(texture_view);
+	}
+
+	fn init_sdf_texture(&mut self) {
+		let size = self.font_mgr.size();
+		let texture = (*self.device).create_texture(&wgpu::TextureDescriptor {
+			label: Some("first depth buffer"),
+			size: wgpu::Extent3d {
+				width: size.width as u32,
+				height: size.height as u32,
+				depth_or_array_layers: 1,
+			},
+			mip_level_count: 1,
+			sample_count: 1,
+			dimension: wgpu::TextureDimension::D2,
+			format: wgpu::TextureFormat::R8Unorm,
+			view_formats: &[],
+			usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+		});
+		let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+		// let key = calc_hash(&"text texture view");
+		let key = Atom::from("_$text_sdf").get_hash() as u64;
+		let texture_view = if let Ok(r) = self.texture_asset_mgr.insert(key, TextureRes::new(size.width as u32, size.height as u32, (size.width * size.height) as usize, texture_view, false, wgpu::TextureFormat::Rgba8Unorm)) {
+			r
+		} else {
+			panic!("insert asset fail");
+		};
+
+		self.sdf_texture = Some(Share::new(texture));
+		self.sdf_texture_view = Some(texture_view);
+	}
 }
 
 pub fn calc_hash<T: Hash>(v: &T)-> u64 {
