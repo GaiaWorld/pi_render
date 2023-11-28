@@ -31,7 +31,7 @@ impl DrawBindGroup {
                 rpass.set_bind_group(i as u32, group, &[]);
             },
             Self::GroupUsage(group) => {
-                rpass.set_bind_group(group.set, group.bind_group(), &group.offsets());
+                rpass.set_bind_group(i, group.bind_group(), &group.offsets());
             },
             Self::Arc(group) => {
                 rpass.set_bind_group(i, group, &[]);

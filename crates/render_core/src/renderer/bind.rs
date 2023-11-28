@@ -1,5 +1,7 @@
 use std::{num::{NonZeroU64, NonZeroU32}, fmt::Debug, hash::Hash, sync::Arc};
 
+use wgpu::ShaderStages;
+
 use super::{
     texture::{BindDataTextureArray, BindDataTexture2D},
     sampler::BindDataSampler,
@@ -7,32 +9,35 @@ use super::{
     bind_buffer::BindBufferRange
 };
 
+pub type KeyBindLayoutBindingType = u8;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct KeyBindLayoutBuffer {
-    pub binding: u16,
+    pub binding: KeyBindLayoutBindingType,
     pub visibility: EShaderStage,
     pub min_binding_size: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct KeyBindLayoutTexture2D {
-    pub binding: u16,
+    pub binding: KeyBindLayoutBindingType,
     pub visibility: EShaderStage,
     pub texture_sample_type: wgpu::TextureSampleType,
+    pub view_dimension: wgpu::TextureViewDimension,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct KeyBindLayoutTexture2DArray {
-    pub binding: u16,
+    pub binding: KeyBindLayoutBindingType,
     pub count: u8,
     pub visibility: EShaderStage,
     pub texture_sample_type: wgpu::TextureSampleType,
+    pub view_dimension: wgpu::TextureViewDimension,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct KeyBindLayoutSampler {
-    pub binding: u16,
+    pub binding: KeyBindLayoutBindingType,
     pub visibility: EShaderStage,
     pub binding_type: wgpu::SamplerBindingType,
 }
@@ -68,7 +73,7 @@ impl KeyBindLayout {
                 wgpu::BindGroupLayoutEntry {
                     binding: val.binding as u32,
                     visibility: val.visibility.mode(),
-                    ty: wgpu::BindingType::Texture { sample_type: val.texture_sample_type, view_dimension: wgpu::TextureViewDimension::D2, multisampled: false },
+                    ty: wgpu::BindingType::Texture { sample_type: val.texture_sample_type, view_dimension: val.view_dimension, multisampled: false },
                     count: None,
                 }
             },
@@ -84,7 +89,7 @@ impl KeyBindLayout {
                 wgpu::BindGroupLayoutEntry {
                     binding: val.binding as u32,
                     visibility: val.visibility.mode(),
-                    ty: wgpu::BindingType::Texture { sample_type: val.texture_sample_type, view_dimension: wgpu::TextureViewDimension::D2, multisampled: false },
+                    ty: wgpu::BindingType::Texture { sample_type: val.texture_sample_type, view_dimension: val.view_dimension, multisampled: false },
                     count: NonZeroU32::new(val.count as u32),
                 }
             },

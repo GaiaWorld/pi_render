@@ -76,8 +76,3 @@ bytemuck = { version = "1.4", features = ["derive"] }
 render_derive={path="../render_derive", version = "0.1", registry = "yn"}
 env_logger = "0.9"
 winit = { registry = "yn", version = "0.27"}
-
-
-[[example]]
-name = "shader3d"
-path = "examples/shader3d.rs"

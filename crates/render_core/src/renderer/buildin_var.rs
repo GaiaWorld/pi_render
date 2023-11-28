@@ -8,6 +8,54 @@ impl ShaderVarUniform {
     pub const CAMERA_POSITION           : &'static str = "PI_CAMERA_POSITION"   ;
     pub const CAMERA_DIRECTION          : &'static str = "PI_VIEW_DIRECTION"    ;
 
+    pub const BRDF_TEXUTRE              : &'static str = "_BRDFTexture"         ;
+    pub const CAMERA_OPAQUE_TEXUTRE     : &'static str = "_CameraOpaqueTexture" ;
+    pub const CAMERA_DEPTH_TEXUTRE      : &'static str = "_CameraDepthTexture"  ;
+    
+    pub const ENVIRONMENT_TEXUTRE       : &'static str = "_EnvironmentTexture"  ;
+    pub const IBL_X                     : &'static str = "_SphericalX"          ;
+    pub const IBL_Y                     : &'static str = "_SphericalY"          ;
+    pub const IBL_Z                     : &'static str = "_SphericalZ"          ;
+    pub const IBL_XY                    : &'static str = "_SphericalXY"         ;
+    pub const IBL_YZ                    : &'static str = "_SphericalYZ"         ;
+    pub const IBL_ZX                    : &'static str = "_SphericalZX"         ;
+    pub const IBL_XX_ZZ                 : &'static str = "_SphericalXX_ZZ"      ;
+    pub const IBL_YY_ZZ                 : &'static str = "_SphericalYY_ZZ"      ;
+    pub const IBL_ZZ                    : &'static str = "_SphericalZZ"         ;
+
+    pub const LIGHTING_INFOS            : &'static str = "_LightingInfos"       ;
+    pub const DIRECT_LIGHT_DIRECTION    : &'static str = "_DirectLightDirection";
+    pub const DIRECT_LIGHT_COLOR        : &'static str = "_DirectLightColor"    ;
+    pub const POINT_LIGHT_POSITION      : &'static str = "_PointLightPosition"  ;
+    pub const POINT_LIGHT_COLOR         : &'static str = "_PointLightColor"     ;
+    pub const POINT_LIGHT_DATA          : &'static str = "_PointLightData"      ;
+    pub const SPOT_LIGHT_POSITION       : &'static str = "_SpotLightPosition"   ;
+    pub const SPOT_LIGHT_COLOR          : &'static str = "_SpotLightColor"      ;
+    pub const SPOT_LIGHT_DATA           : &'static str = "_SpotLightData"       ;
+    pub const SPOT_LIGHT_DIRECTION      : &'static str = "_SpotLightDirection"  ;
+    pub const HEMI_LIGHT_POSITION       : &'static str = "_HemiLightPosition"   ;
+    pub const HEMI_LIGHT_COLOR          : &'static str = "_HemiLightColor"      ;
+    pub const HEMI_LIGHT_DATA           : &'static str = "_HemiLightData"       ;
+    pub const HEMI_LIGHT_DIRECTION      : &'static str = "_HemiLightDirection"  ;
+    pub const SHADOWMAP_TEXTURE         : &'static str = "_ShadowMap"           ;
+
+    pub const MODEL_LIGHTS_COUNT        : &'static str = "_MLightsCount"        ;
+    pub const MODEL_LIGHTS_INDEXS       : &'static str = "_MLightsIndexs"       ;
+    pub const MODEL_DIRECTLIGHT_COUNT   : &'static str = "_MDirectLightCount"   ;
+    pub const MODEL_POINTLIGHT_COUNT    : &'static str = "_MPointLightCount"    ;
+    pub const MODEL_SPOTLIGHT_COUNT     : &'static str = "_MSpotLightCount"     ;
+    pub const MODEL_HEMILIGHT_COUNT     : &'static str = "_MHemiLightCount"     ;
+    pub const DIRECT_LIGHT_INDEXS       : &'static str = "_DirectLightingIdxs"  ;
+    pub const POINT_LIGHT_INDEXS        : &'static str = "_PointLightingIdxs"   ;
+    pub const SPOT_LIGHT_INDEXS         : &'static str = "_SpotLightingIdxs"    ;
+    pub const HEMI_LIGHT_INDEXS         : &'static str = "_HemiLightingIdxs"    ;
+
+    pub const SHADOWMAP_LIGHT_INDEXS    : &'static str = "_ShadowLightIdxs"     ;
+    pub const SHADOWMAP_MATRIX          : &'static str = "_ShadowMapMatrix"     ;
+    pub const SHADOWMAP_BIAS_ANS_SCALE  : &'static str = "_BiasAndScaleSM"      ;
+    pub const SHADOWMAP_DEPTH_VALUES    : &'static str = "_DepthValuesSM"       ;
+    pub const SHADOWMAP_TILLOFF         : &'static str = "_ShadowMapTilloff"    ;
+
     pub const TIME                      : &'static str = "PI_Time"              ;
     pub const DELTA_TIME                : &'static str = "PI_DeltaTime"         ;
 
@@ -54,6 +102,8 @@ impl ShaderVarVertices {
     pub const UV6                       : &'static str = "A_UV6"               ;
     pub const CUSTOM_VEC4_A             : &'static str = "A_CustomV4A"         ;
     pub const CUSTOM_VEC4_B             : &'static str = "A_CustomV4B"         ;
+    pub const CUSTOM_VEC4_C             : &'static str = "A_CustomV4C"         ;
+    pub const CUSTOM_VEC4_D             : &'static str = "A_CustomV4D"         ;
     pub const CUSTOM_VEC3_A             : &'static str = "A_CustomV3A"         ;
     pub const CUSTOM_VEC3_B             : &'static str = "A_CustomV3B"         ;
     pub const CUSTOM_VEC2_A             : &'static str = "A_CustomV2A"         ;
@@ -68,6 +118,8 @@ impl ShaderVarVertices {
     pub const INS_TILL_OFFSET2          : &'static str = "A_INS_TillOff2"      ;
     pub const INS_CUSTOM_VEC4_A         : &'static str = "A_INS_Vec4A"         ;
     pub const INS_CUSTOM_VEC4_B         : &'static str = "A_INS_Vec4B"         ;
+    pub const INS_CUSTOM_VEC4_C         : &'static str = "A_INS_Vec4C"         ;
+    pub const INS_CUSTOM_VEC4_D         : &'static str = "A_INS_Vec4D"         ;
     pub const INS_CUSTOM_UVEC4_A        : &'static str = "A_INS_UVec4A"        ;
     pub const INS_CUSTOM_IVEC4_B        : &'static str = "A_INS_IVec4B"        ;
     pub const MATRICES_INDICES1         : &'static str = "A_JOINT_INC1"        ;
@@ -95,6 +147,38 @@ impl ShaderVarVertices {
     pub const TRAIL_AXIS_Z              : &'static str = "TRAIL_AXIS_Z"     ;
     pub const TRAIL_INFO                : &'static str = "TRAIL_INFO"     ;
 }
+
+pub struct ShaderVarSurface;
+impl ShaderVarSurface {
+    pub const POSITION                  : &'static str = "P"            ;
+    pub const DIFFUSE                   : &'static str = "Diffuse"      ;
+    pub const SPECULAR                  : &'static str = "Specular"     ;
+    pub const EMISSIVE                  : &'static str = "Emissive"     ;
+    pub const AMBIENT                   : &'static str = "Ambient"      ;
+    pub const NORMAL                    : &'static str = "N"            ;
+    pub const VIEW                      : &'static str = "V"            ;
+    pub const N_DOT_V                   : &'static str = "NdotV"        ;
+    pub const GLOSSINESS                : &'static str = "Glossiness"   ;
+    pub const LIGHTMAP                  : &'static str = "LightMap"     ;
+}
+
+/// Varying 变量
+pub struct ShaderVarVarying;
+impl ShaderVarVarying {
+    pub const POSITION                  : &'static str = "v_pos"        ;
+    pub const NORMAL                    : &'static str = "v_normal"     ;
+    pub const TANGENT                   : &'static str = "v_tangent"    ;
+    pub const COLOR                     : &'static str = "v_color"      ;
+    pub const UV                        : &'static str = "v_uv"         ;
+    pub const UV2                       : &'static str = "v_uv2"        ;
+    pub const UV3                       : &'static str = "v_uv3"        ;
+    pub const UV4                       : &'static str = "v_uv4"        ;
+    pub const UV5                       : &'static str = "v_uv5"        ;
+    pub const UV6                       : &'static str = "v_uv6"        ;
+    pub const UV7                       : &'static str = "v_uv7"        ;
+    pub const UV8                       : &'static str = "v_uv8"        ;
+}
+
 
 pub struct ShaderDefaultTexture;
 impl ShaderDefaultTexture {

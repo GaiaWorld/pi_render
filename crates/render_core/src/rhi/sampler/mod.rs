@@ -166,6 +166,19 @@ impl SamplerDesc {
             border_color: None,
         }
     }
+    pub fn nearest_clamp() -> Self {
+        Self {
+            address_mode_u: EAddressMode::ClampToEdge,
+            address_mode_v: EAddressMode::ClampToEdge,
+            address_mode_w: EAddressMode::ClampToEdge,
+            mag_filter: EFilterMode::Nearest,
+            min_filter: EFilterMode::Nearest,
+            mipmap_filter: EFilterMode::Nearest,
+            compare: None,
+            anisotropy_clamp: EAnisotropyClamp::None,
+            border_color: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]

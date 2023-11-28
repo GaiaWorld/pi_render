@@ -383,6 +383,9 @@ impl BindGroupLayout {
             )
         }
     }
+    pub fn layout(&self) -> &crate::rhi::bind_group_layout::BindGroupLayout {
+        &self.layout
+    }
 }
 impl Asset for BindGroupLayout {
     type Key = u64;
@@ -461,19 +464,17 @@ pub type KeyBindGroupU64 = u64;
 
 #[derive(Debug, Clone)]
 pub struct BindGroupUsage {
-    pub(crate) set: u32,
     pub(crate) binds: Arc<IDBinds>,
     pub(crate) key_bind_group: KeyBindGroup,
     pub(crate) bind_group: Handle<BindGroup>,
 }
 impl BindGroupUsage {
     pub fn new(
-        set: u32,
         binds: Arc<IDBinds>,
         bind_group: Handle<BindGroup>,
     ) -> Self {
         let key_bind_group = KeyBindGroup(binds.binds());
-        Self { set, binds, key_bind_group, bind_group }
+        Self { binds, key_bind_group, bind_group }
     }
 
     pub fn bind_group(&self) -> &wgpu::BindGroup {
