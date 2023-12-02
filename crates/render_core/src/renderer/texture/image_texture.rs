@@ -156,7 +156,7 @@ impl ImageTexture {
                 },
                 LoadResult::Receiver(recv) => {
                     match pi_hal::image::load_from_url( &desc.url.url ).await {
-                        Ok(image) => create_texture_from_image(&image, desc, recv).await,
+                        Ok(image) => create_image_texture_from_image(&image, desc, recv).await,
                         Err(_e) => Err(ErrorImageTexture::LoadFail),
                     }
                 }
@@ -164,6 +164,7 @@ impl ImageTexture {
         })
     }
     pub fn async_load_compressed<'a, G: Garbageer<Self>>(desc: ImageTexture2DDesc, result: LoadResult<'a, Self, G>) -> BoxFuture<'a, Result<Handle<Self>, ErrorImageTexture>> {
+        log::error!("{:?}", desc.url.url);
         Box::pin(async move { 
             match result {
                 LoadResult::Ok(r) => Ok(r),
@@ -182,7 +183,7 @@ impl ImageTexture {
     }
 }
 
-pub async fn create_texture_from_image<G: Garbageer<ImageTexture>>(
+pub async fn create_image_texture_from_image<G: Garbageer<ImageTexture>>(
     image: &DynamicImage, 
     desc: ImageTexture2DDesc,
     recv: Receiver<ImageTexture, G>

@@ -75,35 +75,63 @@ impl EVertexBufferSlot {
     }
 }
 
+pub type VertexBufferRangeVType = u32;
+#[derive(Debug, Clone, Copy)]
+pub struct VertexBufferDescRange(pub(crate) VertexBufferRangeVType, pub(crate) VertexBufferRangeVType);
+impl Default for VertexBufferDescRange {
+    fn default() -> Self {
+        Self(0, 0)
+    }
+}
+impl VertexBufferDescRange {
+    pub fn new(start: VertexBufferRangeVType, end: VertexBufferRangeVType) -> Self {
+        Self(start, end)
+    }
+    pub fn range(&self) -> Option<Range<wgpu::BufferAddress>> {
+        if self.1 <= self.0 {
+            None
+        } else {
+            Some(Range { start: self.0 as wgpu::BufferAddress, end: self.1 as wgpu::BufferAddress })
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 ///
 /// 
 /// Range<wgpu::BufferAddress> : byte数据范围
 pub struct VertexBufferDesc {
     pub key: KeyVertexBuffer,
-    pub range: Option<Range<wgpu::BufferAddress>>,
-    pub attrs: Vec<VertexAttribute>,
-    pub step_mode: wgpu::VertexStepMode,
-    pub instance: bool,
+    range: VertexBufferDescRange,
+    attrs: Vec<VertexAttribute>,
+    instance: bool,
 }
 impl VertexBufferDesc {
-    pub fn update_range(&mut self, value: Option<Range<wgpu::BufferAddress>>) {
-        let _ = replace(&mut self.range, value);
+    pub fn update_range(&mut self, value: VertexBufferDescRange) {
+        self.range = value;
+        // let _ = replace(&mut self.range, value);
     }
-    pub fn vertices(bufferkey: KeyVertexBuffer, range: Option<Range<wgpu::BufferAddress>>, attrs: Vec<VertexAttribute>) -> Self {
+    pub fn new(bufferkey: KeyVertexBuffer, range: VertexBufferDescRange, attrs: Vec<VertexAttribute>, instance: bool) -> Self {
         Self {
             key: bufferkey,
             range,
             attrs,
-            step_mode: wgpu::VertexStepMode::Vertex,
+            instance,
+        }
+    }
+    pub fn vertices(bufferkey: KeyVertexBuffer, range: VertexBufferDescRange, attrs: Vec<VertexAttribute>) -> Self {
+        Self {
+            key: bufferkey,
+            range,
+            attrs,
             instance: false,
         }
     }
     pub fn bufferkey(&self) -> &KeyVertexBuffer {
         &self.key
     }
-    pub fn range(&self) -> &Option<Range<wgpu::BufferAddress>> {
-        &self.range
+    pub fn range(&self) -> Option<Range<wgpu::BufferAddress>> {
+        self.range.range()
     }
     pub fn instance(&self) -> bool {
         self.instance
@@ -122,12 +150,12 @@ impl VertexBufferDesc {
     }
 
     pub fn step_mode(&self) -> wgpu::VertexStepMode {
-        self.step_mode
+        if self.instance { wgpu::VertexStepMode::Instance } else { wgpu::VertexStepMode::Vertex }
     }
 }
 impl Hash for VertexBufferDesc {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.attrs.hash(state);
-        self.step_mode.hash(state);
+        self.instance.hash(state);
     }
 }

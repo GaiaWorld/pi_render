@@ -41,7 +41,7 @@ pub type AssetVertexBuffer = EVertexBufferRange;
 pub type KeyPipelineFromAttributes = Arc<VertexBufferLayouts>;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub struct VertexBufferLayout {
+pub struct DVertexBufferLayout {
     pub kinds: Vec<EVertexDataKind>,
     pub list: Vec<wgpu::VertexAttribute>,
     pub stride: wgpu::BufferAddress,
@@ -50,7 +50,7 @@ pub struct VertexBufferLayout {
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct VertexBufferLayouts {
-    layout_list: Vec<VertexBufferLayout>,
+    layout_list: Vec<DVertexBufferLayout>,
     pub size: usize,
 }
 impl From<&Vec<VertexBufferDesc>> for VertexBufferLayouts {
@@ -75,7 +75,7 @@ impl From<&Vec<VertexBufferDesc>> for VertexBufferLayouts {
 
         let mut datasize = 0;
         value.iter().for_each(|buffer_desc| {
-            let mut temp_attributes = VertexBufferLayout { list: vec![], kinds: vec![], stride: 0, step_mode: buffer_desc.step_mode() };
+            let mut temp_attributes = DVertexBufferLayout { list: vec![], kinds: vec![], stride: 0, step_mode: buffer_desc.step_mode() };
 
             buffer_desc.attributes().iter().for_each(|attribute| {
                 match temp_kinds.binary_search(&attribute.kind) {
@@ -90,7 +90,7 @@ impl From<&Vec<VertexBufferDesc>> for VertexBufferLayouts {
                 }
             });
 
-            datasize += size_of::<VertexBufferLayout>();
+            datasize += size_of::<DVertexBufferLayout>();
             layouts.push(temp_attributes);
         });
 
@@ -117,7 +117,7 @@ impl VertexBufferLayouts {
 
         result
     }
-    pub fn as_key_pipeline_from_vertex_layout(&self) -> Vec<VertexBufferLayout> {
+    pub fn as_key_pipeline_from_vertex_layout(&self) -> Vec<DVertexBufferLayout> {
         self.layout_list.clone()
     }
     pub fn layouts(&self) -> Vec<wgpu::VertexBufferLayout> {
