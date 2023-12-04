@@ -8,10 +8,12 @@
 pub mod graph;
 /// 子图模型
 pub mod sub_graph;
+pub mod sub_graph_data;
 /// 节点
 pub mod node;
 /// 节点 输入输出 参数
 pub mod param;
+pub mod graph_data;
 
 pub use node::{NodeId, NodeLabel};
 use thiserror::Error;
@@ -53,4 +55,7 @@ pub enum GraphError {
 
     #[error("Input and output types do not match")]
     MismatchedParam,
+
+	#[error("node does not in one graph: before = `{0}`, after: {1:?}")]
+	CrossGraphDepend(String, String),
 }
