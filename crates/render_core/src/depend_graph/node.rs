@@ -35,7 +35,7 @@ pub trait DependNode<Context>: 'static + ThreadSync {
 	// build， 输出节点运行结果（结果一般都是fbo， build先输出一个没有渲染内容的fbo）
 	fn build<'a>(
         &'a mut self,
-        context: &'a Context,
+        context: &'a mut Context,
         input: &'a Self::Input,
         usage: &'a ParamUsage,
 		id: NodeId, 
@@ -123,6 +123,8 @@ pub(crate) trait InternalNode<Context: ThreadSync + 'static>: OutParam {
     // 当 sub_ng 改变后，需要调用
     fn reset(&mut self);
 
+	fn clear(&mut self);
+
     // 当 sub_ng 改变后，需要调用
     fn inc_next_refs(&mut self);
 
@@ -134,7 +136,7 @@ pub(crate) trait InternalNode<Context: ThreadSync + 'static>: OutParam {
 
     // 构建，当依赖图 构建时候，会调用一次
     // 一般 用于 准备 渲染 资源的 创建
-    fn build<'a>(&'a mut self, context: &'a Context, id: NodeId, from: &[NodeId], to: &[NodeId]) -> Result<(), GraphError>;
+    fn build<'a>(&'a mut self, context: &'a mut Context, id: NodeId, from: &[NodeId], to: &[NodeId]) -> Result<(), GraphError>;
 
     // 执行依赖图
     fn run<'a>(&'a mut self, index: usize, context: &'a Context, id: NodeId, from: &'static [NodeId], to: &'static [NodeId]) -> BoxFuture<'a, Result<(), GraphError>>;
@@ -227,6 +229,11 @@ where
         self.curr_next_refs = AtomicI32::new(0);
     }
 
+	fn clear(&mut self) {
+		self.input = Default::default();
+        self.output = Default::default();
+	}
+
     fn inc_next_refs(&mut self) {
         self.total_next_refs += 1;
     }
@@ -260,7 +267,7 @@ where
         }
     }
 
-	fn build<'a>(&'a mut self, context: &'a Context, id: NodeId, from: &'a [NodeId], to: &'a [NodeId]) -> Result<(), GraphError> {
+	fn build<'a>(&'a mut self, context: &'a mut Context, id: NodeId, from: &'a [NodeId], to: &'a [NodeId]) -> Result<(), GraphError> {
         for (pre_id, pre_node) in &self.pre_nodes {
 			let p = pre_node.0.as_ref();
 			let p = p.borrow();
@@ -303,13 +310,13 @@ where
 
     fn run<'a>(&'a mut self, index: usize, context: &'a Context, id: NodeId, from: &'static [NodeId], to: &'static [NodeId]) -> BoxFuture<'a, Result<(), GraphError>> {
         Box::pin(async move {
-            for (_pre_id, pre_node) in &self.pre_nodes {
-                let p = pre_node.0.as_ref();
-                let p = p.borrow();
-                // self.input.fill_from(*pre_id, p.deref());
-                // 用完了 一个前置，引用计数 减 1
-                p.deref().dec_curr_ref();
-            }
+            // for (_pre_id, pre_node) in &self.pre_nodes {
+            //     let p = pre_node.0.as_ref();
+            //     let p = p.borrow();
+            //     // self.input.fill_from(*pre_id, p.deref());
+            //     // 用完了 一个前置，引用计数 减 1
+            //     p.deref().dec_curr_ref();
+            // }
 
             let runner = self.node.run(index, context, &self.input, &self.param_usage, id, from, to);
 

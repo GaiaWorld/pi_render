@@ -318,7 +318,7 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
     pub async fn run<A: 'static + AsyncRuntime + Send>(
         &mut self,
         rt: &A,
-        context: &Context,
+        context: &mut Context,
     ) -> Result<(), GraphError> {
 		// let is_topo_dirty = self.is_topo_dirty;
 
@@ -339,6 +339,7 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
 		// 运行所有图节点的run方法
 		let topological_sort = &self.schedule_graph.topological;
 		let mut map = rt.map_reduce(topological_sort.len());
+		let context: &Context = context;
 		for (index, node_id) in topological_sort.iter().enumerate() {
 			let node = &self.nodes[*node_id];
 			let graph_node = self.schedule_graph.get(*node_id).unwrap();
@@ -346,6 +347,12 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
 			map.map(rt.clone(), (*node.run_node)(index, unsafe {transmute(context)}, *node_id, unsafe {transmute(graph_node.from())} ,  unsafe { transmute(graph_node.to())})).unwrap();
 		}
 		map.reduce(false).await.unwrap();
+
+		// 重置输入输出参数
+		for node_id in topological_sort.iter() {
+			let node = &self.nodes[*node_id];
+			node.state.0.borrow_mut().clear();
+		}
 		Ok(())
     }
 
@@ -425,7 +432,7 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
         &self,
         node_state: NodeState<Context>,
     ) -> Result<BuildFunc<Context>, GraphError> {
-		let f = move |context: &Context, id: NodeId, from: &[NodeId], to: &[NodeId]| -> std::io::Result<()> {
+		let f = move |context: &mut Context, id: NodeId, from: &[NodeId], to: &[NodeId]| -> std::io::Result<()> {
 			Ok(node_state.0.as_ref().borrow_mut().build(context, id, from, to).unwrap())
         };
 		Ok(Box::new(f))
@@ -451,8 +458,8 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
     }
 }
 
-pub trait BuildFuncTrait<C: ThreadSync + 'static>: Fn(&C, NodeId, &[NodeId], &[NodeId]) -> std::io::Result<()> + ThreadSync + 'static {}
-impl<Context: ThreadSync + 'static, T: Fn(&Context, NodeId, &[NodeId], &[NodeId]) -> std::io::Result<()> + ThreadSync + 'static> BuildFuncTrait<Context> for T {}
+pub trait BuildFuncTrait<C: ThreadSync + 'static>: Fn(&mut C, NodeId, &[NodeId], &[NodeId]) -> std::io::Result<()> + ThreadSync + 'static {}
+impl<Context: ThreadSync + 'static, T: Fn(&mut Context, NodeId, &[NodeId], &[NodeId]) -> std::io::Result<()> + ThreadSync + 'static> BuildFuncTrait<Context> for T {}
 
 pub trait RunFuncTrait<C: ThreadSync + 'static>: Fn(usize, &'static C, NodeId, &'static [NodeId], &'static [NodeId]) -> BoxFuture<'static, std::io::Result<()>> + ThreadSync + 'static{}
 impl<Context: ThreadSync + 'static, T: Fn(usize, &'static Context, NodeId, &'static [NodeId], &'static [NodeId]) -> BoxFuture<'static, std::io::Result<()>> + ThreadSync + 'static> RunFuncTrait<Context> for T {}
@@ -460,6 +467,7 @@ impl<Context: ThreadSync + 'static, T: Fn(usize, &'static Context, NodeId, &'sta
 type BuildFunc<Context> = Box<dyn BuildFuncTrait<Context>>;
 
 type RunFunc<Context> = Box<dyn RunFuncTrait<Context>>;
+
 
 pub struct InternalNodeEmptyImpl;
 
@@ -470,7 +478,7 @@ impl<Context: ThreadSync + 'static> DependNode<Context> for InternalNodeEmptyImp
 
     fn build<'a>(
         &'a mut self,
-        _context: &'a Context,
+        _context: &'a mut Context,
         _input: &'a Self::Input,
         _usage: &'a ParamUsage,
 		_id: NodeId, 
