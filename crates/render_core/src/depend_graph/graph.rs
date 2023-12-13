@@ -369,8 +369,7 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
 
 	/// 节点数量
 	pub fn node_count(&self) -> usize {
-		// self.topo_graph.topological_sort().len()
-        todo!()
+		self.schedule_graph.topological.len()
 	}
 
     
