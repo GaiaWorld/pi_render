@@ -194,6 +194,12 @@ impl SafeAtlasAllocator {
 		Share::new(self.allocate_not_share(width, height, target_type, exclude, true))
 	}
 
+	/// 分配矩形区域, 但不占用该区域
+	#[inline]
+	pub fn allocate_not_hold<G: GetTargetView, T: Iterator<Item=G>>(&self, width: u32, height: u32, target_type: TargetType, exclude: T) -> ShareTargetView {
+		Share::new(self.allocate_not_share(width, height, target_type, exclude, false))
+	}
+
 	/// 分配矩形区域
 	#[inline]
 	pub fn allocate_not_share<G: GetTargetView, T: Iterator<Item=G>>(&self, width: u32, height: u32, target_type: TargetType, exclude: T, is_hold: bool) -> SafeTargetView {
@@ -319,6 +325,8 @@ impl AtlasAllocator {
 					if !is_hold {
 						item.allocator.deallocate(allocation.id);
 					}
+					log::trace!("allocate1, is_hold: {:?}, ty_index: {:?}, index: {:?}, key: {:?}, rect: {:?}", is_hold, target_type.0, index, allocation.id, rect);
+
 					return TargetView {
 						info: allocation,
 						rect,
@@ -354,6 +362,7 @@ impl AtlasAllocator {
 			count: 1,
 		});
 		let rect = allocation.rectangle.clone();
+		log::trace!("allocate2, is_hold: {:?}, ty_index: {:?}, index: {:?}, key: {:?}, rect: {:?}", is_hold, target_type.0, index, allocation.id, rect);
 		return TargetView {
 			info: allocation,
 			rect,
@@ -372,6 +381,7 @@ impl AtlasAllocator {
 			alloctor.allocator.deallocate(view.info.id);
 		}
 		alloctor.count -= 1;
+		log::trace!("deallocate, count: {:?}, ty_index: {:?}, index: {:?}, key: {:?}, rect: {:?}", alloctor.count, view.ty_index, view.index, view.info.id, &view.rect);
 
 		if alloctor.count == 0 {
 			let t = self.all_allocator[view.ty_index].list.remove(view.index).unwrap();

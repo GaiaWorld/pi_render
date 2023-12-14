@@ -81,6 +81,7 @@ impl<K: Key, T> RootGraph<K, T> {
 	/// 添加子图
 	/// 当子图第一次与其他节点连接时， 子图将隶属于与其连接的节点的父图， 如果父图被删除，则此子图也会被删除
 	pub fn add_sub_graph(&mut self, k: K, value: T) {
+		log::trace!("graph.add_sub_graph({:?}, ())", k);
 		// 子图的parent_graph_id暂时为null， 当子图第一次其他节点连接时，会重置parent_graph_id
 		self.add_node(k, value, K::null());
 		self.sub_graphs.insert(k, SubGraphDesc { 
@@ -93,6 +94,7 @@ impl<K: Key, T> RootGraph<K, T> {
 
 	/// 设置子图的父, 只能在该图与其他节点创建连接关系之前设置， 否则设置不成功
 	pub fn set_sub_graph_parent(&mut self, k: K, parent_graph_id: K) {
+		log::warn!("graph.set_sub_graph_parent({:?}, {:?})", k, parent_graph_id);
 		if !parent_graph_id.is_null() {
 			if let (Some(sub_node), true, true) = (self.nodes.get_mut(k), self.sub_graphs.contains_key(k), self.sub_graphs.contains_key(parent_graph_id)) {
 				if sub_node.edges.from.is_empty() && sub_node.edges.to.is_empty() {
@@ -107,6 +109,7 @@ impl<K: Key, T> RootGraph<K, T> {
 
 	/// 如果parent_graph_id是Null， 表示插入到根上
     pub fn add_node(&mut self, k: K, value: T, parent_graph_id: K) {
+		log::trace!("graph.add_node({:?}, (), {:?})", k, parent_graph_id);
 		debug_assert!(!self.nodes.contains_key(k));
         self.nodes.insert(
             k,
@@ -123,6 +126,7 @@ impl<K: Key, T> RootGraph<K, T> {
     }
 
     pub fn remove_node(&mut self, k: K) {
+		log::trace!("graph.remove_node({:?})", k);
         let node = self.nodes.remove(k);
         if let Some(mut node) = node {
             for from_node in node.edges.from {
@@ -153,6 +157,7 @@ impl<K: Key, T> RootGraph<K, T> {
     }
 
     pub fn add_edge(&mut self, before: K, after: K) {
+		log::trace!("graph.add_edge({:?}, {:?})", before, after);
 		if let Some([before_node, after_node]) = self.nodes.get_disjoint_mut([before, after]) {
 			if before_node.parent_graph_id != after_node.parent_graph_id {
 				let (before_node_not_null, after_node_not_null) = (!before_node.parent_graph_id.is_null(), !after_node.parent_graph_id.is_null());
@@ -189,6 +194,7 @@ impl<K: Key, T> RootGraph<K, T> {
     }
 
     pub fn remove_edge(&mut self, before: K, after: K) {
+		log::trace!("graph.remove_edge({:?}, {:?})", before, after);
 		if let Some([before_node, after_node]) = self.nodes.get_disjoint_mut([before, after]) {
 			if !self.edges.remove(&(before, after)) {
 				return;
@@ -216,6 +222,7 @@ impl<K: Key, T> RootGraph<K, T> {
 	pub fn build(&mut self) -> Result<(), Vec<K>>{
 		self.from.clear();
 		self.to.clear();
+		self.topological.clear();
 
 		// self.graph.topological.clear();
 		let mut counts = VecMap::with_capacity(self.nodes.len());
@@ -223,6 +230,7 @@ impl<K: Key, T> RootGraph<K, T> {
 		for sub_graph_desc in self.sub_graphs.values_mut() {
 			sub_graph_desc.from.clear();
 			sub_graph_desc.to.clear();
+			sub_graph_desc.topological.clear();
 		}
 		let mut graph = self;
 
@@ -557,5 +565,75 @@ fn test() {
 	let g = graph.gen_graph_from_keys(finish.iter());
 
 	println!("graph1: {:?}", g.topological, );
+
+}
+
+
+#[test]
+fn test1() {
+	use pi_slotmap::DefaultKey;
+	use pi_slotmap::SlotMap;
+	let mut graph = RootGraph::default();
+	let mut nodes: SlotMap<DefaultKey, ()> = SlotMap::default();
+	
+	let nodes = [
+		nodes.insert(()),
+		nodes.insert(()),
+		nodes.insert(()),
+		nodes.insert(()),
+		nodes.insert(()),
+		nodes.insert(()),
+		nodes.insert(()),
+		nodes.insert(()),
+		nodes.insert(()),
+		nodes.insert(()),
+		nodes.insert(()),
+		nodes.insert(()),
+		nodes.insert(()),
+		nodes.insert(()),
+		nodes.insert(()),
+		nodes.insert(()),
+		nodes.insert(()),
+		nodes.insert(()),
+		nodes.insert(()),
+		nodes.insert(()),
+	];
+
+	graph.add_node(nodes[0], (), DefaultKey::default());     
+	graph.add_node(nodes[1], (), DefaultKey::default());    
+	graph.add_edge(nodes[0], nodes[1]);
+	graph.add_node(nodes[2], (), DefaultKey::default());    
+	graph.add_edge(nodes[0], nodes[2]) ;
+	graph.add_node(nodes[3], (), DefaultKey::default());    
+	graph.add_edge(nodes[0], nodes[3]);
+	graph.add_node(nodes[4], (), DefaultKey::default());    
+	graph.add_edge(nodes[0], nodes[4]);
+	graph.add_node(nodes[5], (), DefaultKey::default());
+	graph.add_edge(nodes[0], nodes[5]);
+	graph.add_node(nodes[6], (), DefaultKey::default());
+	graph.add_edge(nodes[0], nodes[6]);
+	graph.add_node(nodes[7], (), DefaultKey::default());
+	graph.add_edge(nodes[0], nodes[7]);
+	graph.add_node(nodes[8], (), DefaultKey::default());
+	graph.add_edge(nodes[0], nodes[8]);
+	graph.add_node(nodes[9], (), DefaultKey::default());
+	graph.add_edge(nodes[0], nodes[9]);
+	graph.add_node(nodes[10], (), DefaultKey::default());
+	graph.add_edge(nodes[0], nodes[10]);
+	graph.add_edge(nodes[3], nodes[2]);
+	graph.add_edge(nodes[4], nodes[2]);
+	graph.add_edge(nodes[5], nodes[2]);
+	graph.add_edge(nodes[6], nodes[2]);
+	graph.add_edge(nodes[7], nodes[2]);
+	graph.add_edge(nodes[8], nodes[2]);
+	graph.add_edge(nodes[9], nodes[2]);
+	graph.add_edge(nodes[10], nodes[2]);
+
+	if let Err(e) =  graph.build() {
+		println!("e: {:?}", e)
+	};
+	graph.build();
+
+	println!("{:?}", &graph.topological);
 
 }

@@ -240,6 +240,8 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
         self.topo_graph.remove_node(id);
         if let Some(n) = self.nodes.remove(id) {
             self.node_names.remove(n.name.as_str());
+			self.is_topo_dirty = true;
+			self.finish_nodes.remove(&id);
         }
         
         Ok(id)
