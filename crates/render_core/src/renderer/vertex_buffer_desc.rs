@@ -1,4 +1,4 @@
-use std::{ops::Range, hash::Hash, fmt::Debug, mem::replace};
+use std::{ops::Range, hash::Hash, fmt::Debug};
 
 use super::{vertex_buffer::KeyVertexBuffer, attributes::VertexAttribute, vertex_format::TVertexFormatByteSize};
 

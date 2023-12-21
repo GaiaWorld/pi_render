@@ -1,4 +1,4 @@
-use std::{hash::Hash, sync::Arc};
+use std::hash::Hash;
 
 use pi_assets::asset::Handle;
 use pi_atom::Atom;
@@ -6,7 +6,7 @@ use pi_slotmap::DefaultKey;
 
 use crate::{rhi::asset::TextureRes, components::view::target_alloc::ShareTargetView, asset::TAssetKeyU64};
 
-use super::{image_texture_view::{ImageTextureView, EImageTextureViewUsage}, render_target::ERenderTargetViewUsage, TextureRect, KeyTexture, KeyImageTexture, KeyImageTextureView, TextureViewDesc};
+use super::{image_texture_view::{ImageTextureView, EImageTextureViewUsage}, TextureRect, KeyTexture, KeyImageTexture, KeyImageTextureView, TextureViewDesc};
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub enum KeyTextureViewUsage {
@@ -39,9 +39,9 @@ impl From<&str> for EKeyTexture {
 pub enum ETextureViewUsage {
     Tex(Handle<TextureRes>),
     Image(EImageTextureViewUsage),
-    Render(ERenderTargetViewUsage),
+    // Render(ERenderTargetViewUsage),
     SRT(ShareTargetView),
-    Temp(Arc<wgpu::TextureView>, u64),
+    // Temp(Arc<wgpu::TextureView>, u64),
 }
 impl ETextureViewUsage {
     pub fn key(&self) -> KeyTextureViewUsage {
@@ -49,9 +49,9 @@ impl ETextureViewUsage {
             ETextureViewUsage::Image(val) => {
                 KeyTextureViewUsage::Image(*val.key(), TextureRect { x: 0, y: 0, w: val.texture.width as u16, h: val.texture.height as u16 }) 
             },
-            ETextureViewUsage::Render(val) => {
-                KeyTextureViewUsage::Render(val.key(), TextureRect { x: 0, y: 0, w: 1, h: 1 }) 
-            },
+            // ETextureViewUsage::Render(val) => {
+            //     KeyTextureViewUsage::Render(val.key(), TextureRect { x: 0, y: 0, w: 1, h: 1 }) 
+            // },
             ETextureViewUsage::Tex(val) => {
                 KeyTextureViewUsage::Tex(*val.key(), TextureRect { x: 0, y: 0, w: val.width as u16, h: val.height as u16 })
             },
@@ -63,18 +63,18 @@ impl ETextureViewUsage {
                 let h = (rect.max.y - rect.min.y) as u16;
                 KeyTextureViewUsage::SRT(val.ty_index(), val.target_index(), TextureRect { x, y, w, h })
             },
-            ETextureViewUsage::Temp(_, key) => {
-                KeyTextureViewUsage::Temp(*key, TextureRect::default()) 
-            },
+            // ETextureViewUsage::Temp(_, key) => {
+            //     KeyTextureViewUsage::Temp(*key, TextureRect::default()) 
+            // },
         }
     }
     pub fn view(&self) -> &wgpu::TextureView {
         match self {
             ETextureViewUsage::Image(val) => &val.view,
-            ETextureViewUsage::Render(val) => val.view(),
+            // ETextureViewUsage::Render(val) => val.view(),
             ETextureViewUsage::Tex(val) => &val.texture_view,
             ETextureViewUsage::SRT(val) => &val.target().colors[0].0,
-            ETextureViewUsage::Temp(val, _) => val,
+            // ETextureViewUsage::Temp(val, _) => val,
         }
     }
 }
@@ -87,7 +87,7 @@ impl PartialEq for ETextureViewUsage {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Image(l0), Self::Image(r0)) => l0.key() == r0.key(),
-            (Self::Render(l0), Self::Render(r0)) => l0 == r0,
+            // (Self::Render(l0), Self::Render(r0)) => l0 == r0,
             _ => false,
         }
     }
@@ -108,9 +108,9 @@ impl From<Handle<ImageTextureView>> for ETextureViewUsage {
         Self::Image(value)
     }
 }
-impl From<ERenderTargetViewUsage> for ETextureViewUsage {
-    fn from(value: ERenderTargetViewUsage) -> Self {
-        Self::Render(value)
-    }
-}
+// impl From<ERenderTargetViewUsage> for ETextureViewUsage {
+//     fn from(value: ERenderTargetViewUsage) -> Self {
+//         Self::Render(value)
+//     }
+// }
 impl TAssetKeyU64 for ETextureViewUsage {}

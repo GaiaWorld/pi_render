@@ -15,8 +15,12 @@ pub trait TKeyShaderSetBlock: Debug + Clone + Hash + PartialEq + Eq + 'static {
 }
 
 pub trait TShaderBindCode {
-    fn vs_define_code(&self, set: u32) -> String;
-    fn fs_define_code(&self, set: u32) -> String;
+    fn vs_define_code(&self, _set: u32, _bind: u32) -> String {
+        String::from("")
+    }
+    fn fs_define_code(&self, _set: u32, _bind: u32) -> String {
+        String::from("")
+    }
 }
 
 pub trait TShaderSetBlock {

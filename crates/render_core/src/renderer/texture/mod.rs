@@ -17,20 +17,32 @@ pub use texture_view_array::*;
 
 #[derive(Debug, Clone, Default, Hash, PartialEq, Eq)]
 pub struct TextureViewDesc { 
-    /// Aspect of the texture. Color textures must be [`TextureAspect::All`].
-    pub aspect: wgpu::TextureAspect,
+    // /// Aspect of the texture. Color textures must be [`TextureAspect::All`].
+    // pub aspect: wgpu::TextureAspect,
     /// Base mip level.
-    pub base_mip_level: u32,
+    pub base_mip_level: u8,
     /// Mip level count.
     /// If `Some(count)`, `base_mip_level + count` must be less or equal to underlying texture mip count.
     /// If `None`, considered to include the rest of the mipmap levels, but at least 1 in total.
-    pub mip_level_count: Option<u32>,
+    pub mip_level_count: Option<u8>,
     /// Base array layer.
-    pub base_array_layer: u32,
+    pub base_array_layer: u8,
     /// Layer count.
     /// If `Some(count)`, `base_array_layer + count` must be less or equal to the underlying array count.
     /// If `None`, considered to include the rest of the array layers, but at least 1 in total.
-    pub array_layer_count: Option<u32>,
+    pub array_layer_count: Option<u8>,
+}
+impl TextureViewDesc {
+    pub fn mip_level_count(&self) -> Option<u32> {
+        if let Some(v) = self.mip_level_count {
+            Some(v as u32)
+        } else { None }
+    }
+    pub fn array_layer_count(&self) -> Option<u32> {
+        if let Some(v) = self.array_layer_count {
+            Some(v as u32)
+        } else { None }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]

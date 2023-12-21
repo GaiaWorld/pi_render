@@ -49,11 +49,11 @@ impl ImageTextureView {
             label: Some(key.url().deref()),
             format: Some(texture.format.clone()),
             dimension: Some(texture.dimension.clone()),
-            aspect: key.desc.aspect,
-            base_mip_level: key.desc.base_mip_level,
-            mip_level_count: key.desc.mip_level_count,
-            base_array_layer: key.desc.base_array_layer,
-            array_layer_count: key.desc.array_layer_count,
+            aspect: wgpu::TextureAspect::All, // key.desc.aspect,
+            base_mip_level: key.desc.base_mip_level as u32,
+            mip_level_count: key.desc.mip_level_count(),
+            base_array_layer: key.desc.base_array_layer as u32,
+            array_layer_count: key.desc.array_layer_count(),
         });
 
         Self {

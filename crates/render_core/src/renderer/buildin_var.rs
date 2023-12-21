@@ -116,10 +116,29 @@ impl ShaderVarVertices {
     pub const INS_COLOR                 : &'static str = "A_INS_Color"         ;
     pub const INS_TILL_OFFSET1          : &'static str = "A_INS_TillOff1"      ;
     pub const INS_TILL_OFFSET2          : &'static str = "A_INS_TillOff2"      ;
-    pub const INS_CUSTOM_VEC4_A         : &'static str = "A_INS_Vec4A"         ;
-    pub const INS_CUSTOM_VEC4_B         : &'static str = "A_INS_Vec4B"         ;
-    pub const INS_CUSTOM_VEC4_C         : &'static str = "A_INS_Vec4C"         ;
-    pub const INS_CUSTOM_VEC4_D         : &'static str = "A_INS_Vec4D"         ;
+    pub const INS_CUSTOM_VEC4_A         : &'static str = "A_INS_F_Vec4A"       ;
+    pub const INS_CUSTOM_VEC4_B         : &'static str = "A_INS_F_Vec4B"       ;
+    pub const INS_CUSTOM_VEC4_C         : &'static str = "A_INS_F_Vec4C"       ;
+    pub const INS_CUSTOM_VEC4_D         : &'static str = "A_INS_F_Vec4D"       ;
+    
+    pub const INS_VEC4_A                : &'static str = "A_INS_Vec4A"         ;
+    pub const INS_VEC4_B                : &'static str = "A_INS_Vec4B"         ;
+    pub const INS_VEC4_C                : &'static str = "A_INS_Vec4C"         ;
+    pub const INS_VEC4_D                : &'static str = "A_INS_Vec4D"         ;
+    pub const INS_VEC4_E                : &'static str = "A_INS_Vec4E"         ;
+    pub const INS_VEC4_F                : &'static str = "A_INS_Vec4F"         ;
+    pub const INS_VEC4_G                : &'static str = "A_INS_Vec4G"         ;
+    pub const INS_VEC4_H                : &'static str = "A_INS_Vec4H"         ;
+
+    pub const INS_VEC3_A                : &'static str = "A_INS_Vec3A"         ;
+    pub const INS_VEC3_B                : &'static str = "A_INS_Vec3B"         ;
+    pub const INS_VEC3_C                : &'static str = "A_INS_Vec3C"         ;
+    pub const INS_VEC3_D                : &'static str = "A_INS_Vec3D"         ;
+    pub const INS_VEC3_E                : &'static str = "A_INS_Vec3E"         ;
+    pub const INS_VEC3_F                : &'static str = "A_INS_Vec3F"         ;
+    pub const INS_VEC3_G                : &'static str = "A_INS_Vec3G"         ;
+    pub const INS_VEC3_H                : &'static str = "A_INS_Vec3H"         ;
+
     pub const INS_CUSTOM_UVEC4_A        : &'static str = "A_INS_UVec4A"        ;
     pub const INS_CUSTOM_IVEC4_B        : &'static str = "A_INS_IVec4B"        ;
     pub const MATRICES_INDICES1         : &'static str = "A_JOINT_INC1"        ;
