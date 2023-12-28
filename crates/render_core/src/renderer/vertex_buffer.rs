@@ -9,7 +9,7 @@ use wgpu::util::BufferInitDescriptor;
 use crate::{rhi::{device::RenderDevice, RenderQueue,  buffer::Buffer}, asset::TAssetKeyU64};
 
 use super::{
-    attributes::{EVertexDataKind, ShaderAttribute, TAsWgpuVertexAtribute, KeyShaderFromAttributes},
+    attributes::{KeyShaderFromAttributes, EVertexAttribute, KeyAttributesLayouts},
     vertex_buffer_desc::VertexBufferDesc,
     vertex_format::TVertexFormatByteSize,
     buffer::{FixedSizeBufferPool, AssetRWBuffer, RWBufferRange},
@@ -38,101 +38,73 @@ impl TAssetKeyU64 for KeyVertexBuffer {}
 pub type AssetVertexBuffer = EVertexBufferRange;
 
 // #[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub type KeyPipelineFromAttributes = Arc<VertexBufferLayouts>;
+pub type KeyPipelineFromAttributes = KeyAttributesLayouts;
+// impl {
+//     pub fn layouts(&self) -> Vec<wgpu::VertexBufferLayout> {
+//         let mut list = vec![];
+//         self.layout_list.iter().for_each(|item| {
+//             list.push(
+//                 wgpu::VertexBufferLayout {
+//                     array_stride: item.stride,
+//                     step_mode: item.step_mode,
+//                     attributes: item.list.as_slice(),
+//                 }
+//             );
+//         });
+
+//         list
+//     }
+// }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct DVertexBufferLayout {
-    pub kinds: Vec<EVertexDataKind>,
-    pub list: Vec<wgpu::VertexAttribute>,
+    pub kinds: Vec<EVertexAttribute>,
     pub stride: wgpu::BufferAddress,
     pub step_mode: wgpu::VertexStepMode,
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct VertexBufferLayouts {
-    layout_list: Vec<DVertexBufferLayout>,
+    layout_list: KeyAttributesLayouts,
     pub size: usize,
 }
 impl From<&Vec<VertexBufferDesc>> for VertexBufferLayouts {
     fn from(value: &Vec<VertexBufferDesc>) -> Self {
         let mut layouts = vec![];
+        let mut datasize = 0;
 
         // 按 EVertexDataKind 排序确定 shader_location
-        let mut temp_kinds = vec![];
+        let mut shader_location = 0;
         value.iter().for_each(|buffer_desc| {
+            let mut attrs = vec![];
+            let mut offset = 0;
             buffer_desc.attributes().iter().for_each(|attribute| {
-                match temp_kinds.binary_search(&attribute.kind) {
-                    Ok(_) => {
-                        // 重复的顶点属性
-                        log::error!("[{:?}] Can only be set once", attribute.kind);
-                    },
-                    Err(index) => {
-                        temp_kinds.insert(index, attribute.kind);
-                    },
-                }
-            });
-        });
+                let format = attribute.format();
+                let stride = format.use_bytes();
+                attrs.push(wgpu::VertexAttribute {
+                    format,
+                    offset,
+                    shader_location,
+                });
+                offset += stride;
+                shader_location += 1;
 
-        let mut datasize = 0;
-        value.iter().for_each(|buffer_desc| {
-            let mut temp_attributes = DVertexBufferLayout { list: vec![], kinds: vec![], stride: 0, step_mode: buffer_desc.step_mode() };
-
-            buffer_desc.attributes().iter().for_each(|attribute| {
-                match temp_kinds.binary_search(&attribute.kind) {
-                    Ok(shader_location) => {
-                        let temp = attribute.as_attribute(temp_attributes.stride, shader_location as u32);
-
-                        temp_attributes.kinds.push(attribute.kind);
-                        temp_attributes.list.push(temp);
-                        temp_attributes.stride += attribute.format.use_bytes();
-                    },
-                    Err(_) => todo!(),
-                }
+                datasize += size_of::<wgpu::VertexAttribute>();
             });
 
-            datasize += size_of::<DVertexBufferLayout>();
-            layouts.push(temp_attributes);
+            layouts.push((attrs, buffer_desc.step_mode(), offset as u32));
+            datasize += 8;
         });
 
-        Self { layout_list: layouts, size: datasize }
+        Self { layout_list: KeyAttributesLayouts(layouts), size: datasize }
     }
 }
 impl VertexBufferLayouts {
-    pub fn as_key_shader_from_attributes(&self) -> KeyShaderFromAttributes {
-        let mut result = KeyShaderFromAttributes(vec![]);
-        self.layout_list.iter().for_each(|layout| {
-            let len = layout.list.len();
-
-            for i in 0..len {
-                result.0.push(
-                    ShaderAttribute {
-                        kind: layout.kinds.get(i).unwrap().clone(),
-                        location: layout.list.get(i).unwrap().shader_location,
-                    }
-                );
-            }
-        });
-
-        result.0.sort();
-
-        result
-    }
-    pub fn as_key_pipeline_from_vertex_layout(&self) -> Vec<DVertexBufferLayout> {
+    pub fn as_key_pipeline_from_vertex_layout(&self) -> KeyPipelineFromAttributes {
         self.layout_list.clone()
     }
     pub fn layouts(&self) -> Vec<wgpu::VertexBufferLayout> {
-        let mut list = vec![];
-        self.layout_list.iter().for_each(|item| {
-            list.push(
-                wgpu::VertexBufferLayout {
-                    array_stride: item.stride,
-                    step_mode: item.step_mode,
-                    attributes: item.list.as_slice(),
-                }
-            );
-        });
-
-        list
+        self.layout_list.layouts()
     }
 }
 

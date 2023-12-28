@@ -1,4 +1,6 @@
-use super::buildin_var::ShaderVarVertices;
+use pi_atom::Atom;
+
+use super::{buildin_var::{ShaderVarVertices, ShaderVarUniform}, vertex_buffer_desc::VertexBufferDesc};
 
 
 pub trait TVertexFormatShaderCode {
@@ -292,6 +294,215 @@ impl EVertexDataKind {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum EBuildinVertexAtribute {
+    Position                ,
+    Position2D              ,
+    Color4                  ,
+    UV                      ,
+    Normal                  ,
+    Tangent                 ,
+    MatricesIndices         ,
+    MatricesWeights         ,
+    MatricesIndicesExtra    ,
+    MatricesWeightsExtra    ,
+    UV2                     ,
+    UV3                     ,
+    UV4                     ,
+    UV5                     ,
+    UV6                     ,
+    Trail                   ,
+    TrailBillboard          ,
+    TrailAxisX              ,
+    TrailAxisZ              ,
+    InsWorldRow1            ,
+    InsWorldRow2            ,
+    InsWorldRow3            ,
+    InsWorldRow4            ,
+}
+impl EBuildinVertexAtribute {
+    pub fn format(&self) -> wgpu::VertexFormat {
+        match self {
+            EBuildinVertexAtribute::Position => wgpu::VertexFormat::Float32x3,
+            EBuildinVertexAtribute::Position2D => wgpu::VertexFormat::Float32x2,
+            EBuildinVertexAtribute::Color4 => wgpu::VertexFormat::Float32x4,
+            EBuildinVertexAtribute::UV => wgpu::VertexFormat::Float32x2,
+            EBuildinVertexAtribute::Normal => wgpu::VertexFormat::Float32x3,
+            EBuildinVertexAtribute::Tangent => wgpu::VertexFormat::Float32x4,
+            EBuildinVertexAtribute::MatricesIndices => wgpu::VertexFormat::Uint32x4,
+            EBuildinVertexAtribute::MatricesWeights => wgpu::VertexFormat::Float32x4,
+            EBuildinVertexAtribute::MatricesIndicesExtra => wgpu::VertexFormat::Uint32x4,
+            EBuildinVertexAtribute::MatricesWeightsExtra => wgpu::VertexFormat::Float32x4,
+            EBuildinVertexAtribute::UV2 => wgpu::VertexFormat::Float32x2,
+            EBuildinVertexAtribute::UV3 => wgpu::VertexFormat::Float32x2,
+            EBuildinVertexAtribute::UV4 => wgpu::VertexFormat::Float32x2,
+            EBuildinVertexAtribute::UV5 => wgpu::VertexFormat::Float32x2,
+            EBuildinVertexAtribute::UV6 => wgpu::VertexFormat::Float32x2,
+            EBuildinVertexAtribute::Trail => wgpu::VertexFormat::Float32x2,
+            EBuildinVertexAtribute::TrailBillboard => wgpu::VertexFormat::Float32x2,
+            EBuildinVertexAtribute::TrailAxisX => wgpu::VertexFormat::Float32x3,
+            EBuildinVertexAtribute::TrailAxisZ => wgpu::VertexFormat::Float32x3,
+            EBuildinVertexAtribute::InsWorldRow1 => wgpu::VertexFormat::Float32x4,
+            EBuildinVertexAtribute::InsWorldRow2 => wgpu::VertexFormat::Float32x4,
+            EBuildinVertexAtribute::InsWorldRow3 => wgpu::VertexFormat::Float32x4,
+            EBuildinVertexAtribute::InsWorldRow4 => wgpu::VertexFormat::Float32x4,
+        }
+    }
+    pub fn kind(&self) -> String {
+        self.format().shader_code()
+    }
+    pub fn var_code(&self) -> &str {
+        match self {
+            EBuildinVertexAtribute::Position                => ShaderVarVertices::POSITION,
+            EBuildinVertexAtribute::Position2D              => ShaderVarVertices::POSITION2D,
+            EBuildinVertexAtribute::Color4                  => ShaderVarVertices::COLOR4,
+            EBuildinVertexAtribute::UV                      => ShaderVarVertices::UV,
+            EBuildinVertexAtribute::Normal                  => ShaderVarVertices::NORMAL,
+            EBuildinVertexAtribute::Tangent                 => ShaderVarVertices::TANGENT,
+            EBuildinVertexAtribute::MatricesIndices         => ShaderVarVertices::MATRICES_INDICES,
+            EBuildinVertexAtribute::MatricesWeights         => ShaderVarVertices::MATRICES_WEIGHTS,
+            EBuildinVertexAtribute::MatricesIndicesExtra    => ShaderVarVertices::MATRICES_INDICES_EXTRA,
+            EBuildinVertexAtribute::MatricesWeightsExtra    => ShaderVarVertices::MATRICES_WEIGHTS_EXTRA,
+            EBuildinVertexAtribute::UV2                     => ShaderVarVertices::UV2,
+            EBuildinVertexAtribute::UV3                     => ShaderVarVertices::UV3,
+            EBuildinVertexAtribute::UV4                     => ShaderVarVertices::UV4,
+            EBuildinVertexAtribute::UV5                     => ShaderVarVertices::UV5,
+            EBuildinVertexAtribute::UV6                     => ShaderVarVertices::UV6,
+            EBuildinVertexAtribute::Trail                   => ShaderVarVertices::TRAIL_INFO,
+            EBuildinVertexAtribute::TrailBillboard          => ShaderVarVertices::TRAIL_INFO,
+            EBuildinVertexAtribute::TrailAxisX              => ShaderVarVertices::TRAIL_AXIS_X,
+            EBuildinVertexAtribute::TrailAxisZ              => ShaderVarVertices::TRAIL_AXIS_Z,
+            EBuildinVertexAtribute::InsWorldRow1            => ShaderVarVertices::INS_WORLD_ROW1,
+            EBuildinVertexAtribute::InsWorldRow2            => ShaderVarVertices::INS_WORLD_ROW2,
+            EBuildinVertexAtribute::InsWorldRow3            => ShaderVarVertices::INS_WORLD_ROW3,
+            EBuildinVertexAtribute::InsWorldRow4            => ShaderVarVertices::INS_WORLD_ROW4,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum ECustomVertexType {
+    Vec4,
+    Vec3,
+    Vec2,
+    Float,
+    Uint,
+    Int,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct CustomVertexAttribute {
+    key: Atom,
+    code: Atom,
+    foruniform: Option<Atom>,
+    vtype: ECustomVertexType,
+}
+impl CustomVertexAttribute {
+    pub fn new(
+        key: Atom,
+        code: Atom,
+        vtype: ECustomVertexType,
+        foruniform: Option<Atom>,
+    ) -> Self {
+        Self { key, code, vtype, foruniform }
+    }
+    pub fn vtype(&self) -> ECustomVertexType {
+        self.vtype
+    }
+    pub fn var_code(&self) -> &str {
+        self.key.as_str()
+    }
+    pub fn kind(&self) -> String {
+        self.format().shader_code()
+    }
+    pub fn foruniform(&self) -> &Option<Atom> {
+        &self.foruniform
+    }
+    pub fn format(&self) -> wgpu::VertexFormat {
+        match self.vtype {
+            ECustomVertexType::Vec4 => wgpu::VertexFormat::Float32x4,
+            ECustomVertexType::Vec3 => wgpu::VertexFormat::Float32x3,
+            ECustomVertexType::Vec2 => wgpu::VertexFormat::Float32x2,
+            ECustomVertexType::Float => wgpu::VertexFormat::Float32,
+            ECustomVertexType::Uint => wgpu::VertexFormat::Uint32,
+            ECustomVertexType::Int => wgpu::VertexFormat::Sint32,
+        }
+    }
+    pub fn vs_running_code(&self) -> &str {
+        self.code.as_str()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum EVertexAttribute {
+    Buildin(EBuildinVertexAtribute),
+    Custom(CustomVertexAttribute),
+}
+impl TAsWgpuVertexAtribute for EVertexAttribute {
+    fn as_attribute(&self, offset: wgpu::BufferAddress, shader_location: u32) -> wgpu::VertexAttribute {
+        match self {
+            EVertexAttribute::Buildin(val) => wgpu::VertexAttribute { format: val.format(), offset, shader_location, },
+            EVertexAttribute::Custom(val) => wgpu::VertexAttribute { format: val.format(), offset, shader_location, },
+        }
+    }
+}
+impl EVertexAttribute {
+    pub fn var_code(&self) -> &str {
+        match self {
+            EVertexAttribute::Buildin(val) => val.var_code(),
+            EVertexAttribute::Custom(val) => val.var_code(),
+        }
+    }
+    pub fn kind(&self) -> String {
+        match self {
+            EVertexAttribute::Buildin(val) => val.kind(),
+            EVertexAttribute::Custom(val) => val.kind(),
+        }
+    }
+    pub fn format(&self) -> wgpu::VertexFormat {
+        match self {
+            EVertexAttribute::Buildin(val) => val.format(),
+            EVertexAttribute::Custom(val) => val.format(),
+        }
+    }
+    
+    pub fn matrix() -> String {
+        let mut result = String::from("");
+        result += ShaderVarUniform::WORLD_MATRIX;
+        result += " = mat4(";
+        result += ShaderVarVertices::INS_WORLD_ROW1; result += ", ";
+        result += ShaderVarVertices::INS_WORLD_ROW2; result += ", ";
+        result += ShaderVarVertices::INS_WORLD_ROW3; result += ", ";
+        result += ShaderVarVertices::INS_WORLD_ROW4; result += ")";
+        result += ";\r\n";
+
+        result
+    }
+
+    pub fn trail() -> String {
+        String::from("
+    A_UV = vec2(TRAIL_INFO.y, step(0., TRAIL_INFO.x));
+
+    vec3 zaxis = normalize(TRAIL_AXIS_Z);
+    vec3 xaxis = normalize(TRAIL_AXIS_X);
+    A_POSITION += xaxis * TRAIL_INFO.x;
+
+    A_NORMAL = normalize(cross(zaxis, xaxis));
+        ")
+    }
+    pub fn trail_billboard() -> String {
+        String::from("
+    A_UV = vec2(TRAIL_INFO.y, step(0., TRAIL_INFO.x));
+
+    vec3 zaxis = normalize(TRAIL_AXIS_Z);
+    vec3 yaxis = normalize(PI_CAMERA_POSITION.xyz - A_POSITION.xyz);
+    vec3 xaxis = normalize(cross(yaxis, zaxis)) * TRAIL_INFO.x;
+    A_POSITION += xaxis;
+
+    A_NORMAL = yaxis;
+        ")
+    }
+}
 
 pub(crate) trait TAsWgpuVertexAtribute {
     fn as_attribute(&self, offset: wgpu::BufferAddress, shader_location: u32) ->wgpu::VertexAttribute;
@@ -322,49 +533,30 @@ impl TAsWgpuVertexAtribute for VertexAttribute {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct ShaderAttribute {
-    pub kind: EVertexDataKind,
-    pub location: u32,
-}
-impl ShaderAttribute {
-    pub fn define_code(&self) -> String {
-        let mut result = String::from("layout(location = ");
-        result += self.location.to_string().as_str();
-        result += ") in ";
-        result += self.kind.kind();
-        result += " ";
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub struct KeyAttributesLayouts(pub Vec<(Vec<wgpu::VertexAttribute>, wgpu::VertexStepMode, u32)>);
+impl KeyAttributesLayouts {
+    pub fn layouts(&self) -> Vec<wgpu::VertexBufferLayout> {
+        let mut result = vec![];
+        self.0.iter().for_each(|(attrs, stepmode, strip)| {
+            result.push(wgpu::VertexBufferLayout { array_stride: *strip as u64, step_mode: *stepmode, attributes: &attrs })
+        });
 
-        result += "V";
-        result += self.kind.var_code();
-        result += ";\r\n";
-
-        result
-    }
-    pub fn running_code(&self) -> String {
-        
-        let mut result = String::from("");
-        match self.kind {
-            EVertexDataKind::Normal => {
-            },
-            EVertexDataKind::Color4 => {
-            },
-            EVertexDataKind::UV => {
-            },
-            _ => {
-                result += self.kind.kind();
-                result += " ";
-            }
-        }
-        result += self.kind.var_code();
-        result += " = V";
-        result += self.kind.var_code();
-        result += ";\r\n";
-
-        result
+        return result;
     }
 }
-
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub struct KeyShaderFromAttributes(pub Vec<ShaderAttribute>);
+pub struct KeyShaderFromAttributes(pub Vec<EVertexAttribute>);
+impl KeyShaderFromAttributes {
+    pub fn new(value: &Vec<VertexBufferDesc>) -> Self {
+        let mut attrs = vec![];
+        value.iter().for_each(|desc| {
+            desc.attributes().iter().for_each(|attr| {
+                attrs.push(attr.clone());
+            });
+        });
+        Self(attrs)
+    }
+}
+

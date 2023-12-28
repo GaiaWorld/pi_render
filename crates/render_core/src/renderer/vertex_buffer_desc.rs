@@ -1,6 +1,6 @@
 use std::{ops::Range, hash::Hash, fmt::Debug};
 
-use super::{vertex_buffer::KeyVertexBuffer, attributes::VertexAttribute, vertex_format::TVertexFormatByteSize};
+use super::{vertex_buffer::KeyVertexBuffer, attributes::{VertexAttribute, EVertexAttribute}, vertex_format::TVertexFormatByteSize};
 
 
 #[derive(Debug, Clone, Copy)]
@@ -103,7 +103,7 @@ impl VertexBufferDescRange {
 pub struct VertexBufferDesc {
     pub key: KeyVertexBuffer,
     range: VertexBufferDescRange,
-    attrs: Vec<VertexAttribute>,
+    attrs: Vec<EVertexAttribute>,
     instance: bool,
 }
 impl VertexBufferDesc {
@@ -111,7 +111,7 @@ impl VertexBufferDesc {
         self.range = value;
         // let _ = replace(&mut self.range, value);
     }
-    pub fn new(bufferkey: KeyVertexBuffer, range: VertexBufferDescRange, attrs: Vec<VertexAttribute>, instance: bool) -> Self {
+    pub fn new(bufferkey: KeyVertexBuffer, range: VertexBufferDescRange, attrs: Vec<EVertexAttribute>, instance: bool) -> Self {
         Self {
             key: bufferkey,
             range,
@@ -119,7 +119,7 @@ impl VertexBufferDesc {
             instance,
         }
     }
-    pub fn vertices(bufferkey: KeyVertexBuffer, range: VertexBufferDescRange, attrs: Vec<VertexAttribute>) -> Self {
+    pub fn vertices(bufferkey: KeyVertexBuffer, range: VertexBufferDescRange, attrs: Vec<EVertexAttribute>) -> Self {
         Self {
             key: bufferkey,
             range,
@@ -136,14 +136,14 @@ impl VertexBufferDesc {
     pub fn instance(&self) -> bool {
         self.instance
     }
-    pub fn attributes(&self) -> &Vec<VertexAttribute> {
+    pub fn attributes(&self) -> &Vec<EVertexAttribute> {
         &self.attrs
     }
     pub fn stride(&self) -> wgpu::BufferAddress {
         
         let mut result = 0;
         self.attributes().iter().for_each(|attr| {
-            result += attr.format.use_bytes()
+            result += attr.format().use_bytes()
         });
 
         result
