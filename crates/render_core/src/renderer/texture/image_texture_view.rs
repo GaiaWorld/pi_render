@@ -1,6 +1,7 @@
-use std::sync::Arc;
+use std::{sync::Arc, ops::Deref};
 
-use pi_assets::asset::{Handle, Asset, Size};
+use pi_assets::{asset::{Handle, Asset, Size, Garbageer}, mgr::LoadResult};
+use pi_futures::BoxFuture;
 
 use crate::{asset::TAssetKeyU64, rhi::texture::TextureView};
 
@@ -45,20 +46,45 @@ impl ImageTextureView {
         texture: Handle<ImageTexture>,
     ) -> Self {
         let view = texture.texture.create_view(&wgpu::TextureViewDescriptor {
-            label: Some(key.url().as_str()),
+            label: Some(key.url().deref()),
             format: Some(texture.format.clone()),
             dimension: Some(texture.dimension.clone()),
-            aspect: key.desc.aspect,
-            base_mip_level: key.desc.base_mip_level,
-            mip_level_count: key.desc.mip_level_count,
-            base_array_layer: key.desc.base_array_layer,
-            array_layer_count: key.desc.array_layer_count,
+            aspect: wgpu::TextureAspect::All, // key.desc.aspect,
+            base_mip_level: key.desc.base_mip_level as u32,
+            mip_level_count: key.desc.mip_level_count(),
+            base_array_layer: key.desc.base_array_layer as u32,
+            array_layer_count: key.desc.array_layer_count(),
         });
 
         Self {
             texture,
             view: TextureView::with_texture(Arc::new(view)) ,
         }
+    }
+    pub fn texture(&self) -> &Handle<ImageTexture> {
+        &self.texture
+    }
+    pub fn async_load<'a, G: Garbageer<Self>>(image: Handle<ImageTexture>, key: KeyImageTextureView, result: LoadResult<'a, Self, G>) -> BoxFuture<'a, Result<Handle<Self>, ()>> {
+        Box::pin(async move {
+            match result {
+                LoadResult::Ok(r) => { Ok(r) },
+                LoadResult::Wait(f) => {
+                    // log::error!("ImageTexture Wait");
+                    match f.await {
+                        Ok(result) => Ok(result),
+                        Err(_) => Err(()),
+                    }
+                },
+                LoadResult::Receiver(recv) => {
+                    let texture_view = Self::new(&key, image);
+                    let key = key.asset_u64();
+                    match recv.receive(key, Ok(texture_view)).await {
+                        Ok(result) => { Ok(result) },
+                        Err(_) => Err(()),
+                    }
+                }
+            }
+        })
     }
 }
 

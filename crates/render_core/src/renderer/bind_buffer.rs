@@ -6,7 +6,7 @@ use pi_share::{Share};
 
 use crate::rhi::{device::RenderDevice, RenderQueue};
 
-use super::{buffer::{AssetRWBuffer, RWBufferRange, FixedSizeBufferPool}};
+use super::{buffer::{AssetRWBuffer, RWBufferRange, FixedSizeBufferPool}, shader_stage::EShaderStage};
 
 
 pub struct BindBufferAllocator {
@@ -96,5 +96,12 @@ impl BindBufferAllocator {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Deref)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct BindBufferRange(pub Arc<RWBufferRange>);
+impl std::ops::Deref for BindBufferRange {
+    type Target = Arc<RWBufferRange>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}

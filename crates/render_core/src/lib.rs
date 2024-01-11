@@ -8,5 +8,4 @@ pub mod depend_graph;
 pub mod font;
 pub mod rhi;
 pub mod renderer;
-pub mod render_3d;
 pub mod asset;

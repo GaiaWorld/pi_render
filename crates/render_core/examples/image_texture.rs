@@ -237,7 +237,7 @@ pub(crate) fn main() {
 
     MULTI_MEDIA_RUNTIME
     .spawn(async move {
-        let key = KeyImageTexture::File(Atom::from("E:/Rust/PI/pi_3d/assets/images/eff_ui_ll_085.png"), true);
+        let key = KeyImageTexture { url: Atom::from("E:/Rust/PI/pi_3d/assets/images/eff_ui_ll_085.png"), file: true, srgb: true, ..Default::default() };
         let (device, queue, _adapter_info) = setup_render_context(
             options,
             window
@@ -253,7 +253,7 @@ pub(crate) fn main() {
 
         let result = AssetMgr::load(&mgr, &key);
 
-        let r = ImageTexture::async_load(desc, result).await;
+        let r = ImageTexture::async_load_image(desc, result).await;
         match r {
             Ok(r) => {
                 log::info!("load image success, {:?}", r.key());
