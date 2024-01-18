@@ -10,7 +10,7 @@
 //!
 use super::{
     param::{Assign, InParam, OutParam},
-    GraphError,
+    GraphError
 };
 use pi_futures::BoxFuture;
 use pi_hash::{XHashMap, XHashSet};
@@ -18,12 +18,12 @@ use pi_share::{Cell, Share, ThreadSync};
 use pi_slotmap::new_key_type;
 use std::{
     any::TypeId,
-    borrow::Cow,
     ops::{Deref, DerefMut},
     sync::atomic::{AtomicI32, Ordering},
+	borrow::Cow,
 };
 
-/// 图节点，给 外部 扩展 使用
+/// 图节点，管理输入输出
 pub trait DependNode<Context>: 'static + ThreadSync {
     /// 输入参数
     type Input: InParam + Default;
@@ -31,14 +31,17 @@ pub trait DependNode<Context>: 'static + ThreadSync {
     /// 输出参数
     type Output: OutParam + Default + Clone;
 
-    /// 当 依赖图 拓扑结构改变时，第一次调用run之前，会调用一次
-    fn build<'a>(
+    // build, 在所有节点的run之前， 都要执行所有节点的build
+	// build， 输出节点运行结果（结果一般都是fbo， build先输出一个没有渲染内容的fbo）
+	fn build<'a>(
         &'a mut self,
-        _context: &'a Context,
-        _usage: &'a ParamUsage,
-    ) -> Result<(), String> {
-        Ok(())
-    }
+        context: &'a mut Context,
+        input: &'a Self::Input,
+        usage: &'a ParamUsage,
+		id: NodeId, 
+		from: &[NodeId],
+		to: &[NodeId],
+    ) -> Result<Self::Output, String>;
 
     /// 执行，每帧会调用一次
     /// 执行 run方法之前，会先取 前置节点 相同类型的输出 填充到 input 来
@@ -47,62 +50,23 @@ pub trait DependNode<Context>: 'static + ThreadSync {
     ///     run 执行完毕后，input 会 重置 为 Default
     ///     该节点的 所有后继节点 取完 该节点的Output 作为 输入 之后，该节点的 Output 会重置为 Default
     /// usage 的 用法 见 build 方法
+	/// -index: 节点在整个图的topo排序的索引
     fn run<'a>(
         &'a mut self,
+		index: usize,
         context: &'a Context,
         input: &'a Self::Input,
         usage: &'a ParamUsage,
-		id: NodeId, from: &'static [NodeId], to: &'static [NodeId],
-    ) -> BoxFuture<'a, Result<Self::Output, String>>;
+		id: NodeId, 
+		from: &'static [NodeId],
+		to: &'static [NodeId],
+
+    ) -> BoxFuture<'a, Result<(), String>>;
 }
 
 new_key_type! {
     /// 节点 ID
     pub struct NodeId;
-}
-
-/// [`NodeLabel`] 用 名字 或者 [`NodeId`] 来 引用 [`NodeState`]
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub enum NodeLabel {
-    /// 节点 ID 引用
-    Id(NodeId),
-    /// 节点名 引用
-    Name(Cow<'static, str>),
-}
-
-impl From<&NodeLabel> for NodeLabel {
-    fn from(value: &NodeLabel) -> Self {
-        value.clone()
-    }
-}
-
-impl From<String> for NodeLabel {
-    fn from(value: String) -> Self {
-        NodeLabel::Name(value.into())
-    }
-}
-
-impl From<&'static str> for NodeLabel {
-    fn from(value: &'static str) -> Self {
-        NodeLabel::Name(value.into())
-    }
-}
-
-impl From<&NodeLabel> for String {
-    fn from(value: &NodeLabel) -> Self {
-        match value {
-            NodeLabel::Name(value) => value.to_string(),
-            NodeLabel::Id(id) => {
-                format!("{id:?}")
-            }
-        }
-    }
-}
-
-impl From<NodeId> for NodeLabel {
-    fn from(value: NodeId) -> Self {
-        NodeLabel::Id(value)
-    }
 }
 
 /// 用于 参数 该节点 参数的 用途
@@ -159,6 +123,8 @@ pub(crate) trait InternalNode<Context: ThreadSync + 'static>: OutParam {
     // 当 sub_ng 改变后，需要调用
     fn reset(&mut self);
 
+	fn clear(&mut self);
+
     // 当 sub_ng 改变后，需要调用
     fn inc_next_refs(&mut self);
 
@@ -170,11 +136,12 @@ pub(crate) trait InternalNode<Context: ThreadSync + 'static>: OutParam {
 
     // 构建，当依赖图 构建时候，会调用一次
     // 一般 用于 准备 渲染 资源的 创建
-    fn build<'a>(&'a mut self, context: &'a Context) -> Result<(), GraphError>;
+    fn build<'a>(&'a mut self, context: &'a mut Context, id: NodeId, from: &[NodeId], to: &[NodeId]) -> Result<(), GraphError>;
 
     // 执行依赖图
-    fn run<'a>(&'a mut self, context: &'a Context, id: NodeId, from: &'static [NodeId], to: &'static [NodeId]) -> BoxFuture<'a, Result<(), GraphError>>;
+    fn run<'a>(&'a mut self, index: usize, context: &'a Context, id: NodeId, from: &'static [NodeId], to: &'static [NodeId]) -> BoxFuture<'a, Result<(), GraphError>>;
 }
+
 
 /// 链接 NodeInteral 和 DependNode 的 结构体
 pub(crate) struct DependNodeImpl<I, O, R, Context>
@@ -262,6 +229,11 @@ where
         self.curr_next_refs = AtomicI32::new(0);
     }
 
+	fn clear(&mut self) {
+		self.input = Default::default();
+        self.output = Default::default();
+	}
+
     fn inc_next_refs(&mut self) {
         self.total_next_refs += 1;
     }
@@ -295,40 +267,75 @@ where
         }
     }
 
-    fn build<'a>(&'a mut self, context: &'a Context) -> Result<(), GraphError> {
-        self.node
-            .build(context, &self.param_usage)
-            .map_err(GraphError::CustomBuildError)
+	fn build<'a>(&'a mut self, context: &'a mut Context, id: NodeId, from: &'a [NodeId], to: &'a [NodeId]) -> Result<(), GraphError> {
+        for (pre_id, pre_node) in &self.pre_nodes {
+			let p = pre_node.0.as_ref();
+			let p = p.borrow();
+			self.input.fill_from(*pre_id, p.deref());
+			// // 用完了 一个前置，引用计数 减 1
+			// build阶段不减1，在run中减一
+			// p.deref().dec_curr_ref();
+		}
+
+		let runner = self.node.build(context, &self.input, &self.param_usage, id, from, to);
+
+		match runner {
+			Ok(output) => {
+				// 结束前，先 重置 引用数
+				self.curr_next_refs
+					.store(self.total_next_refs, Ordering::SeqCst);
+
+				// 运行完，重置 输入
+				self.input = Default::default();
+
+				// 替换 输出
+				if self.total_next_refs == 0 {
+					// 注：如果此节点 无 后继节点，则 该节点输出 会 直接为 Default
+					self.output = Default::default();
+				} else {
+					self.output = output;
+				}
+
+				Ok(())
+			}
+			Err(msg) => Err(GraphError::CustomRunError(msg)),
+		}
     }
 
-    fn run<'a>(&'a mut self, context: &'a Context, id: NodeId, from: &'static [NodeId], to: &'static [NodeId]) -> BoxFuture<'a, Result<(), GraphError>> {
-        Box::pin(async move {
-            for (pre_id, pre_node) in &self.pre_nodes {
-                let p = pre_node.0.as_ref();
-                let p = p.borrow();
-                self.input.fill_from(*pre_id, p.deref());
-                // 用完了 一个前置，引用计数 减 1
-                p.deref().dec_curr_ref();
-            }
+    // fn build<'a>(&'a mut self, context: &'a Context) -> Result<(), GraphError> {
+    //     self.node
+    //         .build(context, &self.param_usage)
+    //         .map_err(GraphError::CustomBuildError)
+    // }
 
-            let runner = self.node.run(context, &self.input, &self.param_usage, id, from, to);
+    fn run<'a>(&'a mut self, index: usize, context: &'a Context, id: NodeId, from: &'static [NodeId], to: &'static [NodeId]) -> BoxFuture<'a, Result<(), GraphError>> {
+        Box::pin(async move {
+            // for (_pre_id, pre_node) in &self.pre_nodes {
+            //     let p = pre_node.0.as_ref();
+            //     let p = p.borrow();
+            //     // self.input.fill_from(*pre_id, p.deref());
+            //     // 用完了 一个前置，引用计数 减 1
+            //     p.deref().dec_curr_ref();
+            // }
+
+            let runner = self.node.run(index, context, &self.input, &self.param_usage, id, from, to);
 
             match runner.await {
-                Ok(output) => {
-                    // 结束前，先 重置 引用数
-                    self.curr_next_refs
-                        .store(self.total_next_refs, Ordering::SeqCst);
+                Ok(_output) => {
+                    // // 结束前，先 重置 引用数
+                    // self.curr_next_refs
+                    //     .store(self.total_next_refs, Ordering::SeqCst);
 
-                    // 运行完，重置 输入
-                    self.input = Default::default();
+                    // // 运行完，重置 输入
+                    // self.input = Default::default();
 
-                    // 替换 输出
-                    if self.total_next_refs == 0 {
-                        // 注：如果此节点 无 后继节点，则 该节点输出 会 直接为 Default
-                        self.output = Default::default();
-                    } else {
-                        self.output = output;
-                    }
+                    // // 替换 输出
+                    // if self.total_next_refs == 0 {
+                    //     // 注：如果此节点 无 后继节点，则 该节点输出 会 直接为 Default
+                    //     self.output = Default::default();
+                    // } else {
+                    //     self.output = output;
+                    // }
 
                     Ok(())
                 }
@@ -364,3 +371,49 @@ impl<Context: ThreadSync + 'static> NodeState<Context> {
         Self(imp)
     }
 }
+
+
+/// [`NodeLabel`] 用 名字 或者 [`NodeId`] 来 引用 [`NodeState`]
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum NodeLabel {
+    /// 节点 ID 引用
+    NodeId(NodeId),
+    /// 节点名 引用
+    NodeName(Cow<'static, str>),
+}
+
+impl From<&NodeLabel> for NodeLabel {
+    fn from(value: &NodeLabel) -> Self {
+        value.clone()
+    }
+}
+
+impl From<NodeId> for NodeLabel {
+    fn from(value: NodeId) -> Self {
+        NodeLabel::NodeId(value)
+    }
+}
+
+impl From<String> for NodeLabel {
+    fn from(value: String) -> Self {
+        NodeLabel::NodeName(value.into())
+    }
+}
+impl From<&'static str> for NodeLabel {
+    fn from(value: &'static str) -> Self {
+        NodeLabel::NodeName(value.into())
+    }
+}
+
+impl From<&NodeLabel> for String {
+    fn from(value: &NodeLabel) -> Self {
+        match value {
+            NodeLabel::NodeName(value) => value.to_string(),
+			NodeLabel::NodeId(id) => {
+                format!("{id:?}")
+            }
+        }
+    }
+}
+
+

@@ -76,6 +76,7 @@ pub struct TargetView {
 	info: Allocation,
 	rect: Rectangle, // target的宽高（不包含边框）
 	target: Share<Fbo>,
+	is_hold: bool,
 }
 
 impl TargetView {
@@ -190,14 +191,20 @@ impl SafeAtlasAllocator {
 	/// 分配矩形区域
 	#[inline]
 	pub fn allocate<G: GetTargetView, T: Iterator<Item=G>>(&self, width: u32, height: u32, target_type: TargetType, exclude: T) -> ShareTargetView {
-		Share::new(self.allocate_not_share(width, height, target_type, exclude))
+		Share::new(self.allocate_not_share(width, height, target_type, exclude, true))
+	}
+
+	/// 分配矩形区域, 但不占用该区域
+	#[inline]
+	pub fn allocate_not_hold<G: GetTargetView, T: Iterator<Item=G>>(&self, width: u32, height: u32, target_type: TargetType, exclude: T) -> ShareTargetView {
+		Share::new(self.allocate_not_share(width, height, target_type, exclude, false))
 	}
 
 	/// 分配矩形区域
 	#[inline]
-	pub fn allocate_not_share<G: GetTargetView, T: Iterator<Item=G>>(&self, width: u32, height: u32, target_type: TargetType, exclude: T) -> SafeTargetView {
+	pub fn allocate_not_share<G: GetTargetView, T: Iterator<Item=G>>(&self, width: u32, height: u32, target_type: TargetType, exclude: T, is_hold: bool) -> SafeTargetView {
 		SafeTargetView{
-			value: self.0.write().allocate(width, height, target_type, exclude),
+			value: self.0.write().allocate(width, height, target_type, exclude, is_hold),
 			allotor: self.clone()
 		}
 	}
@@ -273,11 +280,13 @@ impl AtlasAllocator {
 	}
 
 	/// 分配TargetView
-	fn allocate<G: GetTargetView, T: Iterator<Item=G>>(&mut self, width: u32, height: u32, target_type: TargetType, exclude: T) -> TargetView {
+	/// -is_hold是否占有分配的空间， 如果是true， 将独占该空间， 如果是false， 则与其他分配共享该空间
+	fn allocate<G: GetTargetView, T: Iterator<Item=G>>(&mut self, width: u32, height: u32, target_type: TargetType, exclude: T, is_hold: bool) -> TargetView {
 		let list = match self.all_allocator.get_mut(target_type.0) {
 			Some(r) => r,
 			None => panic!("TargetType is not exist: {:?}", target_type),
 		};
+		self.excludes.clear();
 		// 将需要排除的渲染目标插入到slotmap中，后续可以更快的判断一个纹理是否需要排除
 		for i in exclude {
 			let i = i.get_target_view();
@@ -312,19 +321,24 @@ impl AtlasAllocator {
 						Point::new(rectangle.min.x + offset, rectangle.min.y + offset),
 						Point::new(rectangle.max.x - offset, rectangle.max.y - offset)
 					);
-					self.excludes.clear();
+					// 如果不需要占有该空间， 则立即释放该空间
+					if !is_hold {
+						item.allocator.deallocate(allocation.id);
+					}
+					log::trace!("allocate1, is_hold: {:?}, ty_index: {:?}, index: {:?}, key: {:?}, rect: {:?}", is_hold, target_type.0, index, allocation.id, rect);
+
 					return TargetView {
 						info: allocation,
 						rect,
 						ty_index: target_type.0,
 						index,
 						target: item.target.clone(),
+						is_hold,
 					};
 				},
 				None => (),
 			};
 		}
-		self.excludes.clear();
 
 		let target = Share::new(self.create_target(width, height, target_type));
 
@@ -336,6 +350,11 @@ impl AtlasAllocator {
 			Some(r) => r,
 			None => panic!("AtlasAllocator allocate first fail, width: {:?}, height: {:?}, target_width : {:?}, target_height: {:?}", width, height, target.width, target.height),
 		};
+		// 如果不需要占有该空间， 则立即释放该空间
+		if !is_hold {
+			atlas_allocator.deallocate(allocation.id);
+		}
+
 		let list = &mut self.all_allocator[target_type.0];
 		let index = list.list.insert(SingleAllocator {
 			allocator:atlas_allocator,
@@ -343,20 +362,26 @@ impl AtlasAllocator {
 			count: 1,
 		});
 		let rect = allocation.rectangle.clone();
+		log::trace!("allocate2, is_hold: {:?}, ty_index: {:?}, index: {:?}, key: {:?}, rect: {:?}", is_hold, target_type.0, index, allocation.id, rect);
 		return TargetView {
 			info: allocation,
 			rect,
 			target,
 			index,
 			ty_index: target_type.0,
+			is_hold,
 		}
 	}
 
 	/// 取消TargetView分配
 	fn deallocate(&mut self, view: &TargetView) {
 		let alloctor = &mut self.all_allocator[view.ty_index].list[view.index];
-		alloctor.allocator.deallocate(view.info.id);
+		// 如果TargetView中独占该空间， 则在此时释放分配空间
+		if view.is_hold {
+			alloctor.allocator.deallocate(view.info.id);
+		}
 		alloctor.count -= 1;
+		log::trace!("deallocate, count: {:?}, ty_index: {:?}, index: {:?}, key: {:?}, rect: {:?}", alloctor.count, view.ty_index, view.index, view.info.id, &view.rect);
 
 		if alloctor.count == 0 {
 			let t = self.all_allocator[view.ty_index].list.remove(view.index).unwrap();

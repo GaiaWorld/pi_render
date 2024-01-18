@@ -18,6 +18,7 @@ trace=[]
 # pi_async = {version="0.5", features=["serial"]}
 # pi_futures = {version="0.1", features=["local"]}
 ahash="=0.8.6"
+petgraph = "0.6"
 paste = "1.0"
 pi_futures = "0.1"
 pi-async-rt = "0.1"
@@ -30,8 +31,10 @@ pi_map = "0.1"
 pi_null = "0.1"
 pi_ecs_macros = "0.1"
 pi_slotmap = "0.1"
+derive_deref = "1.1"
 
 graphviz-rust = "0.6"
+pi_print_any = "0.1"
 
 normpath = "1.1.1"
 tracing = { version = "0.1", default-features = false, features = ["std"] }
