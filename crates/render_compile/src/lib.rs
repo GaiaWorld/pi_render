@@ -2474,5 +2474,20 @@ void main() {
 // 	println!("result: {:?}", result);
 // }
 
+#[test]
+fn test_parse() {
+	let mut parser = naga::front::glsl::Parser::default();
+	let modlue = parser
+				.parse(&naga::front::glsl::Options::from(naga::ShaderStage::Vertex), r#"
+#version 450
+layout(set=0, binding=0) uniform float depth[1];
+
+void main() {
+	 gl_Position.z =  depth[5];
+}
+				"#);
+	println!("modle================={:?}, \nmodle================={:?}", modlue, parser);
+}
+
 
 

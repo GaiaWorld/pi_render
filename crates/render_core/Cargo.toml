@@ -17,10 +17,11 @@ trace=[]
 # pi_share = {version="0.4", features=["serial", "rc"]}
 # pi_async = {version="0.5", features=["serial"]}
 # pi_futures = {version="0.1", features=["local"]}
+ahash="=0.8.6"
 paste = "1.0"
 pi_futures = "0.1"
 pi-async-rt = "0.1"
-pi_share = "0.4"
+pi_share = "=0.4.7"
 pi_async_graph = "0.6"
 pi_assets = "0.13"
 pi_graph = "0.1"

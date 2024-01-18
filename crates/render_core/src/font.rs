@@ -5,7 +5,7 @@ use pi_atom::Atom;
 use pi_hash::DefaultHasher;
 use pi_share::{Share, ShareMutex};
 use wgpu::{Texture, ImageCopyTexture, TextureAspect, ImageDataLayout, Extent3d, Origin3d};
-use pi_hal::font::font::FontMgr;
+pub use pi_hal::font::font::{FontMgr, FontType, FontId};
 pub use pi_hal::font::font::{ Font, Size, GlyphId, FontFamilyId, Glyph};
 pub use pi_hal::font::text_split::*;
 
@@ -21,11 +21,20 @@ pub struct FontSheet {
 	sdf_texture_view: Option<Handle<TextureRes>>,
 	sdf_texture: Option<Share<Texture>>,
 
+	pub sdf2_texture_version: Share<ShareMutex<usize>>,
+	pub sdf2_index_texture_view: Option<Handle<TextureRes>>,
+	pub sdf2_index_texture: Option<Share<Texture>>,
+	pub sdf2_data_texture_view: Option<Handle<TextureRes>>,
+	pub sdf2_data_texture: Option<Share<Texture>>,
+
 	queue: RenderQueue,
 	device: RenderDevice,
 
 	texture_asset_mgr: Share<AssetMgr<TextureRes>>,
 }
+
+unsafe impl Send for FontSheet {}
+unsafe impl Sync for FontSheet {}
 
 impl FontSheet {
 	pub fn new(
@@ -33,7 +42,7 @@ impl FontSheet {
 		texture_asset_mgr: &Share<AssetMgr<TextureRes>>,
 		queue: &RenderQueue,
 		max_texture_dimension_2d: u32,
-		use_sdf: bool,
+		font_type: FontType,
 	) -> FontSheet {
 		let texture_max = max_texture_dimension_2d.min(4096);
 		let width = 4096.min(texture_max);
@@ -41,7 +50,7 @@ impl FontSheet {
 
 		// 宽高可能可变，TODO
 		let mut r = Self { 
-			font_mgr: FontMgr::new(width as usize, height as usize),
+			font_mgr: FontMgr::new(width as usize, height as usize, font_type),
 			texture_view: None, 
 			texture: None,
 			texture_version: Share::new(ShareMutex::new(0)),
@@ -50,16 +59,21 @@ impl FontSheet {
 			sdf_texture: None,
 			sdf_texture_version: Share::new(ShareMutex::new(0)),
 
+			sdf2_index_texture_view: None, 
+			sdf2_index_texture: None,
+			sdf2_data_texture_view: None, 
+			sdf2_data_texture: None,
+			sdf2_texture_version: Share::new(ShareMutex::new(0)),
+
 			queue: queue.clone(),
 			device: device.clone(),
 			texture_asset_mgr: texture_asset_mgr.clone(),
 		};
-		r.font_mgr.set_use_sdf(use_sdf);
-		if use_sdf {
-			r.init_sdf_texture()
-		} else {
-			r.init_texture()
-		}
+		match font_type {
+			FontType::Bitmap => r.init_texture(),
+			FontType::Sdf1 => r.init_sdf_texture(),
+			FontType::Sdf2 => r.init_sdf2_texture(),
+		};
 		r
 	}
 
@@ -107,28 +121,28 @@ impl FontSheet {
 	}
 
 	/// 字体id
-	pub fn font_id(&mut self, f: Font) -> FontFamilyId {
-		self.font_mgr.font_family_id(f)
+	pub fn font_id(&mut self, f: Font) -> FontId {
+		self.font_mgr.font_id(f)
 	}
 
-	pub fn font_height(&self, f: FontFamilyId, font_size: usize) -> f32 {
+	pub fn font_height(&self, f: FontId, font_size: usize) -> f32 {
 		self.font_mgr.font_height(f, font_size)
 	}
 
 	/// 字形id, 纹理中没有更多空间容纳时，返回None
-	pub fn glyph_id(&mut self, f: FontFamilyId, char: char) -> Option<GlyphId> {
+	pub fn glyph_id(&mut self, f: FontId, char: char) -> Option<GlyphId> {
 		self.font_mgr.glyph_id(f, char)
 	}
 
 	/// 测量宽度
-	pub fn measure_width(&mut self, f: FontFamilyId, char: char) -> f32 {
+	pub fn measure_width(&mut self, f: FontId, char: char) -> f32 {
 		self.font_mgr.measure_width(f, char)
 	}
 
-	/// 取到字形信息
-	pub fn glyph(&self, id: GlyphId) -> &Glyph {
-		self.font_mgr.glyph(id)
-	}
+	// /// 取到字形信息
+	// pub fn glyph(&self, id: GlyphId) -> &Glyph {
+	// 	self.font_mgr.glyph(id)
+	// }
 
 	/// 清理字形
 	pub fn clear(&mut self) {
@@ -136,54 +150,61 @@ impl FontSheet {
 	}
 
 	/// 绘制文字
-	pub fn draw(&mut self) {
+	pub fn update(&mut self) {
 		let texture = self.texture.clone();
 		let sdf_texture = self.sdf_texture.clone();
 		let queue = self.queue.clone();
 		let version = self.texture_version.clone();
-		let sdf_texture_version = self.sdf_texture_version.clone();
-		let use_sdf = self.font_mgr.use_sdf();
-		self.font_mgr.draw(move |block, image| {
-			let (texture, pixle_size) = if image.width * image.height == image.buffer.len() {
-				// sdf
-				match &sdf_texture {
-					Some(r) => (r, 1),
-					None => return,
-				}
-			} else {
-				match &texture {
-					Some(r) => (r, 4),
-					None => return,
-				}
-			};
-
-			// log::warn!("draw=-=============={}, {:?}, {:?}, {:?}, {:?}", image.buffer.len(), block.x, block.y, &image.width, image.height);
-			
-			queue.write_texture(
-				ImageCopyTexture {
-					texture: &texture,
-					mip_level: 0,
-					origin: Origin3d {
-						x: block.x as u32,
-						y: block.y as u32,
-						z: 0
-					},
-					aspect: TextureAspect::All
-				}, 
-				image.buffer.as_slice(),
-				ImageDataLayout {
-					offset: 0,
-					bytes_per_row: if image.width == 0 { None }else { Some(image.width as u32 * pixle_size) }, // 32 * 4
-					rows_per_image: None,
-				},
-				Extent3d {
-					width: image.width as u32,
-					height: image.height as u32,
-					depth_or_array_layers: 1,
-				});
-			let mut v =  if use_sdf {sdf_texture_version.lock()} else { version.lock()};
-			*v = *v + 1;
-		})
+		// let sdf_texture_version = self.sdf_texture_version.clone();
+		let font_type = self.font_mgr.font_type();
+		match font_type {
+			FontType::Bitmap => {
+				self.font_mgr.table.bitmap_table.draw(&mut self.font_mgr.sheet.fonts, move |block, image| {
+					let (texture, pixle_size) = if image.width * image.height == image.buffer.len() {
+						// sdf
+						match &sdf_texture {
+							Some(r) => (r, 1),
+							None => return,
+						}
+					} else {
+						match &texture {
+							Some(r) => (r, 4),
+							None => return,
+						}
+					};
+		
+					// log::warn!("draw=-=============={}, {:?}, {:?}, {:?}, {:?}", image.buffer.len(), block.x, block.y, &image.width, image.height);
+					
+					queue.write_texture(
+						ImageCopyTexture {
+							texture: &texture,
+							mip_level: 0,
+							origin: Origin3d {
+								x: block.x as u32,
+								y: block.y as u32,
+								z: 0
+							},
+							aspect: TextureAspect::All
+						}, 
+						image.buffer.as_slice(),
+						ImageDataLayout {
+							offset: 0,
+							bytes_per_row: if image.width == 0 { None }else { Some(image.width as u32 * pixle_size) }, // 32 * 4
+							rows_per_image: None,
+						},
+						Extent3d {
+							width: image.width as u32,
+							height: image.height as u32,
+							depth_or_array_layers: 1,
+						});
+					let mut v =  version.lock();
+					*v = *v + 1;
+				})
+			},
+			FontType::Sdf1 => todo!(),
+			FontType::Sdf2 => todo!(),
+		}
+		
 	}
 
 	// fn draw(&mut self) {
@@ -218,6 +239,35 @@ impl FontSheet {
 	}
 
 	fn init_sdf_texture(&mut self) {
+		let size = self.font_mgr.size();
+		let texture = (*self.device).create_texture(&wgpu::TextureDescriptor {
+			label: Some("first depth buffer"),
+			size: wgpu::Extent3d {
+				width: size.width as u32,
+				height: size.height as u32,
+				depth_or_array_layers: 1,
+			},
+			mip_level_count: 1,
+			sample_count: 1,
+			dimension: wgpu::TextureDimension::D2,
+			format: wgpu::TextureFormat::R8Unorm,
+			view_formats: &[],
+			usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+		});
+		let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+		// let key = calc_hash(&"text texture view");
+		let key = Atom::from("_$text_sdf").get_hash() as u64;
+		let texture_view = if let Ok(r) = self.texture_asset_mgr.insert(key, TextureRes::new(size.width as u32, size.height as u32, (size.width * size.height) as usize, texture_view, false, wgpu::TextureFormat::Rgba8Unorm)) {
+			r
+		} else {
+			panic!("insert asset fail");
+		};
+
+		self.sdf_texture = Some(Share::new(texture));
+		self.sdf_texture_view = Some(texture_view);
+	}
+
+	fn init_sdf2_texture(&mut self) {
 		let size = self.font_mgr.size();
 		let texture = (*self.device).create_texture(&wgpu::TextureDescriptor {
 			label: Some("first depth buffer"),
