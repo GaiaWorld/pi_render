@@ -1,5 +1,5 @@
 #![feature(specialization)]
-
+#![allow(invalid_reference_casting)]
 #[macro_use]
 extern crate lazy_static;
 

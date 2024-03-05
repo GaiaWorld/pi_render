@@ -83,7 +83,7 @@ impl FontSheet {
 
 	/// 取到纹理版本
 	pub fn texture_version(&self) -> usize {
-		*self.texture_version.lock()
+		*self.texture_version.lock().unwrap()
 	}
 
 	/// 纹理宽高
@@ -103,7 +103,7 @@ impl FontSheet {
 
 	/// 取到纹理版本
 	pub fn sdf_texture_version(&self) -> usize {
-		*self.sdf_texture_version.lock()
+		*self.sdf_texture_version.lock().unwrap()
 	}
 
 	/// 字体id
@@ -181,7 +181,7 @@ impl FontSheet {
 					height: image.height as u32,
 					depth_or_array_layers: 1,
 				});
-			let mut v =  if use_sdf {sdf_texture_version.lock()} else { version.lock()};
+			let mut v =  if use_sdf {sdf_texture_version.lock().unwrap()} else { version.lock().unwrap()};
 			*v = *v + 1;
 		})
 	}
@@ -206,7 +206,7 @@ impl FontSheet {
 		});
 		let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 		// let key = calc_hash(&"text texture view");
-		let key = Atom::from("_$text").get_hash() as u64;
+		let key = Atom::from("_$text").str_hash () as u64;
 		let texture_view = if let Ok(r) = self.texture_asset_mgr.insert(key, TextureRes::new(size.width as u32, size.height as u32, (size.width * size.height * 4) as usize, texture_view, false, wgpu::TextureFormat::Rgba8Unorm)) {
 			r
 		} else {
@@ -235,7 +235,7 @@ impl FontSheet {
 		});
 		let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 		// let key = calc_hash(&"text texture view");
-		let key = Atom::from("_$text_sdf").get_hash() as u64;
+		let key = Atom::from("_$text_sdf").str_hash() as u64;
 		let texture_view = if let Ok(r) = self.texture_asset_mgr.insert(key, TextureRes::new(size.width as u32, size.height as u32, (size.width * size.height) as usize, texture_view, false, wgpu::TextureFormat::Rgba8Unorm)) {
 			r
 		} else {

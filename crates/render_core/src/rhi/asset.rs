@@ -201,7 +201,7 @@ pub async fn create_texture_from_image<G: Garbageer<TextureRes>>(
 		texture_extent,
 	);
 
-	recv.receive(key.get_hash() as u64, Ok(TextureRes::new(width, height, byte_size, texture_view, is_opacity, format))).await.unwrap()
+	recv.receive(key.str_hash () as u64, Ok(TextureRes::new(width, height, byte_size, texture_view, is_opacity, format))).await.unwrap()
 }
 
 
@@ -241,7 +241,7 @@ pub async fn create_texture_from_ktx<G: Garbageer<TextureRes>>(
 	}, data.as_slice());
 	let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-	Ok(recv.receive(key.get_hash() as u64, Ok(TextureRes::new(texture_extent.width, texture_extent.height, data.len(), texture_view, true/*TODO*/, format))).await.unwrap())
+	Ok(recv.receive(key.str_hash () as u64, Ok(TextureRes::new(texture_extent.width, texture_extent.height, data.len(), texture_view, true/*TODO*/, format))).await.unwrap())
 }
 
 fn convert_format(v: u32) -> wgpu::TextureFormat {

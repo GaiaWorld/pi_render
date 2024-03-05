@@ -1,6 +1,6 @@
 [package]
 name = "render_core"
-version = "0.1.16"
+version = "0.1.17"
 authors = ["moyy <myy412001799@gmail.com>"]
 edition = "2021"
 description = "Renderer for PI Engine"
@@ -25,7 +25,7 @@ pi_async_graph = "0.6"
 pi_assets = "0.13"
 pi_graph = "0.1"
 pi_hash = "0.1"
-pi_map = "0.1"
+pi_map = "0.2"
 pi_null = "0.1"
 pi_ecs_macros = "0.1"
 pi_slotmap = "0.1"
@@ -60,7 +60,7 @@ futures = "0.3"
 guillotiere = { version = "0.6" }
 smallvec = "1.8"
 lazy_static = "1.4"
-pi_atom = "0.2"
+pi_atom = "0.5"
 bytemuck = { version = "1.4", features = ["derive"] }
 
 pi_hal = { version = "0.1", registry = "yn" }

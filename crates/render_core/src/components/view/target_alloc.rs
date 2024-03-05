@@ -133,7 +133,7 @@ impl SafeTargetView {
 
 impl Drop for SafeTargetView {
     fn drop(&mut self) {
-		self.allotor.0.write().deallocate(&self.value);
+		self.allotor.0.write().unwrap().deallocate(&self.value);
     }
 }
 
@@ -178,13 +178,13 @@ impl SafeAtlasAllocator {
 	}
 
 	pub fn get_or_create_type(&self, descript: TargetDescriptor) -> TargetType {
-		self.0.write().get_or_create_type(descript)
+		self.0.write().unwrap().get_or_create_type(descript)
 	}
 
 	/// 创建一个渲染目标类型，并且不共享（get_or_create_type无法通过hash命中该类型）
 	#[inline]
 	pub fn create_type(&mut self, descript: TargetDescriptor) -> TargetType {
-		self.0.write().create_type(descript)
+		self.0.write().unwrap().create_type(descript)
 	}
 
 	/// 分配矩形区域
@@ -197,14 +197,14 @@ impl SafeAtlasAllocator {
 	#[inline]
 	pub fn allocate_not_share<G: GetTargetView, T: Iterator<Item=G>>(&self, width: u32, height: u32, target_type: TargetType, exclude: T) -> SafeTargetView {
 		SafeTargetView{
-			value: self.0.write().allocate(width, height, target_type, exclude),
+			value: self.0.write().unwrap().allocate(width, height, target_type, exclude),
 			allotor: self.clone()
 		}
 	}
 	
 	#[inline]
 	pub fn targetview_size(&self, target: &TargetView) -> usize {
-		self.0.read().targetview_size(target)
+		self.0.read().unwrap().targetview_size(target)
 	}
 }
 
