@@ -23,19 +23,20 @@ pi_futures = "0.1"
 pi_slotmap = "0.1"
 pi_share = "0.4"
 pi-async-rt = "0.1"
-pi_map = "0.1"
+pi_map = "0.2"
 pi_hash = "0.1"
 
 nalgebra = "0.32"
 winit = { registry = "yn", version = "0.27"}
 log = "0.4"
-wgpu = "0.16"
+wgpu = "0.19"
 env_logger = "0.9"
 float-ord = "0.3"
 lazy_static = "1.4"
 
 render_derive = {path = "crates/render_derive", version = "0.1", registry = "yn"}
 criterion = "0.4"
+crossbeam = "0.8"
 render_core = {path = "crates/render_core", version = "0.1", registry = "yn"}
 pi_hal = { version = "0.1", registry = "yn" }
 
@@ -47,13 +48,6 @@ path = "examples/hello_winit/main.rs"
 name = "clean"
 path = "examples/clean/main.rs"
 
-# [patch.crates-io]
-# pi_async_graph = { path = "../pi_async_graph" }
-# pi_assets = { path = "../pi_assets" }
-
-# [patch."https://github.com/GaiaWorld/pi_hal"]
-# pi_hal = { path = "../pi_hal" }
-
 [[bench]]
 name = "id_alloter_bench"
 path = "benches/id_alloter_bench.rs"
@@ -63,4 +57,15 @@ harness = false
 name = "buffer_alloter"
 path = "benches/buffer_alloter.rs"
 harness = false
+
+
+# [patch.crates-io]
+# pi_async_graph = { path = "../pi_async_graph" }
+# pi_assets = { path = "../pi_assets" }
+
+# [patch.yn]
+# pi_hal = { path = "../pi_hal" }
+# pi_wgpu = {path = "../pi_wgpu"}
+# pi_egl = {path = "../pi_egl"}
+# winit = { path = "../winit"}
 

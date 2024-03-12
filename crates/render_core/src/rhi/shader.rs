@@ -76,6 +76,14 @@ pub trait WriteBuffer {
     fn offset(&self) -> u32;
 }
 
+pub trait GetBuffer {
+	fn get_data(&mut self, index: u32, buffer: &[u8]);
+}
+
+// fn get_data(&mut self, index: u32, buffer: &mut [u8]) {
+// 	unsafe {buffer.as_ptr().add(index as usize).copy_to_nonoverlapping(self.as_mut_ptr(), self.len()) };
+// }
+
 impl WriteBuffer for [u8] {
 	fn write_into(&self, index: u32, buffer: &mut [u8]) {
 		unsafe { self.as_ptr().copy_to_nonoverlapping(buffer.as_mut_ptr().add(index as usize), self.len()) };

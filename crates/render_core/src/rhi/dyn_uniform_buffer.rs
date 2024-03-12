@@ -515,7 +515,8 @@ mod test {
     use pi_async_rt::rt::AsyncRuntime;
     use pi_share::Share;
     use render_derive::{BindLayout, BindingType, BufferSize, Uniform};
-	use winit::{event_loop::EventLoopBuilder, platform::windows::EventLoopBuilderExtWindows};
+	use wgpu::{Gles3MinorVersion, InstanceFlags};
+use winit::{event_loop::EventLoopBuilder, platform::windows::EventLoopBuilderExtWindows};
 	use std::sync::{Arc, atomic::AtomicBool};
 
 	/// Initializes the renderer by retrieving and preparing the GPU instance, device and queue
@@ -523,7 +524,7 @@ mod test {
 	async fn initialize_renderer(
 		instance: &wgpu::Instance,
 		options: &RenderOptions,
-		request_adapter_options: &wgpu::RequestAdapterOptions<'_>,
+		request_adapter_options: &wgpu::RequestAdapterOptions<'_, '_>,
 	) -> (RenderDevice, RenderQueue, wgpu::AdapterInfo) {
 		let adapter = instance
 			.request_adapter(request_adapter_options)
@@ -652,6 +653,9 @@ mod test {
     			max_bindings_per_bind_group: limits
 					.max_bindings_per_bind_group
 					.min(constrained_limits.max_bindings_per_bind_group),
+				max_non_sampler_bindings: limits
+					.max_non_sampler_bindings
+					.min(constrained_limits.max_non_sampler_bindings),
 			};
 		}
 
@@ -659,8 +663,8 @@ mod test {
 			.request_device(
 				&wgpu::DeviceDescriptor {
 					label: options.device_label.as_ref().map(|a| a.as_ref()),
-					features,
-					limits,
+					required_features: features,
+					required_limits: limits,
 				},
 				trace_path,
 			)
@@ -711,14 +715,15 @@ mod test {
 			backends: options.backends,
 			/// Which DX12 shader compiler to use.
 			dx12_shader_compiler: wgpu::Dx12Compiler::Fxc,
+			flags: InstanceFlags::DEBUG,
+			gles_minor_version: Gles3MinorVersion::Automatic,
 		});
 		let event_loop =  EventLoopBuilder::new().with_any_thread(true).build();
 		let window = winit::window::Window::new(&event_loop).unwrap();
-
-		let surface = unsafe {instance.create_surface(&window).unwrap()};
 		
 
 		pi_hal::runtime::MULTI_MEDIA_RUNTIME.spawn(async move {
+			let surface = instance.create_surface(&window).unwrap();
 			let request_adapter_options = wgpu::RequestAdapterOptions {
 				power_preference: options.power_preference,
 				compatible_surface: Some(&surface),

@@ -509,6 +509,7 @@ mod test {
     use std::sync::{Arc, atomic::AtomicBool};
 
     use pi_async_rt::rt::AsyncRuntime;
+    use wgpu::{Gles3MinorVersion, InstanceFlags};
     use winit::{event_loop::EventLoopBuilder, platform::windows::EventLoopBuilderExtWindows};
 
     use crate::rhi::{device::initialize_renderer, options::RenderOptions};
@@ -526,13 +527,16 @@ mod test {
 			backends: options.backends,
 			/// Which DX12 shader compiler to use.
 			dx12_shader_compiler: wgpu::Dx12Compiler::Fxc,
+			flags: InstanceFlags::DEBUG,
+			gles_minor_version: Gles3MinorVersion::Automatic,
 		});
 		let event_loop =  EventLoopBuilder::new().with_any_thread(true).build();
 		let window = winit::window::Window::new(&event_loop).unwrap();
 
-		let surface = unsafe {instance.create_surface(&window).unwrap()};
+		
 
 		pi_hal::runtime::MULTI_MEDIA_RUNTIME.spawn(async move {
+			let surface = instance.create_surface(&window).unwrap();
 			let request_adapter_options = wgpu::RequestAdapterOptions {
 				power_preference: options.power_preference,
 				compatible_surface: Some(&surface),

@@ -43,6 +43,11 @@ pub trait DependNode<Context>: 'static + ThreadSync {
 		to: &[NodeId],
     ) -> Result<Self::Output, String>;
 
+	// 
+	fn reset<'a>(
+        &'a mut self,
+    );
+
     /// 执行，每帧会调用一次
     /// 执行 run方法之前，会先取 前置节点 相同类型的输出 填充到 input 来
     ///
@@ -125,6 +130,9 @@ pub(crate) trait InternalNode<Context: ThreadSync + 'static>: OutParam {
 
 	fn clear(&mut self);
 
+	// 构建结束时调用（指所有出度节点的build方法都调用完成）
+	fn build_end(&mut self);
+
     // 当 sub_ng 改变后，需要调用
     fn inc_next_refs(&mut self);
 
@@ -132,7 +140,10 @@ pub(crate) trait InternalNode<Context: ThreadSync + 'static>: OutParam {
     fn add_pre_node(&mut self, nodes: (NodeId, NodeState<Context>));
 
     // 每帧 后继的渲染节点 获取参数时候，需要调用 此函数
-    fn dec_curr_ref(&self);
+    fn dec_curr_run_ref(&self);
+
+	// 每帧 后继的渲染节点 获取参数时候，需要调用 此函数
+    fn dec_curr_build_ref(&mut self) -> i32;
 
     // 构建，当依赖图 构建时候，会调用一次
     // 一般 用于 准备 渲染 资源的 创建
@@ -167,6 +178,8 @@ where
     // 该节点 当前 后继节点数量
     // 每帧 运行 依赖图 前，让它等于  next_refs
     curr_next_refs: AtomicI32,
+
+	curr_next_build_refs: i32,
 }
 
 impl<I, O, R, Context> DependNodeImpl<I, O, R, Context>
@@ -188,6 +201,7 @@ where
 
             total_next_refs: 0,
             curr_next_refs: AtomicI32::new(0),
+			curr_next_build_refs: 0,
         }
     }
 }
@@ -234,6 +248,10 @@ where
         self.output = Default::default();
 	}
 
+	fn build_end(&mut self) {
+		self.node.reset();
+	}
+
     fn inc_next_refs(&mut self) {
         self.total_next_refs += 1;
     }
@@ -251,13 +269,13 @@ where
         self.pre_nodes.push(node);
     }
 
-    fn dec_curr_ref(&self) {
+    fn dec_curr_run_ref(&self) {
         // 注：这里 last_count 是 self.curr_next_refs 减1 前 的结果
         let last_count = self.curr_next_refs.fetch_sub(1, Ordering::SeqCst);
-        assert!(
-            last_count >= 1,
-            "DependNode error, last_count = {last_count}"
-        );
+        // assert!(
+        //     last_count >= 1,
+        //     "DependNode error, last_count = {last_count}"
+        // );
 
         if last_count == 1 {
             // SAFE: 此处强转可变，然后清理self.output是安全的
@@ -267,32 +285,38 @@ where
         }
     }
 
+	fn dec_curr_build_ref(&mut self) -> i32 {
+		self.curr_next_build_refs -= 1;
+		self.curr_next_build_refs
+    }
+
 	fn build<'a>(&'a mut self, context: &'a mut Context, id: NodeId, from: &'a [NodeId], to: &'a [NodeId]) -> Result<(), GraphError> {
-        for (pre_id, pre_node) in &self.pre_nodes {
+		for (pre_id, pre_node) in &self.pre_nodes {
 			let p = pre_node.0.as_ref();
-			let p = p.borrow();
-			self.input.fill_from(*pre_id, p.deref());
-			// // 用完了 一个前置，引用计数 减 1
-			// build阶段不减1，在run中减一
-			// p.deref().dec_curr_ref();
+			let p1 = p.borrow();
+			self.input.fill_from(*pre_id, p1.deref());
 		}
 
 		let runner = self.node.build(context, &self.input, &self.param_usage, id, from, to);
-
 		match runner {
 			Ok(output) => {
 				// 结束前，先 重置 引用数
-				self.curr_next_refs
-					.store(self.total_next_refs, Ordering::SeqCst);
+				self.curr_next_build_refs = self.total_next_refs;
 
-				// 运行完，重置 输入
-				self.input = Default::default();
+				for (_pre_id, pre_node) in &self.pre_nodes {
+					let p = pre_node.0.as_ref();
+					let mut p = p.borrow_mut();
+					// // 用完了 一个前置，引用计数 减 1
+					// build阶段不减1，在run中减一
+					let cur_count = p.deref_mut().dec_curr_build_ref();
+					if cur_count == 0 {
+						// SAFE: 此处强转可变是安全的，因为单线程执行build
+						p.deref_mut().build_end();
+					}
+				}
 
 				// 替换 输出
-				if self.total_next_refs == 0 {
-					// 注：如果此节点 无 后继节点，则 该节点输出 会 直接为 Default
-					self.output = Default::default();
-				} else {
+				if self.total_next_refs != 0 {
 					self.output = output;
 				}
 
@@ -302,43 +326,12 @@ where
 		}
     }
 
-    // fn build<'a>(&'a mut self, context: &'a Context) -> Result<(), GraphError> {
-    //     self.node
-    //         .build(context, &self.param_usage)
-    //         .map_err(GraphError::CustomBuildError)
-    // }
-
     fn run<'a>(&'a mut self, index: usize, context: &'a Context, id: NodeId, from: &'static [NodeId], to: &'static [NodeId]) -> BoxFuture<'a, Result<(), GraphError>> {
         Box::pin(async move {
-            // for (_pre_id, pre_node) in &self.pre_nodes {
-            //     let p = pre_node.0.as_ref();
-            //     let p = p.borrow();
-            //     // self.input.fill_from(*pre_id, p.deref());
-            //     // 用完了 一个前置，引用计数 减 1
-            //     p.deref().dec_curr_ref();
-            // }
-
             let runner = self.node.run(index, context, &self.input, &self.param_usage, id, from, to);
 
             match runner.await {
-                Ok(_output) => {
-                    // // 结束前，先 重置 引用数
-                    // self.curr_next_refs
-                    //     .store(self.total_next_refs, Ordering::SeqCst);
-
-                    // // 运行完，重置 输入
-                    // self.input = Default::default();
-
-                    // // 替换 输出
-                    // if self.total_next_refs == 0 {
-                    //     // 注：如果此节点 无 后继节点，则 该节点输出 会 直接为 Default
-                    //     self.output = Default::default();
-                    // } else {
-                    //     self.output = output;
-                    // }
-
-                    Ok(())
-                }
+                Ok(_output) => Ok(()),
                 Err(msg) => Err(GraphError::CustomRunError(msg)),
             }
         })

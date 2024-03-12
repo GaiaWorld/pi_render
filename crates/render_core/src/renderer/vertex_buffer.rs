@@ -191,6 +191,10 @@ pub struct VertexBufferAllocator {
     unupdatables_for_index: Vec<FixedSizeBufferPoolNotUpdatable>,
 }
 
+// TODO Send问题， 临时解决
+unsafe impl Send for VertexBufferAllocator {}
+unsafe impl Sync for VertexBufferAllocator {}
+
 impl Default for VertexBufferAllocator {
     fn default() -> Self {
         Self::new(Self::DEFAULT_CAPACITY, Self::DEFAULT_TIMEOUT)

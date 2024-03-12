@@ -56,26 +56,26 @@ pub enum TextureView {
 
     /// 表面缓冲区 对应的 纹理
     Surface {
-        surface: Share<wgpu::Surface>,
+        surface: Share<wgpu::Surface<'static>>,
         texture: Option<Share<wgpu::SurfaceTexture>>,
         view: Option<Share<wgpu::TextureView>>,
     },
 }
 
-impl TextureView {
+impl TextureView{
     #[inline]
     pub fn with_texture(view: Share<wgpu::TextureView>) -> Self {
         Self::Texture(view)
     }
 
-    #[inline]
-    pub fn with_surface(surface: Share<wgpu::Surface>) -> Self {
-        Self::Surface {
-            surface,
-            texture: None,
-            view: None,
-        }
-    }
+    // #[inline]
+    // pub fn with_surface<'a>(surface: Share<wgpu::Surface<'a>>) -> TextureView<'a> {
+    //     Self::Surface {
+    //         surface,
+    //         texture: None,
+    //         view: None,
+    //     }
+    // }
 
     #[inline]
     pub fn surface(&self) -> Option<&wgpu::Surface> {
@@ -129,14 +129,14 @@ impl TextureView {
 }
 
 pub struct ScreenTexture {
-	surface: wgpu::Surface,
+	surface: wgpu::Surface<'static>,
 	texture: Option<Share<wgpu::SurfaceTexture>>,
 	pub view: Option<Share<wgpu::TextureView>>,
 }
 
 impl ScreenTexture {
 	#[inline]
-    pub fn with_surface(surface: wgpu::Surface) -> Self {
+    pub fn with_surface(surface: wgpu::Surface<'static>) -> Self {
         Self {
             surface,
             texture: None,
@@ -195,13 +195,13 @@ impl ScreenTexture {
     }
 }
 
-impl From<wgpu::TextureView> for TextureView {
+impl<'window> From<wgpu::TextureView> for TextureView {
     fn from(value: wgpu::TextureView) -> Self {
         TextureView::Texture(Share::new(value))
     }
 }
 
-impl Deref for TextureView {
+impl<'window> Deref for TextureView {
     type Target = wgpu::TextureView;
 
     #[inline]

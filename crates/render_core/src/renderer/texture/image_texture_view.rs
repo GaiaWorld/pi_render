@@ -2,8 +2,10 @@ use std::{sync::Arc, ops::Deref};
 
 use pi_assets::{asset::{Handle, Asset, Size, Garbageer}, mgr::LoadResult};
 use pi_futures::BoxFuture;
+use pi_share::Share;
+use wgpu::TextureView;
 
-use crate::{asset::TAssetKeyU64, rhi::texture::TextureView};
+use crate::asset::TAssetKeyU64;
 
 use super::{image_texture::{KeyImageTexture, ImageTexture}, TextureViewDesc};
 
@@ -28,7 +30,7 @@ impl KeyImageTextureView {
 #[derive(Debug)]
 pub struct ImageTextureView {
     pub(crate) texture: Handle<ImageTexture>,
-    pub(crate) view: TextureView,
+    pub(crate) view: Share<TextureView>,
 }
 impl Asset for ImageTextureView {
     type Key = u64;
@@ -58,7 +60,7 @@ impl ImageTextureView {
 
         Self {
             texture,
-            view: TextureView::with_texture(Arc::new(view)) ,
+            view: Share::new(view) ,
         }
     }
     pub fn texture(&self) -> &Handle<ImageTexture> {

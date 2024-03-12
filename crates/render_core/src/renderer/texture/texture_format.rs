@@ -80,6 +80,8 @@ impl TTextureFormatPixelByte for wgpu::TextureFormat {
             wgpu::TextureFormat::EacRg11Unorm           => 01,
             wgpu::TextureFormat::EacRg11Snorm           => 01,
             wgpu::TextureFormat::Astc { .. } => 01,
+            wgpu::TextureFormat::Rgb10a2Uint => 01,
+            wgpu::TextureFormat::NV12 => 03,
         }
     }
 }

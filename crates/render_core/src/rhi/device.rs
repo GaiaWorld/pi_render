@@ -13,6 +13,10 @@ use wgpu::util::DeviceExt;
 #[derive(Clone, Deref)]
 pub struct RenderDevice(Share<wgpu::Device>);
 
+// TODO Send问题， 临时解决
+unsafe impl Send for RenderDevice {}
+unsafe impl Sync for RenderDevice {}
+
 impl From<Share<wgpu::Device>> for RenderDevice {
     fn from(device: Share<wgpu::Device>) -> Self {
         log::info!("=============== limits = {:?}", device.limits());
@@ -180,7 +184,7 @@ pub struct Binding(usize);
 pub async fn initialize_renderer(
 	instance: &wgpu::Instance,
 	options: &RenderOptions,
-	request_adapter_options: &wgpu::RequestAdapterOptions<'_>,
+	request_adapter_options: &wgpu::RequestAdapterOptions<'_, '_>,
 ) -> (RenderDevice, RenderQueue, wgpu::AdapterInfo) {
 	let adapter = instance
 		.request_adapter(request_adapter_options)
@@ -309,6 +313,9 @@ pub async fn initialize_renderer(
 			max_bindings_per_bind_group: limits
 				.max_bindings_per_bind_group
 				.min(constrained_limits.max_bindings_per_bind_group),
+			max_non_sampler_bindings: limits
+			.max_non_sampler_bindings
+			.min(constrained_limits.max_non_sampler_bindings),
 		};
 	}
 
@@ -316,8 +323,8 @@ pub async fn initialize_renderer(
 		.request_device(
 			&wgpu::DeviceDescriptor {
 				label: options.device_label.as_ref().map(|a| a.as_ref()),
-				features,
-				limits,
+				required_features: features,
+				required_limits: limits,
 			},
 			trace_path,
 		)

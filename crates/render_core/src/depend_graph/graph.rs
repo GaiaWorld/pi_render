@@ -7,6 +7,8 @@
 //!   + DependGraph
 //!
 
+use crate::rhi::texture::ScreenTexture;
+
 use super::{
     node::{DependNode, NodeId, NodeState, ParamUsage, NodeLabel},
     param::{InParam, OutParam},
@@ -19,7 +21,7 @@ use super::graph_data::NGraph;
 use pi_hash::{XHashMap, XHashSet};
 use pi_share::ThreadSync;
 use pi_slotmap::SlotMap;
-use std::{borrow::Cow, mem::transmute};
+use std::{borrow::Cow, mem::transmute, sync::atomic::AtomicBool};
 
 /// 依赖图
 pub struct DependGraph<Context: ThreadSync + 'static> {
@@ -154,7 +156,7 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
 
 
     /// 添加 名为 name 的 节点
-    pub fn add_node<I, O, R>(
+    pub fn add_node<'a, I, O, R>(
         &mut self,
         name: impl Into<Cow<'static, str>>,
         node: R,
@@ -183,7 +185,7 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
 	}
 
     /// 添加 名为 name 的 节点
-    fn add<I, O, R>(
+    fn add<'a, I, O, R>(
         &mut self,
         name: impl Into<Cow<'static, str>>,
         node: R,
@@ -213,6 +215,7 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
             run_node,
             name: name.to_string(),
             state: node_state,
+			// run_way: RunWay::Schedule,
         });
         if is_sub_graph {
             self.topo_graph.add_sub_graph(node_id, ());
@@ -226,6 +229,12 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
 		
         Ok(node_id)
     }
+
+	// pub fn set_run_way(&mut self, node_id: NodeId, run_way: RunWay) {
+	// 	if let Some(node) = self.nodes.get_mut(node_id) {
+	// 		node.run_way = run_way;
+	// 	}
+	// }
 
 
     /// 移除 节点或子图
@@ -322,28 +331,15 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
         rt: &A,
         context: &mut Context,
     ) -> Result<(), GraphError> {
-		// let is_topo_dirty = self.is_topo_dirty;
-
-		// 检查图是否改变，如果改变， 需要重构图
-		let build_ret: Result<(), GraphError> = self.build();
-		self.is_finish_dirty = false;
-		self.is_topo_dirty = false;
-		build_ret?;
-
-		// 运行所有图节点的build方法
-		let topological_sort = &self.schedule_graph.topological;
-		for node_id in topological_sort.iter() {
-			let node = &self.nodes[*node_id];
-			let graph_node = self.schedule_graph.get(*node_id).unwrap();
-			(*node.build_node)(context, *node_id, &graph_node.from(), &graph_node.to()).unwrap();
-		}
-
 		// 运行所有图节点的run方法
 		let topological_sort = &self.schedule_graph.topological;
 		let mut map = rt.map_reduce(topological_sort.len());
 		let context: &Context = context;
 		for (index, node_id) in topological_sort.iter().enumerate() {
-			let node = &self.nodes[*node_id];
+			let node = match self.nodes.get(*node_id) {
+				Some(r) => r,
+				None => panic!("error============={:?}", *node_id),
+			};
 			let graph_node = self.schedule_graph.get(*node_id).unwrap();
 			// 这里用transmute绕过声明周期， 是安全的，因为在context、self释放之前，map中的任务已完成（外部等待）
 			map.map(rt.clone(), (*node.run_node)(index, unsafe {transmute(context)}, *node_id, unsafe {transmute(graph_node.from())} ,  unsafe { transmute(graph_node.to())})).unwrap();
@@ -358,8 +354,30 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
 		Ok(())
     }
 
+	/// 执行 渲染
+    pub fn build(
+        &mut self,
+        context: &mut Context,
+    ) -> Result<(), GraphError> {
+		// let is_topo_dirty = self.is_topo_dirty;
+		// 检查图是否改变，如果改变， 需要重构图
+		let build_ret: Result<(), GraphError> = self.update();
+		self.is_finish_dirty = false;
+		self.is_topo_dirty = false;
+		build_ret?;
+
+		// 运行所有图节点的build方法
+		let topological_sort = &self.schedule_graph.topological;
+		for node_id in topological_sort.iter() {
+			let node = &self.nodes[*node_id];
+			let graph_node = self.schedule_graph.get(*node_id).unwrap();
+			(*node.build_node)(context, *node_id, &graph_node.from(), &graph_node.to()).unwrap();
+		}
+		Ok(())
+    }
+
 	/// 构建图，不需要 运行时
-    fn build(&mut self) -> Result<(), GraphError> {
+    fn update(&mut self) -> Result<(), GraphError> {
         self.update_graph()?;
 
         // 构建 run_ng，返回 构建图
@@ -489,6 +507,12 @@ impl<Context: ThreadSync + 'static> DependNode<Context> for InternalNodeEmptyImp
         Ok(())
     }
 
+	fn reset<'a>(
+        &'a mut self,
+    ) {
+        
+    }
+
     fn run<'a>(
         &'a mut self,
 		_index: usize,
@@ -510,7 +534,15 @@ struct ScheduleNode<Context: 'static + ThreadSync> {
 	run_node: RunFunc<Context>,// run方法， 如果是图，run为 empty_run
 	name: String, // 节点名字
 	state: NodeState<Context>, // 节点状态
+	// run_way: RunWay, // 运行方式， 默认为RunWay::Schedule
 }
+
+
+// #[derive(Debug)]
+// pub enum RunWay {
+// 	Schedule, // 运行方式为图运行时派发
+// 	Require(AtomicBool), // 运行方式为外部主动请求运行, AtomicBool表示当前是否正在运行
+// }
 
 
 

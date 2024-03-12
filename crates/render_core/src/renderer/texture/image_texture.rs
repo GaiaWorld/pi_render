@@ -322,7 +322,7 @@ pub async fn create_texture_compressed<G: Garbageer<ImageTexture>>(
                         format,
                         usage: desc.url.useage,
                         view_formats: &[],
-                    }, data.as_slice());
+                    }, Default::default(), data.as_slice());
                     
                     match recv.receive(desc.url, Ok(ImageTexture::new(width, height, buffer.len() as usize, texture, format, viewdimension, is_opacity))).await {
                         Ok(result) => Ok(result),

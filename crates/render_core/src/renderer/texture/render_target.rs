@@ -158,16 +158,16 @@ impl RenderTargetView {
         &self.view
     }
 }
-impl Asset for RenderTargetView {
-    type Key = u64;
-    // const TYPE: &'static str = "RenderTargetView";
-}
+// impl<'window> Asset for RenderTargetView<'window> {
+//     type Key = u64;
+//     // const TYPE: &'static str = "RenderTargetView";
+// }
 
-impl Size for RenderTargetView {
-    fn size(&self) -> usize {
-        ASSET_SIZE_FOR_UNKOWN
-    }
-}
+// impl<'window> Size for RenderTargetView<'window> {
+//     fn size(&self) -> usize {
+//         ASSET_SIZE_FOR_UNKOWN
+//     }
+// }
 
 // pub enum ERenderTargetView {
 //     Color(Handle<RenderTexture>, TextureView),
@@ -227,32 +227,32 @@ impl Size for RenderTargetView {
 //     }
 // }
 
-#[derive(Clone, Debug)]
-pub enum ERenderTargetViewUsage {
-    Handle(Handle<RenderTargetView>),
-    Arc(Arc<RenderTargetView>, KeyRenderTargetViewU64),
-}
-impl ERenderTargetViewUsage {
-    pub fn key(&self) -> u64 {
-        match self {
-            ERenderTargetViewUsage::Handle(val) => *val.key(),
-            ERenderTargetViewUsage::Arc(_val, key) => *key,
-        }
-    }
-    pub fn view(&self) -> &TextureView {
-        match self {
-            ERenderTargetViewUsage::Handle(val) => val.view(),
-            ERenderTargetViewUsage::Arc(val, _) => val.view(),
-        }
-    }
-}
-impl PartialEq for ERenderTargetViewUsage {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::Handle(l0), Self::Handle(r0)) => l0.key() == r0.key(),
-            (Self::Arc(_l0, l1), Self::Arc(_r0, r1)) => l1 == r1,
-            _ => false,
-        }
-    }
-}
-impl Eq for ERenderTargetViewUsage {}
+// #[derive(Clone, Debug)]
+// pub enum ERenderTargetViewUsage {
+//     Handle(Handle<RenderTargetView>),
+//     Arc(Arc<RenderTargetView>, KeyRenderTargetViewU64),
+// }
+// impl ERenderTargetViewUsage {
+//     pub fn key(&self) -> u64 {
+//         match self {
+//             ERenderTargetViewUsage::Handle(val) => *val.key(),
+//             ERenderTargetViewUsage::Arc(_val, key) => *key,
+//         }
+//     }
+//     pub fn view(&self) -> &TextureView {
+//         match self {
+//             ERenderTargetViewUsage::Handle(val) => val.view(),
+//             ERenderTargetViewUsage::Arc(val, _) => val.view(),
+//         }
+//     }
+// }
+// impl PartialEq for ERenderTargetViewUsage {
+//     fn eq(&self, other: &Self) -> bool {
+//         match (self, other) {
+//             (Self::Handle(l0), Self::Handle(r0)) => l0.key() == r0.key(),
+//             (Self::Arc(_l0, l1), Self::Arc(_r0, r1)) => l1 == r1,
+//             _ => false,
+//         }
+//     }
+// }
+// impl Eq for ERenderTargetViewUsage {}

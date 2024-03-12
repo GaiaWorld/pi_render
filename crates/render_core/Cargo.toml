@@ -17,17 +17,17 @@ trace=[]
 # pi_share = {version="0.4", features=["serial", "rc"]}
 # pi_async = {version="0.5", features=["serial"]}
 # pi_futures = {version="0.1", features=["local"]}
-ahash="=0.8.6"
+ahash="0.8"
 petgraph = "0.6"
 paste = "1.0"
 pi_futures = "0.1"
 pi-async-rt = "0.1"
-pi_share = "=0.4.7"
+pi_share = "0.4"
 pi_async_graph = "0.6"
 pi_assets = "0.13"
 pi_graph = "0.1"
 pi_hash = "0.1"
-pi_map = "0.1"
+pi_map = "0.2"
 pi_null = "0.1"
 pi_ecs_macros = "0.1"
 pi_slotmap = "0.1"
@@ -49,7 +49,7 @@ anyhow = "1.0"
 downcast-rs = "1.2"
 hex = "0.4"
 log = "0.4"
-naga = { version = "0.12", features = ["glsl-in"]}
+naga = { version = "0.19", features = ["glsl-in"]}
 nalgebra = "0.32"
 parry3d = "0.13"
 once_cell = "1.4" # TODO: replace once_cell with std equivalent if/when this lands: https://github.com/rust-lang/rfcs/pull/2788
@@ -64,16 +64,18 @@ futures = "0.3"
 guillotiere = { version = "0.6" }
 smallvec = "1.8"
 lazy_static = "1.4"
-pi_atom = "0.2"
+pi_atom = "0.5"
 bytemuck = { version = "1.4", features = ["derive"] }
 
-pi_hal = { version = "0.1", registry = "yn" }
+pi_hal = { version = "=0.1.22", registry = "yn" }
 
 # wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
 
 parking_lot = "0.12"
 crossbeam="0.8"
 ktx = "0.3"
+pi_key_alloter = "0.4"
+
 
 [dev-dependencies]
 bytemuck = { version = "1.4", features = ["derive"] }

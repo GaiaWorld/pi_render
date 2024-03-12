@@ -59,6 +59,7 @@ impl DefaultTexture {
                 usage: wgpu::TextureUsages::TEXTURE_BINDING,
 				view_formats: &[],
             },
+			Default::default(),
             data
         )
     }

@@ -1,6 +1,6 @@
 //! 渲染目标分配器
 
-use std::{hash::{Hash, Hasher}, collections::hash_map::Entry, intrinsics::transmute, mem::size_of};
+use std::{hash::{Hash, Hasher}, collections::hash_map::Entry, intrinsics::transmute, mem::size_of, sync::atomic::AtomicBool};
 
 use derive_deref_rs::Deref;
 use guillotiere::{Size, Allocation, Rectangle, Point};
@@ -68,6 +68,10 @@ pub struct Fbo {
 	pub height: u32,
 }
 
+// TODO Send问题， 临时解决
+unsafe impl Send for Fbo {}
+unsafe impl Sync for Fbo {}
+
 /// 渲染目标视图
 #[derive(Debug)]
 pub struct TargetView {
@@ -76,7 +80,7 @@ pub struct TargetView {
 	info: Allocation,
 	rect: Rectangle, // target的宽高（不包含边框）
 	target: Share<Fbo>,
-	is_hold: bool,
+	is_hold: AtomicBool,
 }
 
 impl TargetView {
@@ -102,6 +106,16 @@ impl TargetView {
 		);
 		// [xmin, ymax, xmin, ymin, xmax, ymin, xmax, ymax]
 		[xmin, ymin, xmin, ymax, xmax, ymax, xmax, ymin]
+	}
+	/// 拿到分配的uv
+	pub fn uv_box(&self) -> [f32; 4] {
+		[
+			self.rect.min.x as f32/self.target.width as f32,
+			self.rect.min.y as f32/self.target.height as f32,
+			self.rect.max.x as f32/self.target.width as f32,
+			
+			self.rect.max.y as f32/self.target.height as f32,
+		]
 	}
 	/// 渲染目标类型id
 	pub fn ty_index(&self) -> DefaultKey {
@@ -130,11 +144,17 @@ impl SafeTargetView {
 	pub fn size(&self) -> usize {
 		self.allotor.targetview_size(&self.value)
 	}
+
+	/// 丢弃空间占用句柄
+	#[inline]
+	pub fn dicard_hold(&self) {
+		self.allotor.0.write().unwrap().dicard_hold(&self.value);
+	}
 }
 
 impl Drop for SafeTargetView {
     fn drop(&mut self) {
-		self.allotor.0.write().deallocate(&self.value);
+		self.allotor.0.write().unwrap().deallocate(&self.value);
     }
 }
 
@@ -179,13 +199,13 @@ impl SafeAtlasAllocator {
 	}
 
 	pub fn get_or_create_type(&self, descript: TargetDescriptor) -> TargetType {
-		self.0.write().get_or_create_type(descript)
+		self.0.write().unwrap().get_or_create_type(descript)
 	}
 
 	/// 创建一个渲染目标类型，并且不共享（get_or_create_type无法通过hash命中该类型）
 	#[inline]
 	pub fn create_type(&mut self, descript: TargetDescriptor) -> TargetType {
-		self.0.write().create_type(descript)
+		self.0.write().unwrap().create_type(descript)
 	}
 
 	/// 分配矩形区域
@@ -204,14 +224,14 @@ impl SafeAtlasAllocator {
 	#[inline]
 	pub fn allocate_not_share<G: GetTargetView, T: Iterator<Item=G>>(&self, width: u32, height: u32, target_type: TargetType, exclude: T, is_hold: bool) -> SafeTargetView {
 		SafeTargetView{
-			value: self.0.write().allocate(width, height, target_type, exclude, is_hold),
+			value: self.0.write().unwrap().allocate(width, height, target_type, exclude, is_hold),
 			allotor: self.clone()
 		}
 	}
 	
 	#[inline]
 	pub fn targetview_size(&self, target: &TargetView) -> usize {
-		self.0.read().targetview_size(target)
+		self.0.read().unwrap().targetview_size(target)
 	}
 }
 
@@ -279,6 +299,8 @@ impl AtlasAllocator {
 		TargetType(Self::create_type_inner(&mut self.all_allocator, descript, self.default_depth_hash))
 	}
 
+	
+
 	/// 分配TargetView
 	/// -is_hold是否占有分配的空间， 如果是true， 将独占该空间， 如果是false， 则与其他分配共享该空间
 	fn allocate<G: GetTargetView, T: Iterator<Item=G>>(&mut self, width: u32, height: u32, target_type: TargetType, exclude: T, is_hold: bool) -> TargetView {
@@ -333,7 +355,7 @@ impl AtlasAllocator {
 						ty_index: target_type.0,
 						index,
 						target: item.target.clone(),
-						is_hold,
+						is_hold: AtomicBool::new(is_hold),
 					};
 				},
 				None => (),
@@ -369,15 +391,25 @@ impl AtlasAllocator {
 			target,
 			index,
 			ty_index: target_type.0,
-			is_hold,
+			is_hold: AtomicBool::new(is_hold),
 		}
+	}
+
+	/// 丢弃占用空间（空间可被接下来的分配占用）
+	fn dicard_hold(&mut self, view: &TargetView) {
+		let r = view.is_hold.swap(false, std::sync::atomic::Ordering::Relaxed);
+		if !r {
+			return;
+		}
+		let alloctor = &mut self.all_allocator[view.ty_index].list[view.index];
+		alloctor.allocator.deallocate(view.info.id);
 	}
 
 	/// 取消TargetView分配
 	fn deallocate(&mut self, view: &TargetView) {
 		let alloctor = &mut self.all_allocator[view.ty_index].list[view.index];
 		// 如果TargetView中独占该空间， 则在此时释放分配空间
-		if view.is_hold {
+		if view.is_hold.load(std::sync::atomic::Ordering::Relaxed) {
 			alloctor.allocator.deallocate(view.info.id);
 		}
 		alloctor.count -= 1;
