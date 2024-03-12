@@ -211,7 +211,7 @@ fn test() {
 	for i in blocks.iter() {
 		let vec:Vec<u8> = Vec::with_capacity(256);
 		let time = std::time::Instant::now();
-		block_alloter.lock().full(i, 0, vec.as_slice()).unwrap();
+		block_alloter.lock().unwrap().full(i, 0, vec.as_slice()).unwrap();
 		println!("time====={:?}", std::time::Instant::now() - time);
 	}
 
