@@ -1,6 +1,6 @@
 [package]
 name = "render_core"
-version = "0.1.18"
+version = "0.1.19"
 authors = ["moyy <myy412001799@gmail.com>"]
 edition = "2021"
 description = "Renderer for PI Engine"
@@ -67,7 +67,7 @@ lazy_static = "1.4"
 pi_atom = "0.5"
 bytemuck = { version = "1.4", features = ["derive"] }
 
-pi_hal = { version = "=0.1.22", registry = "yn" }
+pi_hal = { version = "0.1", registry = "yn" }
 
 # wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
 
