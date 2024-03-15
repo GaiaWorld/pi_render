@@ -125,6 +125,16 @@ impl<K: Key, T> RootGraph<K, T> {
         );
     }
 
+	/// 取到入度节点
+    pub fn before_nodes(&self, k: K) -> Option<&[K]> {
+        self.nodes.get(k).map(|r| {r.edges.from.as_slice()})
+    }
+
+	/// 取到出度节点
+    pub fn after_nodes(&self, k: K) -> Option<&[K]> {
+        self.nodes.get(k).map(|r| {r.edges.to.as_slice()})
+    }
+
     pub fn remove_node(&mut self, k: K) {
 		log::trace!("graph.remove_node({:?})", k);
         let node = self.nodes.remove(k);
