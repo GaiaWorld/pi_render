@@ -5,6 +5,7 @@ use std::{hash::{Hash, Hasher}, collections::hash_map::Entry, intrinsics::transm
 use derive_deref_rs::Deref;
 use guillotiere::{Size, Allocation, Rectangle, Point};
 use pi_assets::{asset::{Handle, Droper}, mgr::AssetMgr, homogeneous::HomogeneousMgr};
+use pi_null::Null;
 use pi_share::{Share, ShareRwLock};
 use pi_slotmap::{DefaultKey, SlotMap, SecondaryMap};
 use pi_hash::{DefaultHasher, XHashMap};
@@ -204,7 +205,7 @@ impl SafeAtlasAllocator {
 
 	/// 创建一个渲染目标类型，并且不共享（get_or_create_type无法通过hash命中该类型）
 	#[inline]
-	pub fn create_type(&mut self, descript: TargetDescriptor) -> TargetType {
+	pub fn create_type(&self, descript: TargetDescriptor) -> TargetType {
 		self.0.write().unwrap().create_type(descript)
 	}
 
@@ -224,7 +225,22 @@ impl SafeAtlasAllocator {
 	#[inline]
 	pub fn allocate_not_share<G: GetTargetView, T: Iterator<Item=G>>(&self, width: u32, height: u32, target_type: TargetType, exclude: T, is_hold: bool) -> SafeTargetView {
 		SafeTargetView{
-			value: self.0.write().unwrap().allocate(width, height, target_type, exclude, is_hold),
+			value: self.0.write().unwrap().allocate(width, height, target_type, exclude, is_hold, false),
+			allotor: self.clone()
+		}
+	}
+
+	/// 分配矩形区域, 但不占用该区域
+	#[inline]
+	pub fn allocate_alone<G: GetTargetView, T: Iterator<Item=G>>(&self, width: u32, height: u32, target_type: TargetType, exclude: T) -> ShareTargetView {
+		Share::new(self.allocate_alone_not_share(width, height, target_type, exclude, false))
+	}
+
+	/// 分配矩形区域
+	#[inline]
+	pub fn allocate_alone_not_share<G: GetTargetView, T: Iterator<Item=G>>(&self, width: u32, height: u32, target_type: TargetType, exclude: T, is_hold: bool) -> SafeTargetView {
+		SafeTargetView{
+			value: self.0.write().unwrap().allocate(width, height, target_type, exclude, is_hold, true),
 			allotor: self.clone()
 		}
 	}
@@ -303,7 +319,7 @@ impl AtlasAllocator {
 
 	/// 分配TargetView
 	/// -is_hold是否占有分配的空间， 如果是true， 将独占该空间， 如果是false， 则与其他分配共享该空间
-	fn allocate<G: GetTargetView, T: Iterator<Item=G>>(&mut self, width: u32, height: u32, target_type: TargetType, exclude: T, is_hold: bool) -> TargetView {
+	fn allocate<G: GetTargetView, T: Iterator<Item=G>>(&mut self, width: u32, height: u32, target_type: TargetType, exclude: T, is_hold: bool, is_alone: bool) -> TargetView {
 		let list = match self.all_allocator.get_mut(target_type.0) {
 			Some(r) => r,
 			None => panic!("TargetType is not exist: {:?}", target_type),
@@ -319,19 +335,24 @@ impl AtlasAllocator {
 			}
 		}
 		for (index, item) in list.list.iter_mut(){
-			// 不在需要排除的渲染目标上分配
-			if self.excludes.get(index).is_some() {
-				continue;
-			}
-
-			// 数量等于0，保持原大小，否则需要padding
-			// 原因是，为了重用屏幕渲染使用的深度缓冲区，通常，fbo的大小与屏幕等大
-			// 同时，需要分配的矩形，也很可能与屏幕等大，如果这里不判断item.count == 0，大部分fbo无法容纳与屏幕等大的矩形
-			let (offset, width, height) = if item.count == 0 {
+			let (offset, width, height) = if is_alone && item.count == 0 && item.target.width == width && item.target.height == height { 
 				(0, width, height)
 			} else {
-				(PADDING, width + DOUBLE_PADDING, height + DOUBLE_PADDING)
+				// 不在需要排除的渲染目标上分配
+				if self.excludes.get(index).is_some() {
+					continue;
+				}
+
+				// 数量等于0，保持原大小，否则需要padding
+				// 原因是，为了重用屏幕渲染使用的深度缓冲区，通常，fbo的大小与屏幕等大
+				// 同时，需要分配的矩形，也很可能与屏幕等大，如果这里不判断item.count == 0，大部分fbo无法容纳与屏幕等大的矩形
+				if item.count == 0 {
+					(0, width, height)
+				} else {
+					(PADDING, width + DOUBLE_PADDING, height + DOUBLE_PADDING)
+				}
 			};
+			
 
 			match item.allocator.allocate(Size::new(width as i32, height as i32)) {
 				Some(allocation) => {
@@ -362,7 +383,11 @@ impl AtlasAllocator {
 			};
 		}
 
-		let target = Share::new(self.create_target(width, height, target_type));
+		let target = if is_alone {
+			Share::new(self.create_target(width, height, width, height, target_type))
+		} else {
+			Share::new(self.create_target(width, height, Null::null(), Null::null(), target_type))
+		};
 
 		// self.debugList.push(Cmd::Create(self.cur_allocator_index, w , h));
 		let mut atlas_allocator= guillotiere::AtlasAllocator::new(
@@ -512,11 +537,23 @@ impl AtlasAllocator {
 		&mut self, 
 		min_width: u32, 
 		min_height: u32, 
+		width: u32, 
+		height: u32, 
 		target_type: TargetType,
 	)-> Fbo {
 		let info: &AllocatorGroupInfo = unsafe { transmute(&self.all_allocator[target_type.0].info) };
-		let mut width = info.descript.default_width.max(min_width);
-		let mut height = info.descript.default_height.max(min_height);
+		let mut width = if width.is_null() {
+			info.descript.default_width.max(min_width)
+		} else {
+			width
+		};
+		let mut height = if height.is_null() {
+			info.descript.default_height.max(min_height)
+		} else {
+			height
+		};
+		// let mut width = info.descript.default_width.max(min_width);
+		// let mut height = info.descript.default_height.max(min_height);
 		let len = info.descript.colors_descriptor.len();
 
 		let mut target = Fbo {
