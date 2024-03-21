@@ -273,6 +273,32 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
         Ok(())
     }
 
+	/// 取到入度节点
+	pub fn before_nodes(
+        &self,
+        label: impl Into<NodeLabel>,
+    ) -> Result<&[NodeId], GraphError> {
+        let label = label.into();
+        let node = self.get_id(&label)?;
+		match self.topo_graph.before_nodes(node) {
+			Some(r) => Ok(r),
+			None => Err(GraphError::NoneNode("".to_string())),
+		}
+    }
+
+	/// 取到出度节点
+	pub fn after_nodes(
+        &self,
+        label: impl Into<NodeLabel>,
+    ) -> Result<&[NodeId], GraphError> {
+        let label = label.into();
+        let node = self.get_id(&label)?;
+		match self.topo_graph.after_nodes(node) {
+			Some(r) => Ok(r),
+			None => Err(GraphError::NoneNode("".to_string())),
+		}
+    }
+
     /// 移除 Node 间 Slot 的 依赖
     /// 执行顺序 `before_label` 先于 `after_label`
     pub fn remove_depend(

@@ -6,6 +6,8 @@ use pi_hal::{
 	image::DynamicImage,
 	loader::AsyncLoader,
 };
+use pi_key_alloter::KeyData;
+use pi_share::Share;
 use wgpu::{TextureView, AstcBlock, AstcChannel, util::{DeviceExt, TextureDataOrder}};
 
 use super::{device::RenderDevice, RenderQueue, texture::PiRenderDefault};
@@ -139,6 +141,55 @@ impl<'a, G: Garbageer<Self>> AsyncLoader<'a, Self, ImageTextureDesc<'a>, G> for 
 	}
 }
 
+pub struct TextureAssetDesc<'a> {
+	pub alloter: &'a Share<pi_key_alloter::KeyAlloter>,
+	pub url: &'a Atom,
+	pub device: &'a RenderDevice,
+	pub queue: &'a RenderQueue,
+}
+
+
+impl<'a, G: Garbageer<Self>> AsyncLoader<'a, Self, TextureAssetDesc<'a>, G> for AssetWithId<TextureRes>  {
+	fn async_load(desc: TextureAssetDesc<'a>, result: LoadResult<'a, Self, G>) -> BoxFuture<'a, std::io::Result<Handle<Self>>> {
+		Box::pin(async move { 
+			match result {
+				LoadResult::Ok(r) => Ok(r),
+				LoadResult::Wait(f) => f.await,
+				LoadResult::Receiver(recv) => {
+					if desc.url.ends_with(KTX_SUFF) {
+						// 加载ktx
+						let file = pi_hal::file::load_from_url(&desc.url).await;
+						let file = match file {
+							Ok(r) => r,
+							Err(_e) =>  {
+								log::error!("load file fail: {:?}", desc.url.as_str());
+								return Err(std::io::Error::new(std::io::ErrorKind::NotFound, ""));
+							},
+						};
+						let r = create_texture_from_ktx1(file.as_slice(), &desc.device, &desc.queue, &desc.url)?;
+						let size = r.size();
+						recv.receive(desc.url.str_hash() as u64, Ok(AssetWithId::new(r, size, desc.alloter.clone()))).await
+					} else {
+						// 加载普通图片
+						let image = pi_hal::image::load_from_url(&desc.url).await;
+						let image = match image {
+							Ok(r) => r,
+							Err(_e) =>  {
+								log::error!("load image fail: {:?}", desc.url.as_str());
+								return Err(std::io::Error::new(std::io::ErrorKind::NotFound, ""));
+							},
+						};
+
+						let r = create_texture_from_image1(&image, &desc.device, &desc.queue, &desc.url);
+						let size = r.size();
+						recv.receive(desc.url.str_hash() as u64, Ok(AssetWithId::new(r, size, desc.alloter.clone()))).await
+					}
+				}
+			}
+		})
+	}
+}
+
 pub async fn create_texture_from_image<G: Garbageer<TextureRes>>(
 	image: &DynamicImage, 
 	device: &RenderDevice, 
@@ -146,6 +197,17 @@ pub async fn create_texture_from_image<G: Garbageer<TextureRes>>(
 	key: &Atom,
 	recv: Receiver<TextureRes, G>
 ) -> Handle<TextureRes> {
+	let r = create_texture_from_image1(image, device, queue, key);
+
+	recv.receive(key.str_hash() as u64, Ok(r)).await.unwrap()
+}
+
+pub fn create_texture_from_image1(
+	image: &DynamicImage, 
+	device: &RenderDevice, 
+	queue: &RenderQueue,
+	key: &Atom,
+) -> TextureRes {
 	let buffer_temp;
 	// let buffer_temp1;
 	let (width, height, buffer, format, pre_pixel_size, is_opacity) = match image {
@@ -201,7 +263,7 @@ pub async fn create_texture_from_image<G: Garbageer<TextureRes>>(
 		texture_extent,
 	);
 
-	recv.receive(key.str_hash() as u64, Ok(TextureRes::new(width, height, byte_size, texture_view, is_opacity, format))).await.unwrap()
+	TextureRes::new(width, height, byte_size, texture_view, is_opacity, format)
 }
 
 
@@ -244,6 +306,44 @@ pub async fn create_texture_from_ktx<G: Garbageer<TextureRes>>(
 	Ok(recv.receive(key.str_hash() as u64, Ok(TextureRes::new(texture_extent.width, texture_extent.height, data.len(), texture_view, true/*TODO*/, format))).await.unwrap())
 }
 
+pub fn create_texture_from_ktx1(
+	buffer: &[u8], 
+	device: &RenderDevice, 
+	queue: &RenderQueue,
+	key: &Atom,
+) -> std::io::Result<TextureRes> {
+
+	use ktx::KtxInfo;
+
+	let decoder = ktx::Decoder::new(buffer)?;
+	let format = convert_format(decoder.gl_internal_format());
+
+	let texture_extent = wgpu::Extent3d {
+		width: decoder.pixel_width(),
+		height: decoder.pixel_height(),
+		depth_or_array_layers: 1,
+	}.physical_size(format);
+	log::warn!("width====={:?}, height==={:?}", texture_extent.width, texture_extent.height);
+
+	// let byte_size = buffer.len();
+	let mut textures = decoder.read_textures();
+	let data = textures.next().unwrap(); // TODO
+
+	let texture = (**device).create_texture_with_data(queue, &wgpu::TextureDescriptor {
+		label: Some("first depth buffer"),
+		size: texture_extent,
+		mip_level_count: 1, // TODO
+		sample_count: 1,
+		dimension: wgpu::TextureDimension::D2,
+		format,
+		usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+		view_formats: &[],
+	}, TextureDataOrder::LayerMajor, data.as_slice());
+	let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+	Ok(TextureRes::new(texture_extent.width, texture_extent.height, data.len(), texture_view, true/*TODO*/, format))
+}
+
 fn convert_format(v: u32) -> wgpu::TextureFormat {
 	match v {
 		// 0x83f0 => wgpu::TextureFormat::Bc1RgbUnorm,// GL_COMPRESSED_RGB_S3TC_DXT1_EXT	0x83f0     GL_COMPRESSED_RGB_S3TC_DXT1_EXT	Bc1RgbUnorm
@@ -273,5 +373,53 @@ fn convert_format(v: u32) -> wgpu::TextureFormat {
 		0x93bc => wgpu::TextureFormat::Astc { block: AstcBlock::B12x10, channel: AstcChannel::Unorm },// GL_COMPRESSED_RGBA_ASTC_12x10_KHR	0x93bc     GL_COMPRESSED_RGBA_ASTC_12x10_KHR	Astc12x10 
 		0x93bd => wgpu::TextureFormat::Astc { block: AstcBlock::B12x12, channel: AstcChannel::Unorm },// GL_COMPRESSED_RGBA_ASTC_12x12_KHR	0x93bd     GL_COMPRESSED_RGBA_ASTC_12x12_KHR	Astc12x12Unorm
 		_ => panic!("not suport fomat： {}", v),
+	}
+}
+
+
+
+#[derive(Debug)]
+pub struct AssetWithId<T> {
+	pub id: KeyData,
+	pub value: T,
+	pub size: usize,
+	alloter: Share<pi_key_alloter::KeyAlloter>,
+}
+
+impl<T> AssetWithId<T> {
+    pub fn new(value: T, size: usize, alloter: Share<pi_key_alloter::KeyAlloter>) -> Self {
+		let r = alloter.alloc(1, 1);
+        Self {
+            id: r,
+            value,
+            alloter,
+			size,
+        }
+    }
+}
+
+impl<T> std::ops::Deref for AssetWithId<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.value
+    }
+}
+
+
+impl<T> Drop for AssetWithId<T> {
+    fn drop(&mut self) {
+		self.alloter.recycle(self.id);
+    }
+}
+
+impl<T: 'static> Asset for AssetWithId<T>{
+	type Key = u64;
+    // const TYPE: &'static str = "TextureRes";
+}
+
+impl<T: 'static> Size for AssetWithId<T> {
+	fn size(&self) -> usize {
+		self.size
 	}
 }
