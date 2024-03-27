@@ -278,7 +278,7 @@ impl<K: Key, T> RootGraph<K, T> {
         }
 
         debug!("graph's from = {:?}", from);
-		let mut queue = from.iter().copied().collect::<VecDeque<K>>();
+		let mut queue: VecDeque<K> = from.iter().copied().collect::<VecDeque<K>>();
 		for sub_graph in sub_graphs.values() {
 			queue.extend(sub_graph.from.iter());
 		}
@@ -395,6 +395,7 @@ impl<K: Key, T: Clone> RootGraph<K, T> {
         }
 
 		let mut from_keys = vec![];
+		part_graph.to = current_keys.clone();
         while !current_keys.is_empty() {
             debug!("gen_graph_from_keys, current_keys = {:?}", current_keys);
 
@@ -421,17 +422,46 @@ impl<K: Key, T: Clone> RootGraph<K, T> {
             let _ = std::mem::swap(&mut current_keys, &mut from_keys);
         }
 
-		let mut graph_ids: SecondaryMap<K, bool> = SecondaryMap::default();
-		for k in self.topological.iter() {
-			self.build_topo(*k, &mut part_graph, &mut graph_ids);
+		// let mut graph_ids: SecondaryMap<K, bool> = SecondaryMap::default();
+		// for k in self.topological.iter() {
+		// 	self.build_topo(*k, &mut part_graph, &mut graph_ids);
+		// }
+
+		let mut from1: Vec<K> = part_graph.from.clone();
+		let mut from: Vec<K> = Vec::new();
+		let mut counts: VecMap<usize> = VecMap::with_capacity(part_graph.nodes.len());
+		
+		while from1.len() > 0{
+			for k in from1.drain(..) {
+				let node = part_graph.nodes.get(k).unwrap();
+				part_graph.topological.push(k);
+				
+				
+				// 处理 from 的 下一层
+			   
+				debug!("from = {:?}, to: {:?}", k, node.to());
+				// 遍历节点的后续节点
+				for to in node.to().iter()  {
+					// debug!("graph's each = {:?}, count = {:?}", to, counts[key_index(*to)]);
+					counts[key_index(*to)] -= 1;
+					// handle_set.insert(*to, ());
+					if counts[key_index(*to)] == 0 {
+						from.push(*to);
+					}
+				}
+			}
+			part_graph.layer.push(part_graph.topological.len());
+			std::mem::swap(&mut from1, &mut from);
 		}
-
-
 
 		part_graph
     }
 
 	fn link_from(&self, curr: K, from: &Vec<K>, current_keys: &mut Vec<K>, part_graph: &mut NGraph<K, T>) {
+		// 没有from, 则当前节点是图的入度节点
+		if from.len() == 0 {
+			part_graph.from.push(curr);
+		}
 		for from in from {
 			if let Some(sub_graph) = self.sub_graphs.get(*from){
 				self.link_from(curr, &sub_graph.to, current_keys, part_graph);

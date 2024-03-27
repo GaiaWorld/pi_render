@@ -14,6 +14,7 @@ pub struct NGraph<K: Key, T> {
 	// 所有节点
 	pub nodes: SecondaryMap<K, NGraphNode<K, T>>,
 	pub topological: Vec<K>,
+	pub layer: Vec<usize>, // 层， 表示topological中的从什么位置开始可以切换到下一层
 }
 
 
@@ -24,6 +25,7 @@ impl<K: Key, T> NGraph<K, T>{
 			to: Default::default(),
 			nodes: Default::default(),
 			topological: Vec::default(),
+			layer: Vec::new(),
 		}
 	}
 	#[inline]
