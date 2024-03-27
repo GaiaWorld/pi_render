@@ -6,6 +6,7 @@ use pi_assets::{asset::Handle, mgr::AssetMgr};
 use pi_async_rt::prelude::AsyncValueNonBlocking as AsyncValue;
 use pi_atom::Atom;
 use pi_hal::font::sdf2_table::TexInfo;
+// use pi_hal::font::svg::SvgTable;
 use pi_hal::runtime::MULTI_MEDIA_RUNTIME;
 use pi_hash::DefaultHasher;
 use pi_key_alloter::DefaultKey;
@@ -187,6 +188,76 @@ impl FontSheet {
 			FontType::Sdf1 => todo!(),
 			FontType::Sdf2 => {
 				self.font_mgr.table.sdf2_table.update(move |block, image| {
+					let (texture, pixle_size) = if image.width * image.height * 2 == image.buffer.len() {
+						// index
+						match &sdf2_index_texture {
+							Some(r) => (r, 2),
+							None => return,
+						}
+					} else {
+						// data
+						match &sdf2_data_texture {
+							Some(r) => (r, 4),
+							None => return,
+						}
+					};
+		
+					log::trace!("draw sdf2=-=============={}, {:?}, {:?}, {:?}, {:?}, {:?}", image.buffer.len(), block.x, block.y, &image.width, image.height, pixle_size);
+					
+					queue.write_texture(
+						ImageCopyTexture {
+							texture: &texture,
+							mip_level: 0,
+							origin: Origin3d {
+								x: block.x as u32,
+								y: block.y as u32,
+								z: 0
+							},
+							aspect: TextureAspect::All
+						}, 
+						image.buffer.as_slice(),
+						ImageDataLayout {
+							offset: 0,
+							bytes_per_row: if image.width == 0 { None }else { Some(image.width as u32 * pixle_size) }, // 32 * 4
+							rows_per_image: None,
+						},
+						Extent3d {
+							width: image.width as u32,
+							height: image.height as u32,
+							depth_or_array_layers: 1,
+						});
+					let mut v =  version.lock().unwrap();
+					*v = *v + 1;
+				}, result)
+			},
+		}
+	}
+
+	// 绘制等待列表
+	pub fn draw_sdf_await(&mut self) -> AsyncValue<Share<ShareMutex<(usize, Vec<(u64, TexInfo, Vec<u8>, Vec<u8>)>)>>> {
+		let font_type = self.font_mgr.font_type();
+		
+		match font_type {
+			FontType::Bitmap => todo!(),
+			FontType::Sdf1 => todo!(),
+			FontType::Sdf2 => self.font_mgr.table.sdf2_table.draw_svg_await()
+		}
+	}
+
+	pub fn update_svg_sdf2(&mut self, result: Share<ShareMutex<(usize, Vec<(u64, TexInfo, Vec<u8>, Vec<u8>)>)>>) {
+		let queue = self.queue.clone();
+		let version = self.texture_version.clone();
+		// let sdf_texture_version = self.sdf_texture_version.clone();
+		let font_type = self.font_mgr.font_type();
+
+		let sdf2_index_texture = self.sdf2_index_texture.clone();
+		let sdf2_data_texture = self.sdf2_data_texture.clone();
+
+		match font_type {
+			FontType::Bitmap => todo!(),
+			FontType::Sdf1 => todo!(),
+			FontType::Sdf2 => {
+				self.font_mgr.table.sdf2_table.update_svg(move |block, image| {
 					let (texture, pixle_size) = if image.width * image.height * 2 == image.buffer.len() {
 						// index
 						match &sdf2_index_texture {
