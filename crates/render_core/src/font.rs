@@ -35,6 +35,8 @@ pub struct FontSheet {
 	pub sdf2_index_texture: Option<Share<Texture>>,
 	pub sdf2_data_texture_view: Option<Handle<AssetWithId<TextureRes>>>,
 	pub sdf2_data_texture: Option<Share<Texture>>,
+	pub sdf2_shadow_texture_view: Option<Handle<AssetWithId<TextureRes>>>,
+	pub sdf2_shadow_texture: Option<Share<Texture>>,
 	pub sdf2_await: Share<SegQueue< Arc<ShareMutex<(usize, Vec<(DefaultKey, TexInfo, Vec<u8>, Vec<u8>)>)>>>>,
 
 	queue: RenderQueue,
@@ -75,6 +77,8 @@ impl FontSheet {
 			sdf2_index_texture: None,
 			sdf2_data_texture_view: None, 
 			sdf2_data_texture: None,
+			sdf2_shadow_texture_view: None,
+			sdf2_shadow_texture: None,
 			sdf2_await: Share::new(SegQueue::default()),
 			// sdf2_texture_version: Share::new(ShareMutex::new(0)),
 
@@ -82,6 +86,7 @@ impl FontSheet {
 			device: device.clone(),
 			texture_asset_mgr: texture_asset_mgr.clone(),
 			alloter,
+ 
 		};
 		match font_type {
 			FontType::Bitmap => r.init_texture(),
@@ -164,7 +169,7 @@ impl FontSheet {
 	}
 
 	// 绘制等待列表
-	pub fn draw_await(&mut self) -> AsyncValue<Share<ShareMutex<(usize, Vec<(DefaultKey, TexInfo, Vec<u8>, Vec<u8>)>)>>> {
+	pub fn draw_await(&mut self) -> AsyncValue<Share<ShareMutex<(usize, Vec<(DefaultKey, TexInfo, Vec<u8>, Vec<u8>,Vec<u8>,Vec<u8>,Vec<u8>,Vec<u8>, )>)>>> {
 		let font_type = self.font_mgr.font_type();
 		
 		match font_type {
@@ -174,7 +179,7 @@ impl FontSheet {
 		}
 	}
 
-	pub fn update_sdf2(&mut self, result: Share<ShareMutex<(usize, Vec<(DefaultKey, TexInfo, Vec<u8>, Vec<u8>)>)>>) {
+	pub fn update_sdf2(&mut self, result: Share<ShareMutex<(usize, Vec<(DefaultKey, TexInfo, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>)>)>>) {
 		let queue = self.queue.clone();
 		let version = self.texture_version.clone();
 		// let sdf_texture_version = self.sdf_texture_version.clone();
@@ -182,7 +187,9 @@ impl FontSheet {
 
 		let sdf2_index_texture = self.sdf2_index_texture.clone();
 		let sdf2_data_texture = self.sdf2_data_texture.clone();
+		let sdf2_shadow_texture = self.sdf2_shadow_texture.clone();
 
+		let queue1 = queue.clone();
 		match font_type {
 			FontType::Bitmap => todo!(),
 			FontType::Sdf1 => todo!(),
@@ -228,13 +235,43 @@ impl FontSheet {
 						});
 					let mut v =  version.lock().unwrap();
 					*v = *v + 1;
+				},
+				move |block, image| {
+					log::trace!("draw sdf2=-============== {:?}, {:?}, {:?}, {:?}", block.x, block.y, &image.width, image.height);
+					if let Some(texture) = &sdf2_shadow_texture{
+						for i in 0..=3{
+							let extent = wgpu::Extent3d {
+								width: image.width as u32 >> i,
+								height: image.height as u32 >> i,
+								depth_or_array_layers: 1,
+							};
+							queue1.write_texture(
+								ImageCopyTexture {
+									texture: &texture,
+									mip_level: i,
+									origin: Origin3d {
+										x: block.x as u32 >> i,
+										y: block.y as u32 >> i,
+										z: 0
+									},
+									aspect: TextureAspect::All
+								}, 
+								image.minimip[i as usize].as_slice(),
+								ImageDataLayout {
+									offset: 0,
+									bytes_per_row: if image.width == 0 { None }else { Some(image.width as u32 >> i) },
+									rows_per_image: None,
+								},
+								extent);
+						}
+					}
 				}, result)
 			},
 		}
 	}
 
 	// 绘制等待列表
-	pub fn draw_sdf_await(&mut self) -> AsyncValue<Share<ShareMutex<(usize, Vec<(u64, TexInfo, Vec<u8>, Vec<u8>)>)>>> {
+	pub fn draw_sdf_await(&mut self) -> AsyncValue<Share<ShareMutex<(usize, Vec<(u64, TexInfo, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>)>)>>> {
 		let font_type = self.font_mgr.font_type();
 		
 		match font_type {
@@ -244,7 +281,7 @@ impl FontSheet {
 		}
 	}
 
-	pub fn update_svg_sdf2(&mut self, result: Share<ShareMutex<(usize, Vec<(u64, TexInfo, Vec<u8>, Vec<u8>)>)>>) {
+	pub fn update_svg_sdf2(&mut self, result: Share<ShareMutex<(usize, Vec<(u64, TexInfo, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>)>)>>) {
 		let queue = self.queue.clone();
 		let version = self.texture_version.clone();
 		// let sdf_texture_version = self.sdf_texture_version.clone();
@@ -252,7 +289,8 @@ impl FontSheet {
 
 		let sdf2_index_texture = self.sdf2_index_texture.clone();
 		let sdf2_data_texture = self.sdf2_data_texture.clone();
-
+		let sdf2_shadow_texture = self.sdf2_shadow_texture.clone();
+		let queue1 = queue.clone();
 		match font_type {
 			FontType::Bitmap => todo!(),
 			FontType::Sdf1 => todo!(),
@@ -272,7 +310,7 @@ impl FontSheet {
 						}
 					};
 		
-					log::trace!("draw sdf2=-=============={}, {:?}, {:?}, {:?}, {:?}, {:?}", image.buffer.len(), block.x, block.y, &image.width, image.height, pixle_size);
+					println!("draw sdf2=-=============={}, {:?}, {:?}, {:?}, {:?}, {:?}", image.buffer.len(), block.x, block.y, &image.width, image.height, pixle_size);
 					
 					queue.write_texture(
 						ImageCopyTexture {
@@ -298,7 +336,38 @@ impl FontSheet {
 						});
 					let mut v =  version.lock().unwrap();
 					*v = *v + 1;
-				}, result)
+				}, 
+				move |block, image| {
+					println!("draw sdf2=-============== {:?}, {:?}, {:?}, {:?}", block.x, block.y, &image.width, image.height);
+					if let Some(texture) = &sdf2_shadow_texture{
+						for i in 0..=3{
+							let extent = wgpu::Extent3d {
+								width: image.width as u32 >> i,
+								height: image.height as u32 >> i,
+								depth_or_array_layers: 1,
+							};
+							queue1.write_texture(
+								ImageCopyTexture {
+									texture: &texture,
+									mip_level: i,
+									origin: Origin3d {
+										x: block.x as u32 >> i,
+										y: block.y as u32 >> 1,
+										z: 0
+									},
+									aspect: TextureAspect::All
+								}, 
+								image.minimip[i as usize].as_slice(),
+								ImageDataLayout {
+									offset: 0,
+									bytes_per_row: if image.width == 0 { None }else { Some(image.width as u32 >> i) },
+									rows_per_image: None,
+								},
+								extent);
+						}
+					}
+					
+				},result)
 			},
 		}
 	}
@@ -454,12 +523,28 @@ impl FontSheet {
 			view_formats: &[],
 			usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
 		});
+		let shadow_texture = (*self.device).create_texture(&wgpu::TextureDescriptor {
+			label: Some("sdf2 shadow texture"),
+			size: wgpu::Extent3d {
+				width: index_size.width as u32,
+				height: index_size.height as u32,
+				depth_or_array_layers: 1,
+			},
+			mip_level_count: 4,
+			sample_count: 1,
+			dimension: wgpu::TextureDimension::D2,
+			format: wgpu::TextureFormat::R8Unorm,
+			usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+			view_formats: &[],
+		});
 
 		let index_texture_view = index_texture.create_view(&wgpu::TextureViewDescriptor::default());
 		let data_texture_view = data_texture.create_view(&wgpu::TextureViewDescriptor::default());
+		let shadow_texture_view = shadow_texture.create_view(&wgpu::TextureViewDescriptor::default());
 		// let key = calc_hash(&"text texture view");
 		let index_key = Atom::from("_$text_index").str_hash() as u64;
 		let data_key = Atom::from("_$text_data").str_hash() as u64;
+		let shadow_key = Atom::from("_$shadow_data").str_hash() as u64;
 		let index_texture_view = if let Ok(r) = self.texture_asset_mgr.insert(index_key, AssetWithId::new(TextureRes::new(index_size.width as u32, index_size.height as u32, (index_size.width * index_size.height * 2) as usize, index_texture_view, false, wgpu::TextureFormat::Rg8Unorm), (index_size.width * index_size.height * 2) as usize, self.alloter.clone())) {
 			r
 		} else {
@@ -470,12 +555,20 @@ impl FontSheet {
 		} else {
 			panic!("insert asset fail");
 		};
+		let shadow_texture_view = if let Ok(r) = self.texture_asset_mgr.insert(shadow_key, AssetWithId::new(TextureRes::new(index_size.width as u32, index_size.height as u32, (index_size.width * index_size.height * 1) as usize, shadow_texture_view, false, wgpu::TextureFormat::R8Unorm), (index_size.width * index_size.height * 1) as usize, self.alloter.clone())) {
+			r
+		} else {
+			panic!("insert asset fail");
+		};
 
 		self.sdf2_index_texture = Some(Share::new(index_texture));
 		self.sdf2_index_texture_view = Some(index_texture_view);
 
 		self.sdf2_data_texture = Some(Share::new(data_texture));
 		self.sdf2_data_texture_view = Some(data_texture_view);
+
+		self.sdf2_shadow_texture = Some(Share::new(shadow_texture));
+		self.sdf2_shadow_texture_view = Some(shadow_texture_view);
 	}
 }
 
