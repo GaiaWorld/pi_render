@@ -13,7 +13,7 @@ use pi_atom::Atom;
 use smallvec::SmallVec;
 use wgpu::{TextureAspect, TextureDimension, TextureFormat, TextureUsages, TextureViewDimension};
 
-use crate::rhi::{asset::{RenderRes, calc_texture_size}, device::RenderDevice};
+use crate::rhi::{asset::{calc_texture_size, AssetWithId, RenderRes, TextureRes}, device::RenderDevice};
 
 lazy_static!{
 	pub static ref DEPTH_TEXTURE: Atom = Atom::from("DEPTH_TEXTURE");
@@ -63,8 +63,8 @@ pub struct TargetDescriptor {
 /// 渲染目标
 #[derive(Debug)]
 pub struct Fbo {
-	pub depth: Option<(Handle<RenderRes<wgpu::TextureView>>, Share<wgpu::Texture>)>,
-	pub colors: SmallVec<[(Handle<RenderRes<wgpu::TextureView>>, Share<wgpu::Texture>);1]>,
+	pub depth: Option<(Handle<AssetWithId<TextureRes>>, Share<wgpu::Texture>)>,
+	pub colors: SmallVec<[(Handle<AssetWithId<TextureRes>>, Share<wgpu::Texture>);1]>,
 	pub width: u32,
 	pub height: u32,
 }
@@ -146,10 +146,18 @@ impl SafeTargetView {
 		self.allotor.targetview_size(&self.value)
 	}
 
-	/// 丢弃空间占用句柄
-	#[inline]
-	pub fn dicard_hold(&self) {
-		self.allotor.0.write().unwrap().dicard_hold(&self.value);
+	// /// 丢弃空间占用句柄
+	// #[inline]
+	// pub fn dicard_hold(&self) {
+	// 	self.allotor.0.write().unwrap().dicard_hold(&self.value);
+	// }
+	
+	// 为该TargetView创建一个弱的（不占用空间）SafeTargetView
+	pub fn downgrade(&self) -> Self {
+		Self {
+			value: self.allotor.0.write().unwrap().to_not_hold(&self.value),
+			allotor: self.allotor.clone()
+		}
 	}
 }
 
@@ -190,13 +198,14 @@ impl SafeAtlasAllocator {
 	/// 创建分配器
 	pub fn new(
 		device: RenderDevice, 
-		texture_assets_mgr: Share<AssetMgr<RenderRes<wgpu::TextureView>>>,
-		unuse_textures: Share<HomogeneousMgr<RenderRes<UnuseTexture>>>
+		texture_assets_mgr: Share<AssetMgr<AssetWithId<TextureRes>>>,
+		unuse_textures: Share<HomogeneousMgr<RenderRes<UnuseTexture>>>,
+		key_alloter: Share<pi_key_alloter::KeyAlloter>,
 	) -> Self {
 		Self (
 			Share::new(
 				ShareRwLock::new(
-					AtlasAllocator::new(device, texture_assets_mgr, unuse_textures))))
+					AtlasAllocator::new(device, texture_assets_mgr, unuse_textures, key_alloter))))
 	}
 
 	pub fn get_or_create_type(&self, descript: TargetDescriptor) -> TargetType {
@@ -266,7 +275,8 @@ struct AtlasAllocator {
 	
 	unuse_textures: Share<HomogeneousMgr<RenderRes<UnuseTexture>>>,
 	// 纹理资源管理器，将纹理资源放入资源管理器，未使用的纹理不立即销毁
-	texture_assets_mgr: Share<AssetMgr<RenderRes<wgpu::TextureView>>>,
+	texture_assets_mgr: Share<AssetMgr<AssetWithId<TextureRes>>>,
+	key_alloter: Share<pi_key_alloter::KeyAlloter>,
 	// 递增的数字，用于缓存纹理创建的纹理（纹理本身描述会重复，不能以描述的hash值作为key，而是以描述hash+ texture_cur_index作为纹理的key）
 	texture_cur_index: usize,
 	// 渲染设备
@@ -282,8 +292,9 @@ const DOUBLE_PADDING: u32 = 2;
 impl AtlasAllocator {
 	fn new(
 		device: RenderDevice, 
-		texture_assets_mgr: Share<AssetMgr<RenderRes<wgpu::TextureView>>>,
+		texture_assets_mgr: Share<AssetMgr<AssetWithId<TextureRes>>>,
 		unuse_textures: Share<HomogeneousMgr<RenderRes<UnuseTexture>>>,
+		key_alloter: Share<pi_key_alloter::KeyAlloter>,
 	) -> Self {
 		let d = create_default_depth_descriptor();
 		Self {
@@ -295,6 +306,7 @@ impl AtlasAllocator {
 			texture_cur_index: 0,
 			device,
 			texture_assets_mgr,
+			key_alloter,
 			excludes: SecondaryMap::new(),
 		}
 	}
@@ -420,15 +432,15 @@ impl AtlasAllocator {
 		}
 	}
 
-	/// 丢弃占用空间（空间可被接下来的分配占用）
-	fn dicard_hold(&mut self, view: &TargetView) {
-		let r = view.is_hold.swap(false, std::sync::atomic::Ordering::Relaxed);
-		if !r {
-			return;
-		}
-		let alloctor = &mut self.all_allocator[view.ty_index].list[view.index];
-		alloctor.allocator.deallocate(view.info.id);
-	}
+	// /// 丢弃占用空间（空间可被接下来的分配占用）
+	// fn dicard_hold(&mut self, view: &TargetView) {
+	// 	let r = view.is_hold.swap(false, std::sync::atomic::Ordering::Relaxed);
+	// 	if !r {
+	// 		return;
+	// 	}
+	// 	let alloctor = &mut self.all_allocator[view.ty_index].list[view.index];
+	// 	alloctor.allocator.deallocate(view.info.id);
+	// }
 
 	/// 取消TargetView分配
 	fn deallocate(&mut self, view: &TargetView) {
@@ -486,6 +498,20 @@ impl AtlasAllocator {
 				// 		hash: self.all_allocator[view.ty_index].info.texture_hash[color_index],
 				// 	});
 			}
+		}
+	}
+
+	/// 变为一个不占用空间的targetview
+	fn to_not_hold(&mut self, view: &TargetView) -> TargetView {
+		let alloctor = &mut self.all_allocator[view.ty_index].list[view.index];
+		alloctor.count += 1;
+		TargetView {
+			ty_index: view.ty_index,
+			index: view.index,
+			info: view.info,
+			rect: view.rect,
+			target: view.target.clone(),
+			is_hold: AtomicBool::new(false),
 		}
 	}
 
@@ -613,7 +639,7 @@ impl AtlasAllocator {
 		aspect: TextureAspect,
 		hash: u64,
 		len: usize,
-	) -> (Handle<RenderRes<wgpu::TextureView>>, Share<wgpu::Texture>, u32, u32) {
+	) -> (Handle<AssetWithId<TextureRes>>, Share<wgpu::Texture>, u32, u32) {
 		// 找到一个匹配的纹理，直接返回
 		let unuse =  self.unuse_textures.pop_by_filter(|t| {
 			if t.hash == hash && 
@@ -659,11 +685,12 @@ impl AtlasAllocator {
 
 		self.texture_cur_index += 1;
 		let key = calc_hash(&(hash, self.texture_cur_index, width, height));
+		let s = calc_texture_size(&desc);
 		(
 			match AssetMgr::insert(
 				&self.texture_assets_mgr, 
 				key, 
-				RenderRes::new(texture_view, calc_texture_size(&desc))) {
+				 AssetWithId::new(TextureRes::new(width, height, calc_texture_size(&desc), texture_view, true, descript.format), s, self.key_alloter.clone())) {
 					Ok(r) => r,
 					_ => panic!("alloc fbo key is exist: {:?}", key),
 				},
@@ -703,9 +730,9 @@ struct SingleAllocator {
 
 #[derive(Debug)]
 pub struct UnuseTexture {
-	// weak: ShareWeak<Droper<RenderRes<wgpu::TextureView>>>,
+	// weak: ShareWeak<Droper<AssetWithId<TextureRes>>>,
 	// weak_texture: ShareWeak<wgpu::Texture>,
-	view: Share<Droper<RenderRes<wgpu::TextureView>>>,
+	view: Share<Droper<AssetWithId<TextureRes>>>,
 	texture: Share<wgpu::Texture>,
 	width: u32,
 	height: u32,

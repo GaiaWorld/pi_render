@@ -438,10 +438,14 @@ impl<K: Key, T: Clone> RootGraph<K, T> {
 				
 				
 				// 处理 from 的 下一层
-			   
 				debug!("from = {:?}, to: {:?}", k, node.to());
 				// 遍历节点的后续节点
 				for to in node.to().iter()  {
+					let k = key_index(*to);
+					if !counts.contains(k) {
+						counts.insert(k, part_graph.nodes[*to].from().len());
+					}
+					
 					// debug!("graph's each = {:?}, count = {:?}", to, counts[key_index(*to)]);
 					counts[key_index(*to)] -= 1;
 					// handle_set.insert(*to, ());
@@ -450,7 +454,7 @@ impl<K: Key, T: Clone> RootGraph<K, T> {
 					}
 				}
 			}
-			part_graph.layer.push(part_graph.topological.len());
+			part_graph.depend_split.push(part_graph.topological.len());
 			std::mem::swap(&mut from1, &mut from);
 		}
 
