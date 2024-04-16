@@ -291,14 +291,18 @@ where
     }
 
 	fn build<'a>(&'a mut self, context: &'a mut Context, id: NodeId, from: &'a [NodeId], to: &'a [NodeId]) -> Result<(), GraphError> {
+        // let t1 = std::time::Instant::now();
 		for (pre_id, pre_node) in &self.pre_nodes {
 			let p = pre_node.0.as_ref();
 			let p1 = p.borrow();
 			self.input.fill_from(*pre_id, p1.deref());
 		}
+        // let t2 = std::time::Instant::now();
+        
 
 		let runner = self.node.build(context, &self.input, &self.param_usage, id, from, to);
-		match runner {
+        // let t3 = std::time::Instant::now();
+		let r = match runner {
 			Ok(output) => {
 				// 结束前，先 重置 引用数
 				self.curr_next_build_refs = self.total_next_refs;
@@ -323,7 +327,10 @@ where
 				Ok(())
 			}
 			Err(msg) => Err(GraphError::CustomRunError(msg)),
-		}
+		};
+        // let t4 = std::time::Instant::now();
+        // println!("build1============{:?}", (t2 - t1, t3 - t2, t4 - t3));
+        r
     }
 
     fn run<'a>(&'a mut self, index: usize, context: &'a Context, id: NodeId, from: &'static [NodeId], to: &'static [NodeId]) -> BoxFuture<'a, Result<(), GraphError>> {

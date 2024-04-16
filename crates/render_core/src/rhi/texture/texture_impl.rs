@@ -127,7 +127,7 @@ impl TextureView{
         }
     }
 }
-
+#[derive(Debug)]
 pub struct ScreenTexture {
 	surface: wgpu::Surface<'static>,
 	texture: Option<Share<wgpu::SurfaceTexture>>,

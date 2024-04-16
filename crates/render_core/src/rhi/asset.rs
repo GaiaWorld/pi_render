@@ -49,10 +49,11 @@ pub fn calc_texture_size(desc: &wgpu::TextureDescriptor) -> usize {
 	}
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deref)]
 pub struct TextureRes {
 	pub width: u32,
 	pub height: u32,
+	#[deref]
 	pub texture_view: TextureView,
 	pub is_opacity: bool,
 	pub format: wgpu::TextureFormat,

@@ -39,6 +39,7 @@ pub struct DependGraph<Context: ThreadSync + 'static> {
 	topo_graph: RootGraph<NodeId, ()>, // topo图， 包含节点与子图的链接关系
 	is_topo_dirty: bool, // 哪些图的拓扑结构更改了，会放在该列表中
 	is_finish_dirty: bool,
+	can_run_ndoe_count: usize,
 }
 
 
@@ -61,6 +62,7 @@ impl<Context: ThreadSync + 'static> Default for DependGraph<Context> {
 			is_topo_dirty: false,
 			is_finish_dirty: false,
             // topo_dirty: Vec::new(),
+			can_run_ndoe_count: 0,
         }
     }
 	
@@ -161,13 +163,14 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
         name: impl Into<Cow<'static, str>>,
         node: R,
         parent_graph_id: NodeId,
+		is_run: bool,
     ) -> Result<NodeId, GraphError>
     where
         I: InParam + Default,
         O: OutParam + Default + Clone,
         R: DependNode<Context, Input = I, Output = O>,
     {
-        self.add(name, node, parent_graph_id, false)
+        self.add(name, node, parent_graph_id, is_run, false)
     }
 
     /// 添加 名为 name 的 子图
@@ -176,7 +179,7 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
         name: impl Into<Cow<'static, str>>,
     ) -> Result<NodeId, GraphError>
     {
-        self.add(name, InternalNodeEmptyImpl, NodeId::null(), true)
+        self.add(name, InternalNodeEmptyImpl, NodeId::null(), false, true)
     }
 
 	/// 设置子图的父, 只能在该图与其他节点创建连接关系之前设置， 否则设置不成功
@@ -190,6 +193,7 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
         name: impl Into<Cow<'static, str>>,
         node: R,
         parent_graph_id: NodeId,
+		is_run: bool,
         is_sub_graph: bool,
     ) -> Result<NodeId, GraphError>
     where
@@ -215,6 +219,7 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
             run_node,
             name: name.to_string(),
             state: node_state,
+			is_run,
 			// run_way: RunWay::Schedule,
         });
         if is_sub_graph {
@@ -359,16 +364,21 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
     ) -> Result<(), GraphError> {
 		// 运行所有图节点的run方法
 		let topological_sort = &self.schedule_graph.topological;
-		let mut map = rt.map_reduce(topological_sort.len());
+		let mut map = rt.map_reduce(self.can_run_count());
 		let context: &Context = context;
-		for (index, node_id) in topological_sort.iter().enumerate() {
+		let mut index = 0;
+		for node_id in topological_sort.iter() {
 			let node = match self.nodes.get(*node_id) {
 				Some(r) => r,
 				None => panic!("error============={:?}", *node_id),
 			};
+			if !node.is_run {
+				continue;
+			}
 			let graph_node = self.schedule_graph.get(*node_id).unwrap();
 			// 这里用transmute绕过声明周期， 是安全的，因为在context、self释放之前，map中的任务已完成（外部等待）
 			map.map(rt.clone(), (*node.run_node)(index, unsafe {transmute(context)}, *node_id, unsafe {transmute(graph_node.from())} ,  unsafe { transmute(graph_node.to())})).unwrap();
+			index += 1;
 		}
 		map.reduce(false).await.unwrap();
 
@@ -380,7 +390,7 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
 		Ok(())
     }
 
-	/// 执行 渲染
+	/// 构建
     pub fn build(
         &mut self,
         context: &mut Context,
@@ -388,8 +398,6 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
 		// let is_topo_dirty = self.is_topo_dirty;
 		// 检查图是否改变，如果改变， 需要重构图
 		let build_ret: Result<(), GraphError> = self.update();
-		self.is_finish_dirty = false;
-		self.is_topo_dirty = false;
 		build_ret?;
 
 		// 运行所有图节点的build方法
@@ -402,20 +410,42 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
 		Ok(())
     }
 
-	/// 构建图，不需要 运行时
-    fn update(&mut self) -> Result<(), GraphError> {
+	/// 更新图
+    pub fn update(&mut self) -> Result<(), GraphError> {
         self.update_graph()?;
 
         // 构建 run_ng，返回 构建图
 		if self.is_topo_dirty {
 			self.update_run_ng()?;
 		}
+
+		// 计算可运行节点的数量
+		let mut count = 0;
+		for i in self.schedule_graph.topological.iter() {
+			if self.nodes[*i].is_run {
+				count += 1;
+			}
+		}
+		self.can_run_ndoe_count = count;
+
+		self.is_finish_dirty = false;
+		self.is_topo_dirty = false;
         Ok(())
     }
+
+	/// 派发图
+	pub fn schedule_graph(&self) -> &NGraph<NodeId, ()> {
+		&self.schedule_graph
+	}
 
 	/// 节点数量
 	pub fn node_count(&self) -> usize {
 		self.schedule_graph.topological.len()
+	}
+
+	/// 可运行的节点的数量
+	pub fn can_run_count(&self) -> usize {
+		self.can_run_ndoe_count
 	}
 
     
@@ -560,6 +590,7 @@ struct ScheduleNode<Context: 'static + ThreadSync> {
 	run_node: RunFunc<Context>,// run方法， 如果是图，run为 empty_run
 	name: String, // 节点名字
 	state: NodeState<Context>, // 节点状态
+	is_run: bool,
 	// run_way: RunWay, // 运行方式， 默认为RunWay::Schedule
 }
 
