@@ -67,6 +67,8 @@ pub struct DVertexBufferLayout {
 pub struct VertexBufferLayouts {
     layout_list: KeyAttributesLayouts,
     pub size: usize,
+    pub attrcount: u8,
+    pub desccount: u8,
 }
 impl From<&Vec<VertexBufferDesc>> for VertexBufferLayouts {
     fn from(value: &Vec<VertexBufferDesc>) -> Self {
@@ -75,6 +77,8 @@ impl From<&Vec<VertexBufferDesc>> for VertexBufferLayouts {
 
         // 按 EVertexDataKind 排序确定 shader_location
         let mut shader_location = 0;
+        let mut attrcount = 0;
+        let mut desccount = 0;
         value.iter().for_each(|buffer_desc| {
             let mut attrs = vec![];
             let mut offset = 0;
@@ -88,15 +92,17 @@ impl From<&Vec<VertexBufferDesc>> for VertexBufferLayouts {
                 });
                 offset += stride;
                 shader_location += 1;
+                attrcount += 1;
 
                 datasize += size_of::<wgpu::VertexAttribute>();
             });
 
+            desccount += 1;
             layouts.push((attrs, buffer_desc.step_mode(), offset as u32));
             datasize += 8;
         });
 
-        Self { layout_list: KeyAttributesLayouts(layouts), size: datasize }
+        Self { layout_list: KeyAttributesLayouts(layouts), size: datasize, desccount, attrcount }
     }
 }
 impl VertexBufferLayouts {

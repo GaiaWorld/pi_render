@@ -30,6 +30,8 @@ impl SingleVertexBufferDataMap {
             self.indices.insert(key.clone(), data);
         }
     }
+    ///
+    /// 单线程 创建 VertexBuffer - EVerticesBufferUsage
     pub fn single_create(
         &mut self,
         device: &RenderDevice,
@@ -47,6 +49,8 @@ impl SingleVertexBufferDataMap {
         });
         result
     }
+    ///
+    /// 单线程 创建 IndicesBuffer - EVerticesBufferUsage
     pub fn single_create_indices(
         &mut self,
         device: &RenderDevice,
@@ -70,6 +74,7 @@ impl SingleVertexBufferDataMap {
         // log::info!("add_instance >>>>>>>>>>>>>>>>>>>>> {:?}", key);
         self.instance.insert(key.clone(), data);
     }
+    /// 单线程 创建 InstanceBuffer - EVerticesBufferUsage
     pub fn single_create_instance(
         &mut self,
         device: &RenderDevice,
