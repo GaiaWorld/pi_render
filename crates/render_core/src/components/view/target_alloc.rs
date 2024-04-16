@@ -111,11 +111,11 @@ impl TargetView {
 	/// 拿到分配的uv
 	pub fn uv_box(&self) -> [f32; 4] {
 		[
-			self.rect.min.x as f32/self.target.width as f32,
-			self.rect.min.y as f32/self.target.height as f32,
-			self.rect.max.x as f32/self.target.width as f32,
+			(self.rect.min.x as f32 + 0.5)/self.target.width as f32,
+			(self.rect.min.y as f32 + 0.5)/self.target.height as f32,
+			(self.rect.max.x as f32 - 0.5)/self.target.width as f32,
 			
-			self.rect.max.y as f32/self.target.height as f32,
+			(self.rect.max.y as f32 - 0.5)/self.target.height as f32,
 		]
 	}
 	/// 渲染目标类型id
