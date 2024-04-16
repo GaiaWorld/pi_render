@@ -1,6 +1,6 @@
 [package]
 name = "render_utils"
-version = "0.1.2"
+version = "0.1.3"
 authors = ["moyy <myy412001799@gmail.com>"]
 edition = "2021"
 description = "Render Utils for PI Engine"
@@ -12,6 +12,6 @@ keywords = ["pi"]
 
 [dependencies]
 render_derive = { path = "../render_derive", version = "0.1", registry = "yn" }
-ahash = "0.7"
+ahash = "0.8"
 
 [dev-dependencies]
