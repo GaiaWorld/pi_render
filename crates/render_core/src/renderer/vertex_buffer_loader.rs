@@ -8,7 +8,6 @@ use crate::{rhi::{device::RenderDevice, RenderQueue}, asset::TAssetKeyU64};
 
 use super::{vertex_buffer::{KeyVertexBuffer, EVertexBufferRange, VertexBufferAllocator}, vertices::EVerticesBufferUsage};
 
-#[derive(Debug)]
 pub struct SingleVertexBufferDataMap {
     vertices: XHashMap<KeyVertexBuffer, Vec<u8>>,
     instance: XHashMap<KeyVertexBuffer, Vec<u8>>,
@@ -91,7 +90,6 @@ impl SingleVertexBufferDataMap {
     }
 }
 
-#[derive(Debug)]
 pub struct VertexBufferLoader<T: Clone + Hash + PartialEq + Eq, D: From<EVerticesBufferUsage>> {
     range_waits: XHashMap<KeyVertexBuffer, XHashMap<T, T>>,
     p: PhantomData<D>,
