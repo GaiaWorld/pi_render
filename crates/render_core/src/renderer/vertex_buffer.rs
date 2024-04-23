@@ -9,7 +9,7 @@ use wgpu::util::BufferInitDescriptor;
 use crate::{rhi::{device::RenderDevice, RenderQueue,  buffer::Buffer}, asset::TAssetKeyU64};
 
 use super::{
-    attributes::{KeyShaderFromAttributes, EVertexAttribute, KeyAttributesLayouts},
+    attributes::{EVertexAttribute, KeyAttributesLayouts},
     vertex_buffer_desc::VertexBufferDesc,
     vertex_format::TVertexFormatByteSize,
     buffer::{FixedSizeBufferPool, AssetRWBuffer, RWBufferRange},

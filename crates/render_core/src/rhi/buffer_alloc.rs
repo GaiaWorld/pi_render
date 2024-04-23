@@ -507,7 +507,6 @@ type BufferContainer = SmallVec<[AlignBufferAlloter<SingleBufferAlloter>; 7]>;
 #[cfg(test)]
 mod test {
     use std::sync::{Arc, atomic::AtomicBool};
-
     use pi_async_rt::rt::AsyncRuntime;
     use wgpu::{Gles3MinorVersion, InstanceFlags};
     use winit::{event_loop::EventLoopBuilder, platform::windows::EventLoopBuilderExtWindows};
@@ -523,9 +522,9 @@ mod test {
 		
 		let options = RenderOptions::default();
 		let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-			/// Which `Backends` to enable.
+			// Which `Backends` to enable.
 			backends: options.backends,
-			/// Which DX12 shader compiler to use.
+			// Which DX12 shader compiler to use.
 			dx12_shader_compiler: wgpu::Dx12Compiler::Fxc,
 			flags: InstanceFlags::DEBUG,
 			gles_minor_version: Gles3MinorVersion::Automatic,
@@ -542,9 +541,11 @@ mod test {
 				compatible_surface: Some(&surface),
 				..Default::default()
 			};
+
+			let mut alloter = pi_assets::allocator::Allocator::new(32 * 1024 * 1024);
 			
 			let (device, queue, _adapter_info) =
-			initialize_renderer(&instance, &options, &request_adapter_options).await;
+			initialize_renderer(&instance, &options, &request_adapter_options, &mut alloter).await;
 			
 			let _alloter = BufferAlloter::new(device, queue, 128, wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::VERTEX);
 			let mut level1_buffer = Vec::new();

@@ -486,27 +486,27 @@ impl<K: Key, T: Clone> RootGraph<K, T> {
 		}
 	}
 
-	fn build_topo(&self, k: K, part_graph: &mut NGraph<K, T>, graph_ids: &mut SecondaryMap<K, bool>) {
-		if let Some(g) = self.sub_graphs.get(k) {
-			if !graph_ids.contains_key(k) {
-				for i in g.topological.iter() {
-					self.build_topo(*i, part_graph, graph_ids);
-				}
-			} else {
-				graph_ids.insert(k, true);
-			}
-		} else if part_graph.contains_key(k) {
-			part_graph.topological.push(k);
-			let node = &part_graph.nodes[k];
-			if node.from().is_empty() {
-				part_graph.from.push(k)
-			}
+	// fn build_topo(&self, k: K, part_graph: &mut NGraph<K, T>, graph_ids: &mut SecondaryMap<K, bool>) {
+	// 	if let Some(g) = self.sub_graphs.get(k) {
+	// 		if !graph_ids.contains_key(k) {
+	// 			for i in g.topological.iter() {
+	// 				self.build_topo(*i, part_graph, graph_ids);
+	// 			}
+	// 		} else {
+	// 			graph_ids.insert(k, true);
+	// 		}
+	// 	} else if part_graph.contains_key(k) {
+	// 		part_graph.topological.push(k);
+	// 		let node = &part_graph.nodes[k];
+	// 		if node.from().is_empty() {
+	// 			part_graph.from.push(k)
+	// 		}
 
-			if node.to().is_empty() {
-				part_graph.to.push(k);
-			}
-		}
-	}
+	// 		if node.to().is_empty() {
+	// 			part_graph.to.push(k);
+	// 		}
+	// 	}
+	// }
 }
 
 
@@ -676,7 +676,7 @@ fn test1() {
 	if let Err(e) =  graph.build() {
 		println!("e: {:?}", e)
 	};
-	graph.build();
+	let _ = graph.build();
 
 	println!("{:?}", &graph.topological);
 

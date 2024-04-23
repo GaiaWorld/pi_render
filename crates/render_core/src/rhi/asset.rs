@@ -167,7 +167,7 @@ impl<'a, G: Garbageer<Self>> AsyncLoader<'a, Self, TextureAssetDesc<'a>, G> for 
 								return Err(std::io::Error::new(std::io::ErrorKind::NotFound, ""));
 							},
 						};
-						let r = create_texture_from_ktx1(file.as_slice(), &desc.device, &desc.queue, &desc.url)?;
+						let r = create_texture_from_ktx1(file.as_slice(), &desc.device, &desc.queue)?;
 						let size = r.size();
 						recv.receive(desc.url.str_hash() as u64, Ok(AssetWithId::new(r, size, desc.alloter.clone()))).await
 					} else {
@@ -181,7 +181,7 @@ impl<'a, G: Garbageer<Self>> AsyncLoader<'a, Self, TextureAssetDesc<'a>, G> for 
 							},
 						};
 
-						let r = create_texture_from_image1(&image, &desc.device, &desc.queue, &desc.url);
+						let r = create_texture_from_image1(&image, &desc.device, &desc.queue);
 						let size = r.size();
 						recv.receive(desc.url.str_hash() as u64, Ok(AssetWithId::new(r, size, desc.alloter.clone()))).await
 					}
@@ -198,7 +198,7 @@ pub async fn create_texture_from_image<G: Garbageer<TextureRes>>(
 	key: &Atom,
 	recv: Receiver<TextureRes, G>
 ) -> Handle<TextureRes> {
-	let r = create_texture_from_image1(image, device, queue, key);
+	let r = create_texture_from_image1(image, device, queue);
 
 	recv.receive(key.str_hash() as u64, Ok(r)).await.unwrap()
 }
@@ -207,7 +207,6 @@ pub fn create_texture_from_image1(
 	image: &DynamicImage, 
 	device: &RenderDevice, 
 	queue: &RenderQueue,
-	key: &Atom,
 ) -> TextureRes {
 	let buffer_temp;
 	// let buffer_temp1;
@@ -311,7 +310,6 @@ pub fn create_texture_from_ktx1(
 	buffer: &[u8], 
 	device: &RenderDevice, 
 	queue: &RenderQueue,
-	key: &Atom,
 ) -> std::io::Result<TextureRes> {
 
 	use ktx::KtxInfo;

@@ -39,6 +39,7 @@ criterion = "0.4"
 crossbeam = "0.8"
 render_core = {path = "crates/render_core", version = "0.1", registry = "yn"}
 pi_hal = { version = "0.1", registry = "yn" }
+pi_assets = "0.13"
 
 [[example]]
 name = "hello_winit"

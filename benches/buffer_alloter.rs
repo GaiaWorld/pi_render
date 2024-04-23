@@ -2,6 +2,7 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use pi_share::{ShareMutex, Share};
 use render_core::rhi::{buffer_alloc::BufferAlloter, device::RenderDevice, RenderQueue};
 use pi_async_rt::rt::AsyncRuntime;
+use wgpu::{Gles3MinorVersion, InstanceFlags};
 use winit::{event_loop::EventLoopBuilder, platform::windows::EventLoopBuilderExtWindows};
 
 use render_core::rhi::{device::initialize_renderer, options::RenderOptions};
@@ -10,15 +11,17 @@ fn buffer_alloter(c: &mut Criterion) {
 	let mut group = c.benchmark_group("buffer_alloter");
 	let options = RenderOptions::default();
 	let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-		/// Which `Backends` to enable.
+		// Which `Backends` to enable.
 		backends: options.backends,
-		/// Which DX12 shader compiler to use.
+		// Which DX12 shader compiler to use.
 		dx12_shader_compiler: wgpu::Dx12Compiler::Fxc,
+		flags: InstanceFlags::DEBUG,
+		gles_minor_version: Gles3MinorVersion::Automatic,
 	});
 	let event_loop = EventLoopBuilder::new().with_any_thread(true).build();
 	let window = winit::window::Window::new(&event_loop).unwrap();
 
-	let surface = unsafe {instance.create_surface(&window).unwrap()};
+	let surface = instance.create_surface(window).unwrap();
 
 	let result: Share<ShareMutex<Option<(RenderDevice, RenderQueue)>>> = Share::new(ShareMutex::new(None));
 	let result1 = result.clone();
@@ -29,17 +32,17 @@ fn buffer_alloter(c: &mut Criterion) {
 			compatible_surface: Some(&surface),
 			..Default::default()
 		};
-		
+		let mut alloter = pi_assets::allocator::Allocator::new(32 * 1024 * 1024);
 		let (device, queue, _adapter_info) =
-		initialize_renderer(&instance, &options, &request_adapter_options).await;
-		let mut r = result1.lock();
+		initialize_renderer(&instance, &options, &request_adapter_options, &mut alloter).await;
+		let mut r = result1.lock().unwrap();
 		*r = Some((device, queue));
 	});
 
 	let max_align = 1024;
 
 	loop {
-		let lock = result.lock();
+		let lock = result.lock().unwrap();
 		if let Some((device, queue)) = &*lock {
 			// level2， 由于max_align为128， 该buffer应该创建独立的buffer
 			let mut level2_buffer = Vec::new();

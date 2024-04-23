@@ -7,8 +7,6 @@
 //!   + DependGraph
 //!
 
-use crate::rhi::texture::ScreenTexture;
-
 use super::{
     node::{DependNode, NodeId, NodeState, ParamUsage, NodeLabel},
     param::{InParam, OutParam},
@@ -21,7 +19,7 @@ use super::graph_data::NGraph;
 use pi_hash::{XHashMap, XHashSet};
 use pi_share::ThreadSync;
 use pi_slotmap::SlotMap;
-use std::{borrow::Cow, mem::transmute, sync::atomic::AtomicBool};
+use std::{borrow::Cow, mem::transmute};
 
 /// 依赖图
 pub struct DependGraph<Context: ThreadSync + 'static> {

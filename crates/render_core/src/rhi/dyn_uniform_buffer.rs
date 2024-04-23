@@ -711,9 +711,9 @@ use winit::{event_loop::EventLoopBuilder, platform::windows::EventLoopBuilderExt
 
 		let options = RenderOptions::default();
 		let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-			/// Which `Backends` to enable.
+			// Which `Backends` to enable.
 			backends: options.backends,
-			/// Which DX12 shader compiler to use.
+			// Which DX12 shader compiler to use.
 			dx12_shader_compiler: wgpu::Dx12Compiler::Fxc,
 			flags: InstanceFlags::DEBUG,
 			gles_minor_version: Gles3MinorVersion::Automatic,

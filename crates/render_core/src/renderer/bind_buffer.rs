@@ -1,12 +1,11 @@
 use std::{hash::Hash, fmt::Debug, sync::Arc};
 
-use derive_deref_rs::Deref;
-use pi_assets::{asset::{GarbageEmpty}, mgr::AssetMgr};
-use pi_share::{Share};
+use pi_assets::{asset::GarbageEmpty, mgr::AssetMgr};
+use pi_share::Share;
 
 use crate::rhi::{device::RenderDevice, RenderQueue};
 
-use super::{buffer::{AssetRWBuffer, RWBufferRange, FixedSizeBufferPool}, shader_stage::EShaderStage};
+use super::buffer::{AssetRWBuffer, RWBufferRange, FixedSizeBufferPool};
 
 
 pub struct BindBufferAllocator {

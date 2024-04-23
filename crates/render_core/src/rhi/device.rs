@@ -6,8 +6,9 @@ use super::{
     texture::{Sampler, Texture}, options::{RenderOptions, RenderPriority}, RenderQueue,
 };
 use derive_deref_rs::Deref;
+use pi_assets::allocator::Allocator;
 use pi_share::Share;
-use wgpu::util::DeviceExt;
+use wgpu::{util::DeviceExt, PiWgpuAdapter};
 
 /// This GPU device is responsible for the creation of most rendering and compute resources.
 #[derive(Clone, Deref)]
@@ -179,12 +180,11 @@ impl RenderDevice {
     }
 }
 
-pub struct Binding(usize);
-
 pub async fn initialize_renderer(
 	instance: &wgpu::Instance,
 	options: &RenderOptions,
 	request_adapter_options: &wgpu::RequestAdapterOptions<'_, '_>,
+	alloter: &mut Allocator,
 ) -> (RenderDevice, RenderQueue, wgpu::AdapterInfo) {
 	let adapter = instance
 		.request_adapter(request_adapter_options)
@@ -319,14 +319,15 @@ pub async fn initialize_renderer(
 		};
 	}
 
-	let (device, queue) = adapter
-		.request_device(
+	let (device, queue) = PiWgpuAdapter::request_device(
+			&adapter,
 			&wgpu::DeviceDescriptor {
 				label: options.device_label.as_ref().map(|a| a.as_ref()),
 				required_features: features,
 				required_limits: limits,
 			},
 			trace_path,
+			alloter,
 		)
 		.await
 		.unwrap();
