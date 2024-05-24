@@ -17,7 +17,7 @@ use super::{
 
 pub type IDAssetVertexBuffer = u64;
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, Default)]
 pub struct KeyVertexBuffer(Atom);
 impl KeyVertexBuffer {
     pub fn as_str(&self) -> &str {
@@ -63,7 +63,7 @@ pub struct DVertexBufferLayout {
     pub step_mode: wgpu::VertexStepMode,
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, Default)]
 pub struct VertexBufferLayouts {
     layout_list: KeyAttributesLayouts,
     pub size: usize,

@@ -1,10 +1,11 @@
-use std::{ops::Range, hash::Hash, fmt::Debug};
+use std::{default, fmt::Debug, hash::Hash, ops::Range};
 
 use super::{vertex_buffer::KeyVertexBuffer, attributes::{VertexAttribute, EVertexAttribute}, vertex_format::TVertexFormatByteSize};
 
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub enum EVertexBufferSlot {
+    #[default]
     Slot01,
     Slot02,
     Slot03,
@@ -96,7 +97,7 @@ impl VertexBufferDescRange {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 ///
 /// 
 /// Range<wgpu::BufferAddress> : byte数据范围

@@ -1,4 +1,4 @@
-use std::hash::Hash;
+use std::{default, hash::Hash};
 
 use pi_assets::asset::Handle;
 use pi_atom::Atom;
@@ -17,11 +17,16 @@ pub enum KeyTextureViewUsage {
     Temp(u64, TextureRect),
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, )]
 pub enum EKeyTexture {
     Tex(KeyTexture),
     Image(KeyImageTextureView),
     SRT(u64),
+}
+impl Default for EKeyTexture{
+    fn default() -> Self {
+        Self::Tex(Default::default())
+    }
 }
 impl EKeyTexture {
     pub fn image(value: &str) -> Self {

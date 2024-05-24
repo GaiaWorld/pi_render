@@ -533,7 +533,7 @@ impl TAsWgpuVertexAtribute for VertexAttribute {
     }
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, Default)]
 pub struct KeyAttributesLayouts(pub Vec<(Vec<wgpu::VertexAttribute>, wgpu::VertexStepMode, u32)>);
 impl KeyAttributesLayouts {
     pub fn layouts(&self) -> Vec<wgpu::VertexBufferLayout> {
@@ -546,7 +546,7 @@ impl KeyAttributesLayouts {
     }
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, Default)]
 pub struct KeyShaderFromAttributes(pub Vec<EVertexAttribute>);
 impl KeyShaderFromAttributes {
     pub fn new(value: &Vec<VertexBufferDesc>) -> Self {

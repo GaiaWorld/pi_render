@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use bitvec::vec::BitVec;
 use crossbeam::queue::SegQueue;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct Index {
 	version: u32,
 	index: u32,
