@@ -120,6 +120,8 @@ impl ShaderVarVertices {
     pub const INS_CUSTOM_VEC4_B         : &'static str = "A_INS_F_Vec4B"       ;
     pub const INS_CUSTOM_VEC4_C         : &'static str = "A_INS_F_Vec4C"       ;
     pub const INS_CUSTOM_VEC4_D         : &'static str = "A_INS_F_Vec4D"       ;
+    pub const INS_TEXTUREID             : &'static str = "A_INS_TEXTUREID"     ;
+    pub const INS_MODEL_MAT_SKIN        : &'static str = "A_INS_MODEL_MAT_SKIN";
     
     pub const INS_VEC4_A                : &'static str = "A_INS_Vec4A"         ;
     pub const INS_VEC4_B                : &'static str = "A_INS_Vec4B"         ;

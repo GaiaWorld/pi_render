@@ -74,7 +74,7 @@ pi_hal = { version = "0.1", registry = "yn" }
 parking_lot = "0.12"
 crossbeam="0.8"
 ktx = "0.3"
-pi_key_alloter = "0.4"
+pi_key_alloter = "0.5"
 
 
 [dev-dependencies]

@@ -63,7 +63,7 @@ pub struct DVertexBufferLayout {
     pub step_mode: wgpu::VertexStepMode,
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct VertexBufferLayouts {
     layout_list: KeyAttributesLayouts,
     pub size: usize,
