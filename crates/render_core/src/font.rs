@@ -167,13 +167,13 @@ impl FontSheet {
 	}
 
 	// 绘制等待列表
-	pub fn draw_await(&mut self) -> AsyncValue<Share<ShareMutex<(usize, Vec<(DefaultKey, TexInfo, Vec<u8>, Vec<u8>,Vec<u8>,Vec<u8>,Vec<u8>,Vec<u8>, )>)>>> {
+	pub fn draw_await(&mut self, result: Share<ShareMutex<(usize, Vec<(DefaultKey, TexInfo, Vec<u8>, Vec<u8>,Vec<u8>,Vec<u8>,Vec<u8>,Vec<u8>, )>)>>,  index: usize) -> AsyncValue<()> {
 		let font_type = self.font_mgr.font_type();
 		
 		match font_type {
 			FontType::Bitmap => todo!(),
 			FontType::Sdf1 => todo!(),
-			FontType::Sdf2 => self.font_mgr.table.sdf2_table.draw_await(&mut self.font_mgr.sheet.fonts)
+			FontType::Sdf2 => self.font_mgr.table.sdf2_table.draw_await(&mut self.font_mgr.sheet.fonts, result, index)
 		}
 	}
 
