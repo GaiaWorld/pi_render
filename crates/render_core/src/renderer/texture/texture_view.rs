@@ -1,10 +1,10 @@
-use std::{default, hash::Hash};
+use std::hash::Hash;
 
 use pi_assets::asset::Handle;
 use pi_atom::Atom;
 use pi_slotmap::DefaultKey;
 
-use crate::{rhi::asset::TextureRes, components::view::target_alloc::ShareTargetView, asset::TAssetKeyU64};
+use crate::{asset::TAssetKeyU64, components::view::target_alloc::ShareTargetView, rhi::asset::{AssetWithId, TextureRes}};
 
 use super::{image_texture_view::{ImageTextureView, EImageTextureViewUsage}, TextureRect, KeyTexture, KeyImageTexture, KeyImageTextureView, TextureViewDesc};
 
@@ -43,6 +43,7 @@ impl From<&str> for EKeyTexture {
 #[derive(Clone, Debug)]
 pub enum ETextureViewUsage {
     Tex(Handle<TextureRes>),
+    TexWithId(Handle<AssetWithId<TextureRes>>),
     Image(EImageTextureViewUsage),
     // Render(ERenderTargetViewUsage),
     SRT(ShareTargetView),
@@ -58,6 +59,9 @@ impl ETextureViewUsage {
             //     KeyTextureViewUsage::Render(val.key(), TextureRect { x: 0, y: 0, w: 1, h: 1 }) 
             // },
             ETextureViewUsage::Tex(val) => {
+                KeyTextureViewUsage::Tex(*val.key(), TextureRect { x: 0, y: 0, w: val.width as u16, h: val.height as u16 })
+            },
+            ETextureViewUsage::TexWithId(val) => {
                 KeyTextureViewUsage::Tex(*val.key(), TextureRect { x: 0, y: 0, w: val.width as u16, h: val.height as u16 })
             },
             ETextureViewUsage::SRT(val) => {
@@ -78,6 +82,7 @@ impl ETextureViewUsage {
             ETextureViewUsage::Image(val) => &val.view,
             // ETextureViewUsage::Render(val) => val.view(),
             ETextureViewUsage::Tex(val) => &val.texture_view,
+            ETextureViewUsage::TexWithId(val) => &val.texture_view,
             ETextureViewUsage::SRT(val) => &val.target().colors[0].0,
             // ETextureViewUsage::Temp(val, _) => val,
         }
