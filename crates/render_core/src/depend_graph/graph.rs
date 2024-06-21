@@ -506,7 +506,8 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
                         }
                         for from1 in graph_node.from() {
                             if *from1 != from {
-                                if let Err(GraphParamError::ParamFillRepeat) = self.nodes[*id].state.0.as_ref().borrow_mut().add_pre_node((from, from_node.state.clone())) {
+                                let from_node1 = self.nodes.get(*from1).unwrap();
+                                if let Err(GraphParamError::ParamFillRepeat) = self.nodes[*id].state.0.as_ref().borrow_mut().add_pre_node((*from1, from_node1.state.clone())) {
                                     // 当前节点本身的输出参数类型重复
                                     return Err(GraphError::ParamFillRepeat(from, *from1, *id));
                                 }
