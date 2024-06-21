@@ -9,7 +9,7 @@
 //!     + ParamUsage 参数的用途
 //!
 use super::{
-    param::{Assign, InParam, OutParam},
+    param::{Assign, GraphParamError, InParam, OutParam},
     GraphError
 };
 use pi_futures::BoxFuture;
@@ -137,7 +137,7 @@ pub(crate) trait InternalNode<Context: ThreadSync + 'static>: OutParam {
     fn inc_next_refs(&mut self);
 
     // 添加 前置节点
-    fn add_pre_node(&mut self, nodes: (NodeId, NodeState<Context>));
+    fn add_pre_node(&mut self, nodes: (NodeId, NodeState<Context>)) -> Result<bool, GraphParamError>;
 
     // 每帧 后继的渲染节点 获取参数时候，需要调用 此函数
     fn dec_curr_run_ref(&self);
@@ -213,7 +213,7 @@ where
     O: OutParam + Default,
     R: DependNode<Context, Input = I, Output = O>,
 {
-    fn can_fill(&self, set: &mut Option<&mut XHashSet<TypeId>>, ty: TypeId) -> bool {
+    fn can_fill(&self, set: &mut Option<&mut XHashSet<TypeId>>, ty: TypeId) -> Result<bool, GraphParamError> {
         assert!(set.is_none());
 
         let mut p = self.param_usage.output_usage_set.as_ref().borrow_mut();
@@ -256,17 +256,18 @@ where
         self.total_next_refs += 1;
     }
 
-    fn add_pre_node(&mut self, node: (NodeId, NodeState<Context>)) {
+    fn add_pre_node(&mut self, node: (NodeId, NodeState<Context>)) -> Result<bool, GraphParamError> {
         node.1 .0.as_ref().borrow_mut().inc_next_refs();
 
-        {
+        let r = {
             let n = node.1 .0.as_ref().borrow();
             // 填写 该节点输入 和 前置节点输出 的信息
             self.input
-                .can_fill(&mut self.param_usage.input_map_fill, node.0, n.deref());
-        }
+                .can_fill(&mut self.param_usage.input_map_fill, node.0, n.deref())?
+        };
 		
         self.pre_nodes.push(node);
+        Ok(r)
     }
 
     fn dec_curr_run_ref(&self) {

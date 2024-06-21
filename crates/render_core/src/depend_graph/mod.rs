@@ -15,6 +15,7 @@ pub mod node;
 pub mod param;
 pub mod graph_data;
 
+use graphviz_rust::dot_structures::Node;
 pub use node::{NodeId, NodeLabel};
 use thiserror::Error;
 
@@ -58,4 +59,7 @@ pub enum GraphError {
 
 	#[error("node does not in one graph: before = `{0}`, after: {1:?}")]
 	CrossGraphDepend(String, String),
+
+    #[error("param fill with repeat, from: {0:?} {1:?}, to: {2:?}")]
+    ParamFillRepeat(NodeId, NodeId, NodeId),
 }

@@ -88,7 +88,7 @@ pub fn derive_node_param(input: TokenStream) -> TokenStream {
                     }
                     field_set.insert(t);
 
-                    r |= pi_render::depend_graph::param::InParam::can_fill(&self.#name, map, pre_id, out_param);
+                    r |= pi_render::depend_graph::param::InParam::can_fill(&self.#name, map, pre_id, out_param)?;
                 }
             })
             .collect::<Vec<TokenStream2>>();
@@ -130,21 +130,17 @@ pub fn derive_node_param(input: TokenStream) -> TokenStream {
 
                     field_set.insert(t);
 
-                    if pi_render::depend_graph::param::OutParam::can_fill(&self.#name, set, ty) {
-                        return true;
-                    }
+                    pi_render::depend_graph::param::OutParam::can_fill(&self.#name, set, ty)
                 }
             })
             .collect::<Vec<TokenStream2>>();
         quote! {
             impl #impl_generics pi_render::depend_graph::param::OutParam for #name #ty_generics #where_clause {
 
-                fn can_fill(&self, set: &mut Option<&mut pi_hash::XHashSet<std::any::TypeId>>, ty: std::any::TypeId) -> bool {
+                fn can_fill(&self, set: &mut Option<&mut pi_hash::XHashSet<std::any::TypeId>>, ty: std::any::TypeId) -> Result<bool, pi_render::depend_graph::param::GraphParamError> {
                     let mut field_set = pi_hash::XHashSet::<std::any::TypeId>::default();
 
                     #(#can_outputs)*
-
-                    false
                 }
 
                 fn fill_to(&self, this_id: pi_render::depend_graph::node::NodeId, to: &mut dyn pi_render::depend_graph::param::Assign, ty: std::any::TypeId) -> bool {
@@ -160,13 +156,13 @@ pub fn derive_node_param(input: TokenStream) -> TokenStream {
                     map: &mut pi_hash::XHashMap<std::any::TypeId, Vec<pi_render::depend_graph::NodeId>>,
                     pre_id: pi_render::depend_graph::node::NodeId,
                     out_param: &O,
-                ) -> bool {
+                ) -> Result<bool, pi_render::depend_graph::param::GraphParamError> {
                     let mut r = false;
                     let mut field_set = pi_hash::XHashSet::<std::any::TypeId>::default();
 
                     #(#can_inputs;)*
 
-                    r
+                    Ok(r)
                 }
 
                 fn fill_from<O: pi_render::depend_graph::param::OutParam + ?Sized>(&mut self, pre_id: pi_render::depend_graph::node::NodeId, out_param: &O) -> bool {
@@ -182,7 +178,7 @@ pub fn derive_node_param(input: TokenStream) -> TokenStream {
         // 整体 作为 输入 输入 参数
         quote! {
             impl #impl_generics pi_render::depend_graph::param::OutParam for #name #ty_generics #where_clause {
-                fn can_fill(&self, set: &mut Option<&mut pi_hash::XHashSet<std::any::TypeId>>, ty: std::any::TypeId) -> bool {
+                fn can_fill(&self, set: &mut Option<&mut pi_hash::XHashSet<std::any::TypeId>>, ty: std::any::TypeId) -> Result<bool, pi_render::depend_graph::param::GraphParamError> {
 
                     let r = ty == std::any::TypeId::of::<Self>();
                     if r && set.is_some() {
@@ -194,7 +190,7 @@ pub fn derive_node_param(input: TokenStream) -> TokenStream {
                         }
 
                     }
-                    r
+                    Ok(r)
                 }
 
                 fn fill_to(&self, this_id: pi_render::depend_graph::node::NodeId, to: &mut dyn pi_render::depend_graph::param::Assign, ty: std::any::TypeId) -> bool {
@@ -221,13 +217,13 @@ pub fn derive_node_param(input: TokenStream) -> TokenStream {
                     map: &mut pi_hash::XHashMap<std::any::TypeId, Vec<pi_render::depend_graph::node::NodeId>>,
                     pre_id: pi_render::depend_graph::node::NodeId,
                     out_param: &O,
-                ) -> bool {
+                ) -> Result<bool, pi_render::depend_graph::param::GraphParamError> {
                     let ty = std::any::TypeId::of::<Self>();
                     let r = out_param.can_fill(&mut None, ty.clone());
-                    if r {
+                    if let Ok(true) = r {
                         if map.get(&ty).is_some() {
                             // 输入 类型 不能 相同
-                            panic!("derive NodeParam: input type same, type = {:?}", ty);
+                            return Err(pi_render::depend_graph::param::GraphParamError::ParamFillRepeat);
                         }
                         if ty != std::any::TypeId::of::<()>() {
                             map.insert(ty, vec![pre_id]);

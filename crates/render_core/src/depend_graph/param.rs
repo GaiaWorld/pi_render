@@ -11,7 +11,14 @@ use super::node::NodeId;
 use pi_hash::{XHashMap, XHashSet};
 use pi_share::ThreadSync;
 use std::any::TypeId;
+use thiserror::Error;
 
+
+#[derive(Error, Debug, Eq, PartialEq)]
+pub enum GraphParamError {
+    #[error("param fill with repeat")]
+    ParamFillRepeat,
+}
 /// 渲染图节点的 参数，用于 派生宏
 ///
 /// 注1：在 struct 定义 前 用 派生宏 展开 #[derive(NodeParam)]
@@ -30,7 +37,7 @@ pub trait InParam: 'static + ThreadSync + Assign {
         map: &mut XHashMap<TypeId, Vec<NodeId>>,
         pre_id: NodeId,
         out_param: &O,
-    ) -> bool;
+    ) -> Result<bool, GraphParamError>;
 
     // 由 节点 在 运行前 主动调用，每个 前置节点的 输出参数 调用一次
     fn fill_from<O: OutParam + ?Sized>(&mut self, pre_id: NodeId, out_param: &O) -> bool;
@@ -39,7 +46,7 @@ pub trait InParam: 'static + ThreadSync + Assign {
 /// 渲染图节点的 输出参数，用于 trait Node 的 关联类型 Output
 pub trait OutParam: 'static + ThreadSync {
     /// 判断 本 参数 能否 填充 ty
-    fn can_fill(&self, set: &mut Option<&mut XHashSet<TypeId>>, ty: TypeId) -> bool;
+    fn can_fill(&self, set: &mut Option<&mut XHashSet<TypeId>>, ty: TypeId) -> Result<bool, GraphParamError>;
 
     fn fill_to(&self, this_id: NodeId, to: &mut dyn Assign, ty: TypeId) -> bool;
 }
@@ -61,10 +68,10 @@ impl<T: OutParam + Clone> InParam for InParamCollector<T> {
         map: &mut XHashMap<TypeId, Vec<NodeId>>,
         pre_id: NodeId,
         out_param: &O,
-    ) -> bool {
+    ) -> Result<bool, GraphParamError> {
         let ty = TypeId::of::<T>();
         let r = out_param.can_fill(&mut None, ty);
-        if r {
+        if let Ok(true) = r {
             let v = map.entry(ty).or_insert(vec![]);
             v.push(pre_id);
         }
@@ -77,7 +84,7 @@ impl<T: OutParam + Clone> InParam for InParamCollector<T> {
 }
 
 impl<T: OutParam + Clone> OutParam for InParamCollector<T> {
-    fn can_fill(&self, _set: &mut Option<&mut XHashSet<TypeId>>, _ty: TypeId) -> bool {
+    fn can_fill(&self, _set: &mut Option<&mut XHashSet<TypeId>>, _ty: TypeId) -> Result<bool, GraphParamError> {
         panic!("can_fillInParamCollector can't as Output");
     }
 
@@ -123,13 +130,13 @@ macro_rules! impl_base_copy {
                 map: &mut XHashMap<TypeId, Vec<NodeId>>,
                 pre_id: NodeId,
                 out_param: &O,
-            ) -> bool {
+            ) -> Result<bool, GraphParamError> {
                 let ty = TypeId::of::<Self>();
                 let r = out_param.can_fill(&mut None, ty.clone());
-                if r {
+                if let Ok(r) = r {
                     if map.get(&ty).is_some() {
                         // 输入 类型 不能 相同
-                        panic!("impl_base_copy: input type same, type = {:?}", ty);
+                        return Err(GraphParamError::ParamFillRepeat);
                     }
                     if ty != TypeId::of::<()>() {
                         // 为 unit 类型时候不做相同类型判断，以便于 多个节点的输入都可以是同一个 unit 类型
@@ -145,7 +152,7 @@ macro_rules! impl_base_copy {
         }
 
         impl OutParam for $typ {
-            fn can_fill(&self, set: &mut Option<&mut XHashSet<TypeId>>, ty: TypeId) -> bool {
+            fn can_fill(&self, set: &mut Option<&mut XHashSet<TypeId>>, ty: TypeId) -> Result<bool, GraphParamError> {
                 let r = ty == TypeId::of::<Self>();
                 if r && set.is_some() {
                     match set {
@@ -155,7 +162,7 @@ macro_rules! impl_base_copy {
                         }
                     }
                 }
-                r
+                Ok(r)
             }
 
             fn fill_to(&self, this_id: NodeId, to: &mut dyn Assign, ty: TypeId) -> bool {
@@ -191,10 +198,10 @@ macro_rules! impl_base_noncopy {
                 map: &mut XHashMap<TypeId, Vec<NodeId>>,
                 pre_id: NodeId,
                 out_param: &O,
-            ) -> bool {
+            ) -> Result<bool, GraphParamError> {
                 let ty = TypeId::of::<Self>();
                 let r = out_param.can_fill(&mut None, ty.clone());
-                if r {
+                if let Ok(true) = r {
                     if map.get(&ty).is_some() {
                         // 输入 类型 不能 相同
                         panic!("impl_base_noncopy: input type same, type = {:?}", ty);
@@ -210,7 +217,7 @@ macro_rules! impl_base_noncopy {
         }
 
         impl OutParam for $typ {
-            fn can_fill(&self, set: &mut Option<&mut XHashSet<TypeId>>, ty: TypeId) -> bool {
+            fn can_fill(&self, set: &mut Option<&mut XHashSet<TypeId>>, ty: TypeId) -> Result<bool, GraphParamError> {
                 let r = ty == TypeId::of::<Self>();
                 if r && set.is_some() {
                     match set {
@@ -220,7 +227,7 @@ macro_rules! impl_base_noncopy {
                         }
                     }
                 }
-                r
+                Ok(r)
             }
 
             fn fill_to(&self, this_id: NodeId, to: &mut dyn Assign, ty: TypeId) -> bool {
