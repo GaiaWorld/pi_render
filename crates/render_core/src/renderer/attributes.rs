@@ -1,4 +1,5 @@
 use pi_atom::Atom;
+use wgpu::VertexFormat;
 
 use super::{buildin_var::{ShaderVarVertices, ShaderVarUniform}, vertex_buffer_desc::VertexBufferDesc};
 
@@ -331,9 +332,9 @@ impl EBuildinVertexAtribute {
             EBuildinVertexAtribute::UV => wgpu::VertexFormat::Float32x2,
             EBuildinVertexAtribute::Normal => wgpu::VertexFormat::Float32x3,
             EBuildinVertexAtribute::Tangent => wgpu::VertexFormat::Float32x4,
-            EBuildinVertexAtribute::MatricesIndices => wgpu::VertexFormat::Uint32x4,
+            EBuildinVertexAtribute::MatricesIndices => wgpu::VertexFormat::Uint16x4,
             EBuildinVertexAtribute::MatricesWeights => wgpu::VertexFormat::Float32x4,
-            EBuildinVertexAtribute::MatricesIndicesExtra => wgpu::VertexFormat::Uint32x4,
+            EBuildinVertexAtribute::MatricesIndicesExtra => wgpu::VertexFormat::Uint16x4,
             EBuildinVertexAtribute::MatricesWeightsExtra => wgpu::VertexFormat::Float32x4,
             EBuildinVertexAtribute::UV2 => wgpu::VertexFormat::Float32x2,
             EBuildinVertexAtribute::UV3 => wgpu::VertexFormat::Float32x2,
@@ -394,7 +395,24 @@ pub enum ECustomVertexType {
     Vec2,
     Float,
     Uint,
+    U16x2,
+    U8x4,
     Int,
+}
+impl ECustomVertexType {
+    pub fn format(&self) -> wgpu::VertexFormat {
+        match self {
+            ECustomVertexType::UVec4 => wgpu::VertexFormat::Uint32x4,
+            ECustomVertexType::Vec4 => wgpu::VertexFormat::Float32x4,
+            ECustomVertexType::Vec3 => wgpu::VertexFormat::Float32x3,
+            ECustomVertexType::Vec2 => wgpu::VertexFormat::Float32x2,
+            ECustomVertexType::Float => wgpu::VertexFormat::Float32,
+            ECustomVertexType::Uint => wgpu::VertexFormat::Uint32,
+            ECustomVertexType::U16x2 => wgpu::VertexFormat::Uint16x2,
+            ECustomVertexType::U8x4 => wgpu::VertexFormat::Uint8x4,
+            ECustomVertexType::Int => wgpu::VertexFormat::Sint32,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -426,30 +444,22 @@ impl CustomVertexAttribute {
         &self.foruniform
     }
     pub fn format(&self) -> wgpu::VertexFormat {
-        match self.vtype {
-            ECustomVertexType::UVec4 => wgpu::VertexFormat::Uint32x4,
-            ECustomVertexType::Vec4 => wgpu::VertexFormat::Float32x4,
-            ECustomVertexType::Vec3 => wgpu::VertexFormat::Float32x3,
-            ECustomVertexType::Vec2 => wgpu::VertexFormat::Float32x2,
-            ECustomVertexType::Float => wgpu::VertexFormat::Float32,
-            ECustomVertexType::Uint => wgpu::VertexFormat::Uint32,
-            ECustomVertexType::Int => wgpu::VertexFormat::Sint32,
-        }
+        self.vtype.format()
     }
     pub fn vs_running_code(&self) -> &str {
         self.code.as_str()
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum EVertexAttribute {
-    Buildin(EBuildinVertexAtribute),
+    Buildin(EBuildinVertexAtribute, wgpu::VertexFormat),
     Custom(CustomVertexAttribute),
 }
 impl TAsWgpuVertexAtribute for EVertexAttribute {
     fn as_attribute(&self, offset: wgpu::BufferAddress, shader_location: u32) -> wgpu::VertexAttribute {
         match self {
-            EVertexAttribute::Buildin(val) => wgpu::VertexAttribute { format: val.format(), offset, shader_location, },
+            EVertexAttribute::Buildin(val, format) => wgpu::VertexAttribute { format: *format, offset, shader_location, },
             EVertexAttribute::Custom(val) => wgpu::VertexAttribute { format: val.format(), offset, shader_location, },
         }
     }
@@ -457,19 +467,19 @@ impl TAsWgpuVertexAtribute for EVertexAttribute {
 impl EVertexAttribute {
     pub fn var_code(&self) -> &str {
         match self {
-            EVertexAttribute::Buildin(val) => val.var_code(),
+            EVertexAttribute::Buildin(val, _) => val.var_code(),
             EVertexAttribute::Custom(val) => val.var_code(),
         }
     }
     pub fn kind(&self) -> String {
         match self {
-            EVertexAttribute::Buildin(val) => val.kind(),
+            EVertexAttribute::Buildin(val, _) => val.kind(),
             EVertexAttribute::Custom(val) => val.kind(),
         }
     }
     pub fn format(&self) -> wgpu::VertexFormat {
         match self {
-            EVertexAttribute::Buildin(val) => val.format(),
+            EVertexAttribute::Buildin(val, format) => *format,
             EVertexAttribute::Custom(val) => val.format(),
         }
     }
