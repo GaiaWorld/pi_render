@@ -1,6 +1,6 @@
 [package]
 name = "pi_render"
-version = "0.2.2"
+version = "0.1.7"
 authors = ["moyy <myy412001799@gmail.com>"]
 edition = "2021"
 description = "Render for PI Engine"
@@ -16,7 +16,7 @@ members = ["crates/*"]
 
 
 [dependencies]
-render_core = { path = "crates/render_core", version = "0.2", registry = "yn" }
+render_core = { path = "crates/render_core", version = "0.1", registry = "yn" }
 
 [dev-dependencies]
 pi_futures = "0.1"
@@ -34,10 +34,10 @@ env_logger = "0.9"
 float-ord = "0.3"
 lazy_static = "1.4"
 
-render_derive = {path = "crates/render_derive", version = "0.2", registry = "yn"}
+render_derive = {path = "crates/render_derive", version = "0.1", registry = "yn"}
 criterion = "0.4"
 crossbeam = "0.8"
-render_core = {path = "crates/render_core", version = "0.2", registry = "yn"}
+render_core = {path = "crates/render_core", version = "0.1", registry = "yn"}
 pi_hal = { version = "0.1", registry = "yn" }
 pi_assets = "0.14"
 
