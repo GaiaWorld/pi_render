@@ -1,6 +1,6 @@
 [package]
 name = "crevice_tests"
-version = "0.2.1"
+version = "0.2.2"
 authors = ["moyy <myy412001799@gmail.com>"]
 edition = "2021"
 description = "Tests for Derive crate"
@@ -12,8 +12,8 @@ keywords = ["pi"]
 wgpu-validation = ["wgpu", "naga", "futures"]
 
 [dependencies]
-render_crevice = { path = "..", version = "0.1", registry = "yn" }
-render_crevice_derive = { path = "../render_crevice_derive", version="0.1", registry = "yn", features = [
+render_crevice = { path = "..", version = "0.2", registry = "yn" }
+render_crevice_derive = { path = "../render_crevice_derive", version="0.2", registry = "yn", features = [
     "debug-methods",
 ] }
 

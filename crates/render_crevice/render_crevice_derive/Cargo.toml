@@ -1,6 +1,6 @@
 [package]
 name = "render_crevice_derive"
-version = "0.2.1"
+version = "0.2.2"
 authors = ["moyy <myy412001799@gmail.com>"]
 edition = "2021"
 description = "Derive crate for the 'crevice' crate"
@@ -23,4 +23,4 @@ proc-macro = true
 syn = "1.0.40"
 quote = "1.0.7"
 proc-macro2 = "1.0.21"
-render_macro_utils = { path = "../../render_macro_utils", version = "0.1", registry = "yn" }
+render_macro_utils = { path = "../../render_macro_utils", version = "0.2", registry = "yn" }

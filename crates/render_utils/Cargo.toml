@@ -1,6 +1,6 @@
 [package]
 name = "render_utils"
-version = "0.2.1"
+version = "0.2.2"
 authors = ["moyy <myy412001799@gmail.com>"]
 edition = "2021"
 description = "Render Utils for PI Engine"
