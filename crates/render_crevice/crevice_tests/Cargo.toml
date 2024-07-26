@@ -1,6 +1,6 @@
 [package]
 name = "crevice_tests"
-version = "0.1.0"
+version = "0.2.1"
 authors = ["moyy <myy412001799@gmail.com>"]
 edition = "2021"
 description = "Tests for Derive crate"
