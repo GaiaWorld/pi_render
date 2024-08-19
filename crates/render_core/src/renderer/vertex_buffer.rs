@@ -178,7 +178,7 @@ impl Asset for EVertexBufferRange {
 }
 impl Size for EVertexBufferRange {
     fn size(&self) -> usize {
-        32
+        self.size() as usize
     }
 }
 

@@ -141,7 +141,8 @@ pub struct RenderIndices {
     /// 使用的Buffer数据
     pub buffer: EVerticesBufferUsage,
     /// 使用了Buffer的哪个部分
-    pub buffer_range: Option<Range<wgpu::BufferAddress>>,
+    // pub buffer_range: Option<Range<wgpu::BufferAddress>>,
+    pub buffer_range: Option<Range<u32>>,
     pub format: wgpu::IndexFormat,
 }
 impl RenderIndices {
@@ -149,8 +150,8 @@ impl RenderIndices {
         let mut range0 = self.buffer.active_range();
     
         if let Some(range) = self.buffer_range.as_ref() {
-            range0.end = range.end;
-            range0.start = range.start;
+            range0.end = range.end as wgpu::BufferAddress;
+            range0.start = range.start as wgpu::BufferAddress;
         }
         
         Range {

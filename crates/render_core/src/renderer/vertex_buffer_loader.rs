@@ -19,6 +19,21 @@ impl Default for SingleVertexBufferDataMap {
     }
 }
 impl SingleVertexBufferDataMap {
+    pub fn size(&self) -> usize {
+        let mut result = 0;
+
+        self.vertices.iter().for_each(|item| {
+            result += item.1.len();
+        });
+        self.instance.iter().for_each(|item| {
+            result += item.1.len();
+        });
+        self.indices.iter().for_each(|item| {
+            result += item.1.len();
+        });
+
+        result
+    }
     pub fn add(&mut self, key: &KeyVertexBuffer, data: Vec<u8>) {
         if !self.vertices.contains_key(key) {
             self.vertices.insert(key.clone(), data);
