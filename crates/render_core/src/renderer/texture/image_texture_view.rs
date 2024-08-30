@@ -7,7 +7,7 @@ use wgpu::TextureView;
 
 use crate::asset::TAssetKeyU64;
 
-use super::{image_texture::{KeyImageTexture, ImageTexture}, TextureViewDesc};
+use super::{image_texture::{KeyImageTexture, ResImageTexture}, TextureViewDesc};
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct KeyImageTextureView {
@@ -27,9 +27,8 @@ impl KeyImageTextureView {
     }
 }
 
-#[derive(Debug)]
 pub struct ImageTextureView {
-    pub(crate) texture: Handle<ImageTexture>,
+    pub(crate) texture: Handle<ResImageTexture>,
     pub(crate) view: Share<TextureView>,
 }
 impl Asset for ImageTextureView {
@@ -45,12 +44,12 @@ impl Size for ImageTextureView {
 impl ImageTextureView {
     pub fn new(
         key: &KeyImageTextureView,
-        texture: Handle<ImageTexture>,
+        texture: Handle<ResImageTexture>,
     ) -> Self {
-        let view = texture.texture.create_view(&wgpu::TextureViewDescriptor {
+        let view = texture.data.texture.create_view(&wgpu::TextureViewDescriptor {
             label: Some(key.url().deref()),
-            format: Some(texture.format.clone()),
-            dimension: Some(texture.dimension.clone()),
+            format: Some(texture.data.format.clone()),
+            dimension: Some(texture.data.view_dimension.clone()),
             aspect: wgpu::TextureAspect::All, // key.desc.aspect,
             base_mip_level: key.desc.base_mip_level as u32,
             mip_level_count: key.desc.mip_level_count(),
@@ -63,10 +62,10 @@ impl ImageTextureView {
             view: Share::new(view) ,
         }
     }
-    pub fn texture(&self) -> &Handle<ImageTexture> {
+    pub fn texture(&self) -> &Handle<ResImageTexture> {
         &self.texture
     }
-    pub fn async_load<'a, G: Garbageer<Self>>(image: Handle<ImageTexture>, key: KeyImageTextureView, result: LoadResult<'a, Self, G>) -> BoxFuture<'a, Result<Handle<Self>, ()>> {
+    pub fn async_load<'a, G: Garbageer<Self>>(image: Handle<ResImageTexture>, key: KeyImageTextureView, result: LoadResult<'a, Self, G>) -> BoxFuture<'a, Result<Handle<Self>, ()>> {
         Box::pin(async move {
             match result {
                 LoadResult::Ok(r) => { Ok(r) },
