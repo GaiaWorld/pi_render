@@ -12,7 +12,7 @@ use wgpu::{util::DeviceExt, PiWgpuAdapter};
 
 /// This GPU device is responsible for the creation of most rendering and compute resources.
 #[derive(Clone, Deref)]
-pub struct RenderDevice(Share<wgpu::Device>);
+pub struct RenderDevice(pub Share<wgpu::Device>);
 
 // TODO Send问题， 临时解决
 unsafe impl Send for RenderDevice {}
