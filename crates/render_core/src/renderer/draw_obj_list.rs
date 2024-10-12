@@ -16,7 +16,7 @@ impl DrawList {
         draws: &'a [T],
         renderpass: & mut wgpu::RenderPass<'a>,
     ) {
-        let time = pi_time::Instant::now();
+        // let time = pi_time::Instant::now();
 
         let mut temp_vertex_record: TempDrawInfoRecord = TempDrawInfoRecord::default();
         let mut pipelinekey = 0;
@@ -67,7 +67,7 @@ impl DrawList {
             }
         });
         
-        let time1 = pi_time::Instant::now();
-        log::info!("DrawList: {}, {:?}", draw_count, time1 - time);
+        // let time1 = pi_time::Instant::now();
+        // log::info!("DrawList: {}, {:?}", draw_count, time1 - time);
     }
 }

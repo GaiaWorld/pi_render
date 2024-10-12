@@ -40,7 +40,7 @@ impl From<&str> for EKeyTexture {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub enum ETextureViewUsage {
     Tex(Handle<TextureRes>),
     TexWithId(Handle<AssetWithId<TextureRes>>),
@@ -53,7 +53,7 @@ impl ETextureViewUsage {
     pub fn key(&self) -> KeyTextureViewUsage {
         match self {
             ETextureViewUsage::Image(val) => {
-                KeyTextureViewUsage::Image(*val.key(), TextureRect { x: 0, y: 0, w: val.texture.width as u16, h: val.texture.height as u16 }) 
+                KeyTextureViewUsage::Image(*val.key(), TextureRect { x: 0, y: 0, w: val.texture.data.width as u16, h: val.texture.data.height as u16 }) 
             },
             // ETextureViewUsage::Render(val) => {
             //     KeyTextureViewUsage::Render(val.key(), TextureRect { x: 0, y: 0, w: 1, h: 1 }) 
