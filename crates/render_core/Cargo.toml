@@ -68,6 +68,7 @@ pi_atom = "0.5"
 bytemuck = { version = "1.4", features = ["derive"] }
 
 pi_hal = { version = "0.1", registry = "yn" }
+pi_sdf = { version = "0.1", registry = "yn" }
 
 # wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
 

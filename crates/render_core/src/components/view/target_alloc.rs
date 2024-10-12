@@ -77,7 +77,7 @@ unsafe impl Sync for Fbo {}
 #[derive(Debug)]
 pub struct TargetView {
 	ty_index: DefaultKey,
-	index: DefaultKey, // 第几张纹理
+	pub index: DefaultKey, // 第几张纹理
 	info: Allocation,
 	rect: Rectangle, // target的宽高（不包含边框）
 	target: Share<Fbo>,
@@ -116,6 +116,16 @@ impl TargetView {
 			(self.rect.max.x as f32 - 0.5)/self.target.width as f32,
 			
 			(self.rect.max.y as f32 - 0.5)/self.target.height as f32,
+		]
+	}
+
+	pub fn rect_normalize(&self) -> [f32; 4] {
+		[
+			self.rect.min.x as f32 /self.target.width as f32,
+			self.rect.min.y as f32 /self.target.height as f32,
+			self.rect.max.x as f32 /self.target.width as f32,
+			
+			self.rect.max.y as f32 /self.target.height as f32,
 		]
 	}
 	/// 渲染目标类型id

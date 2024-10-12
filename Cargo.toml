@@ -60,12 +60,13 @@ path = "benches/buffer_alloter.rs"
 harness = false
 
 
-# [patch.crates-io]
+[patch.crates-io]
 # pi_async_graph = { path = "../pi_async_graph" }
 # pi_assets = { path = "../pi_assets" }
 
-# [patch.yn]
-# pi_hal = { path = "../pi_hal" }
+[patch.yn]
+pi_hal = { path = "../pi_hal" }
+pi_sdf = { path = "../pi_sdf" }
 # pi_wgpu = {path = "../pi_wgpu"}
 # pi_egl = {path = "../pi_egl"}
 # winit = { path = "../winit"}
