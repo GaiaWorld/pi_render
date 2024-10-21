@@ -35,7 +35,9 @@ pub struct DependGraph<Context: ThreadSync + 'static> {
 	topo_graph: RootGraph<NodeId, ()>, // topo图， 包含节点与子图的链接关系
 	is_topo_dirty: bool, // 哪些图的拓扑结构更改了，会放在该列表中
 	is_finish_dirty: bool,
-	can_run_ndoe_count: usize,
+    is_enable_dirty: bool,
+	can_run_node: Vec<NodeId>,
+    enable_nodes: Vec<NodeId>,
 }
 
 
@@ -57,8 +59,10 @@ impl<Context: ThreadSync + 'static> Default for DependGraph<Context> {
 			// graphs,
 			is_topo_dirty: false,
 			is_finish_dirty: false,
+            is_enable_dirty: false,
             // topo_dirty: Vec::new(),
-			can_run_ndoe_count: 0,
+			can_run_node: Vec::new(),
+            enable_nodes: Vec::new(),
         }
     }
 	
@@ -216,6 +220,7 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
             name: name.to_string(),
             state: node_state,
 			is_run,
+            is_enable: true,
 			// run_way: RunWay::Schedule,
         });
         if is_sub_graph {
@@ -346,6 +351,24 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
 			Err(GraphError::NoneNode(format!("{:?}", label)))
 		}
     }
+
+     pub fn set_enable(
+        &mut self,
+        label: impl Into<NodeLabel>,
+        is_enable: bool,
+    ) -> Result<(), GraphError> {
+        let label = label.into();
+        let node_id = self.get_id(&label)?;
+
+        if let Some(node) = self.nodes.get_mut(node_id) {
+            if node.is_enable != is_enable {
+                node.is_enable = is_enable;
+                self.is_enable_dirty = true;
+            }
+            
+        }
+        Ok(())
+    }
 }
 
 
@@ -360,17 +383,18 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
     ) -> Result<(), GraphError> {
 		// 运行所有图节点的run方法
 		let topological_sort = &self.schedule_graph.topological;
-		let mut map = rt.map_reduce(self.can_run_count());
+        let nodes = self.can_run_nodes();
+		let mut map = rt.map_reduce(nodes.len());
 		let context: &Context = context;
 		let mut index = 0;
-		for node_id in topological_sort.iter() {
+		for node_id in nodes.iter() {
 			let node = match self.nodes.get(*node_id) {
 				Some(r) => r,
 				None => panic!("error============={:?}", *node_id),
 			};
-			if !node.is_run {
-				continue;
-			}
+			// if !node.is_run {
+			// 	continue;
+			// }
 			let graph_node = self.schedule_graph.get(*node_id).unwrap();
 			// 这里用transmute绕过声明周期， 是安全的，因为在context、self释放之前，map中的任务已完成（外部等待）
 			map.map(rt.clone(), (*node.run_node)(index, unsafe {transmute(context)}, *node_id, unsafe {transmute(graph_node.from())} ,  unsafe { transmute(graph_node.to())})).unwrap();
@@ -379,6 +403,8 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
 		map.reduce(false).await.unwrap();
 
 		// 重置输入输出参数
+        // #[cfg(feature = "trace")]
+        let _clear_span = tracing::warn_span!("Clear Graph");
 		for node_id in topological_sort.iter() {
 			let node = &self.nodes[*node_id];
 			node.state.0.borrow_mut().clear();
@@ -391,18 +417,21 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
         &mut self,
         context: &mut Context,
     ) -> Result<(), GraphError> {
+        // let t1 = pi_time::Instant::now();
 		// let is_topo_dirty = self.is_topo_dirty;
 		// 检查图是否改变，如果改变， 需要重构图
 		let build_ret: Result<(), GraphError> = self.update();
 		build_ret?;
+        // let t2 = pi_time::Instant::now();
 
-		// 运行所有图节点的build方法
-		let topological_sort = &self.schedule_graph.topological;
-		for node_id in topological_sort.iter() {
+		// 运行所有激活图节点的build方法
+		for node_id in self.enable_nodes.iter() {
 			let node = &self.nodes[*node_id];
 			let graph_node = self.schedule_graph.get(*node_id).unwrap();
 			(*node.build_node)(context, *node_id, &graph_node.from(), &graph_node.to()).unwrap();
 		}
+        // let t3 = pi_time::Instant::now();
+        // log::warn!("build=================={:?}", (t2 - t1, t3 - t2, self.enable_nodes.len()));
 		Ok(())
     }
 
@@ -417,17 +446,31 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
                 // log::error!("param fill with repeat, from: {0:?} {1:?}, to: {2:?}", (f1, &self.nodes[f1].name), (f2, self.nodes.get(f2).map(|r| {&r.name})), (t, &self.nodes[t].name));
                 return Err(GraphError::ParamFillRepeat(f1, f2, t));
             }
+
 		}
 
-		// 计算可运行节点的数量
-		let mut count = 0;
-		for i in self.schedule_graph.topological.iter() {
-			if self.nodes[*i].is_run {
-				count += 1;
-			}
-		}
-		self.can_run_ndoe_count = count;
+        if self.is_topo_dirty || self.is_enable_dirty || self.is_finish_dirty {
+            // 重新生成激活节点
+            self.enable_nodes.clear();
+            for i in self.schedule_graph.topological.iter() {
+                if self.nodes[*i].is_enable {
+                    self.enable_nodes.push(i.clone());
+                }
+            }
 
+            // 计算可运行节点
+            self.can_run_node.clear();
+            for i in self.enable_nodes.iter() {
+                if self.nodes[*i].is_run && self.nodes[*i].is_enable {
+                    self.can_run_node.push(i.clone());
+                }
+            }
+            // log::warn!("enable_nodes======{:?}", (self.is_topo_dirty, self.is_enable_dirty, self.is_finish_dirty));
+            // log::warn!("enable_nodes======{:?}", &self.enable_nodes);
+            // log::warn!("can_run_node======{:?}", &self.can_run_node);
+        }
+
+        self.is_enable_dirty = false;
 		self.is_finish_dirty = false;
 		self.is_topo_dirty = false;
         Ok(())
@@ -444,8 +487,8 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
 	}
 
 	/// 可运行的节点的数量
-	pub fn can_run_count(&self) -> usize {
-		self.can_run_ndoe_count
+	pub fn can_run_nodes(&self) -> &[NodeId] {
+		&self.can_run_node
 	}
 
     
@@ -611,6 +654,7 @@ struct ScheduleNode<Context: 'static + ThreadSync> {
 	name: String, // 节点名字
 	state: NodeState<Context>, // 节点状态
 	is_run: bool,
+    is_enable: bool, // 是否有效（无效时， 不会执行build）
 	// run_way: RunWay, // 运行方式， 默认为RunWay::Schedule
 }
 

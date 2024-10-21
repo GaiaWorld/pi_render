@@ -330,7 +330,7 @@ where
 			Err(msg) => Err(GraphError::CustomRunError(msg)),
 		};
         // let t4 = std::time::Instant::now();
-        // println!("build1============{:?}", (t2 - t1, t3 - t2, t4 - t3));
+        // println!("build1============{:?}", (id, self.pre_nodes.len(), t2 - t1, t3 - t2, t4 - t3));
         r
     }
 
