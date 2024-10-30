@@ -179,7 +179,7 @@ impl FontSheet {
 		match font_type {
 			FontType::Bitmap => todo!(),
 			FontType::Sdf1 => todo!(),
-			FontType::Sdf2 => self.font_mgr.table.sdf2_table.draw_await(&mut self.font_mgr.sheet.fonts, index, result, count)
+			FontType::Sdf2 => self.font_mgr.table.sdf2_table.draw_await(&mut self.font_mgr.sheet, index, result, count)
 		}
 	}
 
