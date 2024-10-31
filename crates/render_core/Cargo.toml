@@ -9,9 +9,11 @@ license = "MIT OR Apache-2.0"
 keywords = ["pi"]
 
 [features]
+default = ["debug_info"]
 webgl = []
 location = []
 trace=[]
+debug_info = ["serde"]
 
 [dependencies]
 # pi_share = {version="0.4", features=["serial", "rc"]}
@@ -39,12 +41,13 @@ pi_print_any = "0.1"
 normpath = "1.1.1"
 tracing = { version = "0.1", default-features = false, features = ["std"] }
 
-bitvec = { version = "1.0", features = ["serde"] }
+serde = { workspace = true, features = ["derive"], optional = true }
+bitvec = { version = "1.0"}
 render_utils = { version = "0.1", path = "../render_utils", registry = "yn" }
 render_crevice = { version = "0.1", registry = "yn", path = "../render_crevice", features = [
     "nalgebra",
 ] }
-uuid = { version = "1", features = ["v4", "serde"] }
+uuid = { version = "1", features = ["v4"] }
 anyhow = "1.0"
 downcast-rs = "1.2"
 hex = "0.4"

@@ -34,6 +34,7 @@ pub struct TextureDescriptor {
 	pub view_dimension: Option<TextureViewDimension>,
 }
 
+
 /// 渲染目标描述
 #[derive(Debug, Hash, Clone)]
 pub struct TargetDescriptor {
@@ -203,7 +204,7 @@ impl<T: GetTargetView + 'static, O: std::ops::Deref<Target=T>> GetTargetView for
 
 /// 线程安全的纹理分配器
 #[derive(Clone)]
-pub struct SafeAtlasAllocator(Share<ShareRwLock<AtlasAllocator>>);
+pub struct SafeAtlasAllocator(pub(crate) Share<ShareRwLock<AtlasAllocator>>);
 impl SafeAtlasAllocator {
 	/// 创建分配器
 	pub fn new(
@@ -271,11 +272,11 @@ impl SafeAtlasAllocator {
 }
 
 /// 线程不安全的渲染目标分配器
-struct AtlasAllocator {
+pub(crate) struct AtlasAllocator {
 	// 渲染目标类型索引（每种不同的描述，对应一种渲染目标）
 	type_map: XHashMap<u64/*TargetDescriptor hash */, DefaultKey/*self.all_allocator index */>,
 	// 所有的AllocatorGroup（一个TargetDescriptor对应一个AllocatorGroup）
-	all_allocator: SlotMap<DefaultKey, AllocatorGroup>,
+	pub(crate) all_allocator: SlotMap<DefaultKey, AllocatorGroup>,
 	// 深度纹理描述，当前为内置固定描述，是否需要扩展？TODO
 	default_depth_descript: TextureDescriptor,
 	default_depth_hash: u64,
@@ -490,8 +491,7 @@ impl AtlasAllocator {
 
 			// 缓冲颜色纹理
 			for color_index in 0..t.target.colors.len() {
-				// log::warn!("drop====== width: {}, height: {}, hash: {}, len: {}, {:?}", width, height, hash, len);
-				// log::warn!("drop====={:?}, {:?}, {:?}", t.target.width, t.target.height, self.all_allocator[view.ty_index].info.texture_hash[color_index]);
+				log::trace!("drop====={:?}, {:?}, {:?}", t.target.width, t.target.height, self.all_allocator[view.ty_index].info.texture_hash[color_index]);
 				self.unuse_textures.create(RenderRes::new(UnuseTexture { 
 					view: t.target.colors[color_index].0.clone(),
 					texture: t.target.colors[color_index].1.clone(), 
@@ -680,6 +680,7 @@ impl AtlasAllocator {
 			usage: descript.usage,
 			view_formats: &[],
 		};
+		log::trace!("create target=================={:?}", (width, height));
 		// 缓存中不存在，则创建纹理
 		let texture: wgpu::Texture = (*self.device).create_texture(&desc);
 		let texture_view = texture.create_view(&wgpu::TextureViewDescriptor {
@@ -732,10 +733,10 @@ impl AtlasAllocator {
 	}
 }
 
-struct SingleAllocator {
-	allocator: guillotiere::AtlasAllocator,
-	target: Share<Fbo>,
-	count: usize,
+pub(super) struct SingleAllocator {
+	pub(super) allocator: guillotiere::AtlasAllocator,
+	pub(super) target: Share<Fbo>,
+	pub(super) count: usize,
 }
 
 #[derive(Debug)]
@@ -750,14 +751,14 @@ pub struct UnuseTexture {
 }
 
 pub struct AllocatorGroup {
-	info: AllocatorGroupInfo,
-	list: SlotMap<DefaultKey, SingleAllocator>,
+	pub(super) info: AllocatorGroupInfo,
+	pub(super) list: SlotMap<DefaultKey, SingleAllocator>,
 }
 
 pub struct AllocatorGroupInfo {
-	descript: TargetDescriptor,
-	texture_hash: SmallVec<[u64;1]>,
-	depth_hash: u64,
+	pub(super) descript: TargetDescriptor,
+	pub(super) texture_hash: SmallVec<[u64;1]>,
+	pub(super) depth_hash: u64,
 	// hash: u64,
 }
 

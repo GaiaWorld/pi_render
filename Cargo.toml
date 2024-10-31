@@ -10,10 +10,13 @@ keywords = ["pi", "render"]
 
 [features]
 webgl = ["render_core/webgl"]
+debug_info = ["render_core/debug_info"]
 
 [workspace]
 members = ["crates/*"]
 
+[workspace.dependencies]
+serde = "1"
 
 [dependencies]
 render_core = { path = "crates/render_core", version = "0.1", registry = "yn" }
