@@ -404,7 +404,7 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
 
 		// 重置输入输出参数
         // #[cfg(feature = "trace")]
-        let _clear_span = tracing::warn_span!("Clear Graph");
+        // let _clear_span = tracing::warn_span!("Clear Graph");
 		for node_id in topological_sort.iter() {
 			let node = &self.nodes[*node_id];
 			node.state.0.borrow_mut().clear();
