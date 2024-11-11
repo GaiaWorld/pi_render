@@ -389,27 +389,35 @@ impl EBuildinVertexAtribute {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum ECustomVertexType {
-    UVec4,
+    IVec4,
     Vec4,
     Vec3,
     Vec2,
     Float,
     Uint,
     U16x2,
+    U16x4,
     U8x4,
+    Unorm16x2,
+    Unorm16x4,
+    Unorm8x4,
     Int,
 }
 impl ECustomVertexType {
     pub fn format(&self) -> wgpu::VertexFormat {
         match self {
-            ECustomVertexType::UVec4 => wgpu::VertexFormat::Uint32x4,
+            ECustomVertexType::IVec4 => wgpu::VertexFormat::Sint32x4,
             ECustomVertexType::Vec4 => wgpu::VertexFormat::Float32x4,
             ECustomVertexType::Vec3 => wgpu::VertexFormat::Float32x3,
             ECustomVertexType::Vec2 => wgpu::VertexFormat::Float32x2,
             ECustomVertexType::Float => wgpu::VertexFormat::Float32,
             ECustomVertexType::Uint => wgpu::VertexFormat::Uint32,
             ECustomVertexType::U16x2 => wgpu::VertexFormat::Uint16x2,
+            ECustomVertexType::U16x4 => wgpu::VertexFormat::Uint16x4,
             ECustomVertexType::U8x4 => wgpu::VertexFormat::Uint8x4,
+            ECustomVertexType::Unorm16x2 => wgpu::VertexFormat::Unorm16x2,
+            ECustomVertexType::Unorm16x4 => wgpu::VertexFormat::Unorm16x4,
+            ECustomVertexType::Unorm8x4 => wgpu::VertexFormat::Unorm8x4,
             ECustomVertexType::Int => wgpu::VertexFormat::Sint32,
         }
     }
