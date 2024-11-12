@@ -1,7 +1,8 @@
 
-use std::{sync::Arc, fmt::Debug, hash::Hash};
+use std::{fmt::Debug, hash::{Hash, Hasher}, sync::Arc};
 
 use pi_assets::asset::{Handle, Asset, Size};
+use pi_hash::DefaultHasher;
 
 use crate::{rhi::device::RenderDevice, asset::{TAssetKeyU64, ASSET_SIZE_FOR_UNKOWN}};
 
@@ -94,9 +95,15 @@ impl Size for BindGroup {
     }
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
-pub struct KeyBindGroup(pub Vec<EKeyBind>);
+#[derive(Debug, Default, Clone)]
+pub struct KeyBindGroup(pub (crate)Arc::<Vec<EKeyBind>>, pub (crate) u64);
 impl KeyBindGroup {
+    pub fn new(val: Vec<EKeyBind>) -> Self {
+        let mut state = DefaultHasher::default();
+        val.hash(&mut state);
+        let hash = state.finish();
+        Self (Arc::new(val), hash)
+    }
     pub fn key_bind_group_layout(&self) -> KeyBindGroupLayout {
         let mut result = KeyBindGroupLayout::default();
 
@@ -140,6 +147,21 @@ impl KeyBindGroup {
         });
 
         result
+    }
+}
+impl Hash for KeyBindGroup {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.1.hash(state);
+    }
+}
+impl PartialEq for KeyBindGroup {
+    fn eq(&self, other: &Self) -> bool {
+        self.1 == other.1
+    }
+}
+impl Eq for KeyBindGroup {
+    fn assert_receiver_is_total_eq(&self) {
+        
     }
 }
 

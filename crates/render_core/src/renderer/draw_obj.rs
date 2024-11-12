@@ -97,6 +97,9 @@ impl DrawBindGroups {
             group.set(rpass, *i);
         }
     }
+    pub fn from_vec(val: Vec<(DrawBindGroup, u32)>) -> Self {
+        Self (SmallVecMap::from(val))
+    }
 }
 
 #[derive(Debug)]
