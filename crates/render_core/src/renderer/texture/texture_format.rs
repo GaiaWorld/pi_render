@@ -1,3 +1,5 @@
+use wgpu::Extent3d;
+
 
 pub trait TTextureFormatPixelByte {
     fn pixel_bytes(&self) -> usize;

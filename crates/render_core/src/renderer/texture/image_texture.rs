@@ -56,11 +56,70 @@ impl ResImageTexture {
     pub fn new(data: ImageTexture) -> Self {
         Self { data, extend: vec![] }
     }
-    pub fn create_data_texture(device: &RenderDevice, queue: &RenderQueue, key: &KeyImageTexture, data: &[u8], width: u32, height: u32, format: wgpu::TextureFormat, dimension: wgpu::TextureViewDimension, pre_pixel_size: u32, is_opacity: bool) -> Self {
+    pub fn texture(&self) -> &wgpu::Texture {
+        &self.data.texture
+    }
+    pub fn create_data_texture(
+        device: &RenderDevice, queue: &RenderQueue, key: &KeyImageTexture, width: u32, height: u32,
+        format: wgpu::TextureFormat, dimension: wgpu::TextureViewDimension, is_opacity: bool, depth_or_array_layers: u32, aspect: Option<wgpu::TextureAspect>,
+        data: Option<&[u8]>, dataoffset: u64
+    ) -> Self {
+        let texture = ResImageTexture::create_texture(device, key, width, height, format, dimension.compatible_texture_dimension(), depth_or_array_layers);
+
+        let (block_width, block_height) = format.block_dimensions();
+        let mut extent_width    = width / block_width;
+        let mut extent_height   = height / block_height;
+        if extent_width * block_width < width {
+            extent_width += 1;
+        }
+        if extent_height * block_height < height {
+            extent_height += 1;
+        }
+        let bytes_per_row = if let Some(pre_pixel_size) = format.block_copy_size(aspect) {
+            Some(extent_width * pre_pixel_size)
+        } else { None };
+
+        if let Some(data) = data {
+            let offset = dataoffset;
+
+            let texture_extent = wgpu::Extent3d {
+                width: extent_width,
+                height: extent_height,
+                depth_or_array_layers,
+            };
+            queue.write_texture(
+                texture.as_image_copy(),
+                data,
+                wgpu::ImageDataLayout {
+                    offset,
+                    bytes_per_row,
+                    rows_per_image: None,
+                },
+                texture_extent,
+            );
+        }
+
+        // log::error!("{:?}", (key, width, height, format, dimension, depth_or_array_layers, block_width, block_height, extent_width, extent_height, bytes_per_row));
+        let size = if let Some(bytes_per_row) = bytes_per_row { extent_height * bytes_per_row } else { extent_width * extent_height * 4 };
+        let data: ImageTexture = ImageTexture {
+            width, height, size: size as usize, texture, format, view_dimension: dimension, is_opacity
+        };
+        Self {
+            data, extend: vec![]
+        }
+    }
+
+    pub fn update(&self, queue: &RenderQueue, xoffset: u32, yoffset: u32, width: u32, height: u32, depth_or_array_layers: u32, aspect: Option<wgpu::TextureAspect>, data: &[u8], dataoffset: u64) {
+        ResImageTexture::update_texture(&self.data.texture, queue, xoffset, yoffset, width, height, depth_or_array_layers, aspect, data, dataoffset);
+    }
+    pub fn create_texture(
+        device: &RenderDevice, key: &KeyImageTexture, width: u32, height: u32,
+        format: wgpu::TextureFormat, dimension: wgpu::TextureDimension, depth_or_array_layers: u32
+    ) -> wgpu::Texture {
         let texture_extent = wgpu::Extent3d {
             width,
             height,
-            depth_or_array_layers: 1,
+            depth_or_array_layers,
         };
 
         let texture = (**device).create_texture(&wgpu::TextureDescriptor {
@@ -68,35 +127,27 @@ impl ResImageTexture {
             size: texture_extent,
             mip_level_count: 1,
             sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: format,
+            dimension,
+            format,
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::COPY_SRC,
             view_formats: &[],
         });
 
-        queue.write_texture(
-            texture.as_image_copy(),
-            data,
-            wgpu::ImageDataLayout {
-                offset: 0,
-                bytes_per_row: Some(width * pre_pixel_size),
-                rows_per_image: None,
-            },
-            texture_extent,
-        );
-
-        let size = data.len();
-
-        let data: ImageTexture = ImageTexture {
-            width, height, size, texture, format, view_dimension: dimension, is_opacity
-        };
-        Self::new(data)
+        texture
     }
+    pub fn update_texture(texture: &wgpu::Texture, queue: &RenderQueue, xoffset: u32, yoffset: u32, width: u32, height: u32, depth_or_array_layers: u32, aspect: Option<wgpu::TextureAspect>, data: &[u8], dataoffset: u64) {
+        let offset = dataoffset;
+        let (mut extent_width, mut _extent_height) = texture.format().block_dimensions();
+        extent_width    = width / extent_width;
+        // extent_height   = height / extent_height;
+        let bytes_per_row = if let Some(pre_pixel_size) = texture.format().block_copy_size(aspect) {
+            Some(extent_width * pre_pixel_size)
+        } else { None };
 
-    pub fn update(&self, queue: &RenderQueue, data: &[u8], xoffset: u32, yoffset: u32, width: u32, height: u32) {
-        let offset = (yoffset * self.data.width + xoffset) as u64;
-        let temp = self.data.texture.as_image_copy();
-        queue.write_texture(temp, data, wgpu::ImageDataLayout { offset, bytes_per_row: None, rows_per_image: None  }, wgpu::Extent3d { width, height, depth_or_array_layers: 1 });
+        let mut temp = texture.as_image_copy();
+        temp.origin.x = xoffset;
+        temp.origin.y = yoffset;
+        queue.write_texture(temp, data, wgpu::ImageDataLayout { offset, bytes_per_row, rows_per_image: None  }, wgpu::Extent3d { width, height, depth_or_array_layers });
     }
 
     pub fn width(&self) -> u32 {
