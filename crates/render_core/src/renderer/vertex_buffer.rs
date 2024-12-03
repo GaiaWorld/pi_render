@@ -65,7 +65,7 @@ pub struct DVertexBufferLayout {
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct VertexBufferLayouts {
-    layout_list: KeyAttributesLayouts,
+    pub layout_list: KeyAttributesLayouts,
     pub size: usize,
     pub attrcount: u8,
     pub desccount: u8,

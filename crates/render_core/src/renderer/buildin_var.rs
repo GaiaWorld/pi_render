@@ -72,6 +72,8 @@ impl ShaderVarUniform {
     pub const _VELOCITY                 : &'static str = "U_PI_ObjectVelocity"  ;
     pub const _SKIN_BONE_OFFSET0        : &'static str = "U_PI_SkinBoneOffset0" ;
     pub const _SKIN_BONE_OFFSET1        : &'static str = "U_PI_SkinBoneOffset1" ;
+    pub const _MATIDX                   : &'static str = "U_PI_MatIdxs"         ;
+    pub const MATIDX                    : &'static str = "PI_MatIdxs"           ;
     
     pub const BONE_MATRICES             : &'static str = "boneMatrices"         ;
     pub const BONE_TEX_SIZE             : &'static str = "bondTexSize"          ;
@@ -120,7 +122,7 @@ impl ShaderVarVertices {
     pub const INS_CUSTOM_VEC4_B         : &'static str = "A_INS_F_Vec4B"       ;
     pub const INS_CUSTOM_VEC4_C         : &'static str = "A_INS_F_Vec4C"       ;
     pub const INS_CUSTOM_VEC4_D         : &'static str = "A_INS_F_Vec4D"       ;
-    pub const INS_TEXTUREID             : &'static str = "A_INS_TEXTUREID"     ;
+    pub const INS_MAT_IDX               : &'static str = "A_INS_MATIDX"        ;
     pub const INS_MODEL_MAT_SKIN        : &'static str = "A_INS_MODEL_MAT_SKIN";
     
     pub const INS_VEC4_A                : &'static str = "A_INS_Vec4A"         ;

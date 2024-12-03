@@ -320,7 +320,7 @@ pub enum EBuildinVertexAtribute {
     InsWorldRow2            ,
     InsWorldRow3            ,
     InsWorldRow4            ,
-    TextureIDs              ,
+    MatIdxs              ,
     ModelMaterialSkin       ,
 }
 impl EBuildinVertexAtribute {
@@ -349,7 +349,7 @@ impl EBuildinVertexAtribute {
             EBuildinVertexAtribute::InsWorldRow2 => wgpu::VertexFormat::Float32x4,
             EBuildinVertexAtribute::InsWorldRow3 => wgpu::VertexFormat::Float32x4,
             EBuildinVertexAtribute::InsWorldRow4 => wgpu::VertexFormat::Float32x4,
-            EBuildinVertexAtribute::TextureIDs => wgpu::VertexFormat::Uint32x4,
+            EBuildinVertexAtribute::MatIdxs => wgpu::VertexFormat::Uint32x4,
             EBuildinVertexAtribute::ModelMaterialSkin => wgpu::VertexFormat::Uint32x4,
         }
     }
@@ -381,7 +381,7 @@ impl EBuildinVertexAtribute {
             EBuildinVertexAtribute::InsWorldRow2            => ShaderVarVertices::INS_WORLD_ROW2,
             EBuildinVertexAtribute::InsWorldRow3            => ShaderVarVertices::INS_WORLD_ROW3,
             EBuildinVertexAtribute::InsWorldRow4            => ShaderVarVertices::INS_WORLD_ROW4,
-            EBuildinVertexAtribute::TextureIDs              => ShaderVarVertices::INS_TEXTUREID,
+            EBuildinVertexAtribute::MatIdxs                 => ShaderVarVertices::INS_MAT_IDX,
             EBuildinVertexAtribute::ModelMaterialSkin       => ShaderVarVertices::INS_MODEL_MAT_SKIN,
         }
     }
@@ -500,6 +500,17 @@ impl EVertexAttribute {
         result += ShaderVarVertices::INS_WORLD_ROW2; result += ", ";
         result += ShaderVarVertices::INS_WORLD_ROW3; result += ", ";
         result += ShaderVarVertices::INS_WORLD_ROW4; result += ")";
+        result += ";\r\n";
+
+        result
+    }
+
+    pub fn matidx() -> String {
+        let mut result = String::from("");
+
+        result += ShaderVarUniform::MATIDX;
+        result += " = ";
+        result += ShaderVarVertices::INS_MODEL_MAT_SKIN;
         result += ";\r\n";
 
         result

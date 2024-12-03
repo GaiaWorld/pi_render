@@ -11,20 +11,20 @@ use super::buffer::{AssetRWBuffer, RWBufferRange, FixedSizeBufferPool};
 pub struct BindBufferAllocator {
     base_size: u32,
     base_size_large: u32,
-    block_size: u32,
+    pub block_size: u32,
     pool_slots: Vec<FixedSizeBufferPool>,
-    small_count: u32,
+    smallsizelevel: u32,
     asset_mgr: Share<AssetMgr<AssetRWBuffer>>,
 }
 impl BindBufferAllocator {
     pub fn new(device: &RenderDevice) -> Self {
         let base_size = device.limits().min_uniform_buffer_offset_alignment;
         let block_size = device.limits().max_uniform_buffer_binding_size;
-        let base_size_large = u32::min(base_size * 16, block_size / 16);
+        let base_size_large = u32::min(base_size * 16, block_size / 16).max(base_size);
 
-        let small_count = base_size_large / base_size;
+        let smallsizelevel = base_size_large / base_size;
         let mut pool_slots = vec![];
-        for i in 0..small_count {
+        for i in 0..smallsizelevel {
             pool_slots.push(
                 FixedSizeBufferPool::new(
                     block_size,
@@ -34,7 +34,7 @@ impl BindBufferAllocator {
             );
         }
 
-        let large_count = block_size / base_size_large - 1;
+        let large_count = (block_size + base_size_large - 1) / base_size_large;
         for i in 0..large_count {
             pool_slots.push(
                 FixedSizeBufferPool::new(
@@ -52,24 +52,17 @@ impl BindBufferAllocator {
             base_size_large,
             block_size,
             pool_slots,
-            small_count,
+            smallsizelevel,
             asset_mgr
         }
     }
     pub fn allocate(&mut self, size: wgpu::DynamicOffset) -> Option<BindBufferRange> {
         let slot_index = if size <= self.base_size_large {
-            let mut slot_index = size / self.base_size;
-            if slot_index * self.base_size == size {
-                slot_index -= 1;
-            }
+            let slot_index = (size + self.base_size - 1) / self.base_size - 1;
             slot_index
         } else if size <= self.block_size {
-            let mut slot_index = size / self.base_size_large;
-            if slot_index * self.base_size == size {
-                slot_index -= 1;
-            }
-
-            slot_index += self.small_count;
+            let mut slot_index = (size + self.base_size_large - 1) / self.base_size_large - 1;
+            slot_index += self.smallsizelevel;
             slot_index
         } else {
             return None;
@@ -79,9 +72,11 @@ impl BindBufferAllocator {
             if let Some(range) = pool.allocate(&self.asset_mgr) {
                 Some(BindBufferRange(Arc::new(range)))
             } else {
+                log::error!("bbbb");
                 None
             }
         } else {
+            log::error!("AAAA {:?}", (self.pool_slots.len(), slot_index));
             None
         }
     }

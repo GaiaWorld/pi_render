@@ -413,11 +413,15 @@ impl BufferMap {
 
         let r = match &self.buffer {
             Some(buffer) => {
+				let mut start = self.cache_buffer.change_range.start as wgpu::BufferAddress ;
+				let mut end = self.cache_buffer.change_range.end as wgpu::BufferAddress ;
+				start = start / wgpu::COPY_BUFFER_ALIGNMENT * wgpu::COPY_BUFFER_ALIGNMENT;
+				end = (end + wgpu::COPY_BUFFER_ALIGNMENT - 1) / wgpu::COPY_BUFFER_ALIGNMENT * wgpu::COPY_BUFFER_ALIGNMENT;
                 queue.write_buffer(
                     buffer,
-                    self.cache_buffer.change_range.start as u64,
-                    &self.cache_buffer.buffer()[self.cache_buffer.change_range.start as usize
-                        ..self.cache_buffer.change_range.end as usize],
+                    start as u64,
+                    &self.cache_buffer.buffer()[start as usize
+                        ..end as usize],
                 );
 
                 false

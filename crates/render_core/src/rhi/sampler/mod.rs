@@ -61,12 +61,20 @@ impl Default for EAddressMode {
     }
 }
 impl EAddressMode {
-    fn mode(&self) -> wgpu::AddressMode {
+    pub fn mode(&self) -> wgpu::AddressMode {
         match self {
             EAddressMode::ClampToEdge   => wgpu::AddressMode::ClampToEdge   ,
             EAddressMode::Repeat        => wgpu::AddressMode::Repeat        ,
             EAddressMode::MirrorRepeat  => wgpu::AddressMode::MirrorRepeat  ,
             EAddressMode::ClampToBorder => wgpu::AddressMode::ClampToBorder ,
+        }
+    }
+    pub fn to_u8(&self) -> u8 {
+        match self {
+            EAddressMode::ClampToEdge   => 0 ,
+            EAddressMode::Repeat        => 1 ,
+            EAddressMode::MirrorRepeat  => 2 ,
+            EAddressMode::ClampToBorder => 3 ,
         }
     }
 }
