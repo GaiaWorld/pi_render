@@ -46,10 +46,10 @@ impl ImageTextureView {
         key: &KeyImageTextureView,
         texture: Handle<ResImageTexture>,
     ) -> Self {
-        let view = texture.data.texture.create_view(&wgpu::TextureViewDescriptor {
+        let view = texture.texture().create_view(&wgpu::TextureViewDescriptor {
             label: Some(key.url().deref()),
-            format: Some(texture.data.format.clone()),
-            dimension: Some(texture.data.view_dimension.clone()),
+            format: Some(texture.texture().format()),
+            dimension: Some(texture.image().view_dimension.clone()),
             aspect: wgpu::TextureAspect::All, // key.desc.aspect,
             base_mip_level: key.desc.base_mip_level as u32,
             mip_level_count: key.desc.mip_level_count(),

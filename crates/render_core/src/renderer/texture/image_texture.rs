@@ -149,12 +149,33 @@ impl ResImageTexture {
         temp.origin.y = yoffset;
         queue.write_texture(temp, data, wgpu::ImageDataLayout { offset, bytes_per_row, rows_per_image: None  }, wgpu::Extent3d { width, height, depth_or_array_layers });
     }
+    pub fn update_sub(
+        texture: &wgpu::Texture, queue: &RenderQueue,
+        origin: wgpu::Origin3d,
+        width: u32, height: u32, depth_or_array_layers: u32,
+        aspect: Option<wgpu::TextureAspect>, data: &[u8], dataoffset: u64
+    ) {
+        let offset = dataoffset;
+        let (mut extent_width, mut _extent_height) = texture.format().block_dimensions();
+        extent_width    = width / extent_width;
+        // extent_height   = height / extent_height;
+        let bytes_per_row = if let Some(pre_pixel_size) = texture.format().block_copy_size(aspect) {
+            Some(extent_width * pre_pixel_size)
+        } else { None };
+
+        let mut temp = texture.as_image_copy();
+        temp.origin = origin;
+        queue.write_texture(temp, data, wgpu::ImageDataLayout { offset, bytes_per_row, rows_per_image: None  }, wgpu::Extent3d { width, height, depth_or_array_layers });
+    }
 
     pub fn width(&self) -> u32 {
         self.data.width
     }
     pub fn height(&self) -> u32 {
         self.data.height
+    }
+    pub fn image(&self) -> &ImageTexture {
+        &self.data
     }
 }
 

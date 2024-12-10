@@ -5,6 +5,7 @@ mod image_texture_view;
 mod render_target;
 pub mod texture_view;
 mod texture_view_array;
+mod image_texture_frame;
 
 pub use bind_texture::*;
 pub use texture_format::*;
@@ -13,6 +14,7 @@ pub use image_texture_view::*;
 pub use render_target::*;
 pub use texture_view::*;
 pub use texture_view_array::*;
+pub use image_texture_frame::*;
 
 
 #[derive(Debug, Clone, Default, Hash, PartialEq, Eq)]
@@ -55,5 +57,37 @@ pub struct TextureRect {
 impl Default for TextureRect {
     fn default() -> Self {
         Self { x: 0, y: 0, w: 1, h: 1 }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+pub enum ETextureViewDimension {
+    D1,
+    D2,
+    D2Array,
+    Cube,
+    CubeArray,
+    D3,
+}
+impl ETextureViewDimension {
+    pub fn mode(&self) -> wgpu::TextureViewDimension {
+        match self {
+            ETextureViewDimension::D1       => wgpu::TextureViewDimension::D1       ,
+            ETextureViewDimension::D2       => wgpu::TextureViewDimension::D2       ,
+            ETextureViewDimension::D2Array  => wgpu::TextureViewDimension::D2Array  ,
+            ETextureViewDimension::Cube     => wgpu::TextureViewDimension::Cube     ,
+            ETextureViewDimension::CubeArray=> wgpu::TextureViewDimension::CubeArray,
+            ETextureViewDimension::D3       => wgpu::TextureViewDimension::D3       ,
+        }
+    }
+    pub fn new(stage: wgpu::TextureViewDimension) -> Self {
+        match stage {
+            wgpu::TextureViewDimension::D1       => ETextureViewDimension::D1       ,
+            wgpu::TextureViewDimension::D2       => ETextureViewDimension::D2       ,
+            wgpu::TextureViewDimension::D2Array  => ETextureViewDimension::D2Array  ,
+            wgpu::TextureViewDimension::Cube     => ETextureViewDimension::Cube     ,
+            wgpu::TextureViewDimension::CubeArray=> ETextureViewDimension::CubeArray,
+            wgpu::TextureViewDimension::D3       => ETextureViewDimension::D3       ,
+        }
     }
 }
