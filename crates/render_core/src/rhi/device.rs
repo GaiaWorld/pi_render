@@ -327,7 +327,6 @@ pub async fn initialize_renderer(
 				required_limits: limits,
 			},
 			trace_path,
-			alloter,
 		)
 		.await
 		.unwrap();
