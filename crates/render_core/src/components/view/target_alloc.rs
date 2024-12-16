@@ -206,6 +206,9 @@ impl<T: GetTargetView + 'static, O: std::ops::Deref<Target=T>> GetTargetView for
 #[derive(Clone)]
 pub struct SafeAtlasAllocator(pub(crate) Share<ShareRwLock<AtlasAllocator>>);
 impl SafeAtlasAllocator {
+	pub fn size(&self) -> usize {
+		self.0.as_ref().read().unwrap().size()
+	}
 	/// 创建分配器
 	pub fn new(
 		device: RenderDevice, 
@@ -301,6 +304,23 @@ const PADDING: i32 = 1;
 const DOUBLE_PADDING: u32 = 2;
 
 impl AtlasAllocator {
+	pub fn size(&self) -> usize {
+		let mut result = 0;
+		self.all_allocator.iter().for_each(|(_, item)| {
+			result += item.list.capacity() * (168 + 8);
+		});
+		result += self.type_map.capacity() * 16
+		+ self.all_allocator.capacity() * 182
+		+ 48
+		+ 8
+		+ 8
+		+ 8
+		+ 8
+		+ 8
+		+ 8
+		+ self.excludes.capacity() * 8;
+		result
+	}
 	fn new(
 		device: RenderDevice, 
 		texture_assets_mgr: Share<AssetMgr<AssetWithId<TextureRes>>>,

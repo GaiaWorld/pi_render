@@ -23,13 +23,13 @@ impl SingleVertexBufferDataMap {
         let mut result = 0;
 
         self.vertices.iter().for_each(|item| {
-            result += item.1.len();
+            result += item.1.capacity();
         });
         self.instance.iter().for_each(|item| {
-            result += item.1.len();
+            result += item.1.capacity();
         });
         self.indices.iter().for_each(|item| {
-            result += item.1.len();
+            result += item.1.capacity();
         });
 
         result
