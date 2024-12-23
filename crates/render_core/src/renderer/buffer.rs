@@ -58,6 +58,10 @@ pub(crate) struct FixedSizeBufferPool {
     usage: wgpu::BufferUsages,
 }
 impl FixedSizeBufferPool {
+    pub fn size(&self) -> usize {
+        self.buffers.capacity() * 8 + 24
+        + 4 + 4 + 4 + 4
+    }
     /// * `block_size` 大内存块的基础尺寸
     /// * `fixed_size` 目标区间尺寸
     pub(crate) fn new(

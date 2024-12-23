@@ -88,6 +88,14 @@ impl BindBufferAllocator {
     pub fn asset_mgr(&self) -> &AssetMgr<AssetRWBuffer> {
         &self.asset_mgr
     }
+    pub fn size(&self) -> usize {
+        let mut result = 0;
+        self.pool_slots.iter().for_each(|item| {
+            result += item.size();
+        });
+        result += 4 + 4 + 4 + 4 + 24 + 8;
+        result + self.asset_mgr.size()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
