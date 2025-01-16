@@ -20,14 +20,14 @@ use pi_slotmap::SlotMap;
 use std::{borrow::Cow, mem::transmute};
 
 /// 依赖图
-pub struct DependGraph<Context: ThreadSync + 'static> {
+pub struct DependGraph<Context: ThreadSync + 'static, Bind: ThreadSync + 'static + Null + Clone> {
 	
     // ================== 拓扑信息
 
     // 名字 和 NodeId 映射
     node_names: XHashMap<Cow<'static, str>, NodeId>,
 	// 所有节点
-	nodes: SlotMap<NodeId, ScheduleNode<Context>>,
+	nodes: SlotMap<NodeId, ScheduleNode<Context, Bind>>,
 	// 最终节点，渲染到屏幕的节点
 	finish_nodes: XHashSet<NodeId>,
 
@@ -38,12 +38,14 @@ pub struct DependGraph<Context: ThreadSync + 'static> {
     is_enable_dirty: bool,
 	can_run_node: Vec<NodeId>,
     enable_nodes: Vec<NodeId>,
+
+    main_graph_id: NodeId, // 主图id
 }
 
 
-impl<Context: ThreadSync + 'static> Default for DependGraph<Context> {
+impl<Context: ThreadSync + 'static, Bind: ThreadSync + 'static + Null + Clone> Default for DependGraph<Context, Bind> {
     fn default() -> Self {
-        Self {
+        let mut r = Self {
 			schedule_graph: NGraph::new(),
 			topo_graph: RootGraph::default(),
             node_names: XHashMap::default(),
@@ -63,13 +65,16 @@ impl<Context: ThreadSync + 'static> Default for DependGraph<Context> {
             // topo_dirty: Vec::new(),
 			can_run_node: Vec::new(),
             enable_nodes: Vec::new(),
-        }
+            main_graph_id: Default::default(),
+        };
+        r.main_graph_id = r.add_sub_graph("main_graph").unwrap();
+        r
     }
 	
 }
 
 /// 渲染图的 拓扑信息 相关 方法
-impl<Context: ThreadSync + 'static> DependGraph<Context> {
+impl<Context: ThreadSync + 'static, Bind: ThreadSync + 'static + Null + Clone> DependGraph<Context, Bind> {
 	// #[cfg(not(debug_assertions))]
     // pub fn dump_graphviz(&self) -> String {
     //     "".into()
@@ -156,13 +161,12 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
         self.schedule_graph.get(id).map(|v| v.to())
     }
 
-
     /// 添加 名为 name 的 节点
     pub fn add_node<'a, I, O, R>(
         &mut self,
         name: impl Into<Cow<'static, str>>,
         node: R,
-        parent_graph_id: NodeId,
+        mut parent_graph_id: NodeId,
 		is_run: bool,
     ) -> Result<NodeId, GraphError>
     where
@@ -170,7 +174,30 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
         O: OutParam + Default + Clone,
         R: DependNode<Context, Input = I, Output = O>,
     {
+        if parent_graph_id.is_null() {
+            parent_graph_id = self.main_graph_id;
+        }
         self.add(name, node, parent_graph_id, is_run, false)
+    }
+
+    /// 设置bind
+    pub fn set_bind(&mut self, id: NodeId, bind: Bind) {
+        if let Some(v) = self.nodes.get_mut(id) {
+            v.bind = bind;
+        }
+    }
+
+    /// 获取bind
+    pub fn get_bind(&self, id: NodeId) -> Bind {
+        match self.nodes.get(id) {
+            Some(v) => v.bind.clone(),
+            None => Bind::null(),
+        }
+    }
+
+    ///主图id
+    pub fn main_graph_id(&self) -> NodeId {
+        self.main_graph_id
     }
 
     /// 添加 名为 name 的 子图
@@ -221,6 +248,7 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
             state: node_state,
 			is_run,
             is_enable: true,
+            bind: Null::null()
 			// run_way: RunWay::Schedule,
         });
         if is_sub_graph {
@@ -374,7 +402,7 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
 
 
 /// 渲染图的 执行 相关
-impl<Context: ThreadSync + 'static> DependGraph<Context> {
+impl<Context: ThreadSync + 'static, Bind: ThreadSync + 'static + Null + Clone> DependGraph<Context, Bind> {
     /// 执行 渲染
     pub async fn run<A: 'static + AsyncRuntime + Send>(
         &mut self,
@@ -496,7 +524,7 @@ impl<Context: ThreadSync + 'static> DependGraph<Context> {
 
 // ================== 以下方法 仅供 crate 使用
 
-impl<Context: ThreadSync + 'static> DependGraph<Context> {
+impl<Context: ThreadSync + 'static, Bind: ThreadSync + 'static + Null + Clone> DependGraph<Context, Bind> {
 	fn get_id(&self, label: &NodeLabel) -> Result<NodeId, GraphError> {
         match label {
             NodeLabel::NodeId(id) => Ok(*id),
@@ -648,13 +676,14 @@ impl<Context: ThreadSync + 'static> DependNode<Context> for InternalNodeEmptyImp
     }
 }
 
-struct ScheduleNode<Context: 'static + ThreadSync> {
+struct ScheduleNode<Context: 'static + ThreadSync, Bind: 'static + ThreadSync + Null + Clone> {
 	build_node: BuildFunc<Context>, // build方法， 如果是图，build为 empty_build
 	run_node: RunFunc<Context>,// run方法， 如果是图，run为 empty_run
 	name: String, // 节点名字
 	state: NodeState<Context>, // 节点状态
 	is_run: bool,
     is_enable: bool, // 是否有效（无效时， 不会执行build）
+    bind: Bind,
 	// run_way: RunWay, // 运行方式， 默认为RunWay::Schedule
 }
 

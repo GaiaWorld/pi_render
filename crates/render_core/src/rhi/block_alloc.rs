@@ -81,6 +81,12 @@ impl BlockAlloter {
 			return Err(format!("full fail, index , block_size: {}, offset: {}, datalen: {}", self.block_size, offset, data.len()));
 		}
 	}
+
+	pub unsafe fn get_mut(&mut self, index: usize) -> &[u8] {
+		let i = index / self.each_data_max_count;
+		let offset = index - i * self.each_data_max_count;
+		&self.datas[i].value[offset..]
+	}
 }
 
 /// 块索引
