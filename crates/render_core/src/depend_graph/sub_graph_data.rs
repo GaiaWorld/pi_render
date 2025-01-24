@@ -111,18 +111,26 @@ impl<K: Key, T> RootGraph<K, T> {
     pub fn add_node(&mut self, k: K, value: T, parent_graph_id: K) {
 		log::trace!("graph.add_node({:?}, (), {:?})", k, parent_graph_id);
 		debug_assert!(!self.nodes.contains_key(k));
-        self.nodes.insert(
+		let mut n = GraphNode {
+			edges: NGraphNode {
+				from: Vec::new(),
+				to: Vec::new(),
+			},
+			parent_graph_id,
+			index: 0,
+			value,
+		};
+        if !parent_graph_id.is_null() {
+			if let Some(parent_graph) = self.sub_graphs.get_mut(parent_graph_id) {
+				n.index = parent_graph.children_nodes.len();
+				parent_graph.children_nodes.push(k);
+			}
+		}
+		self.nodes.insert(
             k,
-            GraphNode {
-                edges: NGraphNode {
-                    from: Vec::new(),
-                    to: Vec::new(),
-                },
-                parent_graph_id,
-                index: 0,
-				value,
-            },
+            n,
         );
+		
     }
 
 	/// 取到入度节点
@@ -154,6 +162,7 @@ impl<K: Key, T> RootGraph<K, T> {
 			node.edges.to = Vec::default(); // 清理图， 以防后续重复处理
 
             if let Some(parent_graph) = self.sub_graphs.get_mut(node.parent_graph_id) {
+				log::trace!("graph.remove_node1({:?}) parent_graph_id: {:?}, {:?}", k, node.parent_graph_id, parent_graph.children_nodes.len());
                 parent_graph.children_nodes.swap_remove(node.index);
 				if let Some(child) = parent_graph.children_nodes.get(node.index) {
 					self.nodes[*child].index = node.index;
