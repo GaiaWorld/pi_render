@@ -1,4 +1,4 @@
-use std::{sync::Arc, ops::Deref};
+use std::{hash::{Hash, Hasher}, ops::Deref, sync::Arc};
 
 use crossbeam::queue::SegQueue;
 use guillotiere::{AllocId, AllocatorOptions, AtlasAllocator};
@@ -7,6 +7,7 @@ use pi_assets::{asset::{Handle, Asset, Size, Garbageer}, mgr::LoadResult};
 use pi_atom::Atom;
 use pi_futures::BoxFuture;
 use pi_hal::{image::DynamicImage, texture::ImageTexture};
+use pi_hash::DefaultHasher;
 use pi_share::Share;
 use wgpu::TextureView;
 
@@ -93,10 +94,11 @@ pub struct ImageTextureFrame {
     size: usize,
     pub(crate) tex: Arc<ImageTexture>,
     pub extend: Vec<u8>,
+    pub atlashash: u64,
 }
 impl ImageTextureFrame {
     pub fn new(tex: ImageTexture) -> Self {
-        Self { frame: None, size: tex.size, tex: Arc::new(tex), extend: vec![] }
+        Self { frame: None, size: tex.size, tex: Arc::new(tex), extend: vec![], atlashash: 0 }
     }
     pub fn tilloff(&self) -> [f32;4] {
         if let Some(frame) = &self.frame {
@@ -340,20 +342,21 @@ pub struct Atlas {
     allocator: Vec<AtlasAllocator>,
     format: wgpu::TextureFormat,
     texture: Arc<ImageTexture>,
-    key: Atom,
+    key: u64,
     recycle: Share<SegQueue<(usize, AllocId)>>,
 }
 impl Atlas {
     ///
     /// maxcount 可容纳图块的数目最大值, 根据 bindbuffer
-    pub fn new(key: Atom, maxwidth: u32, maxheight: u32, depth_or_array_layers: u32, format: wgpu::TextureFormat,
+    pub fn new(key: u64, maxwidth: u32, maxheight: u32, depth_or_array_layers: u32, format: wgpu::TextureFormat,
         device: &RenderDevice, queue: &RenderQueue,
     ) -> Self {
         let dimension = wgpu::TextureViewDimension::D2Array;
         let aspect = None;
         let data = None;
         let dataoffset = 0;
-        let texture = ImageTextureFrame::create_data_texture(device, queue, &key, maxwidth, maxheight, format, dimension, true, depth_or_array_layers, aspect, data, dataoffset);
+        let akey = Atom::from(key.to_string());
+        let texture = ImageTextureFrame::create_data_texture(device, queue, &akey, maxwidth, maxheight, format, dimension, true, depth_or_array_layers, aspect, data, dataoffset);
         let (blockw, blockh) = format.block_dimensions();
 
         let mut allocator = Vec::with_capacity(depth_or_array_layers as usize);
@@ -400,8 +403,10 @@ impl Atlas {
                 let blocksize = if let Some(size) = format.block_copy_size(None) {
                     size
                 } else { 1 };
+
                 result = Some(ImageTextureFrame {
-                    frame: Some(TextureFrame {idx,
+                    frame: Some(TextureFrame {
+                        idx,
                         id: rect.id,
                         seq: self.recycle.clone(),
                         rect: (ox, oy, sx, sy, w, h),
@@ -409,6 +414,7 @@ impl Atlas {
                     tex: self.texture.clone(),
                     size: (blocksize * (width + blockw - 1) / blockw * (height + blockh - 1) / blockh) as usize,
                     extend: vec![],
+                    atlashash: self.key
                 });
                 break;
             } else {
@@ -417,6 +423,9 @@ impl Atlas {
             idx += 1;
         }
         result
+    }
+    pub fn hashkey(&self) -> u64 {
+        self.key
     }
 }
 
@@ -456,8 +465,10 @@ impl CombineAtlas2DMgr {
                 idx += 1;
             }
             if frame.is_none() && idx < self.maxcount {
-                let key = self.key() + &idx.to_string();
-                let key = Atom::from(key);
+                let mut hasher = DefaultHasher::default();
+                self.format.hash(&mut hasher);
+                idx.hash(&mut hasher);
+                let key = hasher.finish();
                 let mut atlas = Atlas::new(key, self.maxsize, self.maxsize, self.maxlayer, self.format, device, queue);
                 frame = atlas.allocate(width, height);
                 self.atlasarr.push(atlas);
