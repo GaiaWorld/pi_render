@@ -70,7 +70,8 @@ impl BindBufferAllocator {
         
         if let Some(pool) = self.pool_slots.get_mut(slot_index as usize) {
             if let Some(range) = pool.allocate(&self.asset_mgr) {
-                Some(BindBufferRange(Arc::new(range)))
+                let offset = range.offset();
+                Some(BindBufferRange(Arc::new(range), offset))
             } else {
                 log::error!("bbbb");
                 None
@@ -99,7 +100,7 @@ impl BindBufferAllocator {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct BindBufferRange(pub Arc<RWBufferRange>);
+pub struct BindBufferRange(pub Arc<RWBufferRange>, pub wgpu::DynamicOffset);
 impl std::ops::Deref for BindBufferRange {
     type Target = Arc<RWBufferRange>;
 
