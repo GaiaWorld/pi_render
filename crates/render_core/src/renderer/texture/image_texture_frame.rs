@@ -1,4 +1,4 @@
-use std::{sync::Arc, ops::Deref};
+use std::{hash::{Hash, Hasher}, ops::Deref, sync::Arc};
 
 use crossbeam::queue::SegQueue;
 use guillotiere::{AllocId, AllocatorOptions, AtlasAllocator};
@@ -7,6 +7,7 @@ use pi_assets::{asset::{Handle, Asset, Size, Garbageer}, mgr::LoadResult};
 use pi_atom::Atom;
 use pi_futures::BoxFuture;
 use pi_hal::{image::DynamicImage, texture::ImageTexture};
+use pi_hash::DefaultHasher;
 use pi_share::Share;
 use wgpu::TextureView;
 
@@ -39,11 +40,11 @@ impl std::ops::Deref for KeyImageTextureFrame {
         self.url.as_str()
     }
 }
-
+#[derive(Debug)]
 pub struct TextureFrame {
     id: AllocId,
     rect: (u16, u16, u16, u16, u16, u16),
-    idx: usize,
+    depth_or_array_layer: usize,
     seq: Share<SegQueue<(usize, AllocId)>>,
 }
 impl TextureFrame {
@@ -55,14 +56,14 @@ impl TextureFrame {
         result[offset + 3] = self.rect.1 as f32 / self.rect.5 as f32;
     }
     pub fn texture_coord(&self) -> usize {
-        self.idx
+        self.depth_or_array_layer
     }
     pub fn copy_dst_orign(&self, format: wgpu::TextureFormat) -> wgpu::Origin3d {
         let (blockw, blockh) = format.block_dimensions();
         wgpu::Origin3d {
             x: (self.rect.0 as u32 + blockw - 1) / blockw * blockw,
             y: (self.rect.1 as u32 + blockh - 1) / blockh * blockh,
-            z: self.idx as u32,
+            z: self.depth_or_array_layer as u32,
         }
     }
     pub fn copy_rect(&self, format: wgpu::TextureFormat) -> wgpu::Extent3d {
@@ -84,7 +85,7 @@ impl TextureFrame {
 }
 impl Drop for TextureFrame {
     fn drop(&mut self) {
-        self.seq.push((self.idx, self.id));
+        self.seq.push((self.depth_or_array_layer, self.id));
     }
 }
 
@@ -93,10 +94,11 @@ pub struct ImageTextureFrame {
     size: usize,
     pub(crate) tex: Arc<ImageTexture>,
     pub extend: Vec<u8>,
+    pub atlashash: u64,
 }
 impl ImageTextureFrame {
     pub fn new(tex: ImageTexture) -> Self {
-        Self { frame: None, size: tex.size, tex: Arc::new(tex), extend: vec![] }
+        Self { frame: None, size: tex.size, tex: Arc::new(tex), extend: vec![], atlashash: 0 }
     }
     pub fn tilloff(&self) -> [f32;4] {
         if let Some(frame) = &self.frame {
@@ -119,7 +121,7 @@ impl ImageTextureFrame {
             let (blockw, blockh) = self.tex.texture.format().block_dimensions();
             // log::error!("{:?}", (frame.copy_dst_orign(format), (frame.rect.4 as u32 + blockw - 1) / blockw, (frame.rect.5 as u32 + blockh - 1) / blockh));
             ImageTextureFrame::update_sub(&self.tex.texture, queue, frame.copy_dst_orign(format),
-                (frame.rect.2 as u32 + blockw - 1) / blockw, (frame.rect.3 as u32 + blockh - 1) / blockh,
+                ((frame.rect.2 as u32 + blockw - 1) / blockw) * blockw, ((frame.rect.3 as u32 + blockh - 1) / blockh) * blockh,
                 1, None, data, 0
             );
         }
@@ -245,21 +247,28 @@ impl ImageTextureFrame {
         if let Some(data) = data {
             let offset = dataoffset;
 
-            let texture_extent = wgpu::Extent3d {
-                width: extent_width,
-                height: extent_height,
-                depth_or_array_layers,
-            };
-            queue.write_texture(
-                texture.as_image_copy(),
-                data,
-                wgpu::ImageDataLayout {
-                    offset,
-                    bytes_per_row,
-                    rows_per_image: None,
-                },
-                texture_extent,
-            );
+            for i in 0..depth_or_array_layers {
+                let texture_extent = wgpu::Extent3d {
+                    width: extent_width * block_width,
+                    height: extent_height * block_height,
+                    depth_or_array_layers: i,
+                };
+                let mut texturecopy = texture.as_image_copy();
+                // log::error!("Origin: {:?}", texturecopy);
+                texturecopy.origin.x = 0;
+                texturecopy.origin.y = 0;
+                texturecopy.origin.z = i;
+                queue.write_texture(
+                    texturecopy,
+                    data,
+                    wgpu::ImageDataLayout {
+                        offset,
+                        bytes_per_row,
+                        rows_per_image: None,
+                    },
+                    texture_extent,
+                );
+            }
         }
 
         // log::error!("{:?}", (key, width, height, format, dimension, depth_or_array_layers, block_width, block_height, extent_width, extent_height, bytes_per_row));
@@ -307,7 +316,9 @@ impl ImageTextureFrame {
 
         let mut temp = texture.as_image_copy();
         temp.origin = origin;
-        queue.write_texture(temp, data, wgpu::ImageDataLayout { offset, bytes_per_row, rows_per_image: None  }, wgpu::Extent3d { width, height, depth_or_array_layers });
+        let size = wgpu::Extent3d { width, height, depth_or_array_layers };
+        // log::error!("SIze {:?}", (&size, &temp.origin));
+        queue.write_texture(temp, data, wgpu::ImageDataLayout { offset, bytes_per_row, rows_per_image: None  }, size);
     }
 
     pub fn width(&self) -> u32 {
@@ -318,7 +329,7 @@ impl ImageTextureFrame {
     }
     pub fn coord(&self) -> u32 {
         if let Some(frame) = &self.frame {
-            frame.idx as u32
+            frame.depth_or_array_layer as u32
         } else {
             0
         }
@@ -340,20 +351,34 @@ pub struct Atlas {
     allocator: Vec<AtlasAllocator>,
     format: wgpu::TextureFormat,
     texture: Arc<ImageTexture>,
-    key: Atom,
+    key_image_texture_2d_array: u64,
     recycle: Share<SegQueue<(usize, AllocId)>>,
 }
 impl Atlas {
     ///
     /// maxcount 可容纳图块的数目最大值, 根据 bindbuffer
-    pub fn new(key: Atom, maxwidth: u32, maxheight: u32, depth_or_array_layers: u32, format: wgpu::TextureFormat,
+    pub fn new(key: u64, maxwidth: u32, maxheight: u32, depth_or_array_layers: u32, format: wgpu::TextureFormat,
         device: &RenderDevice, queue: &RenderQueue,
     ) -> Self {
         let dimension = wgpu::TextureViewDimension::D2Array;
         let aspect = None;
-        let data = None;
+        let datavec: Option<Vec<u8>> = {
+            // let (w, h) = format.block_dimensions();
+            // let ww = (maxwidth + w - 1) / w;
+            // let hh = (maxheight + h - 1) / h;
+            // if let Some(size) = format.block_copy_size(None) {
+            //     Some(vec![0u8; (size * ww * hh) as usize])
+            // } else {
+            //     None
+            // }
+            None
+        };
+        let data = if let Some(data) = &datavec {
+            Some(data.as_slice())
+        } else { None };
         let dataoffset = 0;
-        let texture = ImageTextureFrame::create_data_texture(device, queue, &key, maxwidth, maxheight, format, dimension, true, depth_or_array_layers, aspect, data, dataoffset);
+        let akey = Atom::from(key.to_string());
+        let texture = ImageTextureFrame::create_data_texture(device, queue, &akey, maxwidth, maxheight, format, dimension, true, depth_or_array_layers, aspect, data, dataoffset);
         let (blockw, blockh) = format.block_dimensions();
 
         let mut allocator = Vec::with_capacity(depth_or_array_layers as usize);
@@ -373,7 +398,7 @@ impl Atlas {
             maxheight,
             allocator,
             format,
-            key,
+            key_image_texture_2d_array: key,
             texture: Arc::new(texture),
             recycle,
         }
@@ -400,8 +425,10 @@ impl Atlas {
                 let blocksize = if let Some(size) = format.block_copy_size(None) {
                     size
                 } else { 1 };
+
                 result = Some(ImageTextureFrame {
-                    frame: Some(TextureFrame {idx,
+                    frame: Some(TextureFrame {
+                        depth_or_array_layer: idx,
                         id: rect.id,
                         seq: self.recycle.clone(),
                         rect: (ox, oy, sx, sy, w, h),
@@ -409,6 +436,7 @@ impl Atlas {
                     tex: self.texture.clone(),
                     size: (blocksize * (width + blockw - 1) / blockw * (height + blockh - 1) / blockh) as usize,
                     extend: vec![],
+                    atlashash: self.key_image_texture_2d_array
                 });
                 break;
             } else {
@@ -417,6 +445,9 @@ impl Atlas {
             idx += 1;
         }
         result
+    }
+    pub fn hashkey(&self) -> u64 {
+        self.key_image_texture_2d_array
     }
 }
 
@@ -456,8 +487,10 @@ impl CombineAtlas2DMgr {
                 idx += 1;
             }
             if frame.is_none() && idx < self.maxcount {
-                let key = self.key() + &idx.to_string();
-                let key = Atom::from(key);
+                let mut hasher = DefaultHasher::default();
+                self.format.hash(&mut hasher);
+                idx.hash(&mut hasher);
+                let key = hasher.finish();
                 let mut atlas = Atlas::new(key, self.maxsize, self.maxsize, self.maxlayer, self.format, device, queue);
                 frame = atlas.allocate(width, height);
                 self.atlasarr.push(atlas);
