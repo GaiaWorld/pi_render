@@ -26,6 +26,7 @@ pub struct GraphNode<K: Key, T> {
     parent_graph_id: K,
     index: usize,
 	value: T,
+	is_transfer: bool, // 是否是传输节点(不是一个真实的节点， 在生成toop图时， 需要忽略该节点， 将该节点的所有before和所有after相连)
 
 }
 
@@ -94,7 +95,7 @@ impl<K: Key, T> RootGraph<K, T> {
 
 	/// 设置子图的父, 只能在该图与其他节点创建连接关系之前设置， 否则设置不成功
 	pub fn set_sub_graph_parent(&mut self, k: K, parent_graph_id: K) {
-		log::warn!("graph.set_sub_graph_parent({:?}, {:?})", k, parent_graph_id);
+		log::debug!("graph.set_sub_graph_parent({:?}, {:?})", k, parent_graph_id);
 		if !parent_graph_id.is_null() {
 			if let (Some(sub_node), true, true) = (self.nodes.get_mut(k), self.sub_graphs.contains_key(k), self.sub_graphs.contains_key(parent_graph_id)) {
 				if sub_node.edges.from.is_empty() && sub_node.edges.to.is_empty() {
@@ -119,6 +120,7 @@ impl<K: Key, T> RootGraph<K, T> {
 			parent_graph_id,
 			index: 0,
 			value,
+			is_transfer: false,
 		};
         if !parent_graph_id.is_null() {
 			if let Some(parent_graph) = self.sub_graphs.get_mut(parent_graph_id) {
@@ -132,6 +134,18 @@ impl<K: Key, T> RootGraph<K, T> {
         );
 		
     }
+
+	/// 设置是否为中转节点
+	pub fn set_is_transfer(&mut self, k: K, is_transfer: bool) -> bool {
+		if let Some(node) = self.nodes.get_mut(k) {
+			if node.is_transfer  != is_transfer {
+				node.is_transfer = is_transfer;
+				return true;
+			}
+		}
+
+		false
+	}
 
 	/// 取到入度节点
     pub fn before_nodes(&self, k: K) -> Option<&[K]> {
@@ -257,7 +271,7 @@ impl<K: Key, T> RootGraph<K, T> {
         let RootGraph{from, to, nodes, topological, sub_graphs, ..} = &mut graph;
 
 		
-        // 计算开头 和 结尾的 节点
+        // 计算开头(入度) 和 结尾(出度) 节点
         for k in nodes.keys() {
 			let v = &nodes[k];
 			if !v.parent_graph_id.is_null(){
@@ -304,7 +318,6 @@ impl<K: Key, T> RootGraph<K, T> {
             
 			
             // 处理 from 的 下一层
-           
 			debug!("from = {:?}, to: {:?}", k, node.edges.to);
             // 遍历节点的后续节点
             for to in &node.edges.to  {
@@ -400,13 +413,15 @@ impl<K: Key, T: Clone> RootGraph<K, T> {
         let mut current_keys = vec![];
 		
         for k in finish{
-			self.gen_node(*k, &mut current_keys, &mut part_graph);
+			self.gen_node1(*k, &mut current_keys, &mut part_graph);
         }
+
+		log::debug!("gen_graph_from_keys, current_keys = {:?}", current_keys);
 
 		let mut from_keys = vec![];
 		part_graph.to = current_keys.clone();
         while !current_keys.is_empty() {
-            debug!("gen_graph_from_keys, current_keys = {:?}", current_keys);
+            log::debug!("gen_graph_from_keys1, current_keys = {:?}", current_keys);
 
             from_keys.clear();
 
@@ -423,7 +438,12 @@ impl<K: Key, T: Clone> RootGraph<K, T> {
 					&curr_node.edges.from
 				};
 
-				self.link_from(*curr, from,  &mut from_keys, &mut part_graph);
+				// 没有from, 则当前节点是图的入度节点
+				if from.len() == 0 {
+					part_graph.from.push(*curr);
+				} else {
+					self.link_from(*curr, from,  &mut from_keys, &mut part_graph);
+				}
 			}
 
             debug!("gen_graph_from_keys, from_keys = {:?}", from_keys);
@@ -447,7 +467,7 @@ impl<K: Key, T: Clone> RootGraph<K, T> {
 				
 				
 				// 处理 from 的 下一层
-				debug!("from = {:?}, to: {:?}", k, node.to());
+				log::debug!("from = {:?}, to: {:?}", k, node.to());
 				// 遍历节点的后续节点
 				for to in node.to().iter()  {
 					let k = key_index(*to);
@@ -455,7 +475,7 @@ impl<K: Key, T: Clone> RootGraph<K, T> {
 						counts.insert(k, part_graph.nodes[*to].from().len());
 					}
 					
-					// debug!("graph's each = {:?}, count = {:?}", to, counts[key_index(*to)]);
+					log::debug!("graph's each = {:?}, count = {:?}", to, counts[key_index(*to)]);
 					counts[key_index(*to)] -= 1;
 					// handle_set.insert(*to, ());
 					if counts[key_index(*to)] == 0 {
@@ -471,20 +491,42 @@ impl<K: Key, T: Clone> RootGraph<K, T> {
     }
 
 	fn link_from(&self, curr: K, from: &Vec<K>, current_keys: &mut Vec<K>, part_graph: &mut NGraph<K, T>) {
-		// 没有from, 则当前节点是图的入度节点
-		if from.len() == 0 {
-			part_graph.from.push(curr);
-		}
+		log::debug!("link_from, from = {:?}, curr = {:?}", curr, from);
 		for from in from {
 			if let Some(sub_graph) = self.sub_graphs.get(*from){
 				self.link_from(curr, &sub_graph.to, current_keys, part_graph);
 			} else {
-				self.gen_node(*from, current_keys, part_graph);
-				debug!("gen_graph_from_keys, add edge = ({:?}, {:?})", from, curr);
-				part_graph.add_edge(*from, curr);
+				let n = self.nodes.get(*from).unwrap();
+				if n.is_transfer {
+					self.link_from(curr, &n.edges.from, current_keys, part_graph);
+				} else {
+					self.gen_node(*from, current_keys, part_graph);
+					debug!("gen_graph_from_keys, add edge = ({:?}, {:?})", from, curr);
+					part_graph.add_edge(*from, curr);
+					log::debug!("link_from1, from = {:?}, curr = {:?}", from, curr);
+				}
 			}
 		}
 
+	}
+
+	fn gen_node1(&self, k: K, current_keys: &mut Vec<K>, part_graph: &mut NGraph<K, T>) {
+		if let Some(sub_graph) = self.sub_graphs.get(k){
+			for to in sub_graph.to.iter() {
+				self.gen_node1(*to, current_keys, part_graph);
+			}
+			
+		} else {
+			let n = self.nodes.get(k).unwrap();
+			if n.is_transfer { // 如果是传输节点， 继续迭代from
+				for from in n.edges.from.iter() {
+					self.gen_node1(*from, current_keys, part_graph);
+				}
+			} else if !part_graph.contains_key(k) {
+				part_graph.add_node(k, n.value.clone());
+				current_keys.push(k);
+			}
+		}
 	}
 
 	fn gen_node(&self, k: K, current_keys: &mut Vec<K>, part_graph: &mut NGraph<K, T>) {

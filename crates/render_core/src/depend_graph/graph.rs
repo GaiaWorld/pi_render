@@ -178,12 +178,19 @@ impl<Context: ThreadSync + 'static, Bind: ThreadSync + 'static + Null + Clone> D
             parent_graph_id = self.main_graph_id;
         }
         self.add(name, node, parent_graph_id, is_run, false)
-    }
+    }   
 
     /// 设置bind
     pub fn set_bind(&mut self, id: NodeId, bind: Bind) {
         if let Some(v) = self.nodes.get_mut(id) {
             v.bind = bind;
+        }
+    }
+
+    // 设置是否为传输节点
+    pub fn set_is_transfer(&mut self, id: NodeId, is_transfer: bool) {
+        if self.topo_graph.set_is_transfer(id, is_transfer) {
+            self.is_finish_dirty = true; // 设置is_finish_dirty脏
         }
     }
 
@@ -248,7 +255,7 @@ impl<Context: ThreadSync + 'static, Bind: ThreadSync + 'static + Null + Clone> D
             state: node_state,
 			is_run,
             is_enable: true,
-            bind: Null::null()
+            bind: Null::null(),
 			// run_way: RunWay::Schedule,
         });
         if is_sub_graph {
@@ -539,7 +546,7 @@ impl<Context: ThreadSync + 'static, Bind: ThreadSync + 'static + Null + Clone> D
     fn update_graph(&mut self) -> Result<bool, GraphError> {
         // 有必要的话，修改 拓扑结构
         if self.is_topo_dirty {
-            // 根据节点连接关系，更新拓扑图（用户将节点与节点、节点与子图连接在一起， 需要修改为为节点之间的链接关系）
+            // 根据节点连接关系，更新拓扑图（用户将节点与节点、节点与子图连接在一起， 需要修改为节点之间的链接关系）
             self.topo_graph.build().unwrap();
         }
 
