@@ -61,7 +61,7 @@ impl FontSheet {
 
 		// 宽高可能可变，TODO
 		let mut r = Self { 
-			font_mgr: FontMgr::new(width as usize, height as usize, font_type),
+			font_mgr: FontMgr::new(width as usize, height as usize, font_type, device.0.clone(), queue.clone()),
 			texture_view: None, 
 			texture: None,
 			texture_version: Share::new(ShareMutex::new(0)),
@@ -179,7 +179,7 @@ impl FontSheet {
 		match font_type {
 			FontType::Bitmap => todo!(),
 			FontType::Sdf1 => todo!(),
-			FontType::Sdf2 => self.font_mgr.table.sdf2_table.draw_await(&mut self.font_mgr.sheet, index, result, count)
+			FontType::Sdf2 => self.font_mgr.table.sdf2_table.draw_await( self.sdf_texture.as_ref().unwrap().clone(), &mut self.font_mgr.sheet, index, result, count)
 		}
 	}
 
@@ -426,8 +426,8 @@ impl FontSheet {
 			sample_count: 1,
 			dimension: wgpu::TextureDimension::D2,
 			format: wgpu::TextureFormat::R8Unorm,
-			view_formats: &[],
-			usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+			view_formats: &[wgpu::TextureFormat::R8Unorm],
+			usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::RENDER_ATTACHMENT,
 		});
 		let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 		let key = Atom::from("_$text_sdf").str_hash() as u64;
