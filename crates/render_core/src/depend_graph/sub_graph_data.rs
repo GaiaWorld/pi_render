@@ -438,11 +438,12 @@ impl<K: Key, T: Clone> RootGraph<K, T> {
 					&curr_node.edges.from
 				};
 
+				
+				self.link_from(*curr, from,  &mut from_keys, &mut part_graph);
 				// 没有from, 则当前节点是图的入度节点
-				if from.len() == 0 {
+				let n = part_graph.nodes.get(*curr).unwrap();
+				if n.from().is_empty() {
 					part_graph.from.push(*curr);
-				} else {
-					self.link_from(*curr, from,  &mut from_keys, &mut part_graph);
 				}
 			}
 
@@ -460,6 +461,7 @@ impl<K: Key, T: Clone> RootGraph<K, T> {
 		let mut from: Vec<K> = Vec::new();
 		let mut counts: VecMap<usize> = VecMap::with_capacity(part_graph.nodes.len());
 		
+		log::debug!("froms = {:?}", &from1);
 		while from1.len() > 0{
 			for k in from1.drain(..) {
 				let node = part_graph.nodes.get(k).unwrap();
