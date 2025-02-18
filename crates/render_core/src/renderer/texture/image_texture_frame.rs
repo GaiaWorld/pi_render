@@ -336,7 +336,7 @@ pub struct Atlas {
     format: wgpu::TextureFormat,
     texture: Arc<ImageTexture>,
     key_image_texture_2d_array: Option<u64>,
-    recycle: Share<SegQueue<(usize, AllocId, [u16;4])>>,
+    recycle: Share<SegQueue<(usize, AllocId)>>,
 }
 impl Atlas {
     ///
