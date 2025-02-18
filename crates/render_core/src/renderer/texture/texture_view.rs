@@ -98,11 +98,10 @@ impl ETextureViewUsage {
                 KeyTextureViewUsage::SRT(val.ty_index(), val.target_index(), TextureRect { x, y, w, h })
             },
             ETextureViewUsage::ImageFrame(val) => {
-                let atlashash = val.texture().atlashash;
-                if atlashash == 0 {
-                    KeyTextureViewUsage::ImageFrame(*val.key())
-                } else {
+                if let Some(atlashash) = val.texture().atlashash {
                     KeyTextureViewUsage::ImageFrame(atlashash)
+                } else {
+                    KeyTextureViewUsage::ImageFrame(*val.key())
                 }
             },
             // ETextureViewUsage::Temp(_, key) => {
