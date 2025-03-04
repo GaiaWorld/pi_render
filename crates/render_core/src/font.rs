@@ -43,6 +43,13 @@ pub struct FontSheet {
 	alloter: Share<pi_key_alloter::KeyAlloter>,
 }
 
+pub fn calc_hash2<T: Hash>(v: &T, cur: u64) -> u64 {
+    let mut hasher = DefaultHasher::default();
+    cur.hash(&mut hasher);
+    v.hash(&mut hasher);
+    hasher.finish()
+}
+
 unsafe impl Send for FontSheet {}
 unsafe impl Sync for FontSheet {}
 
@@ -93,6 +100,63 @@ impl FontSheet {
 				// r.init_sdf_texture()
 			},
 		};
+		let rect = pi_hal::svg::Rect::new(0.0, 0.0, 32.0, 32.0);
+		let hash = calc_hash2(&"rect sdf", 0);
+		log::error!("预处理 hash： {}", hash);
+        r.font_mgr.table.sdf2_table.add_shape(hash, rect.get_svg_info(), 32, 128, 2);
+		let texture = SdfResult::default();
+		r.font_mgr.table.sdf2_table.advance_computer_svg(texture.clone());
+		let mut result = texture.0.lock().unwrap();
+		let sdf_texture = r.sdf_texture.clone();
+		let version = r.texture_version.clone();
+		let queue = r.queue.clone();
+		r.font_mgr.table.sdf2_table.update_svg(move |block, image| {
+			// let (texture, pixle_size) = if image.width * image.height * 2 == image.buffer.len() {
+			// 	// index
+			// 	match &sdf_texture {
+			// 		Some(r) => (r, 2),
+			// 		None => return,
+			// 	}
+			// } else {
+			// 	// data
+			// 	match &sdf_texture {
+			// 		Some(r) => (r, 4),
+			// 		None => return,
+			// 	}
+			// };
+			let (texture, pixle_size) =	match &sdf_texture {
+				Some(r) => (r, 1),
+				None => return,
+			};
+		
+			// log::warn!("draw sdf2=-=============={}, {:?}, {:?}, {:?}, {:?}, {:?}", image.buffer.len(), block.x, block.y, &image.width, image.height, pixle_size);
+			
+			queue.write_texture(
+				ImageCopyTexture {
+					texture: &texture,
+					mip_level: 0,
+					origin: Origin3d {
+						x: block.x as u32,
+						y: block.y as u32,
+						z: 0
+					},
+					aspect: TextureAspect::All
+				}, 
+				image.buffer.as_slice(),
+				ImageDataLayout {
+					offset: 0,
+					bytes_per_row: if image.width == 0 { None }else { Some(image.width as u32 * pixle_size) }, // 32 * 4
+					rows_per_image: None,
+				},
+				Extent3d {
+					width: image.width as u32,
+					height: image.height as u32,
+					depth_or_array_layers: 1,
+				});
+			let mut v =  version.lock().unwrap();
+			*v = *v + 1;
+		}, &mut result.svg_result);
+		log::error!("预处理 hash222： {}", hash);
 		r
 	}
 
