@@ -1,4 +1,7 @@
-//! 渲染目标分配器
+//! 渲染目标分配器模块
+//!
+//! 该模块负责管理和分配渲染目标（如颜色附件、深度附件）的纹理资源，
+//! 通过Atlas分配算法高效复用纹理内存，支持动态调整纹理尺寸和重用。
 
 use std::{hash::{Hash, Hasher}, collections::hash_map::Entry, intrinsics::transmute, mem::size_of, sync::atomic::AtomicBool};
 
@@ -40,6 +43,7 @@ pub struct TextureDescriptor {
 pub struct TargetDescriptor {
 	/// 颜色纹理描述
 	pub colors_descriptor: SmallVec<[TextureDescriptor; 1]>,
+	/// 是否需要深度附件
 	pub need_depth: bool,
 	/// 深度纹理描述， 如果为None，则使用默认值，默认值为：
 	/// TextureDescriptor {
@@ -54,6 +58,7 @@ pub struct TargetDescriptor {
 	///		array_layer_count: None,
 	///		view_dimension: None,
 	///	}
+	/// 可选的深度附件描述，None时使用默认值
 	pub depth_descriptor: Option<TextureDescriptor>,
 	/// 默认宽度（如果分配纹理宽度小于default_width，则会直接使用default_width）
 	pub default_width: u32,
@@ -61,28 +66,28 @@ pub struct TargetDescriptor {
 	pub default_height: u32,
 }
 
-/// 渲染目标
+/// 帧缓冲对象（Framebuffer Object），包含实际纹理资源
 #[derive(Debug)]
 pub struct Fbo {
-	pub depth: Option<(Handle<AssetWithId<TextureRes>>, Share<wgpu::Texture>)>,
-	pub colors: SmallVec<[(Handle<AssetWithId<TextureRes>>, Share<wgpu::Texture>);1]>,
-	pub width: u32,
-	pub height: u32,
+	pub depth: Option<(Handle<AssetWithId<TextureRes>>, Share<wgpu::Texture>)>, // 深度附件
+	pub colors: SmallVec<[(Handle<AssetWithId<TextureRes>>, Share<wgpu::Texture>);1]>, // 颜色附件
+	pub width: u32,  // 纹理实际宽度
+	pub height: u32, // 纹理实际高度
 }
 
 // TODO Send问题， 临时解决
 unsafe impl Send for Fbo {}
 unsafe impl Sync for Fbo {}
 
-/// 渲染目标视图
+/// 渲染目标视图，表示分配到的具体纹理区域
 #[derive(Debug)]
 pub struct TargetView {
-	ty_index: DefaultKey,
-	pub index: DefaultKey, // 第几张纹理
-	info: Allocation,
-	rect: Rectangle, // target的宽高（不包含边框）
-	target: Share<Fbo>,
-	is_hold: AtomicBool,
+    ty_index: DefaultKey,       // 目标类型索引
+    index: DefaultKey,          // 在分配器中的索引
+    info: Allocation,           // 分配信息（包含边框）
+    rect: Rectangle,            // 实际可用区域（不含边框）
+    target: Share<Fbo>,         // 关联的FBO
+    is_hold: AtomicBool,        // 是否持有该分配区域
 }
 
 impl TargetView {
@@ -142,13 +147,13 @@ impl TargetView {
 #[derive(Debug, Clone, Copy, Hash)]
 pub struct TargetType(DefaultKey);
 
-/// 安全的TargetView
+/// 安全的目标视图包装，自动管理生命周期
 /// 当SafeTargetView销毁时， 会从纹理分配器中自动释放
 #[derive(Deref)]
 pub struct SafeTargetView {
 	#[deref]
-	value: TargetView,
-	allotor: SafeAtlasAllocator
+	value: TargetView, // 内嵌的目标视图
+	allotor: SafeAtlasAllocator // 关联的分配器（用于自动释放）
 }
 
 impl SafeTargetView {
@@ -173,6 +178,7 @@ impl SafeTargetView {
 }
 
 impl Drop for SafeTargetView {
+	/// 析构时自动释放分配的区域
     fn drop(&mut self) {
 		self.allotor.0.write().unwrap().deallocate(&self.value);
     }
@@ -221,6 +227,7 @@ impl SafeAtlasAllocator {
 				ShareRwLock::new(
 					AtlasAllocator::new(device, texture_assets_mgr, unuse_textures, key_alloter))))
 	}
+
 
 	pub fn get_or_create_type(&self, descript: TargetDescriptor) -> TargetType {
 		self.0.write().unwrap().get_or_create_type(descript)

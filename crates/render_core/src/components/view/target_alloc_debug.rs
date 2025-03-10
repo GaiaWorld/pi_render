@@ -1,4 +1,4 @@
-
+//! 渲染目标分配器的debug信息
 use pi_slotmap::DefaultKey;
 use serde::{Serialize, Deserialize};
 
