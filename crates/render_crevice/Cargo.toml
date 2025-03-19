@@ -1,6 +1,6 @@
 [package]
 name = "render_crevice"
-version = "0.2.0"
+version = "0.2.3"
 authors = ["moyy <moyy@gmail.com>"]
 edition = "2021"
 description = "Create GLSL-compatible versions of structs with explicitly-initialized padding"

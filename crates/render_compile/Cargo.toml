@@ -1,6 +1,6 @@
 [package]
 name = "render_compile"
-version = "0.2.0"
+version = "0.2.3"
 authors = ["suncy <530739162@qq.com>"]
 edition = "2021"
 description = "Renderer for PI Engine"
