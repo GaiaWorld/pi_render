@@ -1,6 +1,6 @@
 [package]
 name = "render_derive"
-version = "0.1.1"
+version = "0.2.0"
 authors = ["moyy <myy412001799@gmail.com>"]
 edition = "2021"
 description = "Provides derive implementations for Pi Engine"
@@ -12,7 +12,7 @@ keywords = ["pi"]
 proc-macro = true
 
 [dependencies]
-render_macro_utils = { path = "../render_macro_utils", version = "0.1", registry = "yn" }
+render_macro_utils = { path = "../render_macro_utils", version = "0.2", registry = "yn" }
 
 quote = "1.0"
 syn = "1.0"

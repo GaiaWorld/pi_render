@@ -3,7 +3,7 @@ use std::hash::{Hash, Hasher};
 // use crossbeam::queue::SegQueue;
 // use pi_hal::font::sdf2_table::TexInfo;
 use pi_assets::{asset::Handle, mgr::AssetMgr};
-use pi_async_rt::prelude::AsyncValueNonBlocking as AsyncValue;
+use pi_async_rt::prelude::AsyncValue;
 use pi_atom::Atom;
 use pi_hal::font::sdf2_table::SdfResult;
 // use pi_hal::font::svg::SvgTable;
