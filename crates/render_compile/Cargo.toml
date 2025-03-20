@@ -1,6 +1,6 @@
 [package]
 name = "render_compile"
-version = "0.1.4"
+version = "0.2.3"
 authors = ["suncy <530739162@qq.com>"]
 edition = "2021"
 description = "Renderer for PI Engine"
@@ -15,7 +15,7 @@ pi_naga = { version="0.1", registry = "yn", features=["glsl-in", "wgsl-in", "spv
 thiserror = "1.0"
 Inflector = "0.11"
 pi_ordmap = "0.2"
-pi_atom = "0.5"
+pi_atom = "0.6"
 log = "0.4"
 regex = "1.5"
 once_cell = "1.4" # TODO: replace once_cell with std equivalent if/when this lands: https://github.com/rust-lang/rfcs/pull/2788

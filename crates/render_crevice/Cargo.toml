@@ -1,6 +1,6 @@
 [package]
 name = "render_crevice"
-version = "0.1.1"
+version = "0.2.3"
 authors = ["moyy <moyy@gmail.com>"]
 edition = "2021"
 description = "Create GLSL-compatible versions of structs with explicitly-initialized padding"
@@ -18,8 +18,8 @@ render_crevice_derive= { version = "0.1.0", path = "render_crevice_derive", regi
 bytemuck = "1.4.1"
 mint = "0.5.8"
 
-cgmath = { version = "0.18", optional = true }
-glam = { version = "0.20", features = ["mint"], optional = true }
+# cgmath = { version = "0.18", optional = true }
+# glam = { version = "0.20", features = ["mint"], optional = true }
 nalgebra = { version = "0.32", features = ["mint"], optional = true }
 
 [dev-dependencies]
