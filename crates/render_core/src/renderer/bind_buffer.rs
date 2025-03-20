@@ -18,6 +18,9 @@ pub struct BindBufferAllocator {
 }
 impl BindBufferAllocator {
     pub fn new(device: &RenderDevice) -> Self {
+        Self::create(device, true)
+    }
+    pub fn create(device: &RenderDevice, buffer_common_use: bool) -> Self {
         let base_size = device.limits().min_uniform_buffer_offset_alignment;
         let block_size = device.limits().max_uniform_buffer_binding_size;
         let base_size_large = u32::min(base_size * 16, block_size / 16).max(base_size);
@@ -25,22 +28,26 @@ impl BindBufferAllocator {
         let smallsizelevel = base_size_large / base_size;
         let mut pool_slots = vec![];
         for i in 0..smallsizelevel {
+            let fixed_size = base_size * (i + 1);
             pool_slots.push(
-                FixedSizeBufferPool::new(
-                    block_size,
-                    base_size * (i + 1),
-                    wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::UNIFORM
+                FixedSizeBufferPool::create(
+                    fixed_size,
+                    fixed_size,
+                    wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::UNIFORM,
+                    buffer_common_use
                 )
             );
         }
 
         let large_count = (block_size + base_size_large - 1) / base_size_large;
         for i in 0..large_count {
+            let fixed_size = base_size_large * (i + 1);
             pool_slots.push(
-                FixedSizeBufferPool::new(
-                    block_size,
-                    base_size_large * (i + 1),
-                    wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::UNIFORM
+                FixedSizeBufferPool::create(
+                    fixed_size,
+                    fixed_size,
+                    wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::UNIFORM,
+                    buffer_common_use
                 )
             );
         }

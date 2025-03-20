@@ -56,6 +56,7 @@ pub(crate) struct FixedSizeBufferPool {
     pub(crate) fixed_size: u32,
     mutex: ShareMutex<()>,
     usage: wgpu::BufferUsages,
+    buffer_sub_update: bool,
 }
 impl FixedSizeBufferPool {
     pub fn size(&self) -> usize {
@@ -69,7 +70,17 @@ impl FixedSizeBufferPool {
         fixed_size: u32,
         usage: wgpu::BufferUsages,
     ) -> Self {
-        if block_size < fixed_size {
+        Self::create(block_size, fixed_size, usage, true)
+    }
+    /// * `block_size` 大内存块的基础尺寸
+    /// * `fixed_size` 目标区间尺寸
+    pub(crate) fn create(
+        mut block_size: u32,
+        fixed_size: u32,
+        usage: wgpu::BufferUsages,
+        buffer_sub_update: bool,
+    ) -> Self {
+        if block_size < fixed_size || buffer_sub_update == false {
             block_size = fixed_size;
         }
         Self {
@@ -77,7 +88,8 @@ impl FixedSizeBufferPool {
             fixed_size,
             block_size,
             mutex: ShareMutex::new(()),
-            usage
+            usage,
+            buffer_sub_update
         }
     }
     pub(crate) fn write_buffer(&mut self, device: &RenderDevice, queue: &RenderQueue) {
@@ -136,8 +148,9 @@ impl FixedSizeBufferPool {
         };
 
         // 创建块
+        let block_count = if self.buffer_sub_update { (self.block_size * (key_buffer.index + 1) / self.fixed_size) as usize } else { 1 };
         let buffer = SingleBufferAlloter::new(
-            (self.block_size * (key_buffer.index + 1) / self.fixed_size) as usize,
+            block_count,
             self.fixed_size as u32,
             self.usage
         );
