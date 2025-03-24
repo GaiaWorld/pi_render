@@ -81,19 +81,20 @@ pub struct ImageTextureFrame {
     pub atlashash: Option<u64>,
 }
 impl ImageTextureFrame {
+    pub const DEFAULT_TILLOFF: [f32;4] = [1., 1., 0., 0.];
     pub fn new(tex: ImageTexture) -> Self {
         Self { frame: None, size: tex.size, tex: Arc::new(tex), extend: vec![], atlashash: None }
     }
     pub fn tilloff(&self) -> [f32;4] {
         if let Some(frame) = &self.frame {
             [
-                frame.rect.2 as f32 / frame.rect.4 as f32,
-                frame.rect.3 as f32 / frame.rect.5 as f32,
-                frame.rect.0 as f32 / frame.rect.4 as f32,
-                frame.rect.1 as f32 / frame.rect.5 as f32,
+                (frame.rect.2 as f32 / frame.rect.4 as f32), // * (u16::MAX as f32)) as u16,
+                (frame.rect.3 as f32 / frame.rect.5 as f32), // * (u16::MAX as f32)) as u16,
+                (frame.rect.0 as f32 / frame.rect.4 as f32), // * (u16::MAX as f32)) as u16,
+                (frame.rect.1 as f32 / frame.rect.5 as f32), // * (u16::MAX as f32)) as u16,
             ]
         } else {
-            [1., 1., 0., 0.]
+            ImageTextureFrame::DEFAULT_TILLOFF
         }
     }
     pub fn texture(&self) -> &ImageTexture {
@@ -311,9 +312,9 @@ impl ImageTextureFrame {
     pub fn frame(&self) -> &Option<TextureFrame> {
         &self.frame
     }
-    pub fn coord(&self) -> u32 {
+    pub fn coord(&self) -> u8 {
         if let Some(frame) = &self.frame {
-            frame.depth_or_array_layer as u32
+            frame.depth_or_array_layer as u8
         } else {
             0
         }

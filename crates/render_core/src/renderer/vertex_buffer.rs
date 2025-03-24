@@ -195,6 +195,8 @@ pub struct VertexBufferAllocator {
     asset_mgr_2: Share<AssetMgr<NotUpdatableBuffer>>,
     unupdatables: Vec<FixedSizeBufferPoolNotUpdatable>,
     unupdatables_for_index: Vec<FixedSizeBufferPoolNotUpdatable>,
+    // buffer 是否共用，更新时部分更新
+    buffer_sub_update: bool,
 }
 
 // TODO Send问题， 临时解决
@@ -216,7 +218,7 @@ impl VertexBufferAllocator {
     /// * 最小对齐尺寸
     /// * 一个 2D 三角形 顶点坐标 + UV 坐标: 3 * (2 + 2) * 4 = 48
     /// * 一个 2D 三角形 顶点坐标 + Color: 3 * (2 + 3) * 4 = 60
-    pub const BAE_SIZE: u32 = 64;
+    pub const BAE_SIZE: u32 = 512; // 64;
     /// * LEVEL_COUNT 对应的 最大对齐尺寸 - 
     /// * 一个顶点 (Pos + UV + UV2 + Color4 + Normal + Tangent + BoneWeight + BoneIndice) = (3 + 2 + 2 + 4 + 3 + 4 + 4) * 4 + 4 * 2 = 96
     /// * u16::MAX 个顶点 = 96 * 65536 = 6 * 1024 * 1024
@@ -249,6 +251,10 @@ impl VertexBufferAllocator {
     }
 
     pub fn new(capacity: usize, timeout: usize) -> Self {
+        Self::create(capacity, timeout, true)
+    }
+    
+    pub fn create(capacity: usize, timeout: usize, buffer_sub_update: bool) -> Self {
         let base_size = Self::BAE_SIZE;
         let level = Self::LEVEL_COUNT;
         // let max_base_size = Self::MAX_BASE_SIZE;
@@ -256,10 +262,10 @@ impl VertexBufferAllocator {
 
         let usage = wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::VERTEX;
         let pool_slots = [
-            FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(00) as u32, usage),
-            FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(01) as u32, usage),
-            FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(02) as u32, usage),
-            FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(03) as u32, usage),
+            FixedSizeBufferPool::create(block_size, base_size * 2_i32.pow(00) as u32, usage, buffer_sub_update),
+            FixedSizeBufferPool::create(block_size, base_size * 2_i32.pow(01) as u32, usage, buffer_sub_update),
+            FixedSizeBufferPool::create(block_size, base_size * 2_i32.pow(02) as u32, usage, buffer_sub_update),
+            FixedSizeBufferPool::create(block_size, base_size * 2_i32.pow(03) as u32, usage, buffer_sub_update),
             // FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(04) as u32, usage),
             // FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(05) as u32, usage),
             // FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(06) as u32, usage),
@@ -275,10 +281,10 @@ impl VertexBufferAllocator {
         ];
         let usage = wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::INDEX;
         let pool_slots_for_index = [
-            FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(00) as u32, usage),
-            FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(01) as u32, usage),
-            FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(02) as u32, usage),
-            FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(03) as u32, usage),
+            FixedSizeBufferPool::create(block_size, base_size * 2_i32.pow(00) as u32, usage, buffer_sub_update),
+            FixedSizeBufferPool::create(block_size, base_size * 2_i32.pow(01) as u32, usage, buffer_sub_update),
+            FixedSizeBufferPool::create(block_size, base_size * 2_i32.pow(02) as u32, usage, buffer_sub_update),
+            FixedSizeBufferPool::create(block_size, base_size * 2_i32.pow(03) as u32, usage, buffer_sub_update),
             // FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(04) as u32, usage),
             // FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(05) as u32, usage),
             // FixedSizeBufferPool::new(block_size, base_size * 2_i32.pow(06) as u32, usage),
@@ -306,7 +312,8 @@ impl VertexBufferAllocator {
             asset_mgr,
             asset_mgr_2,
             unupdatables: vec![],
-            unupdatables_for_index: vec![]
+            unupdatables_for_index: vec![],
+            buffer_sub_update
         }
     }
     pub fn create_updatable_buffer(&mut self, data: &[u8]) -> Option<EVertexBufferRange> {
@@ -566,7 +573,17 @@ impl FixedSizeBufferPoolNotUpdatable {
             // 创建块
             let key_buffer = IDNotUpdatableBuffer { index: index as u32, size: self.block_size, usage: self.usage };
             let buffer = NotUpdatableBuffer(buffer, self.block_size, true, self.usage, self.pools.clone());
-            buffer.write_buffer(queue, data);
+            let datalen = data.len();
+            let blocksize = self.block_size as usize;
+            // if datalen < blocksize {
+            //     let mut data = data.to_vec();
+            //     for _ in datalen..blocksize {
+            //         data.push(0);
+            //     }
+            //     buffer.write_buffer(queue, &data);
+            // } else {
+                buffer.write_buffer(queue, data);
+            // }
             // if let Ok(asset_buffer) = asset_mgr.insert(key_buffer, buffer) {
                 let use_buffer = UseNotUpdatableBuffer(Arc::new(buffer));
                 let use_buffer = Arc::new(use_buffer);
@@ -589,7 +606,17 @@ impl FixedSizeBufferPoolNotUpdatable {
             let key_buffer = IDNotUpdatableBuffer { index: self.counter as u32, size: self.block_size, usage: self.usage };
             let buffer = NotUpdatableBuffer::new(device, self.block_size, self.usage, self.pools.clone());
             self.list.push(buffer.0.clone());
-            buffer.write_buffer(queue, data);
+            let datalen = data.len();
+            let blocksize = self.block_size as usize;
+            // if datalen < blocksize {
+            //     let mut data = data.to_vec();
+            //     for _ in datalen..blocksize {
+            //         data.push(0);
+            //     }
+            //     buffer.write_buffer(queue, &data);
+            // } else {
+                buffer.write_buffer(queue, data);
+            // }
             // if let Ok(asset_buffer) = asset_mgr.insert(key_buffer, buffer) {
                 let use_buffer = UseNotUpdatableBuffer(Arc::new(buffer));
                 let use_buffer = Arc::new(use_buffer);

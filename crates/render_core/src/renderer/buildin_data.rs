@@ -63,4 +63,21 @@ impl DefaultTexture {
             data
         )
     }
+    pub fn ctexture(device: &RenderDevice, queue: &RenderQueue, dim: wgpu::TextureDimension, width: u32, height: u32, data: &Vec<u8>) -> wgpu::Texture {
+        device.create_texture_with_data(
+            queue,
+            &wgpu::TextureDescriptor {
+                label: None,
+                size: wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: dim,
+                format: wgpu::TextureFormat::Rgba8Unorm,
+                usage: wgpu::TextureUsages::TEXTURE_BINDING,
+				view_formats: &[],
+            },
+			Default::default(),
+            data.as_slice()
+        )
+    }
 }
