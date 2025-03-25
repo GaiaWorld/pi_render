@@ -385,7 +385,7 @@ impl AtlasAllocator {
 			}
 		}
 		for (index, item) in list.list.iter_mut(){
-			let (offset, width, height) = if is_alone && item.count == 0 && item.target.width == width && item.target.height == height { 
+			let (offset, width, height) = if is_alone && item.hold_count == 0 && item.target.width == width && item.target.height == height { 
 				(0, width, height)
 			} else {
 				// 不在需要排除的渲染目标上分配
@@ -396,7 +396,7 @@ impl AtlasAllocator {
 				// 数量等于0，保持原大小，否则需要padding
 				// 原因是，为了重用屏幕渲染使用的深度缓冲区，通常，fbo的大小与屏幕等大
 				// 同时，需要分配的矩形，也很可能与屏幕等大，如果这里不判断item.count == 0，大部分fbo无法容纳与屏幕等大的矩形
-				if item.count == 0 {
+				if item.hold_count == 0 {
 					(0, width, height)
 				} else {
 					(PADDING, width + DOUBLE_PADDING, height + DOUBLE_PADDING)
@@ -417,8 +417,10 @@ impl AtlasAllocator {
 					// 如果不需要占有该空间， 则立即释放该空间
 					if !is_hold {
 						item.allocator.deallocate(allocation.id);
+					} else {
+						item.hold_count += 1;
 					}
-					log::trace!("allocate1, is_hold: {:?}, ty_index: {:?}, index: {:?}, key: {:?}, rect: {:?}", is_hold, target_type.0, index, allocation.id, rect);
+					log::trace!("allocate1, is_hold: {:?}, ty_index: {:?}, target_index: {:?}, key: {:?}, rect: {:?}", is_hold, target_type.0, index, allocation.id, rect);
 
 					return TargetView {
 						info: allocation,
@@ -448,18 +450,22 @@ impl AtlasAllocator {
 			None => panic!("AtlasAllocator allocate first fail, width: {:?}, height: {:?}, target_width : {:?}, target_height: {:?}", width, height, target.width, target.height),
 		};
 		// 如果不需要占有该空间， 则立即释放该空间
-		if !is_hold {
+		let hold_count = if !is_hold {
 			atlas_allocator.deallocate(allocation.id);
-		}
+			0
+		} else {
+			1
+		};
 
 		let list = &mut self.all_allocator[target_type.0];
 		let index = list.list.insert(SingleAllocator {
 			allocator:atlas_allocator,
 			target: target.clone(),
 			count: 1,
+			hold_count: hold_count,
 		});
 		let rect = allocation.rectangle.clone();
-		log::trace!("allocate2, is_hold: {:?}, ty_index: {:?}, index: {:?}, key: {:?}, rect: {:?}", is_hold, target_type.0, index, allocation.id, rect);
+		log::trace!("allocate2, is_hold: {:?}, ty_index: {:?}, target_index: {:?}, key: {:?}, rect: {:?}", is_hold, target_type.0, index, allocation.id, rect);
 		return TargetView {
 			info: allocation,
 			rect,
@@ -484,11 +490,13 @@ impl AtlasAllocator {
 	fn deallocate(&mut self, view: &TargetView) {
 		let alloctor = &mut self.all_allocator[view.ty_index].list[view.index];
 		// 如果TargetView中独占该空间， 则在此时释放分配空间
+		let is_hold = view.is_hold.load(std::sync::atomic::Ordering::Relaxed);
 		if view.is_hold.load(std::sync::atomic::Ordering::Relaxed) {
 			alloctor.allocator.deallocate(view.info.id);
+			alloctor.hold_count -= 1;
 		}
 		alloctor.count -= 1;
-		log::trace!("deallocate, count: {:?}, ty_index: {:?}, index: {:?}, key: {:?}, rect: {:?}", alloctor.count, view.ty_index, view.index, view.info.id, &view.rect);
+		log::trace!("deallocate, count: {:?}, ty_index: {:?}, target_index: {:?}, is_hold: {:?}, key: {:?}, rect: {:?}", alloctor.count, view.ty_index, view.index, is_hold, view.info.id, &view.rect);
 
 		if alloctor.count == 0 {
 			let t = self.all_allocator[view.ty_index].list.remove(view.index).unwrap();
@@ -518,7 +526,7 @@ impl AtlasAllocator {
 
 			// 缓冲颜色纹理
 			for color_index in 0..t.target.colors.len() {
-				log::trace!("drop====={:?}, {:?}, {:?}", t.target.width, t.target.height, self.all_allocator[view.ty_index].info.texture_hash[color_index]);
+				log::trace!("drop=====ty_index:{:?}, view_index: {:?}, width: {:?}, height: {:?}, target: {:?}", view.ty_index, view.index, t.target.width, t.target.height, self.all_allocator[view.ty_index].info.texture_hash[color_index]);
 				self.unuse_textures.create(RenderRes::new(UnuseTexture { 
 					view: t.target.colors[color_index].0.clone(),
 					texture: t.target.colors[color_index].1.clone(), 
@@ -764,6 +772,7 @@ pub(super) struct SingleAllocator {
 	pub(super) allocator: guillotiere::AtlasAllocator,
 	pub(super) target: Share<Fbo>,
 	pub(super) count: usize,
+	pub(super) hold_count: usize,
 }
 
 #[derive(Debug)]

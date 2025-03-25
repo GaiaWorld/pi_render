@@ -305,25 +305,30 @@ where
         // let t3 = std::time::Instant::now();
 		let r = match runner {
 			Ok(output) => {
-				// 结束前，先 重置 引用数
-				self.curr_next_build_refs = self.total_next_refs;
+                // 结束前，先 重置 引用数
+                self.curr_next_build_refs = self.total_next_refs;
 
-				for (_pre_id, pre_node) in &self.pre_nodes {
-					let p = pre_node.0.as_ref();
-					let mut p = p.borrow_mut();
-					// // 用完了 一个前置，引用计数 减 1
-					// build阶段不减1，在run中减一
-					let cur_count = p.deref_mut().dec_curr_build_ref();
-					if cur_count == 0 {
-						// SAFE: 此处强转可变是安全的，因为单线程执行build
-						p.deref_mut().build_end();
-					}
-				}
+                for (_pre_id, pre_node) in &self.pre_nodes {
+                    let p = pre_node.0.as_ref();
+                    let mut p = p.borrow_mut();
+                    // // 用完了 一个前置，引用计数 减 1
+                    // build阶段不减1，在run中减一
+                    let cur_count = p.deref_mut().dec_curr_build_ref();
+                    if cur_count == 0 {
+                        // SAFE: 此处强转可变是安全的，因为单线程执行build
+                        p.deref_mut().build_end();
+                    }
+                    // log::warn!("pre == id: {:?}, id: {:?}, cur_count:{:?}", id,  _pre_id, cur_count);
+                }
 
-				// 替换 输出
-				if self.total_next_refs != 0 {
-					self.output = output;
-				}
+                // log::warn!("total_next_refs == id: {:?}, total_next_refs: {:?}, pre_count:{:?}", id, self.total_next_refs, self.pre_nodes.len());
+                if self.total_next_refs == 0 { 
+                    self.build_end();
+                } else {
+                    
+                    // 替换 输出
+                    self.output = output;
+                }
 
 				Ok(())
 			}
