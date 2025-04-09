@@ -134,7 +134,7 @@ impl<Context: ThreadSync + 'static, Bind: ThreadSync + 'static + Null + Clone> D
 			let id1 = id.data();
 
             v.push(format!(
-                "\t \"{id:?}\" [\"style\"=\"filled\" \"label\"={name}_{id1:?} \"fillcolor\"=\"{color}\"]"
+                "\t \"{id:?}\" [\"style\"=\"filled\" \"label\"=\"{name}_{id1:?}\" \"fillcolor\"=\"{color}\"]"
             ));
         }
 
