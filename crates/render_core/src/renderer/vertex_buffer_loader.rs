@@ -1,6 +1,6 @@
-use std::{marker::PhantomData, hash::Hash, sync::Arc};
+use std::{marker::PhantomData, hash::Hash};
 
-use pi_assets::{mgr::AssetMgr};
+use pi_assets::mgr::AssetMgr;
 use pi_hash::XHashMap;
 use pi_share::Share;
 
@@ -98,7 +98,7 @@ impl SingleVertexBufferDataMap {
         let mut result = XHashMap::default();
         self.instance.drain().for_each(|(key, data)| {
             if let Some(bufferrange) = allocator.create_not_updatable_buffer(device, queue, &data, None) {
-                result.insert(key, EVerticesBufferUsage::EVBRange(Arc::new(bufferrange)) );
+                result.insert(key, EVerticesBufferUsage::EVBRange(Share::new(bufferrange)) );
             }
         });
         result

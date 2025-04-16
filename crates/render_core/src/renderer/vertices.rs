@@ -18,8 +18,8 @@ pub enum EVerticesBufferUsage {
     /// 3D Buffer 不会更新
     Other(Handle<EVertexBufferRange>),
     /// 3D Buffer, 可以更新数据 - 应用于 粒子系统、实例化等情况
-    EVBRange(Arc<EVertexBufferRange>),
-    Temp(Arc<Buffer>),
+    EVBRange(Share<EVertexBufferRange>),
+    Temp(Share<Buffer>),
 }
 impl EVerticesBufferUsage {
     pub fn range(&self) -> Range<wgpu::BufferAddress> {
