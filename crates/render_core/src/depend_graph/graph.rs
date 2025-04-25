@@ -38,6 +38,7 @@ pub struct DependGraph<Context: ThreadSync + 'static, Bind: ThreadSync + 'static
     is_enable_dirty: bool,
 	can_run_node: Vec<NodeId>,
     enable_nodes: Vec<NodeId>,
+    need_init_nodes: Vec<NodeId>,
 
     main_graph_id: NodeId, // 主图id
 }
@@ -65,6 +66,7 @@ impl<Context: ThreadSync + 'static, Bind: ThreadSync + 'static + Null + Clone> D
             // topo_dirty: Vec::new(),
 			can_run_node: Vec::new(),
             enable_nodes: Vec::new(),
+            need_init_nodes: Vec::new(),
             main_graph_id: Default::default(),
         };
         r.main_graph_id = r.add_sub_graph("main_graph").unwrap();
@@ -254,7 +256,7 @@ impl<Context: ThreadSync + 'static, Bind: ThreadSync + 'static + Null + Clone> D
             name: name.to_string(),
             state: node_state,
 			is_run,
-            is_enable: true,
+            is_build: true,
             bind: Null::null(),
 			// run_way: RunWay::Schedule,
         });
@@ -263,6 +265,7 @@ impl<Context: ThreadSync + 'static, Bind: ThreadSync + 'static + Null + Clone> D
         } else {
             self.topo_graph.add_node(node_id, (), parent_graph_id);
         }
+        self.need_init_nodes.push(node_id);
         
 
         self.node_names.insert(name, node_id);
@@ -387,7 +390,24 @@ impl<Context: ThreadSync + 'static, Bind: ThreadSync + 'static + Null + Clone> D
 		}
     }
 
-     pub fn set_enable(
+    pub fn set_is_build(
+        &mut self,
+        label: impl Into<NodeLabel>,
+        is_is_build: bool,
+    ) -> Result<(), GraphError> {
+        let label = label.into();
+        let node_id = self.get_id(&label)?;
+
+        if let Some(node) = self.nodes.get_mut(node_id) {
+            if node.is_build != is_is_build {
+                node.is_build = is_is_build;
+                self.is_enable_dirty = true;
+            }
+        }
+        Ok(())
+    }
+
+    pub fn set_enable(
         &mut self,
         label: impl Into<NodeLabel>,
         is_enable: bool,
@@ -396,8 +416,31 @@ impl<Context: ThreadSync + 'static, Bind: ThreadSync + 'static + Null + Clone> D
         let node_id = self.get_id(&label)?;
 
         if let Some(node) = self.nodes.get_mut(node_id) {
-            if node.is_enable != is_enable {
-                node.is_enable = is_enable;
+            if node.is_build != is_enable {
+                node.is_build = is_enable;
+                self.is_enable_dirty = true;
+            }
+
+            if node.is_run != is_enable {
+                node.is_run = is_enable;
+                self.is_enable_dirty = true;
+            }
+            
+        }
+        Ok(())
+    }
+
+    pub fn set_is_run(
+        &mut self,
+        label: impl Into<NodeLabel>,
+        is_run: bool,
+    ) -> Result<(), GraphError> {
+        let label = label.into();
+        let node_id = self.get_id(&label)?;
+
+        if let Some(node) = self.nodes.get_mut(node_id) {
+            if node.is_run != is_run {
+                node.is_run = is_run;
                 self.is_enable_dirty = true;
             }
             
@@ -430,7 +473,7 @@ impl<Context: ThreadSync + 'static, Bind: ThreadSync + 'static + Null + Clone> D
 			// if !node.is_run {
 			// 	continue;
 			// }
-			let graph_node = self.schedule_graph.get(*node_id).unwrap();
+			let graph_node: &super::graph_data::NGraphNode<NodeId, ()> = self.schedule_graph.get(*node_id).unwrap();
 			// 这里用transmute绕过声明周期， 是安全的，因为在context、self释放之前，map中的任务已完成（外部等待）
 			map.map(rt.clone(), (*node.run_node)(index, unsafe {transmute(context)}, *node_id, unsafe {transmute(graph_node.from())} ,  unsafe { transmute(graph_node.to())})).unwrap();
 			index += 1;
@@ -465,6 +508,16 @@ impl<Context: ThreadSync + 'static, Bind: ThreadSync + 'static + Null + Clone> D
 			let graph_node = self.schedule_graph.get(*node_id).unwrap();
 			(*node.build_node)(context, *node_id, &graph_node.from(), &graph_node.to()).unwrap();
 		}
+
+        if self.need_init_nodes.len() > 0 {
+            // let t3 = pi_time::Instant::now();
+            // log::warn!("build========");
+            for node_id in self.need_init_nodes.iter() {
+                let node = &self.nodes[*node_id];
+                (*node.state.0.borrow_mut()).init(context).unwrap();
+            }
+            self.need_init_nodes.clear();
+        }
         // let t3 = pi_time::Instant::now();
         // log::warn!("build=================={:?}", (t2 - t1, t3 - t2, self.enable_nodes.len()));
 		Ok(())
@@ -487,16 +540,13 @@ impl<Context: ThreadSync + 'static, Bind: ThreadSync + 'static + Null + Clone> D
         if self.is_topo_dirty || self.is_enable_dirty || self.is_finish_dirty {
             // 重新生成激活节点
             self.enable_nodes.clear();
-            for i in self.schedule_graph.topological.iter() {
-                if self.nodes[*i].is_enable {
-                    self.enable_nodes.push(i.clone());
-                }
-            }
-
             // 计算可运行节点
             self.can_run_node.clear();
-            for i in self.enable_nodes.iter() {
-                if self.nodes[*i].is_run && self.nodes[*i].is_enable {
+            for i in self.schedule_graph.topological.iter() {
+                if self.nodes[*i].is_build {
+                    self.enable_nodes.push(i.clone());
+                }
+                if self.nodes[*i].is_run {
                     self.can_run_node.push(i.clone());
                 }
             }
@@ -649,6 +699,18 @@ impl<Context: ThreadSync + 'static> DependNode<Context> for InternalNodeEmptyImp
 
     type Output =();
 
+    fn init<'a>(
+        &'a mut self,
+        context: &'a mut Context,
+        // input: &'a Self::Input,
+        // usage: &'a ParamUsage,
+		// id: NodeId, 
+		// from: &[NodeId],
+		// to: &[NodeId],
+    ) -> Result<(), String> {
+        Ok(())
+    }
+
     fn build<'a>(
         &'a mut self,
         _context: &'a mut Context,
@@ -689,7 +751,7 @@ struct ScheduleNode<Context: 'static + ThreadSync, Bind: 'static + ThreadSync + 
 	name: String, // 节点名字
 	state: NodeState<Context>, // 节点状态
 	is_run: bool,
-    is_enable: bool, // 是否有效（无效时， 不会执行build）
+    is_build: bool, // 是否需要build）
     bind: Bind,
 	// run_way: RunWay, // 运行方式， 默认为RunWay::Schedule
 }

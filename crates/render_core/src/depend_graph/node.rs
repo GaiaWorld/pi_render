@@ -31,6 +31,16 @@ pub trait DependNode<Context>: 'static + ThreadSync {
     /// 输出参数
     type Output: OutParam + Default + Clone;
 
+
+    fn init<'a>(
+        &'a mut self,
+        context: &'a mut Context,
+        // input: &'a Self::Input,
+        // usage: &'a ParamUsage,
+		// id: NodeId, 
+		// from: &[NodeId],
+		// to: &[NodeId],
+    ) -> Result<(), String>;
     // build, 在所有节点的run之前， 都要执行所有节点的build
 	// build， 输出节点运行结果（结果一般都是fbo， build先输出一个没有渲染内容的fbo）
 	fn build<'a>(
@@ -148,6 +158,8 @@ pub(crate) trait InternalNode<Context: ThreadSync + 'static>: OutParam {
     // 构建，当依赖图 构建时候，会调用一次
     // 一般 用于 准备 渲染 资源的 创建
     fn build<'a>(&'a mut self, context: &'a mut Context, id: NodeId, from: &[NodeId], to: &[NodeId]) -> Result<(), GraphError>;
+
+    fn init<'a>(&'a mut self, context: &'a mut Context) -> Result<(), GraphError>;
 
     // 执行依赖图
     fn run<'a>(&'a mut self, index: usize, context: &'a Context, id: NodeId, from: &'static [NodeId], to: &'static [NodeId]) -> BoxFuture<'a, Result<(), GraphError>>;
@@ -289,6 +301,13 @@ where
 	fn dec_curr_build_ref(&mut self) -> i32 {
 		self.curr_next_build_refs -= 1;
 		self.curr_next_build_refs
+    }
+
+    fn init<'a>(&'a mut self, context: &'a mut Context) -> Result<(), GraphError> {
+        match self.node.init(context) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(GraphError::BuildError(e)),
+        }
     }
 
 	fn build<'a>(&'a mut self, context: &'a mut Context, id: NodeId, from: &'a [NodeId], to: &'a [NodeId]) -> Result<(), GraphError> {
