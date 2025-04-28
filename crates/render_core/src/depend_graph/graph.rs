@@ -549,6 +549,8 @@ impl<Context: ThreadSync + 'static, Bind: ThreadSync + 'static + Null + Clone> D
                 if self.nodes[*i].is_run {
                     self.can_run_node.push(i.clone());
                 }
+
+                pi_print_any::out_any!(log::debug, "enable_nodes======{:?}", (&self.nodes[*i].bind, &self.nodes[*i].is_run));
             }
             // log::warn!("enable_nodes======{:?}", (self.is_topo_dirty, self.is_enable_dirty, self.is_finish_dirty));
             // log::warn!("enable_nodes======{:?}", &self.enable_nodes);
@@ -575,6 +577,10 @@ impl<Context: ThreadSync + 'static, Bind: ThreadSync + 'static + Null + Clone> D
 	pub fn can_run_nodes(&self) -> &[NodeId] {
 		&self.can_run_node
 	}
+
+    pub fn can_build_nodes(&self) -> &[NodeId] {
+        &self.enable_nodes
+    }
 
     
 }
