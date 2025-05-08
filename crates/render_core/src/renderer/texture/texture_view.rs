@@ -2,9 +2,10 @@ use std::hash::Hash;
 
 use pi_assets::asset::Handle;
 use pi_atom::Atom;
+use pi_share::Share;
 use pi_slotmap::DefaultKey;
 
-use crate::{asset::TAssetKeyU64, components::view::target_alloc::ShareTargetView, rhi::asset::{AssetWithId, TextureRes}};
+use crate::{asset::TAssetKeyU64, components::view::target_alloc::{Fbo, ShareTargetView}, rhi::asset::{AssetWithId, TextureRes}};
 
 use super::{image_texture_view::{EImageTextureViewUsage, ImageTextureView}, ImageTextureViewFrame, KeyImageTexture, KeyImageTextureFrame, KeyImageTextureView, KeyImageTextureViewFrame, KeyTexture, TextureRect, TextureViewDesc};
 
@@ -72,6 +73,7 @@ pub enum ETextureViewUsage {
     ImageFrame(Handle<ImageTextureViewFrame>),
     // Render(ERenderTargetViewUsage),
     SRT(ShareTargetView),
+    FBORect(Share<Fbo>, DefaultKey, DefaultKey, TextureRect),
     // Temp(Arc<wgpu::TextureView>, u64),
 }
 impl ETextureViewUsage {
@@ -89,13 +91,16 @@ impl ETextureViewUsage {
             ETextureViewUsage::TexWithId(val) => {
                 KeyTextureViewUsage::Tex(*val.key(), TextureRect { x: 0, y: 0, w: val.width as u16, h: val.height as u16 })
             },
-            ETextureViewUsage::SRT(val) => {
-                let rect = val.rect();
+            ETextureViewUsage::SRT(value) => {
+                let rect = value.rect();
                 let x = rect.min.x as u16;
                 let y = rect.min.y as u16;
                 let w = (rect.max.x - rect.min.x) as u16;
                 let h = (rect.max.y - rect.min.y) as u16;
-                KeyTextureViewUsage::SRT(val.ty_index(), val.target_index(), TextureRect { x, y, w, h })
+                KeyTextureViewUsage::SRT(value.ty_index(), value.target_index(), TextureRect { x, y, w, h })
+            },
+            ETextureViewUsage::FBORect(val, k0, k1, rect) => {
+                KeyTextureViewUsage::SRT(*k0, *k1, *rect)
             },
             ETextureViewUsage::ImageFrame(val) => {
                 if let Some(atlashash) = val.texture().atlashash {
@@ -116,6 +121,7 @@ impl ETextureViewUsage {
             ETextureViewUsage::Tex(val) => &val.texture_view,
             ETextureViewUsage::TexWithId(val) => &val.texture_view,
             ETextureViewUsage::SRT(val) => &val.target().colors[0].0,
+            ETextureViewUsage::FBORect(val, _, _, _) => &val.colors[0].0,
             ETextureViewUsage::ImageFrame(val) => &val.view,
             // ETextureViewUsage::Temp(val, _) => val,
         }
@@ -126,7 +132,8 @@ impl ETextureViewUsage {
             // ETextureViewUsage::Render(val) => val.view(),
             ETextureViewUsage::Tex(val) => wgpu::TextureViewDimension::D2,
             ETextureViewUsage::TexWithId(val) => wgpu::TextureViewDimension::D2,
-            ETextureViewUsage::SRT(val) => wgpu::TextureViewDimension::D2,
+            ETextureViewUsage::SRT(_) => wgpu::TextureViewDimension::D2,
+            ETextureViewUsage::FBORect(_, _, _, _) => wgpu::TextureViewDimension::D2,
             ETextureViewUsage::ImageFrame(val) => val.texture.texture().view_dimension,
             // ETextureViewUsage::Temp(val, _) => val,
         }
@@ -150,6 +157,16 @@ impl Eq for ETextureViewUsage {}
 impl From<ShareTargetView> for ETextureViewUsage {
     fn from(value: ShareTargetView) -> Self {
         Self::SRT(value)
+    }
+}
+impl From<&ShareTargetView> for ETextureViewUsage {
+    fn from(value: &ShareTargetView) -> Self {
+        let rect = value.rect();
+        let x = rect.min.x as u16;
+        let y = rect.min.y as u16;
+        let w = (rect.max.x - rect.min.x) as u16;
+        let h = (rect.max.y - rect.min.y) as u16;
+        Self::FBORect(value.target().clone(), value.ty_index(), value.target_index(), TextureRect { x, y, w, h })
     }
 }
 impl From<Handle<TextureRes>> for ETextureViewUsage {
