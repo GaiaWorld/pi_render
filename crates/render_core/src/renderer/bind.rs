@@ -12,6 +12,7 @@ pub type KeyBindLayoutBindingType = u8;
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct KeyBindLayoutBuffer {
     pub visibility: EShaderStage,
+    pub dynamic: bool,
     pub min_binding_size: u32,
 }
 
