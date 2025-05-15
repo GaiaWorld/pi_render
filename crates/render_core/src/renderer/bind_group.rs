@@ -123,7 +123,9 @@ impl KeyBindGroup {
         self.0.iter().for_each(|v| {
             match v {
                 EKeyBind::Buffer(val) => {
-                    result.push(val.data.offset())
+                    if val.data.2 {
+                        result.push(val.data.offset())
+                    }
                 },
                 EKeyBind::Texture2D(_) => {},
                 EKeyBind::Sampler(_) => {},
