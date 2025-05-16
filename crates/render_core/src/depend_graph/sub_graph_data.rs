@@ -154,6 +154,7 @@ impl<K: Key, T> RootGraph<K, T> {
 	pub fn set_enable(&mut self, k: K, is_enable: bool) -> bool {
 		if let Some(node) = self.nodes.get_mut(k) {
 			if node.is_enable  != is_enable {
+				log::error!("graph.set_enable({:?}, {:?})", (k, is_enable));
 				node.is_enable = is_enable;
 				return true;
 			}
