@@ -434,7 +434,7 @@ impl<Context: ThreadSync + 'static, Bind: ThreadSync + 'static + Null + Clone> D
         let label = label.into();
         let node_id = self.get_id(&label)?;
         if self.topo_graph.set_enable(node_id, is_enable) {
-            self.is_finish_dirty = true; // 设置is_finish_dirty脏
+            self.is_topo_dirty = true; // 设置is_topo_dirty脏
         }
         Ok(())
     }
