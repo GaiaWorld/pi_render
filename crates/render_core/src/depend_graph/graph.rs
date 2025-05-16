@@ -166,7 +166,15 @@ impl<Context: ThreadSync + 'static, Bind: ThreadSync + 'static + Null + Clone> D
         }
 
         for (from, to) in self.topo_graph.edges.iter() {
-            v.push(format!("\t \"{from:?}_in\" -> \"{to:?}\""));
+            let from = match self.topo_graph.sub_graphs.get(*from) {
+                Some(r) => format!("{from:?}_out"),
+                None => format!("{from:?}"),
+            };
+            let to = match self.topo_graph.sub_graphs.get(*to) {
+                Some(r) => format!("{to:?}_in"),
+                None => format!("{to:?}"),
+            };
+            v.push(format!("\t \"{from}\" -> \"{to}\""));
         }
 
         v.push("}".into());
