@@ -112,7 +112,7 @@ impl<K: Key, T> RootGraph<K, T> {
 
 	/// 如果parent_graph_id是Null， 表示插入到根上
     pub fn add_node(&mut self, k: K, value: T, parent_graph_id: K) {
-		log::error!("graph.add_node({:?}, (), {:?})", k, parent_graph_id);
+		log::trace!("graph.add_node({:?}, (), {:?})", k, parent_graph_id);
 		debug_assert!(!self.nodes.contains_key(k));
 		let mut n = GraphNode {
 			edges: NGraphNode {
@@ -154,7 +154,7 @@ impl<K: Key, T> RootGraph<K, T> {
 	pub fn set_enable(&mut self, k: K, is_enable: bool) -> bool {
 		if let Some(node) = self.nodes.get_mut(k) {
 			if node.is_enable  != is_enable {
-				log::error!("graph.set_enable({:?}, {:?})", k, is_enable);
+				// log::error!("graph.set_enable({:?}, {:?})", k, is_enable);
 				node.is_enable = is_enable;
 				return true;
 			}
@@ -206,7 +206,7 @@ impl<K: Key, T> RootGraph<K, T> {
     }
 
     pub fn add_edge(&mut self, before: K, after: K) {
-		log::error!("graph.add_edge({:?}, {:?})", before, after);
+		log::trace!("graph.add_edge({:?}, {:?})", before, after);
 		if let Some([before_node, after_node]) = self.nodes.get_disjoint_mut([before, after]) {
 			if before_node.parent_graph_id != after_node.parent_graph_id {
 				let (before_node_not_null, after_node_not_null) = (!before_node.parent_graph_id.is_null(), !after_node.parent_graph_id.is_null());
@@ -512,13 +512,13 @@ impl<K: Key, T: Clone> RootGraph<K, T> {
 		log::debug!("link_from, from = {:?}, curr = {:?}", curr, from);
 		for from in from {
 			if let Some(sub_graph) = self.sub_graphs.get(*from){
-				log::error!("sub_graph============={:?}", (*from, curr, &sub_graph.to));
+				// log::error!("sub_graph============={:?}", (*from, curr, &sub_graph.to));
 				self.link_from(curr, &sub_graph.to, current_keys, part_graph);
 			} else {
 				let n = self.nodes.get(*from).unwrap();
-				log::error!("link_from============={:?}", (*from, curr, n.is_enable));
+				// log::error!("link_from============={:?}", (*from, curr, n.is_enable));
 				if (!n.is_enable) {
-					return; // 未激活， 不继续处理前置节点
+					continue; // 未激活， 不继续处理前置节点
 				}
 				if n.is_transfer {
 					self.link_from(curr, &n.edges.from, current_keys, part_graph);
@@ -541,7 +541,7 @@ impl<K: Key, T: Clone> RootGraph<K, T> {
 			
 		} else {
 			let n = self.nodes.get(k).unwrap();
-			log::error!("gen_node1============={:?}", (k, n.is_enable));
+			// log::error!("gen_node1============={:?}", (k, n.is_enable));
 			if !n.is_enable {
 				return; // 未激活， 不继续处理前置节点
 			}
