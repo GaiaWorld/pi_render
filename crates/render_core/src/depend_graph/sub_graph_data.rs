@@ -27,6 +27,8 @@ pub struct GraphNode<K: Key, T> {
     index: usize,
 	value: T,
 	is_transfer: bool, // 是否是传输节点(不是一个真实的节点， 在生成toop图时， 需要忽略该节点， 将该节点的所有before和所有after相连)
+	is_enable: bool, // 是否激活节点(如果为false其与其所有的递归前置接节点不会链接到最终的执行图上)
+
 
 }
 
@@ -121,6 +123,7 @@ impl<K: Key, T> RootGraph<K, T> {
 			index: 0,
 			value,
 			is_transfer: false,
+			is_enable: true,
 		};
         if !parent_graph_id.is_null() {
 			if let Some(parent_graph) = self.sub_graphs.get_mut(parent_graph_id) {
@@ -140,6 +143,18 @@ impl<K: Key, T> RootGraph<K, T> {
 		if let Some(node) = self.nodes.get_mut(k) {
 			if node.is_transfer  != is_transfer {
 				node.is_transfer = is_transfer;
+				return true;
+			}
+		}
+
+		false
+	}
+
+	/// 设置是否激活节点， 默认激活
+	pub fn set_enable(&mut self, k: K, is_enable: bool) -> bool {
+		if let Some(node) = self.nodes.get_mut(k) {
+			if node.is_enable  != is_enable {
+				node.is_enable = is_enable;
 				return true;
 			}
 		}
@@ -499,6 +514,9 @@ impl<K: Key, T: Clone> RootGraph<K, T> {
 				self.link_from(curr, &sub_graph.to, current_keys, part_graph);
 			} else {
 				let n = self.nodes.get(*from).unwrap();
+				if (!n.is_enable) {
+					return; // 未激活， 不继续处理前置节点
+				}
 				if n.is_transfer {
 					self.link_from(curr, &n.edges.from, current_keys, part_graph);
 				} else {
@@ -520,6 +538,9 @@ impl<K: Key, T: Clone> RootGraph<K, T> {
 			
 		} else {
 			let n = self.nodes.get(k).unwrap();
+			if !n.is_enable {
+				return; // 未激活， 不继续处理前置节点
+			}
 			if n.is_transfer { // 如果是传输节点， 继续迭代from
 				for from in n.edges.from.iter() {
 					self.gen_node1(*from, current_keys, part_graph);

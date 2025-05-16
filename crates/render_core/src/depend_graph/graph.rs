@@ -429,6 +429,12 @@ impl<Context: ThreadSync + 'static, Bind: ThreadSync + 'static + Null + Clone> D
         }
         Ok(())
     }
+    // 设置是否激活节点, 未激活的节点， 和它的递归前置节点都不会链接到最终的执行图中
+    pub fn set_enable(&mut self, id: NodeId, is_enable: bool) {
+        if self.topo_graph.set_enable(id, is_transfer) {
+            self.is_finish_dirty = true; // 设置is_finish_dirty脏
+        }
+    }
 
     pub fn set_is_run(
         &mut self,
