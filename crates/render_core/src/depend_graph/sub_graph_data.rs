@@ -512,6 +512,7 @@ impl<K: Key, T: Clone> RootGraph<K, T> {
 		log::debug!("link_from, from = {:?}, curr = {:?}", curr, from);
 		for from in from {
 			if let Some(sub_graph) = self.sub_graphs.get(*from){
+				log::error!("sub_graph============={:?}", (*from, curr));
 				self.link_from(curr, &sub_graph.to, current_keys, part_graph);
 			} else {
 				let n = self.nodes.get(*from).unwrap();
