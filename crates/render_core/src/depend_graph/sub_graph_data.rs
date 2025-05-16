@@ -26,10 +26,8 @@ pub struct GraphNode<K: Key, T> {
     parent_graph_id: K,
     index: usize,
 	value: T,
-	is_transfer: bool, // 是否是传输节点(不是一个真实的节点， 在生成toop图时， 需要忽略该节点， 将该节点的所有before和所有after相连)
-	is_enable: bool, // 是否激活节点(如果为false其与其所有的递归前置接节点不会链接到最终的执行图上)
-
-
+	pub(crate) is_transfer: bool, // 是否是传输节点(不是一个真实的节点， 在生成toop图时， 需要忽略该节点， 将该节点的所有before和所有after相连)
+	pub(crate) is_enable: bool, // 是否激活节点(如果为false其与其所有的递归前置接节点不会链接到最终的执行图上)
 }
 
 // mut query: Q<&mut>
@@ -39,13 +37,13 @@ pub struct GraphNode<K: Key, T> {
 
 #[derive(Debug)]
 pub struct RootGraph<K: Key, T> {
-    nodes: SecondaryMap<K, GraphNode<K, T>>,
+    pub(crate) nodes: SecondaryMap<K, GraphNode<K, T>>,
     from: Vec<K>,
     to: Vec<K>,
 	// 描述了所有的边（外部添加边时，不可以重复，使用此字段来判断是否重复）
-	edges: XHashSet<(K, K)>,
+	pub(crate) edges: XHashSet<(K, K)>,
 	topological: Vec<K>,
-	sub_graphs: SparseSecondaryMap<K, SubGraphDesc<K>>,
+	pub(crate) sub_graphs: SparseSecondaryMap<K, SubGraphDesc<K>>,
 }
 
 impl<K: Key, T> Default for RootGraph<K, T> {
@@ -65,8 +63,8 @@ impl<K: Key, T> Default for RootGraph<K, T> {
 pub struct SubGraphDesc<K> {
 	topological: Vec<K>,
 	children_nodes: Vec<K>,
-	from: Vec<K>, 
-	to: Vec<K>,
+	pub(crate) from: Vec<K>, 
+	pub(crate) to: Vec<K>,
 }
 
 impl<K: Key, T> RootGraph<K, T> {
@@ -206,7 +204,7 @@ impl<K: Key, T> RootGraph<K, T> {
     }
 
     pub fn add_edge(&mut self, before: K, after: K) {
-		log::error!("graph.add_edge({:?}, {:?})", before, after);
+		log::trace!("graph.add_edge({:?}, {:?})", before, after);
 		if let Some([before_node, after_node]) = self.nodes.get_disjoint_mut([before, after]) {
 			if before_node.parent_graph_id != after_node.parent_graph_id {
 				let (before_node_not_null, after_node_not_null) = (!before_node.parent_graph_id.is_null(), !after_node.parent_graph_id.is_null());
@@ -512,9 +510,9 @@ impl<K: Key, T: Clone> RootGraph<K, T> {
 		log::debug!("link_from, from = {:?}, curr = {:?}", curr, from);
 		for from in from {
 			if let Some(sub_graph) = self.sub_graphs.get(*from){
-				if curr.index() == 16 {
-					log::error!("sub_graph============={:?}", (*from, curr, &sub_graph.to));
-				}
+				// if curr.index() == 15 {
+					// log::error!("sub_graph============={:?}", (*from, curr, &sub_graph.to));
+				// }
 				self.link_from(curr, &sub_graph.to, current_keys, part_graph);
 			} else {
 				let n = self.nodes.get(*from).unwrap();
