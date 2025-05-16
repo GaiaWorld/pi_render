@@ -407,33 +407,36 @@ impl<Context: ThreadSync + 'static, Bind: ThreadSync + 'static + Null + Clone> D
         Ok(())
     }
 
-    pub fn set_enable(
-        &mut self,
-        label: impl Into<NodeLabel>,
-        is_enable: bool,
-    ) -> Result<(), GraphError> {
+    // pub fn set_enable(
+    //     &mut self,
+    //     label: impl Into<NodeLabel>,
+    //     is_enable: bool,
+    // ) -> Result<(), GraphError> {
+    //     let label = label.into();
+    //     let node_id = self.get_id(&label)?;
+
+    //     if let Some(node) = self.nodes.get_mut(node_id) {
+    //         if node.is_build != is_enable {
+    //             node.is_build = is_enable;
+    //             self.is_enable_dirty = true;
+    //         }
+
+    //         if node.is_run != is_enable {
+    //             node.is_run = is_enable;
+    //             self.is_enable_dirty = true;
+    //         }
+            
+    //     }
+    //     Ok(())
+    // }
+    // 设置是否激活节点, 未激活的节点， 和它的递归前置节点都不会链接到最终的执行图中
+    pub fn set_enable(&mut self, label: impl Into<NodeLabel>, is_enable: bool) -> Result<(), GraphError> {
         let label = label.into();
         let node_id = self.get_id(&label)?;
-
-        if let Some(node) = self.nodes.get_mut(node_id) {
-            if node.is_build != is_enable {
-                node.is_build = is_enable;
-                self.is_enable_dirty = true;
-            }
-
-            if node.is_run != is_enable {
-                node.is_run = is_enable;
-                self.is_enable_dirty = true;
-            }
-            
-        }
-        Ok(())
-    }
-    // 设置是否激活节点, 未激活的节点， 和它的递归前置节点都不会链接到最终的执行图中
-    pub fn set_enable(&mut self, id: NodeId, is_enable: bool) {
-        if self.topo_graph.set_enable(id, is_transfer) {
+        if self.topo_graph.set_enable(node_id, is_enable) {
             self.is_finish_dirty = true; // 设置is_finish_dirty脏
         }
+        Ok(())
     }
 
     pub fn set_is_run(
