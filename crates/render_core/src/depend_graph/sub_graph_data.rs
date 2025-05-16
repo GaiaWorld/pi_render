@@ -514,6 +514,7 @@ impl<K: Key, T: Clone> RootGraph<K, T> {
 				self.link_from(curr, &sub_graph.to, current_keys, part_graph);
 			} else {
 				let n = self.nodes.get(*from).unwrap();
+				log::error!("link_from============={:?}", (*from, curr, n.is_enable));
 				if (!n.is_enable) {
 					return; // 未激活， 不继续处理前置节点
 				}
@@ -538,6 +539,7 @@ impl<K: Key, T: Clone> RootGraph<K, T> {
 			
 		} else {
 			let n = self.nodes.get(k).unwrap();
+			log::error!("gen_node1============={:?}", (k, n.is_enable));
 			if !n.is_enable {
 				return; // 未激活， 不继续处理前置节点
 			}
