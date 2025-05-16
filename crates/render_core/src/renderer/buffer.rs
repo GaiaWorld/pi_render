@@ -56,7 +56,7 @@ pub(crate) struct FixedSizeBufferPool {
     pub(crate) fixed_size: u32,
     mutex: ShareMutex<()>,
     usage: wgpu::BufferUsages,
-    buffer_sub_update: bool,
+    pub(crate) buffer_sub_update: bool,
 }
 impl FixedSizeBufferPool {
     pub fn size(&self) -> usize {

@@ -12,6 +12,7 @@ pub type KeyBindLayoutBindingType = u8;
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct KeyBindLayoutBuffer {
     pub visibility: EShaderStage,
+    pub dynamic: bool,
     pub min_binding_size: u32,
 }
 
@@ -51,7 +52,7 @@ impl KeyBindLayout {
                 wgpu::BindGroupLayoutEntry {
                     binding: binding as u32,
                     visibility: val.visibility.mode(),
-                    ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: true, min_binding_size: NonZeroU64::new(val.min_binding_size as u64)  },
+                    ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: val.dynamic, min_binding_size: NonZeroU64::new(val.min_binding_size as u64)  },
                     count: None,
                 }
             },
