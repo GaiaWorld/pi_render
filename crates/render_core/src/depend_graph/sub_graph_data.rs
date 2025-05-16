@@ -206,7 +206,7 @@ impl<K: Key, T> RootGraph<K, T> {
     }
 
     pub fn add_edge(&mut self, before: K, after: K) {
-		log::trace!("graph.add_edge({:?}, {:?})", before, after);
+		log::error!("graph.add_edge({:?}, {:?})", before, after);
 		if let Some([before_node, after_node]) = self.nodes.get_disjoint_mut([before, after]) {
 			if before_node.parent_graph_id != after_node.parent_graph_id {
 				let (before_node_not_null, after_node_not_null) = (!before_node.parent_graph_id.is_null(), !after_node.parent_graph_id.is_null());
@@ -512,7 +512,9 @@ impl<K: Key, T: Clone> RootGraph<K, T> {
 		log::debug!("link_from, from = {:?}, curr = {:?}", curr, from);
 		for from in from {
 			if let Some(sub_graph) = self.sub_graphs.get(*from){
-				// log::error!("sub_graph============={:?}", (*from, curr, &sub_graph.to));
+				if curr.index() == 16 {
+					log::error!("sub_graph============={:?}", (*from, curr, &sub_graph.to));
+				}
 				self.link_from(curr, &sub_graph.to, current_keys, part_graph);
 			} else {
 				let n = self.nodes.get(*from).unwrap();
