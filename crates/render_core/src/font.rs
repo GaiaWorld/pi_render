@@ -102,7 +102,7 @@ impl FontSheet {
 		};
 		let rect = pi_hal::svg::Rect::new(0.0, 0.0, 32.0, 32.0);
 		let hash = calc_hash2(&"rect sdf", 0);
-		log::error!("预处理 hash： {}", hash);
+		log::debug!("预处理 hash： {}", hash);
         r.font_mgr.table.sdf2_table.add_shape(hash, rect.get_svg_info(), 32, 128, 2);
 		let texture = SdfResult::default();
 		r.font_mgr.table.sdf2_table.advance_computer_svg(texture.clone());
@@ -156,7 +156,7 @@ impl FontSheet {
 			let mut v =  version.lock().unwrap();
 			*v = *v + 1;
 		}, &mut result.svg_result);
-		log::error!("预处理 hash222： {}", hash);
+		log::debug!("预处理 hash222： {}", hash);
 		r
 	}
 
@@ -501,7 +501,7 @@ impl FontSheet {
 			panic!("insert asset fail");
 		};
 
-		log::warn!("sdf texture size: {:?}", size);
+		log::debug!("sdf texture size: {:?}", size);
 
 		self.sdf_texture = Some(Share::new(texture));
 		self.sdf_texture_view = Some(texture_view);
