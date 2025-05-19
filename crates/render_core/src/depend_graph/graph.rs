@@ -117,6 +117,97 @@ impl<Context: ThreadSync + 'static, Bind: ThreadSync + 'static + Null + Clone> D
         s
     }
 
+    /// toop图
+    pub fn dump_toop_graphviz(&self) -> String {
+
+        use pi_slotmap::Key;
+
+        let mut v = vec!["digraph Render {".into()];
+
+        for (id, n) in self.topo_graph.nodes.iter() {
+			let node = &self.nodes[id];
+			let name = &node.name;
+            let color = if self.finish_nodes.get(&id).is_some() {
+                "red"
+            } else {
+                "white"
+            };
+			let id1 = id.data();
+            let enable = n.is_enable;
+            let transfer = n.is_transfer;
+
+            
+
+            if let Some(r) = self.topo_graph.sub_graphs.get(id) {
+                v.push(format!(
+                    "\t \"{id:?}_out\" [\"style\"=\"filled\" \"label\"=\"{name}_{id1:?}_enable_{enable:?}\" \"fillcolor\"=\"green\"]"
+                ));
+                v.push(format!(
+                    "\t \"{id:?}_in\" [\"style\"=\"filled\" \"label\"=\"{name}_{id1:?}_enable_{enable:?}\" \"fillcolor\"=\"green\"]"
+                ));
+            } else {
+                v.push(format!(
+                    "\t \"{id:?}\" [\"style\"=\"filled\" \"label\"=\"{name}_{id1:?}_enable_{enable:?}_transfer_{transfer:?}\" \"fillcolor\"=\"{color}\"]"
+                ));
+            }
+        }
+
+        v.push("".into());
+
+        for (id, n) in self.topo_graph.nodes.iter() {
+            if let Some(r) = self.topo_graph.sub_graphs.get(id) {
+                for input in r.from.iter() {
+                    v.push(format!("\t \"{id:?}_in\" -> \"{input:?}\""));
+                }
+                for out in r.to.iter() {
+                    v.push(format!("\t \"{out:?}\" -> \"{id:?}_out\""));
+                }
+            }
+        }
+
+        for (from, to) in self.topo_graph.edges.iter() {
+            let from = match self.topo_graph.sub_graphs.get(*from) {
+                Some(r) => format!("{from:?}_out"),
+                None => format!("{from:?}"),
+            };
+            let to = match self.topo_graph.sub_graphs.get(*to) {
+                Some(r) => format!("{to:?}_in"),
+                None => format!("{to:?}"),
+            };
+            v.push(format!("\t \"{from}\" -> \"{to}\""));
+        }
+
+        v.push("}".into());
+
+        let s = v.join("\n");
+
+        // + Debug 模式
+        //     - windwos 非 wasm32 平台，运行目录 生成 dump_graphviz.dot
+        //     - 其他 平台，返回 字符串
+        // + Release 模式：返回 空串
+        #[cfg(all(target_os = "windows", not(target_arch = "wasm32")))]
+        {
+            use std::io::Write;
+
+            match std::fs::OpenOptions::new()
+                .write(true)
+                .create(true)
+                .open("dump_graphviz.dot")
+            {
+                Ok(mut file) => match file.write_all(s.as_bytes()) {
+                    Ok(_) => {}
+                    Err(e) => {
+                        log::warn!("write to dump_toop_graphviz.dot error = {:?}", e);
+                    }
+                },
+                Err(e) => {
+                    log::warn!("open dump_toop_graphviz.dot for write error = {:?}", e);
+                }
+            }
+        }
+        s
+    }
+
     /// 将 渲染图 打印成 Graphviz (.dot) 格式
     /// 红色 是 结束 节点
     // #[cfg(debug_assertions)]
@@ -407,25 +498,34 @@ impl<Context: ThreadSync + 'static, Bind: ThreadSync + 'static + Null + Clone> D
         Ok(())
     }
 
-    pub fn set_enable(
-        &mut self,
-        label: impl Into<NodeLabel>,
-        is_enable: bool,
-    ) -> Result<(), GraphError> {
+    // pub fn set_enable(
+    //     &mut self,
+    //     label: impl Into<NodeLabel>,
+    //     is_enable: bool,
+    // ) -> Result<(), GraphError> {
+    //     let label = label.into();
+    //     let node_id = self.get_id(&label)?;
+
+    //     if let Some(node) = self.nodes.get_mut(node_id) {
+    //         if node.is_build != is_enable {
+    //             node.is_build = is_enable;
+    //             self.is_enable_dirty = true;
+    //         }
+
+    //         if node.is_run != is_enable {
+    //             node.is_run = is_enable;
+    //             self.is_enable_dirty = true;
+    //         }
+            
+    //     }
+    //     Ok(())
+    // }
+    // 设置是否激活节点, 未激活的节点， 和它的递归前置节点都不会链接到最终的执行图中
+    pub fn set_enable(&mut self, label: impl Into<NodeLabel>, is_enable: bool) -> Result<(), GraphError> {
         let label = label.into();
         let node_id = self.get_id(&label)?;
-
-        if let Some(node) = self.nodes.get_mut(node_id) {
-            if node.is_build != is_enable {
-                node.is_build = is_enable;
-                self.is_enable_dirty = true;
-            }
-
-            if node.is_run != is_enable {
-                node.is_run = is_enable;
-                self.is_enable_dirty = true;
-            }
-            
+        if self.topo_graph.set_enable(node_id, is_enable) {
+            self.is_topo_dirty = true; // 设置is_topo_dirty脏
         }
         Ok(())
     }
@@ -603,7 +703,11 @@ impl<Context: ThreadSync + 'static, Bind: ThreadSync + 'static + Null + Clone> D
         // 有必要的话，修改 拓扑结构
         if self.is_topo_dirty {
             // 根据节点连接关系，更新拓扑图（用户将节点与节点、节点与子图连接在一起， 需要修改为节点之间的链接关系）
-            self.topo_graph.build().unwrap();
+            let r = self.topo_graph.build();
+            if r.is_err() {
+                log::error!("topo graph: {:?}", self.dump_toop_graphviz());
+            }
+            r.unwrap();
         }
 
 		if self.is_finish_dirty || self.is_topo_dirty {

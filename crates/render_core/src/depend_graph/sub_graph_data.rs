@@ -26,8 +26,8 @@ pub struct GraphNode<K: Key, T> {
     parent_graph_id: K,
     index: usize,
 	value: T,
-	is_transfer: bool, // 是否是传输节点(不是一个真实的节点， 在生成toop图时， 需要忽略该节点， 将该节点的所有before和所有after相连)
-
+	pub(crate) is_transfer: bool, // 是否是传输节点(不是一个真实的节点， 在生成toop图时， 需要忽略该节点， 将该节点的所有before和所有after相连)
+	pub(crate) is_enable: bool, // 是否激活节点(如果为false其与其所有的递归前置接节点不会链接到最终的执行图上)
 }
 
 // mut query: Q<&mut>
@@ -37,13 +37,13 @@ pub struct GraphNode<K: Key, T> {
 
 #[derive(Debug)]
 pub struct RootGraph<K: Key, T> {
-    nodes: SecondaryMap<K, GraphNode<K, T>>,
+    pub(crate) nodes: SecondaryMap<K, GraphNode<K, T>>,
     from: Vec<K>,
     to: Vec<K>,
 	// 描述了所有的边（外部添加边时，不可以重复，使用此字段来判断是否重复）
-	edges: XHashSet<(K, K)>,
+	pub(crate) edges: XHashSet<(K, K)>,
 	topological: Vec<K>,
-	sub_graphs: SparseSecondaryMap<K, SubGraphDesc<K>>,
+	pub(crate) sub_graphs: SparseSecondaryMap<K, SubGraphDesc<K>>,
 }
 
 impl<K: Key, T> Default for RootGraph<K, T> {
@@ -63,8 +63,8 @@ impl<K: Key, T> Default for RootGraph<K, T> {
 pub struct SubGraphDesc<K> {
 	topological: Vec<K>,
 	children_nodes: Vec<K>,
-	from: Vec<K>, 
-	to: Vec<K>,
+	pub(crate) from: Vec<K>, 
+	pub(crate) to: Vec<K>,
 }
 
 impl<K: Key, T> RootGraph<K, T> {
@@ -121,6 +121,7 @@ impl<K: Key, T> RootGraph<K, T> {
 			index: 0,
 			value,
 			is_transfer: false,
+			is_enable: true,
 		};
         if !parent_graph_id.is_null() {
 			if let Some(parent_graph) = self.sub_graphs.get_mut(parent_graph_id) {
@@ -140,6 +141,19 @@ impl<K: Key, T> RootGraph<K, T> {
 		if let Some(node) = self.nodes.get_mut(k) {
 			if node.is_transfer  != is_transfer {
 				node.is_transfer = is_transfer;
+				return true;
+			}
+		}
+
+		false
+	}
+
+	/// 设置是否激活节点， 默认激活
+	pub fn set_enable(&mut self, k: K, is_enable: bool) -> bool {
+		if let Some(node) = self.nodes.get_mut(k) {
+			if node.is_enable  != is_enable {
+				// log::error!("graph.set_enable({:?}, {:?})", k, is_enable);
+				node.is_enable = is_enable;
 				return true;
 			}
 		}
@@ -496,9 +510,16 @@ impl<K: Key, T: Clone> RootGraph<K, T> {
 		log::debug!("link_from, from = {:?}, curr = {:?}", curr, from);
 		for from in from {
 			if let Some(sub_graph) = self.sub_graphs.get(*from){
+				// if curr.index() == 15 {
+					// log::error!("sub_graph============={:?}", (*from, curr, &sub_graph.to));
+				// }
 				self.link_from(curr, &sub_graph.to, current_keys, part_graph);
 			} else {
 				let n = self.nodes.get(*from).unwrap();
+				// log::error!("link_from============={:?}", (*from, curr, n.is_enable));
+				if (!n.is_enable) {
+					continue; // 未激活， 不继续处理前置节点
+				}
 				if n.is_transfer {
 					self.link_from(curr, &n.edges.from, current_keys, part_graph);
 				} else {
@@ -520,6 +541,10 @@ impl<K: Key, T: Clone> RootGraph<K, T> {
 			
 		} else {
 			let n = self.nodes.get(k).unwrap();
+			// log::error!("gen_node1============={:?}", (k, n.is_enable));
+			if !n.is_enable {
+				return; // 未激活， 不继续处理前置节点
+			}
 			if n.is_transfer { // 如果是传输节点， 继续迭代from
 				for from in n.edges.from.iter() {
 					self.gen_node1(*from, current_keys, part_graph);
