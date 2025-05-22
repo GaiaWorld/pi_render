@@ -26,7 +26,7 @@ impl KeyBindGroupLayout {
     pub fn layout(&self, device: &RenderDevice) -> crate::rhi::bind_group_layout::BindGroupLayout {
         device.create_bind_group_layout(
             &wgpu::BindGroupLayoutDescriptor {
-                label: None,
+                label: Some(&self.entries().len().to_string()),
                 entries: &self.entries().as_slice(),
             }
         )
@@ -49,7 +49,7 @@ impl BindGroupLayout {
         Self {
             layout: device.create_bind_group_layout(
                 &wgpu::BindGroupLayoutDescriptor {
-                    label: None,
+                    label: Some(&entries.len().to_string()),
                     entries: entries.as_slice(),
                 }
             )
