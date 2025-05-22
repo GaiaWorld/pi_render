@@ -51,6 +51,39 @@ pub trait OutParam: 'static + ThreadSync {
     fn fill_to(&self, this_id: NodeId, to: &mut dyn Assign, ty: TypeId) -> bool;
 }
 
+/// 变为弱引用
+pub trait DownGrade: 'static + ThreadSync {
+    fn downgrade(&mut self);
+}
+
+impl DownGrade for () {
+    fn downgrade(&mut self) {}
+}
+impl DownGrade for u32 {
+    fn downgrade(&mut self) {}
+}
+impl DownGrade for u16 {
+    fn downgrade(&mut self) {}
+}
+impl DownGrade for usize {
+    fn downgrade(&mut self) {}
+}
+impl DownGrade for u64 {
+    fn downgrade(&mut self) {}
+}
+impl DownGrade for f32 {
+    fn downgrade(&mut self) {}
+}
+impl DownGrade for f64 {
+    fn downgrade(&mut self) {}
+}
+impl DownGrade for &'static str {
+    fn downgrade(&mut self) {}
+}
+impl DownGrade for String {
+    fn downgrade(&mut self) {}
+}
+
 // 赋值
 pub trait Assign {
     fn assign(&mut self, pre_id: NodeId, ptr: usize);
@@ -61,6 +94,14 @@ pub trait Assign {
 /// 哈希表 Key = 前置节点的 NodeId，值 = 该 前置节点的输出
 #[derive(Debug, Default, Clone)]
 pub struct InParamCollector<T: OutParam + Clone>(pub XHashMap<NodeId, T>);
+
+impl<T: OutParam + DownGrade + Clone> DownGrade for InParamCollector<T> {
+    fn downgrade(&mut self) {
+        for item in self.0.values_mut() {
+            item.downgrade();
+        }
+    }
+}
 
 impl<T: OutParam + Clone> InParam for InParamCollector<T> {
     fn can_fill<O: OutParam + ?Sized>(

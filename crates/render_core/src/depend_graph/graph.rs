@@ -8,7 +8,7 @@
 //!
 
 use super::{
-    node::{DependNode, NodeId, NodeLabel, NodeState, ParamUsage}, param::{GraphParamError, InParam, OutParam}, sub_graph_data::RootGraph, GraphError
+    node::{DependNode, NodeId, NodeLabel, NodeState, ParamUsage}, param::{DownGrade, GraphParamError, InParam, OutParam}, sub_graph_data::RootGraph, GraphError
 };
 use pi_async_rt::prelude::AsyncRuntime;
 use pi_futures::BoxFuture;
@@ -263,7 +263,7 @@ impl<Context: ThreadSync + 'static, Bind: ThreadSync + 'static + Null + Clone> D
 		is_run: bool,
     ) -> Result<NodeId, GraphError>
     where
-        I: InParam + Default,
+        I: InParam + DownGrade + Default,
         O: OutParam + Default + Clone,
         R: DependNode<Context, Input = I, Output = O>,
     {
@@ -324,7 +324,7 @@ impl<Context: ThreadSync + 'static, Bind: ThreadSync + 'static + Null + Clone> D
         is_sub_graph: bool,
     ) -> Result<NodeId, GraphError>
     where
-        I: InParam + Default,
+        I: InParam + DownGrade + Default,
         O: OutParam + Default + Clone,
         R: DependNode<Context, Input = I, Output = O>,
     {
@@ -526,6 +526,7 @@ impl<Context: ThreadSync + 'static, Bind: ThreadSync + 'static + Null + Clone> D
         let node_id = self.get_id(&label)?;
         if self.topo_graph.set_enable(node_id, is_enable) {
             self.is_topo_dirty = true; // 设置is_topo_dirty脏
+            // log::warn!("set_enable: {:?}", (node_id, is_enable));
         }
         Ok(())
     }
@@ -629,7 +630,7 @@ impl<Context: ThreadSync + 'static, Bind: ThreadSync + 'static + Null + Clone> D
 
         // 构建 run_ng，返回 构建图
 		if self.is_topo_dirty {
-
+            // log::warn!("update_run_ng=================");
 			if let Err(GraphError::ParamFillRepeat(f1, f2, t)) = self.update_run_ng() {
                 // log::error!("param fill with repeat, from: {0:?} {1:?}, to: {2:?}", (f1, &self.nodes[f1].name), (f2, self.nodes.get(f2).map(|r| {&r.name})), (t, &self.nodes[t].name));
                 return Err(GraphError::ParamFillRepeat(f1, f2, t));
@@ -831,12 +832,6 @@ impl<Context: ThreadSync + 'static> DependNode<Context> for InternalNodeEmptyImp
 		_to: &[NodeId],
     ) -> Result<Self::Output, String> {
         Ok(())
-    }
-
-	fn reset<'a>(
-        &'a mut self,
-    ) {
-        
     }
 
     fn run<'a>(

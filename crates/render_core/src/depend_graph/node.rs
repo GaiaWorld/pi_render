@@ -9,13 +9,13 @@
 //!     + ParamUsage 参数的用途
 //!
 use super::{
-    param::{Assign, GraphParamError, InParam, OutParam},
+    param::{Assign, DownGrade, GraphParamError, InParam, OutParam},
     GraphError
 };
 use pi_futures::BoxFuture;
 use pi_hash::{XHashMap, XHashSet};
 use pi_share::{Cell, Share, ThreadSync};
-use pi_slotmap::new_key_type;
+use pi_slotmap::{new_key_type, Key};
 use std::{
     any::TypeId,
     ops::{Deref, DerefMut},
@@ -53,10 +53,10 @@ pub trait DependNode<Context>: 'static + ThreadSync {
 		to: &[NodeId],
     ) -> Result<Self::Output, String>;
 
-	// 
-	fn reset<'a>(
-        &'a mut self,
-    );
+	// // 
+	// fn reset<'a>(
+    //     &'a mut self,
+    // );
 
     /// 执行，每帧会调用一次
     /// 执行 run方法之前，会先取 前置节点 相同类型的输出 填充到 input 来
@@ -135,6 +135,8 @@ impl ParamUsage {
 
 // 渲染节点，给 依赖图 内部 使用
 pub(crate) trait InternalNode<Context: ThreadSync + 'static>: OutParam {
+    // 将所有输入变成弱引用（节点build后调用）
+    fn downgrade_input(&mut self);
     // 当 sub_ng 改变后，需要调用
     fn reset(&mut self);
 
@@ -240,10 +242,13 @@ where
 impl<I, O, R, Context> InternalNode<Context> for DependNodeImpl<I, O, R, Context>
 where
     Context: ThreadSync + 'static,
-    I: InParam + Default,
+    I: InParam + DownGrade + Default,
     O: OutParam + Default,
     R: DependNode<Context, Input = I, Output = O>,
 {
+    fn downgrade_input(&mut self) {
+        self.input.downgrade();
+    }
     fn reset(&mut self) {
         self.input = Default::default();
         self.output = Default::default();
@@ -261,7 +266,8 @@ where
 	}
 
 	fn build_end(&mut self) {
-		self.node.reset();
+		// self.node.reset();
+        self.output = Default::default();
 	}
 
     fn inc_next_refs(&mut self) {
@@ -321,32 +327,39 @@ where
         
 
 		let runner = self.node.build(context, &self.input, &self.param_usage, id, from, to);
+        self.downgrade_input();
+        // 结束前，先 重置 引用数
+        self.curr_next_build_refs = self.total_next_refs;
+
+        for (_pre_id, pre_node) in &self.pre_nodes {
+            let p = pre_node.0.as_ref();
+            let mut p = p.borrow_mut();
+            // // 用完了 一个前置，引用计数 减 1
+            // build阶段不减1，在run中减一
+            let cur_count = p.deref_mut().dec_curr_build_ref();
+            if cur_count == 0 {
+                // SAFE: 此处强转可变是安全的，因为单线程执行build
+                p.deref_mut().build_end();
+            }
+            // log::warn!("pre == id: {:?}, id: {:?}, cur_count:{:?}", id,  _pre_id, cur_count);
+        }
+        if self.total_next_refs == 0 { 
+            self.build_end();
+        }
+
         // let t3 = std::time::Instant::now();
 		let r = match runner {
 			Ok(output) => {
-                // 结束前，先 重置 引用数
-                self.curr_next_build_refs = self.total_next_refs;
-
-                for (_pre_id, pre_node) in &self.pre_nodes {
-                    let p = pre_node.0.as_ref();
-                    let mut p = p.borrow_mut();
-                    // // 用完了 一个前置，引用计数 减 1
-                    // build阶段不减1，在run中减一
-                    let cur_count = p.deref_mut().dec_curr_build_ref();
-                    if cur_count == 0 {
-                        // SAFE: 此处强转可变是安全的，因为单线程执行build
-                        p.deref_mut().build_end();
-                    }
-                    // log::warn!("pre == id: {:?}, id: {:?}, cur_count:{:?}", id,  _pre_id, cur_count);
-                }
-
                 // log::warn!("total_next_refs == id: {:?}, total_next_refs: {:?}, pre_count:{:?}", id, self.total_next_refs, self.pre_nodes.len());
-                if self.total_next_refs == 0 { 
-                    self.build_end();
-                } else {
-                    
-                    // 替换 输出
-                    self.output = output;
+                // if id.index() == 37 {
+                //     pi_print_any::out_any!(log::error, "build == id: {:?}, output: {:?}", &id, &output);
+                // }
+                //  if id.index() == 38 {
+                //     pi_print_any::out_any!(log::error, "build == id: {:?}, input: {:?}", &id, (from, &self.input, &self.param_usage.input_map_fill));
+                // }
+                // log::warn!("total_next_refs == id: {:?}, total_next_refs: {:?}, pre_count:{:?}", id, self.total_next_refs, self.pre_nodes.len());
+                if self.total_next_refs != 0 { 
+                   self.output = output;
                 }
 
 				Ok(())
@@ -385,7 +398,7 @@ impl<Context: ThreadSync + 'static> Clone for NodeState<Context> {
 impl<Context: ThreadSync + 'static> NodeState<Context> {
     pub(crate) fn new<I, O, R>(node: R) -> Self
     where
-        I: InParam + Default,
+        I: InParam + DownGrade + Default,
         O: OutParam + Default + Clone,
         R: DependNode<Context, Input = I, Output = O>,
     {
