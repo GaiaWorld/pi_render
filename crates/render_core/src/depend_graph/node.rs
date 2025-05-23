@@ -53,10 +53,10 @@ pub trait DependNode<Context>: 'static + ThreadSync {
 		to: &[NodeId],
     ) -> Result<Self::Output, String>;
 
-	// // 
-	// fn reset<'a>(
-    //     &'a mut self,
-    // );
+	// 
+	fn reset<'a>(
+        &'a mut self,
+    );
 
     /// 执行，每帧会调用一次
     /// 执行 run方法之前，会先取 前置节点 相同类型的输出 填充到 input 来
@@ -266,7 +266,7 @@ where
 	}
 
 	fn build_end(&mut self) {
-		// self.node.reset();
+		self.node.reset();
         self.output = Default::default();
 	}
 
@@ -327,6 +327,7 @@ where
         
 
 		let runner = self.node.build(context, &self.input, &self.param_usage, id, from, to);
+        
         self.downgrade_input();
         // 结束前，先 重置 引用数
         self.curr_next_build_refs = self.total_next_refs;

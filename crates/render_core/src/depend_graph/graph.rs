@@ -848,6 +848,9 @@ impl<Context: ThreadSync + 'static> DependNode<Context> for InternalNodeEmptyImp
         // async {Ok(())}.
 		todo!()
     }
+
+    fn reset<'a>(
+     &'a mut self) {}
 }
 
 struct ScheduleNode<Context: 'static + ThreadSync, Bind: 'static + ThreadSync + Null + Clone> {

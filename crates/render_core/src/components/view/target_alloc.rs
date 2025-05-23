@@ -175,6 +175,10 @@ impl SafeTargetView {
 			allotor: self.allotor.clone()
 		}
 	}
+
+	pub fn is_hold(&self) -> bool {
+	    self.value.is_hold.load(std::sync::atomic::Ordering::Relaxed)
+	}
 }
 
 impl Drop for SafeTargetView {
