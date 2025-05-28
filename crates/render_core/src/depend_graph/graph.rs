@@ -632,7 +632,7 @@ impl<Context: ThreadSync + 'static, Bind: ThreadSync + 'static + Null + Clone> D
 		if self.is_topo_dirty {
             // log::warn!("update_run_ng=================");
 			if let Err(GraphError::ParamFillRepeat(f1, f2, t)) = self.update_run_ng() {
-                // log::error!("param fill with repeat, from: {0:?} {1:?}, to: {2:?}", (f1, &self.nodes[f1].name), (f2, self.nodes.get(f2).map(|r| {&r.name})), (t, &self.nodes[t].name));
+                log::error!("param fill with repeat, graph: {:}", self.dump_graphviz());
                 return Err(GraphError::ParamFillRepeat(f1, f2, t));
             }
 
