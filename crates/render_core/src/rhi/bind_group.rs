@@ -16,6 +16,11 @@ impl BindGroup {
     pub fn id(&self) -> BindGroupId {
         self.id
     }
+    
+    #[inline]
+    pub fn value(&self) -> &wgpu::BindGroup {
+        self.value.as_ref()
+    }
 }
 
 impl From<wgpu::BindGroup> for BindGroup {

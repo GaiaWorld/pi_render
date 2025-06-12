@@ -8,7 +8,7 @@ use pi_atom::Atom;
 use pi_hal::{loader::AsyncLoader, runtime::MULTI_MEDIA_RUNTIME, init_load_cb, on_load};
 use pi_share::Share;
 use render_core::{
-    renderer::texture::{ImageTexture, ImageTexture2DDesc, KeyImageTexture}, rhi::{device::{initialize_renderer, RenderDevice}, options::{RenderOptions, RenderPriority}, RenderQueue}
+    renderer::texture::{ ImageTexture2DDesc, KeyImageTexture}, rhi::{device::{initialize_renderer, RenderDevice}, options::{RenderOptions, RenderPriority}, RenderQueue}
 };
 use wgpu::{Gles3MinorVersion, InstanceFlags};
 
@@ -181,13 +181,14 @@ pub async fn  setup_render_context(
     // let rt = runtime.clone();
 
     // let _ = runtime.spawn(runtime.alloc(), async move {
-        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
 			// Which `Backends` to enable.
 			backends: options.backends,
 			// Which DX12 shader compiler to use.
-			dx12_shader_compiler: wgpu::Dx12Compiler::Fxc,
+			// dx12_shader_compiler: wgpu::Dx12Compiler::Fxc,
             flags: InstanceFlags::DEBUG,
-			gles_minor_version: Gles3MinorVersion::Automatic,
+			// gles_minor_version: Gles3MinorVersion::Automatic,
+            ..Default::default()
 		});
         let surface = unsafe { instance.create_surface(window.as_ref()).unwrap() };
         let request_adapter_options = wgpu::RequestAdapterOptions {
@@ -228,15 +229,15 @@ pub(crate) fn main() {
 	// });
     // let surface = unsafe { instance.create_surface(window.as_ref()) };
 
-    init_load_cb(Arc::new(|path: String| {
-        MULTI_MEDIA_RUNTIME
-            .spawn(async move {
-                log::debug!("Load {}", path);
-                let r = std::fs::read(path.clone()).unwrap();
-                on_load(&path, r);
-            })
-            .unwrap();
-    }));
+    // init_load_cb(Arc::new(|path: String| {
+    //     MULTI_MEDIA_RUNTIME
+    //         .spawn(async move {
+    //             log::debug!("Load {}", path);
+    //             let r = std::fs::read(path.clone()).unwrap();
+    //             on_load(&path, r);
+    //         })
+    //         .unwrap();
+    // }));
 
     MULTI_MEDIA_RUNTIME
     .spawn(async move {
@@ -246,25 +247,25 @@ pub(crate) fn main() {
             window
         ).await;
 
-        let mgr = AssetMgr::<ImageTexture>::new(GarbageEmpty(), false, 1024, 1000);
+        // let mgr = AssetMgr::<ImageTexture>::new(GarbageEmpty(), false, 1024, 1000);
 
-        let desc = ImageTexture2DDesc {
-            url: key.clone(),
-            device: device.clone(),
-            queue: queue.clone(),
-        };
+        // let desc = ImageTexture2DDesc {
+        //     url: key.clone(),
+        //     device: device.clone(),
+        //     queue: queue.clone(),
+        // };
 
-        let result = AssetMgr::load(&mgr, &key);
+        // let result = AssetMgr::load(&mgr, &key);
 
-        let r = ImageTexture::async_load_image(desc, result).await;
-        match r {
-            Ok(r) => {
-                log::info!("load image success, {:?}", r.key());
-            }
-            Err(e) => {
-                log::error!("load image fail, {:?}", e);
-            }
-        };
+        // let r = ImageTexture::async_load_image(desc, result).await;
+        // match r {
+        //     Ok(r) => {
+        //         log::info!("load image success, {:?}", r.key());
+        //     }
+        //     Err(e) => {
+        //         log::error!("load image fail, {:?}", e);
+        //     }
+        // };
     })
     .unwrap();
 

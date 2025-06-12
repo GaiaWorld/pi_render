@@ -98,13 +98,15 @@ impl<const MAX_BIND_GROUP_COUNT: usize, K: TKeyShaderSetBlock> KeyRenderPipeline
         });
         let vs_state = wgpu::VertexState {
             module: &shader.vs,
-            entry_point: shader.vs_point,
+            entry_point: Some(shader.vs_point),
             buffers: &key.key_vertex_layouts.layouts(),
+            compilation_options: wgpu::PipelineCompilationOptions::default(),
         };
         let fs_state = wgpu::FragmentState {
             module: &shader.fs,
-            entry_point: shader.fs_point,
+            entry_point: Some(shader.fs_point),
             targets: &key.key_state.target_state(),
+            compilation_options: wgpu::PipelineCompilationOptions::default(),
         };
 
         let pipeline_layout = device.create_pipeline_layout(
@@ -132,6 +134,7 @@ impl<const MAX_BIND_GROUP_COUNT: usize, K: TKeyShaderSetBlock> KeyRenderPipeline
                 depth_stencil,
                 multisample: key.key_state.multisample,
                 multiview: None,
+                cache: None,
             }
         );
         RenderRes::new(pipeline, ASSET_SIZE_FOR_UNKOWN)

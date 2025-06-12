@@ -64,9 +64,9 @@ pub use wgpu::{
     FrontFace,
     // Image
     ImageCopyBuffer,
-    ImageCopyBufferBase,
+    // ImageCopyBufferBase,
     ImageCopyTexture,
-    ImageCopyTextureBase,
+    // ImageCopyTextureBase,
     ImageDataLayout,
     ImageSubresourceRange,
 

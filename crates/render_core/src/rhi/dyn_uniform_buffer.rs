@@ -534,7 +534,7 @@ use winit::{event_loop::EventLoopBuilder, platform::windows::EventLoopBuilderExt
 		let adapter_info = adapter.get_info();
 
 		// #[cfg(not(feature = "trace"))]
-		let trace_path = None;
+		// let trace_path = None;
 
 		// Maybe get features and limits based on what is supported by the adapter/backend
 		let mut features = wgpu::Features::empty();
@@ -546,14 +546,14 @@ use winit::{event_loop::EventLoopBuilder, platform::windows::EventLoopBuilderExt
 				// discrete GPUs due to having to transfer data across the PCI-E bus and so it
 				// should not be automatically enabled in this case. It is however beneficial for
 				// integrated GPUs.
-				features -= wgpu::Features::MAPPABLE_PRIMARY_BUFFERS;
+				features = features & (features ^ wgpu::Features::MAPPABLE_PRIMARY_BUFFERS);
 			}
 			limits = adapter.limits();
 		}
 
 		// Enforce the disabled features
 		if let Some(disabled_features) = options.disabled_features {
-			features -= disabled_features;
+			features = features & (features ^ disabled_features);
 		}
 		// NOTE: |= is used here to ensure that any explicitly-enabled features are respected.
 		features |= options.features;
@@ -656,6 +656,12 @@ use winit::{event_loop::EventLoopBuilder, platform::windows::EventLoopBuilderExt
 				max_non_sampler_bindings: limits
 					.max_non_sampler_bindings
 					.min(constrained_limits.max_non_sampler_bindings),
+				max_binding_array_elements_per_shader_stage: limits.max_binding_array_elements_per_shader_stage.min(constrained_limits.max_binding_array_elements_per_shader_stage),
+				max_binding_array_sampler_elements_per_shader_stage: limits.max_binding_array_sampler_elements_per_shader_stage.min(constrained_limits.max_binding_array_sampler_elements_per_shader_stage),
+				max_color_attachments: limits.max_color_attachments.min(constrained_limits.max_color_attachments),
+				max_color_attachment_bytes_per_sample: limits.max_color_attachment_bytes_per_sample.min(constrained_limits.max_color_attachment_bytes_per_sample),
+				min_subgroup_size: limits.min_subgroup_size.max(constrained_limits.min_subgroup_size),
+				max_subgroup_size: limits.max_subgroup_size.min(constrained_limits.max_subgroup_size),
 			};
 		}
 
@@ -665,8 +671,10 @@ use winit::{event_loop::EventLoopBuilder, platform::windows::EventLoopBuilderExt
 					label: options.device_label.as_ref().map(|a| a.as_ref()),
 					required_features: features,
 					required_limits: limits,
+					memory_hints: wgpu::MemoryHints::default(),
+					trace: wgpu::Trace::default(),
 				},
-				trace_path,
+				// trace_path,
 			)
 			.await
 			.unwrap();
@@ -710,13 +718,14 @@ use winit::{event_loop::EventLoopBuilder, platform::windows::EventLoopBuilderExt
 		let is_end1 = is_end.clone();
 
 		let options = RenderOptions::default();
-		let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+		let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
 			// Which `Backends` to enable.
 			backends: options.backends,
 			// Which DX12 shader compiler to use.
-			dx12_shader_compiler: wgpu::Dx12Compiler::Fxc,
+			// dx12_shader_compiler: wgpu::Dx12Compiler::Fxc,
 			flags: InstanceFlags::DEBUG,
-			gles_minor_version: Gles3MinorVersion::Automatic,
+			// gles_minor_version: Gles3MinorVersion::Automatic,
+			backend_options: wgpu::BackendOptions::default(),
 		});
 		let event_loop =  EventLoopBuilder::new().with_any_thread(true).build();
 		let window = winit::window::Window::new(&event_loop).unwrap();

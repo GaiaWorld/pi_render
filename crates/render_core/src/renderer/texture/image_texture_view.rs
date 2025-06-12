@@ -55,6 +55,7 @@ impl ImageTextureView {
             mip_level_count: key.desc.mip_level_count(),
             base_array_layer: key.desc.base_array_layer as u32,
             array_layer_count: key.desc.array_layer_count(),
+            usage: Some(texture.image().texture.usage()),
         });
 
         Self {

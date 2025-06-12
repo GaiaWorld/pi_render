@@ -1,5 +1,4 @@
 use pi_atom::Atom;
-use wgpu::VertexFormat;
 
 use super::{buildin_var::{ShaderVarVertices, ShaderVarUniform}, vertex_buffer_desc::VertexBufferDesc};
 
@@ -45,6 +44,17 @@ impl TVertexFormatShaderCode for wgpu::VertexFormat {
             wgpu::VertexFormat::Float64x2   => String::from(""),
             wgpu::VertexFormat::Float64x3   => String::from(""),
             wgpu::VertexFormat::Float64x4   => String::from(""),
+            wgpu::VertexFormat::Unorm10_10_10_2 => String::from(""),
+            wgpu::VertexFormat::Unorm8x4Bgra    => String::from(""),
+            wgpu::VertexFormat::Uint8           => String::from(""),
+            wgpu::VertexFormat::Sint8           => String::from(""),
+            wgpu::VertexFormat::Unorm8          => String::from(""),
+            wgpu::VertexFormat::Snorm8          => String::from(""),
+            wgpu::VertexFormat::Uint16          => String::from(""),
+            wgpu::VertexFormat::Sint16          => String::from(""),
+            wgpu::VertexFormat::Unorm16         => String::from(""),
+            wgpu::VertexFormat::Snorm16         => String::from(""),
+            wgpu::VertexFormat::Float16         => String::from(""),
         }
     }
 }

@@ -731,6 +731,7 @@ impl AtlasAllocator {
 			mip_level_count: if descript.mip_level_count == 0 {None}else {Some(descript.mip_level_count)},
 			base_array_layer: descript.base_array_layer,
 			array_layer_count: descript.array_layer_count,
+    		usage: Some(descript.usage),
 		});
 
 		self.texture_cur_index += 1;

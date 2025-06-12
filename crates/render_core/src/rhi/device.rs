@@ -206,14 +206,14 @@ pub async fn initialize_renderer(
 			// discrete GPUs due to having to transfer data across the PCI-E bus and so it
 			// should not be automatically enabled in this case. It is however beneficial for
 			// integrated GPUs.
-			features -= wgpu::Features::MAPPABLE_PRIMARY_BUFFERS;
+			features = features & (features ^ wgpu::Features::MAPPABLE_PRIMARY_BUFFERS);
 		}
 		limits = adapter.limits();
 	}
 
 	// Enforce the disabled features
 	if let Some(disabled_features) = options.disabled_features {
-		features -= disabled_features;
+		features = features & (features ^ disabled_features);
 	}
 	// NOTE: |= is used here to ensure that any explicitly-enabled features are respected.
 	features |= options.features;
@@ -316,6 +316,12 @@ pub async fn initialize_renderer(
 			max_non_sampler_bindings: limits
 			.max_non_sampler_bindings
 			.min(constrained_limits.max_non_sampler_bindings),
+			max_binding_array_elements_per_shader_stage: limits.max_binding_array_elements_per_shader_stage.min(constrained_limits.max_binding_array_elements_per_shader_stage),
+			max_binding_array_sampler_elements_per_shader_stage: limits.max_binding_array_sampler_elements_per_shader_stage.min(constrained_limits.max_binding_array_sampler_elements_per_shader_stage),
+			max_color_attachments: limits.max_color_attachments.min(constrained_limits.max_color_attachments),
+			max_color_attachment_bytes_per_sample: limits.max_color_attachment_bytes_per_sample.min(constrained_limits.max_color_attachment_bytes_per_sample),
+			min_subgroup_size: limits.min_subgroup_size.max(constrained_limits.min_subgroup_size),
+			max_subgroup_size: limits.max_subgroup_size.min(constrained_limits.max_subgroup_size),
 		};
 	}
 
@@ -325,6 +331,8 @@ pub async fn initialize_renderer(
 				label: options.device_label.as_ref().map(|a| a.as_ref()),
 				required_features: features,
 				required_limits: limits,
+				memory_hints: wgpu::MemoryHints::default(),
+				trace: wgpu::Trace::default(),
 			},
 			trace_path,
 		)

@@ -1,6 +1,6 @@
 [package]
 name = "pi_render"
-version = "0.2.3"
+version = "0.3.0"
 authors = ["moyy <myy412001799@gmail.com>"]
 edition = "2021"
 description = "Render for PI Engine"
@@ -32,7 +32,7 @@ pi_hash = "0.1"
 nalgebra = "0.32"
 winit = { registry = "yn", version = "0.27"}
 log = "0.4"
-wgpu = "0.19"
+wgpu = "*"
 env_logger = "0.9"
 float-ord = "0.3"
 lazy_static = "1.4"
@@ -68,9 +68,9 @@ harness = false
 # pi_assets = { path = "../pi_assets" }
 
 [patch.yn]
-# pi_hal = { path = "../pi_hal" }
+pi_hal = { path = "../pi_hal" }
 # pi_sdf = { path = "../pi_sdf" }
-# pi_wgpu = {path = "../pi_wgpu"}
+pi_wgpu = {path = "../pi_wgpu"}
 # pi_egl = {path = "../pi_egl"}
 # winit = { path = "../winit"}
 

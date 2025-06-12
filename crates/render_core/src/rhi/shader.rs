@@ -148,7 +148,7 @@ impl ShaderMeta {
 		let s = match stage {
 			naga::ShaderStage::Vertex => wgpu::ShaderStages::VERTEX,
 			naga::ShaderStage::Fragment => wgpu::ShaderStages::FRAGMENT,
-			naga::ShaderStage::Compute => wgpu::ShaderStages::COMPUTE,
+			_ => wgpu::ShaderStages::COMPUTE,
 		};
 		let code = self.to_code(defines, s);
 		log::debug!("shader_code====,\nname={:?},\nstage={stage:?}\ndefines={defines:?}\ncode=\n{code}", &self.name);
@@ -157,7 +157,7 @@ impl ShaderMeta {
             source: wgpu::ShaderSource::Glsl {
                 shader: Cow::Borrowed(code.as_str()),
                 stage,
-                defines: naga::FastHashMap::default(),
+                defines: &[],
             },
         });
 	}
@@ -763,7 +763,7 @@ impl ProcessedShader {
                 let mut parser = naga::front::glsl::Frontend::default();
                 parser
                     .parse(&naga::front::glsl::Options::from(*shader_stage), source)
-                    .map_err(ShaderReflectError::GlslParse)?
+                    .map_err(|arg0: naga::front::glsl::ParseErrors| ShaderReflectError::GlslParse(vec![]))?
             }
 			#[cfg(feature="wgpu/spirv")]
             ProcessedShader::SpirV(source) => naga::front::spv::parse_u8_slice(

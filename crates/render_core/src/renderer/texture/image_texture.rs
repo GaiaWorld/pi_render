@@ -129,7 +129,7 @@ impl ResImageTexture {
             sample_count: 1,
             dimension,
             format,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::COPY_SRC,
+            usage: key.useage,
             view_formats: &[],
         });
 

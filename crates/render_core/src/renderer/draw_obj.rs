@@ -25,16 +25,16 @@ impl DrawBindGroup {
         match self {
             Self::Offset(index) => {
                 let group = index.get_group();
-                rpass.set_bind_group(i as u32, group.bind_group, group.offsets);
+                rpass.set_bind_group(i as u32, group.bind_group.value(), group.offsets);
             }
             Self::Independ(group) => {
-                rpass.set_bind_group(i as u32, group, &[]);
+                rpass.set_bind_group(i as u32, group.value(), &[]);
             },
             Self::GroupUsage(group) => {
                 rpass.set_bind_group(i, group.bind_group(), &group.offsets());
             },
             Self::Arc(group) => {
-                rpass.set_bind_group(i, group, &[]);
+                rpass.set_bind_group(i, group.value(), &[]);
             },
         };
     }

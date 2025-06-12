@@ -49,6 +49,17 @@ impl TVertexFormatByteSize for wgpu::VertexFormat {
             wgpu::VertexFormat::Float64x2   => 8 * 2,
             wgpu::VertexFormat::Float64x3   => 8 * 3,
             wgpu::VertexFormat::Float64x4   => 8 * 4,
+            wgpu::VertexFormat::Uint8 => todo!(),
+            wgpu::VertexFormat::Sint8 => todo!(),
+            wgpu::VertexFormat::Unorm8 => todo!(),
+            wgpu::VertexFormat::Snorm8 => todo!(),
+            wgpu::VertexFormat::Uint16 => todo!(),
+            wgpu::VertexFormat::Sint16 => todo!(),
+            wgpu::VertexFormat::Unorm16 => todo!(),
+            wgpu::VertexFormat::Snorm16 => todo!(),
+            wgpu::VertexFormat::Float16 => todo!(),
+            wgpu::VertexFormat::Unorm10_10_10_2 => todo!(),
+            wgpu::VertexFormat::Unorm8x4Bgra => todo!(),
         }
     }
 }

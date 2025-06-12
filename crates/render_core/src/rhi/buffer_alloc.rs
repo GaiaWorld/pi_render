@@ -528,13 +528,14 @@ mod test {
 		let is_end1 = is_end.clone();
 		
 		let options = RenderOptions::default();
-		let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+		let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
 			// Which `Backends` to enable.
 			backends: options.backends,
 			// Which DX12 shader compiler to use.
-			dx12_shader_compiler: wgpu::Dx12Compiler::Fxc,
+			// dx12_shader_compiler: wgpu::Dx12Compiler::Fxc,
 			flags: InstanceFlags::DEBUG,
-			gles_minor_version: Gles3MinorVersion::Automatic,
+			// gles_minor_version: Gles3MinorVersion::Automatic,
+    		backend_options: wgpu::BackendOptions::default(),
 		});
 		let event_loop =  EventLoopBuilder::new().with_any_thread(true).build();
 		let window = winit::window::Window::new(&event_loop).unwrap();

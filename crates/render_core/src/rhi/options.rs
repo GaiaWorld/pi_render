@@ -34,7 +34,8 @@ impl Default for RenderOptions {
             wgpu::Backends::PRIMARY
         };
 
-        let backends = wgpu::util::backend_bits_from_env().unwrap_or(default_backends);
+        // let backends = wgpu::util::backend_bits_from_env().unwrap_or(default_backends);
+        let backends = default_backends.with_env();
 
         let priority = options_priority_from_env().unwrap_or(RenderPriority::Functionality);
 

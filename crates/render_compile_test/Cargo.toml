@@ -1,6 +1,6 @@
 [package]
 name = "test_shader"
-version = "0.1.1"
+version = "0.2.0"
 authors = ["moyy <myy412001799@gmail.com>"]
 edition = "2021"
 description = "Render for PI Engine"
@@ -13,7 +13,7 @@ pi_render = {path = "../render_core", package="render_core"}
 pi_atom = {version="0.6", features = ["serde"]}
 render_derive = {path="../render_derive"}
 render_compile = {path="../render_compile"}
-wgpu = { version = "0.19", default-features = false, features = ["glsl"] }
+wgpu = { version = "25.0.*", default-features = false, features = ["glsl"] }
 pi_map="0.2"
 bytemuck = { version = "1.4", features = ["derive"] }
 cargo-manifest = "0.2.6"
@@ -27,5 +27,5 @@ pi_map = { path = "../pi_map" }
 
 [build-dependencies]
 render_compile = {path="../render_compile"}
-naga = { version = "0.19"}
+naga = { version = "25.0.*"}
 
