@@ -44,7 +44,7 @@ tracing = { version = "0.1", default-features = false, features = ["std"] }
 serde = { workspace = true, features = ["derive"], optional = true }
 bitvec = { version = "1.0"}
 render_utils = { version = "0.2", path = "../render_utils", registry = "yn" }
-render_crevice = { version = "0.2", registry = "yn", path = "../render_crevice", features = [
+render_crevice = { version = "0.3", registry = "yn", path = "../render_crevice", features = [
     "nalgebra",
 ] }
 uuid = { version = "1", features = ["v4"] }
@@ -59,7 +59,7 @@ once_cell = "1.4" # TODO: replace once_cell with std equivalent if/when this lan
 regex = "1.5"
 thiserror = "1.0"
 pi_slab = "0.1"
-wgpu = {version = "0.2", registry = "yn", package="pi_wgpu"}
+wgpu = {version = "0.3", registry = "yn", package="pi_wgpu"}
 derive-deref-rs = "0.1"
 pi_any = "0.1"
 # pi_time = "0.3"
@@ -70,7 +70,7 @@ lazy_static = "1.4"
 pi_atom = "0.6"
 bytemuck = { version = "1.4", features = ["derive"] }
 
-pi_hal = { version = "0.2", registry = "yn" }
+pi_hal = { version = "0.3", registry = "yn" }
 # pi_sdf = { version = "0.1", registry = "yn" }
 
 # wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
@@ -87,4 +87,4 @@ bytemuck = { version = "1.4", features = ["derive"] }
 render_derive={path="../render_derive", version = "0.2", registry = "yn"}
 env_logger = "0.9"
 winit = { registry = "yn", version = "0.27"}
-wgpu = {version = "0.2", registry = "yn", package="pi_wgpu", features = ["use_wgpu"]}
+wgpu = {version = "0.3", registry = "yn", package="pi_wgpu", features = ["use_wgpu"]}
