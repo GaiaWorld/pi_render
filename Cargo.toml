@@ -1,6 +1,6 @@
 [package]
 name = "pi_render"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["moyy <myy412001799@gmail.com>"]
 edition = "2021"
 description = "Render for PI Engine"
@@ -30,7 +30,7 @@ pi_map = "0.2"
 pi_hash = "0.1"
 
 nalgebra = "0.32"
-winit = { registry = "yn", version = "0.27"}
+winit = { registry = "yn", version = "0.28"}
 log = "0.4"
 wgpu = "25.0.*"
 env_logger = "0.9"

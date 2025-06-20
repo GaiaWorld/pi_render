@@ -5,7 +5,7 @@ use pi_atom::Atom;
 use pi_share::Share;
 use pi_slotmap::DefaultKey;
 
-use crate::{asset::TAssetKeyU64, components::view::target_alloc::{Fbo, ShareTargetView}, rhi::asset::{AssetWithId, TextureRes}};
+use crate::{asset::TAssetKeyU64, components::view::target_alloc::{Fbo, ShareTargetView}, renderer::texture::ImageTextureFrame, rhi::asset::{AssetWithId, TextureRes}};
 
 use super::{image_texture_view::{EImageTextureViewUsage, ImageTextureView}, ImageTextureViewFrame, KeyImageTexture, KeyImageTextureFrame, KeyImageTextureView, KeyImageTextureViewFrame, KeyTexture, TextureRect, TextureViewDesc};
 
@@ -136,6 +136,30 @@ impl ETextureViewUsage {
             ETextureViewUsage::FBORect(_, _, _, _) => wgpu::TextureViewDimension::D2,
             ETextureViewUsage::ImageFrame(val) => val.texture.texture().view_dimension,
             // ETextureViewUsage::Temp(val, _) => val,
+        }
+    }
+    pub fn coord(&self) -> u8 {
+        match self {
+            ETextureViewUsage::Tex(_arc) => 0,
+            ETextureViewUsage::TexWithId(_arc) => 0,
+            ETextureViewUsage::Image(_arc) => 0,
+            ETextureViewUsage::ImageFrame(arc) => {
+                arc.texture().coord()
+            },
+            ETextureViewUsage::SRT(_) => 0,
+            ETextureViewUsage::FBORect(_, _, _, _) => 0,
+        }
+    }
+    pub fn tilloff(&self) -> [f32;4] {
+        match self {
+            ETextureViewUsage::Tex(_arc) => ImageTextureFrame::DEFAULT_TILLOFF,
+            ETextureViewUsage::TexWithId(_arc) => ImageTextureFrame::DEFAULT_TILLOFF,
+            ETextureViewUsage::Image(_arc) => ImageTextureFrame::DEFAULT_TILLOFF,
+            ETextureViewUsage::ImageFrame(arc) => {
+                arc.texture().tilloff()
+            },
+            ETextureViewUsage::SRT(_) => ImageTextureFrame::DEFAULT_TILLOFF,
+            ETextureViewUsage::FBORect(_, _, _, _) => ImageTextureFrame::DEFAULT_TILLOFF,
         }
     }
 }
