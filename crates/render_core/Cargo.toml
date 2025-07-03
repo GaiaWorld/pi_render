@@ -34,6 +34,8 @@ pi_null = "0.1"
 pi_ecs_macros = "0.1"
 pi_slotmap = "0.2"
 derive_deref = "1.1"
+serde_json          = { features = ["raw_value"], version = "1.0" }
+serde = { workspace = true, features = ["derive"], optional = true }
 
 graphviz-rust = "0.6"
 pi_print_any = "0.1"
@@ -41,7 +43,6 @@ pi_print_any = "0.1"
 normpath = "1.1.1"
 tracing = { version = "0.1", default-features = false, features = ["std"] }
 
-serde = { workspace = true, features = ["derive"], optional = true }
 bitvec = { version = "1.0"}
 render_utils = { version = "0.2", path = "../render_utils", registry = "yn" }
 render_crevice = { version = "0.3", registry = "yn", path = "../render_crevice", features = [

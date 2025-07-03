@@ -27,6 +27,8 @@ pub mod texture;
 pub mod sampler;
 pub mod shader_stage;
 pub mod error;
+pub mod texture_loader;
+pub mod errors;
 
 #[derive(Debug, Default)]
 pub struct AssetDataMap<K: Clone + Hash + PartialEq + Eq, A: Asset<Key = K>> {
