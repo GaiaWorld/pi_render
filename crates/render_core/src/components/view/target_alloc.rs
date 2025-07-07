@@ -3,11 +3,11 @@
 //! 该模块负责管理和分配渲染目标（如颜色附件、深度附件）的纹理资源，
 //! 通过Atlas分配算法高效复用纹理内存，支持动态调整纹理尺寸和重用。
 
-use std::{hash::{Hash, Hasher}, collections::hash_map::Entry, intrinsics::transmute, mem::size_of, sync::atomic::AtomicBool};
+use std::{hash::{Hash, Hasher}, collections::hash_map::Entry, mem::transmute, mem::size_of, sync::atomic::AtomicBool};
 
 use derive_deref_rs::Deref;
 use guillotiere::{Size, Allocation, Rectangle, Point};
-use pi_assets::{asset::{Handle, Droper}, mgr::AssetMgr, homogeneous::HomogeneousMgr};
+use pi_assets::{asset::{Asset, Handle}, homogeneous::HomogeneousMgr, mgr::AssetMgr};
 use pi_null::Null;
 use pi_share::{Share, ShareRwLock};
 use pi_slotmap::{DefaultKey, SlotMap, SecondaryMap};
@@ -69,8 +69,8 @@ pub struct TargetDescriptor {
 /// 帧缓冲对象（Framebuffer Object），包含实际纹理资源
 #[derive(Debug)]
 pub struct Fbo {
-	pub depth: Option<(Handle<AssetWithId<TextureRes>>, Share<wgpu::Texture>)>, // 深度附件
-	pub colors: SmallVec<[(Handle<AssetWithId<TextureRes>>, Share<wgpu::Texture>);1]>, // 颜色附件
+	pub depth: Option<(Handle<FboRes>, Atom)>, // 深度附件
+	pub colors: SmallVec<[(Handle<FboRes>, Atom);1]>, // 颜色附件
 	pub width: u32,  // 纹理实际宽度
 	pub height: u32, // 纹理实际高度
 }
@@ -222,7 +222,7 @@ impl SafeAtlasAllocator {
 	/// 创建分配器
 	pub fn new(
 		device: RenderDevice, 
-		texture_assets_mgr: Share<AssetMgr<AssetWithId<TextureRes>>>,
+		texture_assets_mgr: Share<AssetMgr<FboRes>>,
 		unuse_textures: Share<HomogeneousMgr<RenderRes<UnuseTexture>>>,
 		key_alloter: Share<pi_key_alloter::KeyAlloter>,
 	) -> Self {
@@ -285,6 +285,24 @@ impl SafeAtlasAllocator {
 	}
 }
 
+#[derive(Debug, Deref)]
+pub struct FboRes {
+	#[deref]
+    pub res: AssetWithId<TextureRes>,
+	pub texture: Share<wgpu::Texture>,
+}
+
+impl Asset for FboRes {
+	type Key = Atom;
+}
+
+impl pi_assets::asset::Size for FboRes {
+	fn size(&self) -> usize {
+		self.res.size()
+	}
+}
+
+
 /// 线程不安全的渲染目标分配器
 pub(crate) struct AtlasAllocator {
 	// 渲染目标类型索引（每种不同的描述，对应一种渲染目标）
@@ -300,7 +318,7 @@ pub(crate) struct AtlasAllocator {
 	
 	unuse_textures: Share<HomogeneousMgr<RenderRes<UnuseTexture>>>,
 	// 纹理资源管理器，将纹理资源放入资源管理器，未使用的纹理不立即销毁
-	texture_assets_mgr: Share<AssetMgr<AssetWithId<TextureRes>>>,
+	texture_assets_mgr: Share<AssetMgr<FboRes>>,
 	key_alloter: Share<pi_key_alloter::KeyAlloter>,
 	// 递增的数字，用于缓存纹理创建的纹理（纹理本身描述会重复，不能以描述的hash值作为key，而是以描述hash+ texture_cur_index作为纹理的key）
 	texture_cur_index: usize,
@@ -334,7 +352,7 @@ impl AtlasAllocator {
 	}
 	fn new(
 		device: RenderDevice, 
-		texture_assets_mgr: Share<AssetMgr<AssetWithId<TextureRes>>>,
+		texture_assets_mgr: Share<AssetMgr<FboRes>>,
 		unuse_textures: Share<HomogeneousMgr<RenderRes<UnuseTexture>>>,
 		key_alloter: Share<pi_key_alloter::KeyAlloter>,
 	) -> Self {
@@ -508,8 +526,7 @@ impl AtlasAllocator {
 			if let Some(r) = &t.target.depth {
 				// log::warn!("drop depth====={:?}, {:?}, ty: {:?}, {:?},", t.target.width, t.target.height, view.ty_index, self.all_allocator[view.ty_index].info.depth_hash);
 				self.unuse_textures.create(RenderRes::new(UnuseTexture { 
-					view: r.0.clone(),
-					texture: r.1.clone(),
+					key: r.1.clone(),
 					// weak: Share::downgrade(&r.0), 
 					// weak_texture: Share::downgrade(&r.1),
 					width: t.target.width, 
@@ -532,8 +549,7 @@ impl AtlasAllocator {
 			for color_index in 0..t.target.colors.len() {
 				log::trace!("drop=====ty_index:{:?}, view_index: {:?}, width: {:?}, height: {:?}, target: {:?}", view.ty_index, view.index, t.target.width, t.target.height, self.all_allocator[view.ty_index].info.texture_hash[color_index]);
 				self.unuse_textures.create(RenderRes::new(UnuseTexture { 
-					view: t.target.colors[color_index].0.clone(),
-					texture: t.target.colors[color_index].1.clone(), 
+					key: t.target.colors[color_index].1.clone(),
 					width: t.target.width, 
 					height: t.target.height, 
 					hash: self.all_allocator[view.ty_index].info.texture_hash[color_index],
@@ -649,13 +665,13 @@ impl AtlasAllocator {
 				len,
 			);
 			if len == 1 {
-				width = r.2;
-				height = r.3;
+				width = r.1;
+				height = r.2;
 				target.width = width;
 				target.height = height;
 			}
 			
-			target.colors.push((r.0, r.1));
+			target.colors.push((r.0, r.3));
 		}
 
 		if info.descript.need_depth {
@@ -673,7 +689,7 @@ impl AtlasAllocator {
 				2, // 
 
 			);
-			target.depth = Some((r.0, r.1));
+			target.depth = Some((r.0, r.3));
 		}
 
 		return target;
@@ -688,26 +704,38 @@ impl AtlasAllocator {
 		aspect: TextureAspect,
 		hash: u64,
 		len: usize,
-	) -> (Handle<AssetWithId<TextureRes>>, Share<wgpu::Texture>, u32, u32) {
-		// 找到一个匹配的纹理，直接返回
-		let unuse =  self.unuse_textures.pop_by_filter(|t| {
-			if t.hash == hash && 
-				(( // 只需要一张纹理，则只要该纹理的大小大于等于要求的大小即可
-					len == 1 &&
-					t.width >= width &&
-					t.height >= height) ||
-				( // 需要多张纹理，该纹理的大小必须等于要求的大小（如果大于等于就可以，后续如果找不到缓冲的纹理，则需要创建比要求的大小更大的纹理）
-					len > 1 && 
-					t.width == width &&
-					t.height == height)) {
-				return true;
+	) -> (Handle<FboRes>, u32, u32, Atom) {
+		let mut unuse = None; 
+		loop {
+			// 找到一个匹配的纹理，直接返回
+			let unuse1 =  self.unuse_textures.pop_by_filter(|t| {
+				if t.hash == hash && 
+					(( // 只需要一张纹理，则只要该纹理的大小大于等于要求的大小即可
+						len == 1 &&
+						t.width >= width &&
+						t.height >= height) ||
+					( // 需要多张纹理，该纹理的大小必须等于要求的大小（如果大于等于就可以，后续如果找不到缓冲的纹理，则需要创建比要求的大小更大的纹理）
+						len > 1 && 
+						t.width == width &&
+						t.height == height)) {
+					return true;
+				}
+				return false;
+			});
+			
+			if let Some(unuse1) = unuse1 {
+				if let Some(r) = self.texture_assets_mgr.get(&unuse1.key) {
+					unuse = Some((unuse1, r));
+				};
 			}
-			return false;
-		});
-		
-		if let Some(r) = unuse {
-			return (r.view.clone(), r.texture.clone(), r.width, r.height);
+			break;
 		}
+
+		if let Some(r) = unuse {
+			return (r.1, r.0.width, r.0.height, r.0.key.clone());
+		}
+		
+		
 
 		let desc = wgpu::TextureDescriptor {
 			label: None,
@@ -735,19 +763,35 @@ impl AtlasAllocator {
 		});
 
 		self.texture_cur_index += 1;
-		let key = calc_hash(&(hash, self.texture_cur_index, width, height));
+		let hash = calc_hash(&(hash, self.texture_cur_index, width, height));
 		let s = calc_texture_size(&desc);
+		let key = Atom::from(hash.to_string()+ "_fbo");
 		(
 			match AssetMgr::insert(
 				&self.texture_assets_mgr, 
-				key, 
-				 AssetWithId::new(TextureRes::new(width, height, calc_texture_size(&desc), texture_view, true, descript.format), s, self.key_alloter.clone())) {
-					Ok(r) => r,
-					_ => panic!("alloc fbo key is exist: {:?}", key),
-				},
-			Share::new(texture),
+				key.clone(), 
+				FboRes { 
+					res: AssetWithId::new(
+						TextureRes::new(
+							width, 
+							height, 
+							calc_texture_size(&desc), 
+							texture_view, 
+							true, 
+							descript.format
+						), 
+						s, 
+						self.key_alloter.clone()
+					),
+					texture: Share::new(texture),
+				}
+			) {
+				Ok(r) => r,
+				_ => panic!("alloc fbo key is exist: {:?}", key),
+			},
 			width,
-			height
+			height,
+			key
 		)
 	}
 
@@ -784,8 +828,7 @@ pub(super) struct SingleAllocator {
 pub struct UnuseTexture {
 	// weak: ShareWeak<Droper<AssetWithId<TextureRes>>>,
 	// weak_texture: ShareWeak<wgpu::Texture>,
-	view: Share<Droper<AssetWithId<TextureRes>>>,
-	texture: Share<wgpu::Texture>,
+	key: Atom,
 	width: u32,
 	height: u32,
 	hash: u64,
