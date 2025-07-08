@@ -489,14 +489,29 @@ impl CombineAtlas2DMgr {
         device: &RenderDevice, queue: &RenderQueue
     ) -> Option<ImageTextureFrame> {
         if self.format == format {
-            let mut idx = 0;
             let mut frame = None;
-            for atlas in self.atlasarr.iter_mut() {
-                if let Some(val) = atlas.allocate(width, height) {
-                    frame = Some(val);
-                    break;
+            let mut idx = 0;
+            if (width < 256 && height < 256) || !(width.is_power_of_two() && height.is_power_of_two()) {
+                let len = self.atlasarr.len();
+                idx = usize::MAX;
+                for i in 0..len {
+                    idx = len - i - 1;
+                    let atlas = self.atlasarr.get_mut(idx).unwrap();
+                    if let Some(val) = atlas.allocate(width, height) {
+                        frame = Some(val);
+                        break;
+                    } else {
+                        idx = usize::MAX;
+                    }
                 }
-                idx += 1;
+            } else {
+                for atlas in self.atlasarr.iter_mut() {
+                    if let Some(val) = atlas.allocate(width, height) {
+                        frame = Some(val);
+                        break;
+                    }
+                    idx += 1;
+                }
             }
             if frame.is_none() && idx < self.maxcount {
                 let mut hasher = DefaultHasher::default();
