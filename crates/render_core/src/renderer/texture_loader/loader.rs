@@ -66,16 +66,17 @@ impl<K: Send + 'static> ImageTextureLoader<K> {
         + self.success.len() * 8
     }
     pub fn async_load(
+        &self,
         loadtaskkey: K,
         param: KeyImageTextureFrame,
         useage: TextureUsages,
         device: &RenderDevice, queue: &RenderQueue,
         image_assets_mgr: &Share<AssetMgr<ImageTextureFrame>>,
-        success: &Share<SegQueue<(K, KeyImageTextureFrame, Handle<ImageTextureFrame>)>>,
-        failquene: &Share<SegQueue<(K, KeyImageTextureFrame, EError)>>,
-        tempdata: &Share<SegQueue<(K, KeyImageTextureFrame, Arc<Vec<u8>>, Receiver<ImageTextureFrame, GarbageEmpty>)>>,
-        tempimage: &Share<SegQueue<(K, KeyImageTextureFrame, DynamicImage, Receiver<ImageTextureFrame, GarbageEmpty>)>>,
     ) -> Option<Handle<ImageTextureFrame>> {
+        let tempdata = &self.loading_data;
+        let tempimage = &self.loading_image;
+        let success = &self.success;
+        let failquene = &self.failquene;
         let imageresult = AssetMgr::load(&image_assets_mgr, &param);
         match imageresult {
             LoadResult::Ok(data) => return Some(data),
@@ -142,13 +143,14 @@ impl<K: Send + 'static> ImageTextureLoader<K> {
         return None;
     }
     pub fn check_combine(
+        &self,
         device: &RenderDevice, queue: &RenderQueue,
         combinemgr: &mut TextureCombineAtlas2DMgr,
-        success: &Share<SegQueue<(K, KeyImageTextureFrame, Handle<ImageTextureFrame>)>>,
-        failquene: &Share<SegQueue<(K, KeyImageTextureFrame, EError)>>,
-        tempdata: &Share<SegQueue<(K, KeyImageTextureFrame, Arc<Vec<u8>>, Receiver<ImageTextureFrame, GarbageEmpty>)>>,
-        tempimage: &Share<SegQueue<(K, KeyImageTextureFrame, DynamicImage, Receiver<ImageTextureFrame, GarbageEmpty>)>>,
     ) {
+        let tempdata = &self.loading_data;
+        let tempimage = &self.loading_image;
+        let success = &self.success;
+        let failquene = &self.failquene;
         // 压缩纹理合并
         while let Some((key, keyimage, data, receiver)) = tempdata.pop() {
             if let Some(texture) = combinemgr.combine_ktx(&keyimage, &data, &device, &queue) {
