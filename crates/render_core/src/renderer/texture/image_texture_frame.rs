@@ -1,4 +1,4 @@
-use std::{hash::{Hash, Hasher}, ops::Deref, sync::Arc};
+use std::{hash::{Hash, Hasher}, ops::Deref};
 
 use crossbeam::queue::SegQueue;
 use guillotiere::{AllocId, AllocatorOptions, AtlasAllocator};
@@ -84,7 +84,7 @@ pub struct ImageTextureFrame {
     /// 图块数据大小
     size: usize,
     /// 图块对应纹理资源
-    pub(crate) tex: Arc<ImageTexture>,
+    pub(crate) tex: Share<ImageTexture>,
     /// 图块拓展数据,比如 IBL 纹理的6个球谐光照数据
     pub extend: Vec<u8>,
     /// 图块所在图集纹理的唯一键, 图块是单独图片时没有该数据
@@ -95,7 +95,7 @@ impl ImageTextureFrame {
     pub const DEFAULT_TILLOFF: [f32;4] = [1., 1., 0., 0.];
     /// 新建一个独立图片的图块数据
     pub fn new(tex: ImageTexture) -> Self {
-        Self { frame: None, size: tex.size, tex: Arc::new(tex), extend: vec![], atlashash: None }
+        Self { frame: None, size: tex.size, tex: Share::new(tex), extend: vec![], atlashash: None }
     }
     /// 获取图块在图集中的矩形信息
     pub fn tilloff(&self) -> [f32;4] {
@@ -382,7 +382,7 @@ pub struct Atlas {
     /// 图集的纹理格式
     format: wgpu::TextureFormat,
     /// 图集对应纹理资源
-    texture: Arc<ImageTexture>,
+    texture: Share<ImageTexture>,
     /// 图集的键
     key_image_texture_2d_array: Option<u64>,
     /// 图集矩形回收器
@@ -425,7 +425,7 @@ impl Atlas {
             allocator,
             format,
             key_image_texture_2d_array: Some(temp.asset_u64()),
-            texture: Arc::new(texture),
+            texture: Share::new(texture),
             recycle,
         }
     }
@@ -647,5 +647,5 @@ pub type EImageTextureViewUsage = Handle<ImageTextureViewFrame>;
 // #[derive(Clone)]
 // pub enum EImageTextureViewUsage {
 //     Handle(Handle<ImageTextureViewFrame>),
-//     Arc(Arc<ImageTextureViewFrame>),
+//     Share(Share<ImageTextureViewFrame>),
 // }

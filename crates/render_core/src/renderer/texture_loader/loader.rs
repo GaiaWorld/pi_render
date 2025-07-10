@@ -1,4 +1,4 @@
-use std::sync::Arc;
+
 
 use crossbeam::queue::SegQueue;
 use ktx::KtxInfo;
@@ -22,7 +22,7 @@ pub trait TTextureLoaderImpl: Clone {
         device: &RenderDevice, queue: &RenderQueue,
         image_assets_mgr: &Share<AssetMgr<ImageTextureFrame>>,
         success: Share<SegQueue<Self>>,
-        tempdata: Share<SegQueue<(KeyImageTextureFrame, Arc<Vec<u8>>, Receiver<ImageTextureFrame, GarbageEmpty>)>>,
+        tempdata: Share<SegQueue<(KeyImageTextureFrame, Share<Vec<u8>>, Receiver<ImageTextureFrame, GarbageEmpty>)>>,
         tempimage: Share<SegQueue<(KeyImageTextureFrame, DynamicImage, Receiver<ImageTextureFrame, GarbageEmpty>)>>,
         failquene: Share<SegQueue<(KeyImageTextureFrame, EError)>>,
         combinemgr: &mut TextureCombineAtlas2DMgr,
