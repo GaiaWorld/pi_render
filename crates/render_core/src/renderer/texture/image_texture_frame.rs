@@ -421,11 +421,13 @@ impl Atlas {
         let (blockw, blockh) = format.block_dimensions();
         width  = (width  + blockw - 1) / blockw * blockw;
         height = (height + blockh - 1) / blockh * blockh;
+        let deltaw = if width * 4 < self.maxwidth { blockw } else { 0 };
+        let deltah = if height * 4 < self.maxheight { blockh } else { 0 };
         for allocator in self.allocator.iter_mut() {
-            if let Some(rect) = allocator.allocate(guillotiere::Size { width: width as i32, height: height as i32, ..Default::default() }) {
+            if let Some(rect) = allocator.allocate(guillotiere::Size { width: (width + deltaw * 2) as i32, height: (height + deltah * 2) as i32, ..Default::default() }) {
                 // log::error!("Alloc: {:?}", (rect.rectangle.min.x, rect.rectangle.min.y, idx, width, height, ));
-                let ox = rect.rectangle.min.x as u16;
-                let oy = rect.rectangle.min.y as u16;
+                let ox = rect.rectangle.min.x as u16 + deltaw as u16;
+                let oy = rect.rectangle.min.y as u16 + deltah as u16;
                 let sx = width  as u16;
                 let sy = height as u16;
                 let w = self.maxwidth  as u16;
@@ -489,14 +491,29 @@ impl CombineAtlas2DMgr {
         device: &RenderDevice, queue: &RenderQueue
     ) -> Option<ImageTextureFrame> {
         if self.format == format {
-            let mut idx = 0;
             let mut frame = None;
-            for atlas in self.atlasarr.iter_mut() {
-                if let Some(val) = atlas.allocate(width, height) {
-                    frame = Some(val);
-                    break;
+            let mut idx = 0;
+            if (width < 256 && height < 256) || !(width.is_power_of_two() && height.is_power_of_two()) {
+                let len = self.atlasarr.len();
+                idx = usize::MAX;
+                for i in 0..len {
+                    idx = len - i - 1;
+                    let atlas = self.atlasarr.get_mut(idx).unwrap();
+                    if let Some(val) = atlas.allocate(width, height) {
+                        frame = Some(val);
+                        break;
+                    } else {
+                        idx = usize::MAX;
+                    }
                 }
-                idx += 1;
+            } else {
+                for atlas in self.atlasarr.iter_mut() {
+                    if let Some(val) = atlas.allocate(width, height) {
+                        frame = Some(val);
+                        break;
+                    }
+                    idx += 1;
+                }
             }
             if frame.is_none() && idx < self.maxcount {
                 let mut hasher = DefaultHasher::default();
