@@ -421,11 +421,13 @@ impl Atlas {
         let (blockw, blockh) = format.block_dimensions();
         width  = (width  + blockw - 1) / blockw * blockw;
         height = (height + blockh - 1) / blockh * blockh;
+        let deltaw = if width * 4 < self.maxwidth { blockw } else { 0 };
+        let deltah = if height * 4 < self.maxheight { blockh } else { 0 };
         for allocator in self.allocator.iter_mut() {
-            if let Some(rect) = allocator.allocate(guillotiere::Size { width: width as i32, height: height as i32, ..Default::default() }) {
+            if let Some(rect) = allocator.allocate(guillotiere::Size { width: (width + deltaw * 2) as i32, height: (height + deltah * 2) as i32, ..Default::default() }) {
                 // log::error!("Alloc: {:?}", (rect.rectangle.min.x, rect.rectangle.min.y, idx, width, height, ));
-                let ox = rect.rectangle.min.x as u16;
-                let oy = rect.rectangle.min.y as u16;
+                let ox = rect.rectangle.min.x as u16 + deltaw as u16;
+                let oy = rect.rectangle.min.y as u16 + deltah as u16;
                 let sx = width  as u16;
                 let sy = height as u16;
                 let w = self.maxwidth  as u16;

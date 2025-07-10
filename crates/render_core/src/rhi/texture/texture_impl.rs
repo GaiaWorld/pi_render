@@ -2,7 +2,7 @@ use pi_share::Share;
 use std::ops::Deref;
 use wgpu::{SurfaceConfiguration, SurfaceTexture};
 
-use crate::rhi::device::RenderDevice;
+use crate::{components::view::target_alloc::Fbo, rhi::device::RenderDevice};
 
 /// 提供 可 Clone的 Texture
 #[derive(Clone, Debug)]
@@ -131,7 +131,9 @@ impl TextureView{
 pub struct ScreenTexture {
 	surface: wgpu::Surface<'static>,
 	texture: Option<Share<wgpu::SurfaceTexture>>,
-	pub view: Option<Share<wgpu::TextureView>>,
+	view: Option<Share<wgpu::TextureView>>,
+    postprocess_texture: Option<(Share<Fbo>, f32, f32, f32, f32)>,
+	postprocess_view: Option<Share<wgpu::TextureView>>,
 }
 
 impl ScreenTexture {
@@ -141,6 +143,18 @@ impl ScreenTexture {
             surface,
             texture: None,
             view: None,
+            postprocess_texture: None,
+            postprocess_view: None,
+        }
+    }
+
+	#[inline]
+    pub fn set_postprocess_target(&mut self, target: Option<(Share<Fbo>, f32, f32, f32, f32)>) {
+        self.postprocess_texture = target;
+        if let Some(target) = &self.postprocess_texture {
+            self.postprocess_view = Some(Share::new(target.0.colors[0].1.create_view(&Default::default())));
+        } else {
+            self.postprocess_view = None;
         }
     }
 
@@ -157,8 +171,25 @@ impl ScreenTexture {
     }
 
 	#[inline]
-    pub fn texture(&self) -> &Option<Share<wgpu::SurfaceTexture>> {
-        &self.texture
+    pub fn texture(&self) -> Option<&wgpu::Texture> {
+        if let Some(texture) = &self.postprocess_texture {
+            Some(&texture.0.colors[0].1)
+        } else if let Some(texture) = &self.texture {
+            Some(&texture.texture)
+        } else {
+            None
+        }
+    }
+    
+	#[inline]
+    pub fn view(&self) -> Option<&wgpu::TextureView> {
+        if let Some(view) = &self.postprocess_view {
+            Some(view)
+        } else if let Some(view) = &self.view {
+            Some(view)
+        } else {
+            None
+        }
     }
 
 	#[inline]
