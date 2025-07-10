@@ -517,7 +517,7 @@ impl<K: Key, T: Clone> RootGraph<K, T> {
 			} else {
 				let n = self.nodes.get(*from).unwrap();
 				// log::error!("link_from============={:?}", (*from, curr, n.is_enable));
-				if !n.is_enable {
+				if (!n.is_enable) {
 					continue; // 未激活， 不继续处理前置节点
 				}
 				if n.is_transfer {

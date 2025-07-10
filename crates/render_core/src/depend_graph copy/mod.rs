@@ -12,9 +12,10 @@ pub mod sub_graph_data;
 /// 节点
 pub mod node;
 /// 节点 输入输出 参数
-// pub mod param;
+pub mod param;
 pub mod graph_data;
 
+use graphviz_rust::dot_structures::Node;
 pub use node::{NodeId, NodeLabel};
 use thiserror::Error;
 

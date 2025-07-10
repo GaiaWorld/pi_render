@@ -8,7 +8,7 @@
 //!
 
 use super::{
-    node::{DependNode, NodeId, NodeLabel, NodeState}, sub_graph_data::RootGraph, GraphError
+    node::{DependNode, NodeId, NodeLabel, NodeState, ParamUsage}, param::{DownGrade, GraphParamError, InParam, OutParam}, sub_graph_data::RootGraph, GraphError
 };
 use pi_async_rt::prelude::AsyncRuntime;
 use pi_futures::BoxFuture;
@@ -16,18 +16,18 @@ use pi_null::Null;
 use super::graph_data::NGraph;
 use pi_hash::{XHashMap, XHashSet};
 use pi_share::ThreadSync;
-use pi_slotmap::{Key, SlotMap};
+use pi_slotmap::SlotMap;
 use std::{borrow::Cow, mem::transmute};
 
 /// 依赖图
-pub struct DependGraph<Context: ThreadSync + 'static, DataId: Key + ThreadSync> {
+pub struct DependGraph<Context: ThreadSync + 'static, Bind: ThreadSync + 'static + Null + Clone> {
 	
     // ================== 拓扑信息
 
     // 名字 和 NodeId 映射
     node_names: XHashMap<Cow<'static, str>, NodeId>,
 	// 所有节点
-	nodes: SlotMap<NodeId, ScheduleNode<Context, DataId>>,
+	nodes: SlotMap<NodeId, ScheduleNode<Context, Bind>>,
 	// 最终节点，渲染到屏幕的节点
 	finish_nodes: XHashSet<NodeId>,
 
@@ -37,14 +37,14 @@ pub struct DependGraph<Context: ThreadSync + 'static, DataId: Key + ThreadSync> 
 	is_finish_dirty: bool,
     is_enable_dirty: bool,
 	can_run_node: Vec<NodeId>,
-    build_nodes: Vec<NodeId>,
+    enable_nodes: Vec<NodeId>,
     need_init_nodes: Vec<NodeId>,
 
     main_graph_id: NodeId, // 主图id
 }
 
 
-impl<Context: ThreadSync + 'static, DataId: Key + ThreadSync> Default for DependGraph<Context, DataId> {
+impl<Context: ThreadSync + 'static, Bind: ThreadSync + 'static + Null + Clone> Default for DependGraph<Context, Bind> {
     fn default() -> Self {
         let mut r = Self {
 			schedule_graph: NGraph::new(),
@@ -65,7 +65,7 @@ impl<Context: ThreadSync + 'static, DataId: Key + ThreadSync> Default for Depend
             is_enable_dirty: false,
             // topo_dirty: Vec::new(),
 			can_run_node: Vec::new(),
-            build_nodes: Vec::new(),
+            enable_nodes: Vec::new(),
             need_init_nodes: Vec::new(),
             main_graph_id: Default::default(),
         };
@@ -76,7 +76,7 @@ impl<Context: ThreadSync + 'static, DataId: Key + ThreadSync> Default for Depend
 }
 
 /// 渲染图的 拓扑信息 相关 方法
-impl<Context: ThreadSync + 'static, DataId: Key + ThreadSync> DependGraph<Context, DataId> {
+impl<Context: ThreadSync + 'static, Bind: ThreadSync + 'static + Null + Clone> DependGraph<Context, Bind> {
 	// #[cfg(not(debug_assertions))]
     // pub fn dump_graphviz(&self) -> String {
     //     "".into()
@@ -138,7 +138,7 @@ impl<Context: ThreadSync + 'static, DataId: Key + ThreadSync> DependGraph<Contex
 
             
 
-            if let Some(_r) = self.topo_graph.sub_graphs.get(id) {
+            if let Some(r) = self.topo_graph.sub_graphs.get(id) {
                 v.push(format!(
                     "\t \"{id:?}_out\" [\"style\"=\"filled\" \"label\"=\"{name}_{id1:?}_enable_{enable:?}\" \"fillcolor\"=\"green\"]"
                 ));
@@ -154,7 +154,7 @@ impl<Context: ThreadSync + 'static, DataId: Key + ThreadSync> DependGraph<Contex
 
         v.push("".into());
 
-        for (id, _n) in self.topo_graph.nodes.iter() {
+        for (id, n) in self.topo_graph.nodes.iter() {
             if let Some(r) = self.topo_graph.sub_graphs.get(id) {
                 for input in r.from.iter() {
                     v.push(format!("\t \"{id:?}_in\" -> \"{input:?}\""));
@@ -167,11 +167,11 @@ impl<Context: ThreadSync + 'static, DataId: Key + ThreadSync> DependGraph<Contex
 
         for (from, to) in self.topo_graph.edges.iter() {
             let from = match self.topo_graph.sub_graphs.get(*from) {
-                Some(_r) => format!("{from:?}_out"),
+                Some(r) => format!("{from:?}_out"),
                 None => format!("{from:?}"),
             };
             let to = match self.topo_graph.sub_graphs.get(*to) {
-                Some(_r) => format!("{to:?}_in"),
+                Some(r) => format!("{to:?}_in"),
                 None => format!("{to:?}"),
             };
             v.push(format!("\t \"{from}\" -> \"{to}\""));
@@ -255,15 +255,17 @@ impl<Context: ThreadSync + 'static, DataId: Key + ThreadSync> DependGraph<Contex
     }
 
     /// 添加 名为 name 的 节点
-    pub fn add_node<'a, R>(
+    pub fn add_node<'a, I, O, R>(
         &mut self,
         name: impl Into<Cow<'static, str>>,
-        node: R, 
+        node: R,
         mut parent_graph_id: NodeId,
 		is_run: bool,
     ) -> Result<NodeId, GraphError>
     where
-        R: DependNode<Context, DataId>,
+        I: InParam + DownGrade + Default,
+        O: OutParam + Default + Clone,
+        R: DependNode<Context, Input = I, Output = O>,
     {
         if parent_graph_id.is_null() {
             parent_graph_id = self.main_graph_id;
@@ -271,10 +273,25 @@ impl<Context: ThreadSync + 'static, DataId: Key + ThreadSync> DependGraph<Contex
         self.add(name, node, parent_graph_id, is_run, false)
     }   
 
+    /// 设置bind
+    pub fn set_bind(&mut self, id: NodeId, bind: Bind) {
+        if let Some(v) = self.nodes.get_mut(id) {
+            v.bind = bind;
+        }
+    }
+
     // 设置是否为传输节点
     pub fn set_is_transfer(&mut self, id: NodeId, is_transfer: bool) {
         if self.topo_graph.set_is_transfer(id, is_transfer) {
             self.is_finish_dirty = true; // 设置is_finish_dirty脏
+        }
+    }
+
+    /// 获取bind
+    pub fn get_bind(&self, id: NodeId) -> Bind {
+        match self.nodes.get(id) {
+            Some(v) => v.bind.clone(),
+            None => Bind::null(),
         }
     }
 
@@ -289,7 +306,7 @@ impl<Context: ThreadSync + 'static, DataId: Key + ThreadSync> DependGraph<Contex
         name: impl Into<Cow<'static, str>>,
     ) -> Result<NodeId, GraphError>
     {
-        self.add(name, InternalNodeEmptyImpl, Null::null(), false, true)
+        self.add(name, InternalNodeEmptyImpl, NodeId::null(), false, true)
     }
 
 	/// 设置子图的父, 只能在该图与其他节点创建连接关系之前设置， 否则设置不成功
@@ -297,24 +314,8 @@ impl<Context: ThreadSync + 'static, DataId: Key + ThreadSync> DependGraph<Contex
 		self.topo_graph.set_sub_graph_parent(k, parent_graph_id);
 	}
 
-    /// 设置dataid
-    pub fn set_data_id(&mut self, node_id: NodeId, data_id: DataId) {
-        if let Some(r) = self.nodes.get_mut(node_id) {
-            r.data_id = data_id;
-        }
-    }
-
-    /// 获取dataid
-    pub fn get_data_id(&self, node_id: NodeId) -> DataId {
-        if let Some(r) = self.nodes.get(node_id) {
-            r.data_id
-        } else {
-            DataId::null()
-        }
-    }
-
     /// 添加 名为 name 的 节点
-    fn add<'a, R>(
+    fn add<'a, I, O, R>(
         &mut self,
         name: impl Into<Cow<'static, str>>,
         node: R,
@@ -323,7 +324,9 @@ impl<Context: ThreadSync + 'static, DataId: Key + ThreadSync> DependGraph<Contex
         is_sub_graph: bool,
     ) -> Result<NodeId, GraphError>
     where
-        R: DependNode<Context, DataId>,
+        I: InParam + DownGrade + Default,
+        O: OutParam + Default + Clone,
+        R: DependNode<Context, Input = I, Output = O>,
     {
         let name = name.into();
 
@@ -335,9 +338,9 @@ impl<Context: ThreadSync + 'static, DataId: Key + ThreadSync> DependGraph<Contex
         // // 拓扑结构改变
         // self.is_topo_dirty = true;
 
-        let node_state = NodeState::<Context, DataId>::new(node);
+        let node_state = NodeState::<Context>::new(node);
 		let run_node = self.create_run_node(node_state.clone())?;
-		let build_node: Box<dyn BuildFuncTrait<Context, DataId>> = self.create_build_node(node_state.clone())?;
+		let build_node: Box<dyn BuildFuncTrait<Context>> = self.create_build_node(node_state.clone())?;
         let node_id = self.nodes.insert(ScheduleNode {
             build_node,
             run_node,
@@ -345,12 +348,7 @@ impl<Context: ThreadSync + 'static, DataId: Key + ThreadSync> DependGraph<Contex
             state: node_state,
 			is_run,
             is_build: true,
-            from_data_id: Default::default(),
-            to_data_id: Default::default(),
-            data_id: Null::null(),
-
-            curr_next_build_refs: 0,
-            total_next_build_refs: 0,
+            bind: Null::null(),
 			// run_way: RunWay::Schedule,
         });
         if is_sub_graph {
@@ -555,7 +553,7 @@ impl<Context: ThreadSync + 'static, DataId: Key + ThreadSync> DependGraph<Contex
 
 
 /// 渲染图的 执行 相关
-impl<Context: ThreadSync + 'static, DataId: Key + ThreadSync> DependGraph<Context, DataId> {
+impl<Context: ThreadSync + 'static, Bind: ThreadSync + 'static + Null + Clone> DependGraph<Context, Bind> {
     /// 执行 渲染
     pub async fn run<A: 'static + AsyncRuntime + Send>(
         &mut self,
@@ -576,15 +574,9 @@ impl<Context: ThreadSync + 'static, DataId: Key + ThreadSync> DependGraph<Contex
 			// if !node.is_run {
 			// 	continue;
 			// }
-			// let graph_node: &super::graph_data::NGraphNode<NodeId, DataId> = self.schedule_graph.get(*node_id).unwrap();
+			let graph_node: &super::graph_data::NGraphNode<NodeId, ()> = self.schedule_graph.get(*node_id).unwrap();
 			// 这里用transmute绕过声明周期， 是安全的，因为在context、self释放之前，map中的任务已完成（外部等待）
-			map.map(rt.clone(), (*node.run_node)(
-                index, 
-                unsafe {transmute(context)}, 
-                node.data_id,
-                unsafe { transmute(node.from_data_id.as_slice())},
-                unsafe { transmute(node.to_data_id.as_slice())},
-            )).unwrap();
+			map.map(rt.clone(), (*node.run_node)(index, unsafe {transmute(context)}, *node_id, unsafe {transmute(graph_node.from())} ,  unsafe { transmute(graph_node.to())})).unwrap();
 			index += 1;
 		}
 		map.reduce(false).await.unwrap();
@@ -612,37 +604,10 @@ impl<Context: ThreadSync + 'static, DataId: Key + ThreadSync> DependGraph<Contex
         // let t2 = pi_time::Instant::now();
 
 		// 运行所有激活图节点的build方法
-		for node_id in self.build_nodes.iter() {
-			let node = &mut self.nodes[*node_id];
-            node.curr_next_build_refs = node.total_next_build_refs as i32;
-			// let graph_node = self.schedule_graph.get(*node_id).unwrap();
-			(*node.build_node)(
-                context, 
-                node.data_id,
-                unsafe { transmute(node.from_data_id.as_slice())},
-                unsafe { transmute(node.to_data_id.as_slice())},
-            ).unwrap();
-
-            let graph_node = match self.schedule_graph.get(*node_id) {
-                Some(r) => r,
-                None => continue,
-            };
-            for from in graph_node.from().iter() {
-                let node = &mut self.nodes[*from];
-
-                // 用完了 前置，引用计数 减 1
-                node.curr_next_build_refs -= 1;
-
-                
-                if node.curr_next_build_refs == 0 {
-                    // SAFE: 此处强转可变是安全的，因为单线程执行build
-                    node.state.0.borrow_mut().build_end(context, node.data_id);
-                }
-            }
-            let node = &self.nodes[*node_id];
-            if node.curr_next_build_refs == 0 { 
-                node.state.0.borrow_mut().build_end(context, node.data_id);
-            }
+		for node_id in self.enable_nodes.iter() {
+			let node = &self.nodes[*node_id];
+			let graph_node = self.schedule_graph.get(*node_id).unwrap();
+			(*node.build_node)(context, *node_id, &graph_node.from(), &graph_node.to()).unwrap();
 		}
 
         if self.need_init_nodes.len() > 0 {
@@ -675,21 +640,18 @@ impl<Context: ThreadSync + 'static, DataId: Key + ThreadSync> DependGraph<Contex
 
         if self.is_topo_dirty || self.is_enable_dirty || self.is_finish_dirty {
             // 重新生成激活节点
-            self.build_nodes.clear();
+            self.enable_nodes.clear();
             // 计算可运行节点
             self.can_run_node.clear();
             for i in self.schedule_graph.topological.iter() {
                 if self.nodes[*i].is_build {
-                    self.build_nodes.push(i.clone());
-                } else {
-                    let graph_node = &mut self.nodes[*i];
-                    graph_node.total_next_build_refs -= 1;
+                    self.enable_nodes.push(i.clone());
                 }
                 if self.nodes[*i].is_run {
                     self.can_run_node.push(i.clone());
                 }
 
-                pi_print_any::out_any!(log::debug, "enable_nodes======{:?}", &self.nodes[*i].is_run);
+                pi_print_any::out_any!(log::debug, "enable_nodes======{:?}", (&self.nodes[*i].bind, &self.nodes[*i].is_run));
             }
             // log::warn!("enable_nodes======{:?}", (self.is_topo_dirty, self.is_enable_dirty, self.is_finish_dirty));
             // log::warn!("enable_nodes======{:?}", &self.enable_nodes);
@@ -718,7 +680,7 @@ impl<Context: ThreadSync + 'static, DataId: Key + ThreadSync> DependGraph<Contex
 	}
 
     pub fn can_build_nodes(&self) -> &[NodeId] {
-        &self.build_nodes
+        &self.enable_nodes
     }
 
     
@@ -726,7 +688,7 @@ impl<Context: ThreadSync + 'static, DataId: Key + ThreadSync> DependGraph<Contex
 
 // ================== 以下方法 仅供 crate 使用
 
-impl<Context: ThreadSync + 'static, DataId: Key + ThreadSync> DependGraph<Context, DataId> {
+impl<Context: ThreadSync + 'static, Bind: ThreadSync + 'static + Null + Clone> DependGraph<Context, Bind> {
 	fn get_id(&self, label: &NodeLabel) -> Result<NodeId, GraphError> {
         match label {
             NodeLabel::NodeId(id) => Ok(*id),
@@ -771,29 +733,30 @@ impl<Context: ThreadSync + 'static, DataId: Key + ThreadSync> DependGraph<Contex
                 Some(r) => r,
                 None => continue,
             };
-            let node = &mut self.nodes[*id];
-            node.total_next_build_refs = graph_node.to().len() as i32; // 初始化总数量
-            node.from_data_id.clear();
-            node.to_data_id.clear();
-            let mut from_data_id = std::mem::replace(&mut node.from_data_id, Vec::new());
-            let mut to_data_id = std::mem::replace(&mut node.to_data_id, Vec::new());
-            for from in graph_node.from() {
-                let data_id = self.nodes[*from].data_id;
-                if !data_id.is_null() {
-                    from_data_id.push(self.nodes[*from].data_id);
+			for from in graph_node.from() {
+                let from_node = self.nodes.get(*from).unwrap();
+                let mut rr = self.nodes[*id].state.0.as_ref().borrow_mut();
+                if let Err(r) = rr.add_pre_node((*from, from_node.state.clone())) {
+                    if let GraphParamError::ParamFillRepeat = r {
+                        let from = from.clone();
+                        // 参数重复, 找到与之冲突的节点， 报告明确的错误
+                        rr.reset();
+                        if let Err(GraphParamError::ParamFillRepeat) = rr.add_pre_node((from, from_node.state.clone())) {
+                            // 当前节点本身的输出参数类型重复
+                            return Err(GraphError::ParamFillRepeat(from, NodeId::null(), *id));
+                        }
+                        for from1 in graph_node.from() {
+                            if *from1 != from {
+                                let from_node1 = self.nodes.get(*from1).unwrap();
+                                if let Err(GraphParamError::ParamFillRepeat) = rr.add_pre_node((*from1, from_node1.state.clone())) {
+                                    // 当前节点本身的输出参数类型重复
+                                    return Err(GraphError::ParamFillRepeat(from, *from1, *id));
+                                }
+                            }
+                        }
+                    }
                 }
             }
-            for to in graph_node.to() {
-                let data_id = self.nodes[*to].data_id;
-                if !data_id.is_null() {
-                    to_data_id.push(data_id);
-                }
-            }
-           
-            // let node = &mut self.nodes[*id];
-            // let mut node_state = node.state.0.as_ref().borrow_mut();
-           
-            // node_state.set_next_count(graph_node.to().len() as i32);
         }
 		Ok(())
     }
@@ -801,9 +764,9 @@ impl<Context: ThreadSync + 'static, DataId: Key + ThreadSync> DependGraph<Contex
     // 创建 构建 节点
     fn create_build_node(
         &self,
-        node_state: NodeState<Context, DataId>,
-    ) -> Result<BuildFunc<Context, DataId>, GraphError> {
-		let f = move |context: &mut Context, id: DataId, from: &'static [DataId], to: &'static [DataId]| -> std::io::Result<()> {
+        node_state: NodeState<Context>,
+    ) -> Result<BuildFunc<Context>, GraphError> {
+		let f = move |context: &mut Context, id: NodeId, from: &[NodeId], to: &[NodeId]| -> std::io::Result<()> {
 			Ok(node_state.0.as_ref().borrow_mut().build(context, id, from, to).unwrap())
         };
 		Ok(Box::new(f))
@@ -812,11 +775,11 @@ impl<Context: ThreadSync + 'static, DataId: Key + ThreadSync> DependGraph<Contex
     // 创建 渲染 节点
     fn create_run_node(
         &self,
-		node_state: NodeState<Context, DataId>,
+		node_state: NodeState<Context>,
         // node_id: NodeId,
-    ) -> Result<RunFunc<Context, DataId>, GraphError> {
+    ) -> Result<RunFunc<Context>, GraphError> {
         // 该函数 会在 ng 图上，每帧每节点 执行一次
-        let f = move |index: usize, context: &'static Context, id: DataId, from: &'static [DataId], to: &'static [DataId]| -> BoxFuture<'static, std::io::Result<()>> {
+        let f = move |index: usize, context: &'static Context, id: NodeId, from: &'static [NodeId], to: &'static [NodeId]| -> BoxFuture<'static, std::io::Result<()>> {
             let node_state = node_state.0.clone();
             Box::pin(async move {
                 // log::warn!("run graphnode start {:?}", node_id);
@@ -829,24 +792,27 @@ impl<Context: ThreadSync + 'static, DataId: Key + ThreadSync> DependGraph<Contex
     }
 }
 
-pub trait BuildFuncTrait<C: ThreadSync + 'static, DataId: Key + ThreadSync>: Fn(&mut C, DataId, &'static [DataId], &'static [DataId]) -> std::io::Result<()> + ThreadSync + 'static {}
-impl<Context: ThreadSync + 'static, DataId: Key + ThreadSync, T: Fn(&mut Context, DataId, &'static [DataId], &'static [DataId]) -> std::io::Result<()> + ThreadSync + 'static> BuildFuncTrait<Context, DataId> for T {}
+pub trait BuildFuncTrait<C: ThreadSync + 'static>: Fn(&mut C, NodeId, &[NodeId], &[NodeId]) -> std::io::Result<()> + ThreadSync + 'static {}
+impl<Context: ThreadSync + 'static, T: Fn(&mut Context, NodeId, &[NodeId], &[NodeId]) -> std::io::Result<()> + ThreadSync + 'static> BuildFuncTrait<Context> for T {}
 
-pub trait RunFuncTrait<C: ThreadSync + 'static, DataId: Key + ThreadSync>: Fn(usize, &'static C, DataId, &'static [DataId], &'static [DataId]) -> BoxFuture<'static, std::io::Result<()>> + ThreadSync + 'static{}
-impl<Context: ThreadSync + 'static, DataId: Key + ThreadSync, T: Fn(usize, &'static Context, DataId, &'static [DataId], &'static [DataId]) -> BoxFuture<'static, std::io::Result<()>> + ThreadSync + 'static> RunFuncTrait<Context, DataId> for T {}
+pub trait RunFuncTrait<C: ThreadSync + 'static>: Fn(usize, &'static C, NodeId, &'static [NodeId], &'static [NodeId]) -> BoxFuture<'static, std::io::Result<()>> + ThreadSync + 'static{}
+impl<Context: ThreadSync + 'static, T: Fn(usize, &'static Context, NodeId, &'static [NodeId], &'static [NodeId]) -> BoxFuture<'static, std::io::Result<()>> + ThreadSync + 'static> RunFuncTrait<Context> for T {}
 
-type BuildFunc<Context, DataId> = Box<dyn BuildFuncTrait<Context, DataId>>;
+type BuildFunc<Context> = Box<dyn BuildFuncTrait<Context>>;
 
-type RunFunc<Context, DataId> = Box<dyn RunFuncTrait<Context, DataId>>;
+type RunFunc<Context> = Box<dyn RunFuncTrait<Context>>;
 
 
 pub struct InternalNodeEmptyImpl;
 
-impl<Context: ThreadSync + 'static, DataId: Key + ThreadSync> DependNode<Context, DataId> for InternalNodeEmptyImpl {
+impl<Context: ThreadSync + 'static> DependNode<Context> for InternalNodeEmptyImpl {
+    type Input = ();
+
+    type Output =();
 
     fn init<'a>(
         &'a mut self,
-        _context: &'a mut Context,
+        context: &'a mut Context,
         // input: &'a Self::Input,
         // usage: &'a ParamUsage,
 		// id: NodeId, 
@@ -859,12 +825,12 @@ impl<Context: ThreadSync + 'static, DataId: Key + ThreadSync> DependNode<Context
     fn build<'a>(
         &'a mut self,
         _context: &'a mut Context,
-        // _input: &'a Self::Input,
-        // _usage: &'a ParamUsage,
-		_id: DataId, 
-		_from: &[DataId],
-		_to: &[DataId],
-    ) -> Result<(), String> {
+        _input: &'a Self::Input,
+        _usage: &'a ParamUsage,
+		_id: NodeId, 
+		_from: &[NodeId],
+		_to: &[NodeId],
+    ) -> Result<Self::Output, String> {
         Ok(())
     }
 
@@ -872,43 +838,30 @@ impl<Context: ThreadSync + 'static, DataId: Key + ThreadSync> DependNode<Context
         &'a mut self,
 		_index: usize,
         _context: &'a Context,
-        // _input: &'a Self::Input,
-        // _usage: &'a ParamUsage,
-		_id: DataId, 
-		_from: &'static [DataId],
-		_to: &'static [DataId],
+        _input: &'a Self::Input,
+        _usage: &'a ParamUsage,
+		_id: NodeId, 
+		_from: &'static [NodeId],
+		_to: &'static [NodeId],
 
     ) -> BoxFuture<'a, Result<(), String>> {
         // async {Ok(())}.
 		todo!()
     }
-    
-    fn reset<'a>(
-        &'a mut self,
-        _context: &'a mut Context,
-        _id: DataId,
-    ) {
-        todo!()
-    }
 
+    fn reset<'a>(
+     &'a mut self) {}
 }
 
-struct ScheduleNode<Context: 'static + ThreadSync, DataId: ThreadSync + Key> {
-	build_node: BuildFunc<Context, DataId>, // build方法， 如果是图，build为 empty_build
-	run_node: RunFunc<Context, DataId>,// run方法， 如果是图，run为 empty_run
+struct ScheduleNode<Context: 'static + ThreadSync, Bind: 'static + ThreadSync + Null + Clone> {
+	build_node: BuildFunc<Context>, // build方法， 如果是图，build为 empty_build
+	run_node: RunFunc<Context>,// run方法， 如果是图，run为 empty_run
 	name: String, // 节点名字
-	state: NodeState<Context, DataId>, // 节点状态
+	state: NodeState<Context>, // 节点状态
 	is_run: bool,
     is_build: bool, // 是否需要build）
-
-    // from节点和to节点的数据id， 当toop图发生改变时，需要重置from_data_id和 to_data_id
-    from_data_id: Vec<DataId>,
-    to_data_id: Vec<DataId>,
-
-    data_id: DataId,
-
-    curr_next_build_refs: i32,
-    total_next_build_refs: i32,
+    bind: Bind,
+	// run_way: RunWay, // 运行方式， 默认为RunWay::Schedule
 }
 
 

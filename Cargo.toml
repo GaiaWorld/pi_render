@@ -68,9 +68,9 @@ harness = false
 # pi_assets = { path = "../pi_assets" }
 
 [patch.yn]
-pi_hal = { path = "../pi_hal" }
+# pi_hal = { path = "../pi_hal" }
 # pi_sdf = { path = "../pi_sdf" }
-pi_wgpu = {path = "../pi_wgpu"}
+# pi_wgpu = {path = "../pi_wgpu"}
 # pi_egl = {path = "../pi_egl"}
 # winit = { path = "../winit"}
 

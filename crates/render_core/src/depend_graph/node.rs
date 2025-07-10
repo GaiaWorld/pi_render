@@ -8,54 +8,41 @@
 //!     + NodeLabel  节点标示，可以用 Id 或 String
 //!     + ParamUsage 参数的用途
 //!
-use super::{
-    param::{Assign, DownGrade, GraphParamError, InParam, OutParam},
-    GraphError
-};
+use super::GraphError;
 use pi_futures::BoxFuture;
 use pi_hash::{XHashMap, XHashSet};
 use pi_share::{Cell, Share, ThreadSync};
 use pi_slotmap::{new_key_type, Key};
 use std::{
-    any::TypeId,
-    ops::{Deref, DerefMut},
-    sync::atomic::{AtomicI32, Ordering},
-	borrow::Cow,
+    any::TypeId, borrow::Cow, marker::PhantomData
 };
 
 /// 图节点，管理输入输出
-pub trait DependNode<Context>: 'static + ThreadSync {
-    /// 输入参数
-    type Input: InParam + Default;
+pub trait DependNode<Context, DataId: Key + ThreadSync>: 'static + ThreadSync {
 
     /// 输出参数
-    type Output: OutParam + Default + Clone;
+    // type Output: OutParam + Default + Clone;
 
 
     fn init<'a>(
         &'a mut self,
         context: &'a mut Context,
-        // input: &'a Self::Input,
-        // usage: &'a ParamUsage,
-		// id: NodeId, 
-		// from: &[NodeId],
-		// to: &[NodeId],
     ) -> Result<(), String>;
     // build, 在所有节点的run之前， 都要执行所有节点的build
 	// build， 输出节点运行结果（结果一般都是fbo， build先输出一个没有渲染内容的fbo）
 	fn build<'a>(
         &'a mut self,
         context: &'a mut Context,
-        input: &'a Self::Input,
-        usage: &'a ParamUsage,
-		id: NodeId, 
-		from: &[NodeId],
-		to: &[NodeId],
-    ) -> Result<Self::Output, String>;
+		id: DataId,
+		from: &[DataId],
+		to: &[DataId],
+    ) -> Result<(), String>;
 
 	// 
 	fn reset<'a>(
         &'a mut self,
+        context: &'a mut Context,
+		id: DataId,
     );
 
     /// 执行，每帧会调用一次
@@ -70,12 +57,11 @@ pub trait DependNode<Context>: 'static + ThreadSync {
         &'a mut self,
 		index: usize,
         context: &'a Context,
-        input: &'a Self::Input,
-        usage: &'a ParamUsage,
-		id: NodeId, 
-		from: &'static [NodeId],
-		to: &'static [NodeId],
-
+        // input: &'a Self::Input,
+        // usage: &'a ParamUsage,
+		id: DataId,  
+		from: &'static [DataId],
+		to: &'static [DataId],
     ) -> BoxFuture<'a, Result<(), String>>;
 }
 
@@ -116,198 +102,181 @@ impl ParamUsage {
 
 // ====================== crate内 使用的 数据结构
 
-impl Default for ParamUsage {
-    fn default() -> Self {
-        Self {
-            output_usage_set: Share::new(Cell::new(Default::default())),
-            input_map_fill: Default::default(),
-        }
-    }
-}
-
-impl ParamUsage {
-    // 当 图 拓扑结构改变，需要 重置
-    pub(crate) fn reset(&mut self) {
-        self.input_map_fill.clear();
-        self.output_usage_set.as_ref().borrow_mut().clear();
-    }
-}
-
 // 渲染节点，给 依赖图 内部 使用
-pub(crate) trait InternalNode<Context: ThreadSync + 'static>: OutParam {
-    // 将所有输入变成弱引用（节点build后调用）
-    fn downgrade_input(&mut self);
+pub(crate) trait InternalNode<Context: ThreadSync + 'static, DataId: Key + ThreadSync>: ThreadSync + 'static {
+    // // 将所有输入变成弱引用（节点build后调用）
+    // fn downgrade_input(&mut self);
     // 当 sub_ng 改变后，需要调用
     fn reset(&mut self);
 
 	fn clear(&mut self);
 
 	// 构建结束时调用（指所有出度节点的build方法都调用完成）
-	fn build_end(&mut self);
+	fn build_end<'a>(&mut self, context: &'a mut Context, id: DataId);
 
-    // 当 sub_ng 改变后，需要调用
-    fn inc_next_refs(&mut self);
+    // // 当 sub_ng 改变后，需要调用
+    // fn inc_next_refs(&mut self);
 
-    // 添加 前置节点
-    fn add_pre_node(&mut self, nodes: (NodeId, NodeState<Context>)) -> Result<bool, GraphParamError>;
+    // // 设置后继节点总数量
+    // fn set_next_count(&mut self, count: i32);
 
-    // 每帧 后继的渲染节点 获取参数时候，需要调用 此函数
-    fn dec_curr_run_ref(&self);
+    // // 添加 前置节点
+    // fn add_pre_node(&mut self, nodes: (NodeId, NodeState<Context, NodeId>)) -> Result<bool, GraphParamError>;
 
-	// 每帧 后继的渲染节点 获取参数时候，需要调用 此函数
-    fn dec_curr_build_ref(&mut self) -> i32;
+    // // 每帧 后继的渲染节点 获取参数时候，需要调用 此函数
+    // fn dec_curr_run_ref(&self);
+
+	// // 每帧 后继的渲染节点 获取参数时候，需要调用 此函数
+    // fn dec_curr_build_ref(&mut self) -> i32;
 
     // 构建，当依赖图 构建时候，会调用一次
     // 一般 用于 准备 渲染 资源的 创建
-    fn build<'a>(&'a mut self, context: &'a mut Context, id: NodeId, from: &[NodeId], to: &[NodeId]) -> Result<(), GraphError>;
+    fn build<'a>(&'a mut self, context: &'a mut Context, id: DataId, from: &[DataId], to: &[DataId]) -> Result<(), GraphError>;
 
     fn init<'a>(&'a mut self, context: &'a mut Context) -> Result<(), GraphError>;
 
     // 执行依赖图
-    fn run<'a>(&'a mut self, index: usize, context: &'a Context, id: NodeId, from: &'static [NodeId], to: &'static [NodeId]) -> BoxFuture<'a, Result<(), GraphError>>;
+    fn run<'a>(&'a mut self, index: usize, context: &'a Context, id: DataId, from: &'static [DataId], to: &'static [DataId]) -> BoxFuture<'a, Result<(), GraphError>>;
 }
 
 
 /// 链接 NodeInteral 和 DependNode 的 结构体
-pub(crate) struct DependNodeImpl<I, O, R, Context>
+pub(crate) struct DependNodeImpl<R, Context, DataId: Key + ThreadSync>
 where
     Context: ThreadSync + 'static,
-    I: InParam + Default,
-    O: OutParam + Default,
-    R: DependNode<Context, Input = I, Output = O>,
+    R: DependNode<Context, DataId>
 {
     node: R,
-    input: I,
-    output: O,
 
     context: std::marker::PhantomData<Context>,
 
-    param_usage: ParamUsage,
-    pre_nodes: Vec<(NodeId, NodeState<Context>)>,
+    // param_usage: ParamUsage,
+    // pre_nodes: Vec<(NodeId, NodeState<Context, NodeId>)>,
 
-    // 该节点 的后继 节点数量
-    // 当依赖图改变节点的拓扑关系后，需要调用一次
-    total_next_refs: i32,
+    // // 该节点 的后继 节点数量
+    // // 当依赖图改变节点的拓扑关系后，需要调用一次
+    // total_next_refs: i32,
 
-    // 该节点 当前 后继节点数量
-    // 每帧 运行 依赖图 前，让它等于  next_refs
-    curr_next_refs: AtomicI32,
+    // // 该节点 当前 后继节点数量
+    // // 每帧 运行 依赖图 前，让它等于  next_refs
+    // curr_next_refs: AtomicI32,
 
-	curr_next_build_refs: i32,
+	// curr_next_build_refs: i32,
+    mark: PhantomData<DataId>,
 }
 
-impl<I, O, R, Context> DependNodeImpl<I, O, R, Context>
+impl<R, Context, DataId: Key + ThreadSync> DependNodeImpl<R, Context, DataId>
 where
     Context: ThreadSync + 'static,
-    I: InParam + Default,
-    O: OutParam + Default,
-    R: DependNode<Context, Input = I, Output = O>,
+    R: DependNode<Context, DataId>,
 {
     pub(crate) fn new(node: R) -> Self {
         Self {
             context: Default::default(),
             node,
-            pre_nodes: Default::default(),
-            input: Default::default(),
-            output: Default::default(),
+            // pre_nodes: Default::default(),
+            // output: Default::default(),
 
-            param_usage: Default::default(),
+            // param_usage: Default::default(),
 
-            total_next_refs: 0,
-            curr_next_refs: AtomicI32::new(0),
-			curr_next_build_refs: 0,
+            // total_next_refs: 0,
+            // curr_next_refs: AtomicI32::new(0),
+			// curr_next_build_refs: 0,
+            mark: PhantomData,
         }
     }
 }
 
-impl<I, O, R, Context> OutParam for DependNodeImpl<I, O, R, Context>
+// impl<O, R, Context, DataId: Key + ThreadSync> OutParam for DependNodeImpl<O, R, Context, DataId>
+// where
+//     Context: ThreadSync + 'static,
+//     O: OutParam + Default,
+//     R: DependNode<Context, DataId, Output = O>,
+// {
+//     fn can_fill(&self, set: &mut Option<&mut XHashSet<TypeId>>, ty: TypeId) -> Result<bool, GraphParamError> {
+//         assert!(set.is_none());
+
+//         let mut p = self.param_usage.output_usage_set.as_ref().borrow_mut();
+//         self.output.can_fill(&mut Some(p.deref_mut()), ty)
+//     }
+
+//     fn fill_to(&self, this_id: NodeId, to: &mut dyn Assign, ty: TypeId) -> bool {
+//         self.output.fill_to(this_id, to, ty)
+//     }
+// }
+
+impl<R, Context, DataId: Key + ThreadSync> InternalNode<Context, DataId> for DependNodeImpl<R, Context, DataId>
 where
     Context: ThreadSync + 'static,
-    I: InParam + Default,
-    O: OutParam + Default,
-    R: DependNode<Context, Input = I, Output = O>,
+    R: DependNode<Context, DataId>,
 {
-    fn can_fill(&self, set: &mut Option<&mut XHashSet<TypeId>>, ty: TypeId) -> Result<bool, GraphParamError> {
-        assert!(set.is_none());
-
-        let mut p = self.param_usage.output_usage_set.as_ref().borrow_mut();
-        self.output.can_fill(&mut Some(p.deref_mut()), ty)
-    }
-
-    fn fill_to(&self, this_id: NodeId, to: &mut dyn Assign, ty: TypeId) -> bool {
-        self.output.fill_to(this_id, to, ty)
-    }
-}
-
-impl<I, O, R, Context> InternalNode<Context> for DependNodeImpl<I, O, R, Context>
-where
-    Context: ThreadSync + 'static,
-    I: InParam + DownGrade + Default,
-    O: OutParam + Default,
-    R: DependNode<Context, Input = I, Output = O>,
-{
-    fn downgrade_input(&mut self) {
-        self.input.downgrade();
-    }
+    // fn downgrade_input(&mut self) {
+    //     self.input.downgrade();
+    // }
     fn reset(&mut self) {
-        self.input = Default::default();
-        self.output = Default::default();
+        // self.input = Default::default();
+        // self.output = Default::default();
 
-        self.param_usage.reset();
-        self.pre_nodes.clear();
+        // self.param_usage.reset();
+        // self.pre_nodes.clear();
 
-        self.total_next_refs = 0;
-        self.curr_next_refs = AtomicI32::new(0);
+        // self.total_next_refs = 0;
+        // self.curr_next_refs = AtomicI32::new(0);
     }
 
 	fn clear(&mut self) {
-		self.input = Default::default();
-        self.output = Default::default();
+		// self.input = Default::default();
+        // self.output = Default::default();
 	}
 
-	fn build_end(&mut self) {
-		self.node.reset();
-        self.output = Default::default();
+	fn build_end<'a>(&mut self, context: &'a mut Context, id: DataId) {
+		self.node.reset(context, id);
+        // self.output = Default::default();
 	}
 
-    fn inc_next_refs(&mut self) {
-        self.total_next_refs += 1;
-    }
+    // fn inc_next_refs(&mut self) {
+    //     self.total_next_refs += 1;
+    // }
 
-    fn add_pre_node(&mut self, node: (NodeId, NodeState<Context>)) -> Result<bool, GraphParamError> {
-        node.1 .0.as_ref().borrow_mut().inc_next_refs();
+    // fn set_next_count(&mut self, count: i32) {
+    //     self.total_next_refs = count;
+    // } 
 
-        let r = {
-            let n = node.1 .0.as_ref().borrow();
-            // 填写 该节点输入 和 前置节点输出 的信息
-            self.input
-                .can_fill(&mut self.param_usage.input_map_fill, node.0, n.deref())?
-        };
+    // fn add_pre_node(&mut self, node: (NodeId, NodeState<Context, NodeId>)) -> Result<bool, GraphParamError> {
+    //     node.1 .0.as_ref().borrow_mut().inc_next_refs();
+
+    //     // let r = {
+    //     //     let n = node.1 .0.as_ref().borrow();
+    //     //     // 填写 该节点输入 和 前置节点输出 的信息
+    //     //     self.input
+    //     //         .can_fill(&mut self.param_usage.input_map_fill, node.0, n.deref())?
+    //     // };
 		
-        self.pre_nodes.push(node);
-        Ok(r)
-    }
+    //     // self.pre_nodes.push(node);
+    //     Ok(true)
+    // }
 
-    fn dec_curr_run_ref(&self) {
-        // 注：这里 last_count 是 self.curr_next_refs 减1 前 的结果
-        let last_count = self.curr_next_refs.fetch_sub(1, Ordering::SeqCst);
-        // assert!(
-        //     last_count >= 1,
-        //     "DependNode error, last_count = {last_count}"
-        // );
+    // fn dec_curr_run_ref(&self) {
+    //     // 注：这里 last_count 是 self.curr_next_refs 减1 前 的结果
+    //     let last_count = self.curr_next_refs.fetch_sub(1, Ordering::SeqCst);
+    //     // assert!(
+    //     //     last_count >= 1,
+    //     //     "DependNode error, last_count = {last_count}"
+    //     // );
 
-        if last_count == 1 {
-            // SAFE: 此处强转可变，然后清理self.output是安全的
-            // curr_next_refs 为 原子操作，在一次图运行过程中， 保证了此处代码仅运行一次
-            unsafe { &mut *(self as *const Self as usize as *mut Self) }.output =
-                Default::default();
-        }
-    }
+    //     if last_count == 1 {
+    //         // SAFE: 此处强转可变，然后清理self.output是安全的
+    //         // curr_next_refs 为 原子操作，在一次图运行过程中， 保证了此处代码仅运行一次
+    //         // unsafe { &mut *(self as *const Self as usize as *mut Self) }.output =
+    //         //     Default::default();
+    //         todo!()
+    //     }
+    // }
 
-	fn dec_curr_build_ref(&mut self) -> i32 {
-		self.curr_next_build_refs -= 1;
-		self.curr_next_build_refs
-    }
+	// fn dec_curr_build_ref(&mut self) -> i32 {
+	// 	self.curr_next_build_refs -= 1;
+	// 	self.curr_next_build_refs
+    // }
 
     fn init<'a>(&'a mut self, context: &'a mut Context) -> Result<(), GraphError> {
         match self.node.init(context) {
@@ -316,65 +285,69 @@ where
         }
     }
 
-	fn build<'a>(&'a mut self, context: &'a mut Context, id: NodeId, from: &'a [NodeId], to: &'a [NodeId]) -> Result<(), GraphError> {
+	fn build<'a>(&'a mut self, context: &'a mut Context, id: DataId, from: &'a [DataId], to: &'a [DataId]) -> Result<(), GraphError> {
         // let t1 = std::time::Instant::now();
-		for (pre_id, pre_node) in &self.pre_nodes {
-			let p = pre_node.0.as_ref();
-			let p1 = p.borrow();
-			self.input.fill_from(*pre_id, p1.deref());
-		}
+		// for (pre_id, pre_node) in &self.pre_nodes {
+		// 	let p = pre_node.0.as_ref();
+		// 	let p1 = p.borrow();
+		// 	self.input.fill_from(*pre_id, p1.deref());
+		// }
         // let t2 = std::time::Instant::now();
         
 
-		let runner = self.node.build(context, &self.input, &self.param_usage, id, from, to);
+		let runner = self.node.build(context, id, from, to);
         
-        self.downgrade_input();
+        // self.downgrade_input();
         // 结束前，先 重置 引用数
-        self.curr_next_build_refs = self.total_next_refs;
+        // self.curr_next_build_refs = self.total_next_refs;
 
-        for (_pre_id, pre_node) in &self.pre_nodes {
-            let p = pre_node.0.as_ref();
-            let mut p = p.borrow_mut();
-            // // 用完了 一个前置，引用计数 减 1
-            // build阶段不减1，在run中减一
-            let cur_count = p.deref_mut().dec_curr_build_ref();
-            if cur_count == 0 {
-                // SAFE: 此处强转可变是安全的，因为单线程执行build
-                p.deref_mut().build_end();
-            }
-            // log::warn!("pre == id: {:?}, id: {:?}, cur_count:{:?}", id,  _pre_id, cur_count);
-        }
-        if self.total_next_refs == 0 { 
-            self.build_end();
-        }
+        // for (_pre_id, pre_node) in &self.pre_nodes {
+        //     let p = pre_node.0.as_ref();
+        //     let mut p = p.borrow_mut();
+        //     // // 用完了 一个前置，引用计数 减 1
+        //     // build阶段不减1，在run中减一
+        //     let cur_count = p.deref_mut().dec_curr_build_ref();
+        //     if cur_count == 0 {
+        //         // SAFE: 此处强转可变是安全的，因为单线程执行build
+        //         p.deref_mut().build_end();
+        //     }
+        //     // log::warn!("pre == id: {:?}, id: {:?}, cur_count:{:?}", id,  _pre_id, cur_count);
+        // }
+        // if self.total_next_refs == 0 { 
+        //     self.build_end();
+        // }
 
         // let t3 = std::time::Instant::now();
-		let r = match runner {
-			Ok(output) => {
-                // log::warn!("total_next_refs == id: {:?}, total_next_refs: {:?}, pre_count:{:?}", id, self.total_next_refs, self.pre_nodes.len());
-                // if id.index() == 37 {
-                //     pi_print_any::out_any!(log::error, "build == id: {:?}, output: {:?}", &id, &output);
-                // }
-                //  if id.index() == 38 {
-                //     pi_print_any::out_any!(log::error, "build == id: {:?}, input: {:?}", &id, (from, &self.input, &self.param_usage.input_map_fill));
-                // }
-                // log::warn!("total_next_refs == id: {:?}, total_next_refs: {:?}, pre_count:{:?}", id, self.total_next_refs, self.pre_nodes.len());
-                if self.total_next_refs != 0 { 
-                   self.output = output;
-                }
+		// let r = match runner {
+		// 	Ok(output) => {
+        //         // log::warn!("total_next_refs == id: {:?}, total_next_refs: {:?}, pre_count:{:?}", id, self.total_next_refs, self.pre_nodes.len());
+        //         // if id.index() == 37 {
+        //         //     pi_print_any::out_any!(log::error, "build == id: {:?}, output: {:?}", &id, &output);
+        //         // }
+        //         //  if id.index() == 38 {
+        //         //     pi_print_any::out_any!(log::error, "build == id: {:?}, input: {:?}", &id, (from, &self.input, &self.param_usage.input_map_fill));
+        //         // }
+        //         // log::warn!("total_next_refs == id: {:?}, total_next_refs: {:?}, pre_count:{:?}", id, self.total_next_refs, self.pre_nodes.len());
+        //         if self.total_next_refs != 0 { 
+        //            self.output = output;
+        //         }
 
-				Ok(())
-			}
-			Err(msg) => Err(GraphError::CustomRunError(msg)),
-		};
+		// 		Ok(())
+		// 	}
+		// 	Err(msg) => Err(GraphError::CustomRunError(msg)),
+		// };
         // let t4 = std::time::Instant::now();
         // println!("build1============{:?}", (id, self.pre_nodes.len(), t2 - t1, t3 - t2, t4 - t3));
-        r
+        // r
+        match runner {
+            Ok(r) => Ok(r),
+            Err(msg) => Err(GraphError::CustomRunError(msg)),
+        }
     }
 
-    fn run<'a>(&'a mut self, index: usize, context: &'a Context, id: NodeId, from: &'static [NodeId], to: &'static [NodeId]) -> BoxFuture<'a, Result<(), GraphError>> {
+    fn run<'a>(&'a mut self, index: usize, context: &'a Context, id: DataId, from: &'static [DataId], to: &'static [DataId]) -> BoxFuture<'a, Result<(), GraphError>> {
         Box::pin(async move {
-            let runner = self.node.run(index, context, &self.input, &self.param_usage, id, from, to);
+            let runner = self.node.run(index, context, id, from, to);
 
             match runner.await {
                 Ok(_output) => Ok(()),
@@ -385,23 +358,21 @@ where
 }
 
 // 节点 状态
-pub(crate) struct NodeState<Context: ThreadSync + 'static>(
-    pub Share<Cell<dyn InternalNode<Context>>>,
+pub(crate) struct NodeState<Context: ThreadSync + 'static, DataId: Key + ThreadSync>(
+    pub Share<Cell<dyn InternalNode<Context, DataId>>>,
 );
 
-impl<Context: ThreadSync + 'static> Clone for NodeState<Context> {
+impl<Context: ThreadSync + 'static, DataId: Key + ThreadSync,> Clone for NodeState<Context, DataId> {
     fn clone(&self) -> Self {
         Self(self.0.clone())
     }
 }
 
 
-impl<Context: ThreadSync + 'static> NodeState<Context> {
-    pub(crate) fn new<I, O, R>(node: R) -> Self
+impl<Context: ThreadSync + 'static, DataId: Key + ThreadSync,> NodeState<Context, DataId> {
+    pub(crate) fn new<R>(node: R) -> Self
     where
-        I: InParam + DownGrade + Default,
-        O: OutParam + Default + Clone,
-        R: DependNode<Context, Input = I, Output = O>,
+        R: DependNode<Context, DataId>,
     {
         let imp = DependNodeImpl::new(node);
 
