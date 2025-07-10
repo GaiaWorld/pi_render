@@ -101,10 +101,10 @@ impl ImageTextureFrame {
     pub fn tilloff(&self) -> [f32;4] {
         if let Some(frame) = &self.frame {
             [
-                (frame.rect.2 as f32 / frame.rect.4 as f32), /// * (u16::MAX as f32)) as u16,
-                (frame.rect.3 as f32 / frame.rect.5 as f32), /// * (u16::MAX as f32)) as u16,
-                (frame.rect.0 as f32 / frame.rect.4 as f32), /// * (u16::MAX as f32)) as u16,
-                (frame.rect.1 as f32 / frame.rect.5 as f32), /// * (u16::MAX as f32)) as u16,
+                (frame.rect.2 as f32 / frame.rect.4 as f32), // * (u16::MAX as f32)) as u16,
+                (frame.rect.3 as f32 / frame.rect.5 as f32), // * (u16::MAX as f32)) as u16,
+                (frame.rect.0 as f32 / frame.rect.4 as f32), // * (u16::MAX as f32)) as u16,
+                (frame.rect.1 as f32 / frame.rect.5 as f32), // * (u16::MAX as f32)) as u16,
             ]
         } else {
             ImageTextureFrame::DEFAULT_TILLOFF
@@ -203,7 +203,7 @@ impl ImageTextureFrame {
             texture_extent,
         );
 
-        /// log::error!("{:?}", (key, width, height, format, dimension, depth_or_array_layers, block_width, block_height, extent_width, extent_height, bytes_per_row));
+        // log::error!("{:?}", (key, width, height, format, dimension, depth_or_array_layers, block_width, block_height, extent_width, extent_height, bytes_per_row));
         let size = if let Some(bytes_per_row) = bytes_per_row { extent_height * bytes_per_row } else { extent_width * extent_height * 4 };
         Some(ImageTexture {
             width, height, size: size as usize, texture, format, view_dimension: dimension, is_opacity: true
@@ -254,7 +254,7 @@ impl ImageTextureFrame {
                     depth_or_array_layers: i,
                 };
                 let mut texturecopy = texture.as_image_copy();
-                /// log::error!("Origin: {:?}", texturecopy);
+                // log::error!("Origin: {:?}", texturecopy);
                 texturecopy.origin.x = 0;
                 texturecopy.origin.y = 0;
                 texturecopy.origin.z = i;
@@ -271,7 +271,7 @@ impl ImageTextureFrame {
             }
         }
 
-        /// log::error!("{:?}", (key, width, height, format, dimension, depth_or_array_layers, block_width, block_height, extent_width, extent_height, bytes_per_row));
+        // log::error!("{:?}", (key, width, height, format, dimension, depth_or_array_layers, block_width, block_height, extent_width, extent_height, bytes_per_row));
         let size = if let Some(bytes_per_row) = bytes_per_row { extent_height * bytes_per_row } else { extent_width * extent_height * 4 };
         ImageTexture {
             width, height, size: size as usize, texture, format, view_dimension: dimension, is_opacity
@@ -311,7 +311,7 @@ impl ImageTextureFrame {
         let offset = dataoffset;
         let (mut extent_width, mut _extent_height) = texture.format().block_dimensions();
         extent_width    = width / extent_width;
-        /// extent_height   = height / extent_height;
+        // extent_height   = height / extent_height;
         let (bytes_per_row, rows_per_image) = if let Some(block_copy_size) = texture.format().block_copy_size(aspect) {
             (Some(extent_width * block_copy_size), Some(height / _extent_height))
         } else { (None, None) };
@@ -319,7 +319,7 @@ impl ImageTextureFrame {
         let mut temp = texture.as_image_copy();
         temp.origin = origin;
         let size = wgpu::Extent3d { width, height, depth_or_array_layers };
-        /// log::error!("SIze {:?}", (&size, &temp.origin));
+        // log::error!("SIze {:?}", (&size, &temp.origin));
         queue.write_texture(temp, data, wgpu::ImageDataLayout { offset, bytes_per_row, rows_per_image  }, size);
     }
     /// 纹理宽度
@@ -446,7 +446,7 @@ impl Atlas {
         let deltah = if height * 4 < self.maxheight { blockh } else { 0 };
         for allocator in self.allocator.iter_mut() {
             if let Some(rect) = allocator.allocate(guillotiere::Size { width: (width + deltaw * 2) as i32, height: (height + deltah * 2) as i32, ..Default::default() }) {
-                /// log::error!("Alloc: {:?}", (rect.rectangle.min.x, rect.rectangle.min.y, idx, width, height, ));
+                // log::error!("Alloc: {:?}", (rect.rectangle.min.x, rect.rectangle.min.y, idx, width, height, ));
                 let ox = rect.rectangle.min.x as u16 + deltaw as u16;
                 let oy = rect.rectangle.min.y as u16 + deltah as u16;
                 let sx = width  as u16;
@@ -547,17 +547,17 @@ impl CombineAtlas2DMgr {
             }
             frame
         } else {
-            /// log::error!("Combin Faile A");
+            // log::error!("Combin Faile A");
             None
         }
     }
     fn key(&self) -> String {
         let mut result = String::from("Combine");
         result += "#";
-        /// result += &serde_json::to_string(&self.format).unwrap();
-        /// result += &serde_json::to_string(&self.dimesion).unwrap();
-        /// result += &serde_json::to_string(&self.sample_type).unwrap();
-        /// result += &serde_json::to_string(&self.sampler).unwrap();
+        // result += &serde_json::to_string(&self.format).unwrap();
+        // result += &serde_json::to_string(&self.dimesion).unwrap();
+        // result += &serde_json::to_string(&self.sample_type).unwrap();
+        // result += &serde_json::to_string(&self.sampler).unwrap();
         result
     }
 }
@@ -603,7 +603,7 @@ impl ImageTextureViewFrame {
             label: Some(key.url().deref()),
             format: Some(texture.tex.format.clone()),
             dimension: Some(texture.tex.view_dimension.clone()),
-            aspect: wgpu::TextureAspect::All, /// key.desc.aspect,
+            aspect: wgpu::TextureAspect::All, // key.desc.aspect,
             base_mip_level: key.desc.base_mip_level as u32,
             mip_level_count: key.desc.mip_level_count(),
             base_array_layer: key.desc.base_array_layer as u32,
@@ -624,7 +624,7 @@ impl ImageTextureViewFrame {
             match result {
                 LoadResult::Ok(r) => { Ok(r) },
                 LoadResult::Wait(f) => {
-                    /// log::error!("ImageTexture Wait");
+                    // log::error!("ImageTexture Wait");
                     match f.await {
                         Ok(result) => Ok(result),
                         Err(_) => Err(()),
