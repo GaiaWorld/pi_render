@@ -326,6 +326,21 @@ impl ImageTextureFrame {
     // 纹理高度
     pub fn height(&self) -> u32 {
         self.tex.height
+    }    // 纹理宽度
+    pub fn internal_width(&self) -> u32 {
+        if let Some(frame) = &self.frame {
+            frame.rect.2 as u32
+        } else {
+            self.tex.width
+        }
+    }
+    // 纹理高度
+    pub fn internal_height(&self) -> u32 {
+        if let Some(frame) = &self.frame {
+            frame.rect.3 as u32
+        } else {
+            self.tex.height
+        }
     }
     // 图块矩形信息
     pub fn frame(&self) -> &Option<TextureFrame> {
