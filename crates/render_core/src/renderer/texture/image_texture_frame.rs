@@ -43,19 +43,22 @@ impl std::ops::Deref for KeyImageTextureFrame {
 }
 #[derive(Debug)]
 pub struct TextureFrame {
+    /// 矩形分配获得的ID
     id: AllocId,
+    /// 矩形信息(单位-像素) \[有效偏移x, 有效偏移y, 有效宽度, 有效高度, 所属图集宽度, 所属图集高度\]
     rect: (u16, u16, u16, u16, u16, u16),
+    /// 图块所属纹理数组层级
     depth_or_array_layer: usize,
     seq: Share<SegQueue<(usize, AllocId)>>,
 }
 impl TextureFrame {
-    
     pub fn tilloff(&self, result: &mut [f32], offset: usize) {
         result[offset + 0] = self.rect.2 as f32 / self.rect.4 as f32;
         result[offset + 1] = self.rect.3 as f32 / self.rect.5 as f32;
         result[offset + 2] = self.rect.0 as f32 / self.rect.4 as f32;
         result[offset + 3] = self.rect.1 as f32 / self.rect.5 as f32;
     }
+    /// 图块所属纹理数组层级
     pub fn texture_coord(&self) -> usize {
         self.depth_or_array_layer
     }
@@ -76,42 +79,42 @@ impl Drop for TextureFrame {
 ///
 /// 纹理图块数据
 pub struct ImageTextureFrame {
-    // 如果图块在大图集中,则有相关矩形信息; 图块是单独图片则没有该数据
+    /// 如果图块在大图集中,则有相关矩形信息; 图块是单独图片则没有该数据
     frame: Option<TextureFrame>,
-    // 图块数据大小
+    /// 图块数据大小
     size: usize,
-    // 图块对应纹理资源
+    /// 图块对应纹理资源
     pub(crate) tex: Arc<ImageTexture>,
-    // 图块拓展数据,比如 IBL 纹理的6个球谐光照数据
+    /// 图块拓展数据,比如 IBL 纹理的6个球谐光照数据
     pub extend: Vec<u8>,
-    // 图块所在图集纹理的唯一键, 图块是单独图片时没有该数据
+    /// 图块所在图集纹理的唯一键, 图块是单独图片时没有该数据
     pub atlashash: Option<u64>,
 }
 impl ImageTextureFrame {
-    // 图块默认在图集中的矩形信息
+    /// 图块默认在图集中的矩形信息
     pub const DEFAULT_TILLOFF: [f32;4] = [1., 1., 0., 0.];
-    // 新建一个独立图片的图块数据
+    /// 新建一个独立图片的图块数据
     pub fn new(tex: ImageTexture) -> Self {
         Self { frame: None, size: tex.size, tex: Arc::new(tex), extend: vec![], atlashash: None }
     }
-    // 获取图块在图集中的矩形信息
+    /// 获取图块在图集中的矩形信息
     pub fn tilloff(&self) -> [f32;4] {
         if let Some(frame) = &self.frame {
             [
-                (frame.rect.2 as f32 / frame.rect.4 as f32), // * (u16::MAX as f32)) as u16,
-                (frame.rect.3 as f32 / frame.rect.5 as f32), // * (u16::MAX as f32)) as u16,
-                (frame.rect.0 as f32 / frame.rect.4 as f32), // * (u16::MAX as f32)) as u16,
-                (frame.rect.1 as f32 / frame.rect.5 as f32), // * (u16::MAX as f32)) as u16,
+                (frame.rect.2 as f32 / frame.rect.4 as f32), /// * (u16::MAX as f32)) as u16,
+                (frame.rect.3 as f32 / frame.rect.5 as f32), /// * (u16::MAX as f32)) as u16,
+                (frame.rect.0 as f32 / frame.rect.4 as f32), /// * (u16::MAX as f32)) as u16,
+                (frame.rect.1 as f32 / frame.rect.5 as f32), /// * (u16::MAX as f32)) as u16,
             ]
         } else {
             ImageTextureFrame::DEFAULT_TILLOFF
         }
     }
-    // 获取纹理资源
+    /// 获取纹理资源
     pub fn texture(&self) -> &ImageTexture {
         &self.tex
     }
-    // 更新图块数据
+    /// 更新图块数据
     pub fn update_texture(&self, queue: &RenderQueue, data: &[u8]) {
         if let Some(frame) = &self.frame {
             let format = self.tex.texture.format();
@@ -126,7 +129,7 @@ impl ImageTextureFrame {
             );
         }
     }
-    // 创建独立纹理资源 - 从普通图片
+    /// 创建独立纹理资源 - 从普通图片
     pub fn create_image(
         device: &RenderDevice, queue: &RenderQueue, key: &Atom,
         dimension: wgpu::TextureViewDimension,
@@ -200,13 +203,13 @@ impl ImageTextureFrame {
             texture_extent,
         );
 
-        // log::error!("{:?}", (key, width, height, format, dimension, depth_or_array_layers, block_width, block_height, extent_width, extent_height, bytes_per_row));
+        /// log::error!("{:?}", (key, width, height, format, dimension, depth_or_array_layers, block_width, block_height, extent_width, extent_height, bytes_per_row));
         let size = if let Some(bytes_per_row) = bytes_per_row { extent_height * bytes_per_row } else { extent_width * extent_height * 4 };
         Some(ImageTexture {
             width, height, size: size as usize, texture, format, view_dimension: dimension, is_opacity: true
         })
     }
-    // 创建独立纹理资源 - 从压缩纹理图片
+    /// 创建独立纹理资源 - 从压缩纹理图片
     pub fn create_ktx(
         device: &RenderDevice, queue: &RenderQueue, key: &Atom,
         dimension: wgpu::TextureViewDimension,
@@ -226,7 +229,7 @@ impl ImageTextureFrame {
         }
         None
     }
-    // 创建独立纹理资源 - 从数据纹理
+    /// 创建独立纹理资源 - 从数据纹理
     pub fn create_data_texture(
         device: &RenderDevice, queue: &RenderQueue, key: &Atom, width: u32, height: u32,
         format: wgpu::TextureFormat, dimension: wgpu::TextureViewDimension, is_opacity: bool, depth_or_array_layers: u32, aspect: Option<wgpu::TextureAspect>,
@@ -251,7 +254,7 @@ impl ImageTextureFrame {
                     depth_or_array_layers: i,
                 };
                 let mut texturecopy = texture.as_image_copy();
-                // log::error!("Origin: {:?}", texturecopy);
+                /// log::error!("Origin: {:?}", texturecopy);
                 texturecopy.origin.x = 0;
                 texturecopy.origin.y = 0;
                 texturecopy.origin.z = i;
@@ -268,13 +271,13 @@ impl ImageTextureFrame {
             }
         }
 
-        // log::error!("{:?}", (key, width, height, format, dimension, depth_or_array_layers, block_width, block_height, extent_width, extent_height, bytes_per_row));
+        /// log::error!("{:?}", (key, width, height, format, dimension, depth_or_array_layers, block_width, block_height, extent_width, extent_height, bytes_per_row));
         let size = if let Some(bytes_per_row) = bytes_per_row { extent_height * bytes_per_row } else { extent_width * extent_height * 4 };
         ImageTexture {
             width, height, size: size as usize, texture, format, view_dimension: dimension, is_opacity
         }
     }
-    // 创建纹理
+    /// 创建纹理
     pub fn create_texture(
         device: &RenderDevice, key: &Atom, width: u32, height: u32,
         format: wgpu::TextureFormat, dimension: wgpu::TextureDimension, depth_or_array_layers: u32
@@ -298,7 +301,7 @@ impl ImageTextureFrame {
 
         texture
     }
-    // 更新纹理图块
+    /// 更新纹理图块
     pub fn update_sub(
         texture: &wgpu::Texture, queue: &RenderQueue,
         origin: wgpu::Origin3d,
@@ -308,7 +311,7 @@ impl ImageTextureFrame {
         let offset = dataoffset;
         let (mut extent_width, mut _extent_height) = texture.format().block_dimensions();
         extent_width    = width / extent_width;
-        // extent_height   = height / extent_height;
+        /// extent_height   = height / extent_height;
         let (bytes_per_row, rows_per_image) = if let Some(block_copy_size) = texture.format().block_copy_size(aspect) {
             (Some(extent_width * block_copy_size), Some(height / _extent_height))
         } else { (None, None) };
@@ -316,17 +319,20 @@ impl ImageTextureFrame {
         let mut temp = texture.as_image_copy();
         temp.origin = origin;
         let size = wgpu::Extent3d { width, height, depth_or_array_layers };
-        // log::error!("SIze {:?}", (&size, &temp.origin));
+        /// log::error!("SIze {:?}", (&size, &temp.origin));
         queue.write_texture(temp, data, wgpu::ImageDataLayout { offset, bytes_per_row, rows_per_image  }, size);
     }
-    // 纹理宽度
+    /// 纹理宽度
+    /// 如果是图块则返回值为图集尺寸
     pub fn width(&self) -> u32 {
         self.tex.width
     }
-    // 纹理高度
+    /// 纹理高度
+    /// 如果是图块则返回值为图集尺寸
     pub fn height(&self) -> u32 {
         self.tex.height
-    }    // 纹理宽度
+    }
+    /// 纹理有效内容宽度
     pub fn internal_width(&self) -> u32 {
         if let Some(frame) = &self.frame {
             frame.rect.2 as u32
@@ -334,7 +340,7 @@ impl ImageTextureFrame {
             self.tex.width
         }
     }
-    // 纹理高度
+    /// 纹理有效内容宽度
     pub fn internal_height(&self) -> u32 {
         if let Some(frame) = &self.frame {
             frame.rect.3 as u32
@@ -342,11 +348,11 @@ impl ImageTextureFrame {
             self.tex.height
         }
     }
-    // 图块矩形信息
+    /// 图块矩形信息
     pub fn frame(&self) -> &Option<TextureFrame> {
         &self.frame
     }
-    // 图块在纹理数组的序号
+    /// 图块在纹理数组的序号
     pub fn coord(&self) -> u8 {
         if let Some(frame) = &self.frame {
             frame.depth_or_array_layer as u8
@@ -367,19 +373,19 @@ impl Asset for ImageTextureFrame {
 
 // 图集2d矩形分配
 pub struct Atlas {
-    // 图集宽度
+    /// 图集宽度
     maxwidth: u32,
-    // 图集高度
+    /// 图集高度
     maxheight: u32,
-    // 矩形分配器宽度
+    /// 矩形分配器宽度
     allocator: Vec<AtlasAllocator>,
-    // 图集的纹理格式
+    /// 图集的纹理格式
     format: wgpu::TextureFormat,
-    // 图集对应纹理资源
+    /// 图集对应纹理资源
     texture: Arc<ImageTexture>,
-    // 图集的键
+    /// 图集的键
     key_image_texture_2d_array: Option<u64>,
-    // 图集矩形回收器
+    /// 图集矩形回收器
     recycle: Share<SegQueue<(usize, AllocId)>>,
 }
 impl Atlas {
@@ -423,7 +429,7 @@ impl Atlas {
             recycle,
         }
     }
-    // 尝试申请指定宽高的矩形区域; 申请成功则返回纹理图块数据
+    /// 尝试申请指定宽高的矩形区域; 申请成功则返回纹理图块数据
     pub fn allocate(&mut self, mut width: u32, mut height: u32) -> Option<ImageTextureFrame> {
         let mut result = None;
         while let Some((idx, id))  = self.recycle.pop() {
@@ -440,7 +446,7 @@ impl Atlas {
         let deltah = if height * 4 < self.maxheight { blockh } else { 0 };
         for allocator in self.allocator.iter_mut() {
             if let Some(rect) = allocator.allocate(guillotiere::Size { width: (width + deltaw * 2) as i32, height: (height + deltah * 2) as i32, ..Default::default() }) {
-                // log::error!("Alloc: {:?}", (rect.rectangle.min.x, rect.rectangle.min.y, idx, width, height, ));
+                /// log::error!("Alloc: {:?}", (rect.rectangle.min.x, rect.rectangle.min.y, idx, width, height, ));
                 let ox = rect.rectangle.min.x as u16 + deltaw as u16;
                 let oy = rect.rectangle.min.y as u16 + deltah as u16;
                 let sx = width  as u16;
@@ -475,15 +481,15 @@ impl Atlas {
 
 /// 纹理图集管理器 - 可能需要多个图集
 pub struct CombineAtlas2DMgr {
-    // 图集数组
+    /// 图集数组
     atlasarr: Vec<Atlas>,
-    // 图集纹理格式
+    /// 图集纹理格式
     format: wgpu::TextureFormat,
-    // 最大图集数目
+    /// 最大图集数目
     maxcount: usize,
-    // 最大层级数目
+    /// 最大层级数目
     maxlayer: u32,
-    // 最大纹理尺寸
+    /// 最大纹理尺寸
     maxsize: u32,
 }
 impl CombineAtlas2DMgr {
@@ -499,7 +505,7 @@ impl CombineAtlas2DMgr {
         let maxlayer = maxlayer.min(limit.max_texture_array_layers);
         Self { atlasarr: vec![], format, maxcount, maxlayer, maxsize }
     }
-    // 尝试合并一个指定宽高的图块,成功则返回分配的图块信息
+    /// 尝试合并一个指定宽高的图块,成功则返回分配的图块信息
     pub fn combine(&mut self,
         format: wgpu::TextureFormat,
         width: u32, height: u32,
@@ -541,17 +547,17 @@ impl CombineAtlas2DMgr {
             }
             frame
         } else {
-            // log::error!("Combin Faile A");
+            /// log::error!("Combin Faile A");
             None
         }
     }
     fn key(&self) -> String {
         let mut result = String::from("Combine");
         result += "#";
-        // result += &serde_json::to_string(&self.format).unwrap();
-        // result += &serde_json::to_string(&self.dimesion).unwrap();
-        // result += &serde_json::to_string(&self.sample_type).unwrap();
-        // result += &serde_json::to_string(&self.sampler).unwrap();
+        /// result += &serde_json::to_string(&self.format).unwrap();
+        /// result += &serde_json::to_string(&self.dimesion).unwrap();
+        /// result += &serde_json::to_string(&self.sample_type).unwrap();
+        /// result += &serde_json::to_string(&self.sampler).unwrap();
         result
     }
 }
@@ -597,7 +603,7 @@ impl ImageTextureViewFrame {
             label: Some(key.url().deref()),
             format: Some(texture.tex.format.clone()),
             dimension: Some(texture.tex.view_dimension.clone()),
-            aspect: wgpu::TextureAspect::All, // key.desc.aspect,
+            aspect: wgpu::TextureAspect::All, /// key.desc.aspect,
             base_mip_level: key.desc.base_mip_level as u32,
             mip_level_count: key.desc.mip_level_count(),
             base_array_layer: key.desc.base_array_layer as u32,
@@ -618,7 +624,7 @@ impl ImageTextureViewFrame {
             match result {
                 LoadResult::Ok(r) => { Ok(r) },
                 LoadResult::Wait(f) => {
-                    // log::error!("ImageTexture Wait");
+                    /// log::error!("ImageTexture Wait");
                     match f.await {
                         Ok(result) => Ok(result),
                         Err(_) => Err(()),
