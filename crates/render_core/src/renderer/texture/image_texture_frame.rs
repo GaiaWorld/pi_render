@@ -11,7 +11,7 @@ use pi_hash::DefaultHasher;
 use pi_share::Share;
 use wgpu::TextureView;
 
-use crate::{asset::TAssetKeyU64, renderer::buildin_data::DefaultTexture, rhi::{device::RenderDevice, sampler::SamplerDesc, RenderQueue}};
+use crate::{asset::TAssetKeyU64, renderer::{buildin_data::DefaultTexture, texture::ImageTextureView}, rhi::{device::RenderDevice, sampler::SamplerDesc, RenderQueue}};
 
 use super::TextureViewDesc;
 
@@ -84,7 +84,9 @@ pub struct ImageTextureFrame {
     /// 图块数据大小
     size: usize,
     /// 图块对应纹理资源
-    pub(crate) tex: Share<ImageTexture>,
+    pub tex: Share<ImageTexture>,
+    /// 图块对应默认纹理视图
+    pub view: Share<TextureView>,
     /// 图块拓展数据,比如 IBL 纹理的6个球谐光照数据
     pub extend: Vec<u8>,
     /// 图块所在图集纹理的唯一键, 图块是单独图片时没有该数据
@@ -95,7 +97,8 @@ impl ImageTextureFrame {
     pub const DEFAULT_TILLOFF: [f32;4] = [1., 1., 0., 0.];
     /// 新建一个独立图片的图块数据
     pub fn new(tex: ImageTexture) -> Self {
-        Self { frame: None, size: tex.size, tex: Share::new(tex), extend: vec![], atlashash: None }
+        let view = tex.texture.create_view(&wgpu::TextureViewDescriptor::default());
+        Self { frame: None, size: tex.size, tex: Share::new(tex), extend: vec![], atlashash: None, view: Share::new(view) }
     }
     /// 获取图块在图集中的矩形信息
     pub fn tilloff(&self) -> [f32;4] {
@@ -387,6 +390,8 @@ pub struct Atlas {
     key_image_texture_2d_array: Option<u64>,
     /// 图集矩形回收器
     recycle: Share<SegQueue<(usize, AllocId)>>,
+    /// 图块对应默认纹理视图
+    view: Share<TextureView>,
 }
 impl Atlas {
     ///
@@ -419,6 +424,8 @@ impl Atlas {
             tex: KeyImageTextureFrame { url: akey, file: false, compressed: false, cancombine: false },
             desc: TextureViewDesc::default(),
         };
+        let view = Share::new(texture.texture.create_view(&wgpu::TextureViewDescriptor::default()));
+
         Self {
             maxwidth,
             maxheight,
@@ -427,6 +434,7 @@ impl Atlas {
             key_image_texture_2d_array: Some(temp.asset_u64()),
             texture: Share::new(texture),
             recycle,
+            view
         }
     }
     /// 尝试申请指定宽高的矩形区域; 申请成功则返回纹理图块数据
@@ -467,7 +475,8 @@ impl Atlas {
                     tex: self.texture.clone(),
                     size: (blocksize * width / blockw * height / blockh) as usize,
                     extend: vec![],
-                    atlashash: self.key_image_texture_2d_array
+                    atlashash: self.key_image_texture_2d_array,
+                    view: self.view.clone(),
                 });
                 break;
             } else {
