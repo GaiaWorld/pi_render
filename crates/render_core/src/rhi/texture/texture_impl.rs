@@ -152,7 +152,7 @@ impl ScreenTexture {
     pub fn set_postprocess_target(&mut self, target: Option<(Share<Fbo>, f32, f32, f32, f32)>) {
         self.postprocess_texture = target;
         if let Some(target) = &self.postprocess_texture {
-            self.postprocess_view = Some(Share::new(target.0.colors[0].1.create_view(&Default::default())));
+            self.postprocess_view = Some(Share::new(target.0.colors[0].0.texture.create_view(&Default::default())));
         } else {
             self.postprocess_view = None;
         }
@@ -173,7 +173,7 @@ impl ScreenTexture {
 	#[inline]
     pub fn texture(&self) -> Option<&wgpu::Texture> {
         if let Some(texture) = &self.postprocess_texture {
-            Some(&texture.0.colors[0].1)
+            Some(&texture.0.colors[0].0.texture)
         } else if let Some(texture) = &self.texture {
             Some(&texture.texture)
         } else {

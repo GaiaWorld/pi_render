@@ -78,6 +78,7 @@ impl Drop for TextureFrame {
 }
 ///
 /// 纹理图块数据
+#[derive(Debug)]
 pub struct ImageTextureFrame {
     /// 如果图块在大图集中,则有相关矩形信息; 图块是单独图片则没有该数据
     frame: Option<TextureFrame>,
