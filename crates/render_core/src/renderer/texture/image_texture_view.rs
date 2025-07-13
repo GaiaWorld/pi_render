@@ -1,4 +1,4 @@
-use std::{sync::Arc, ops::Deref};
+use std::{ops::Deref};
 
 use pi_assets::{asset::{Handle, Asset, Size, Garbageer}, mgr::LoadResult};
 use pi_futures::BoxFuture;
@@ -94,5 +94,5 @@ pub type EImageTextureViewUsage = Handle<ImageTextureView>;
 // #[derive(Clone)]
 // pub enum EImageTextureViewUsage {
 //     Handle(Handle<ImageTextureView>),
-//     Arc(Arc<ImageTextureView>),
+//     Share(Share<ImageTextureView>),
 // }
