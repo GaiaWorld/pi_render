@@ -415,7 +415,7 @@ impl Atlas {
                 &AllocatorOptions {
                     alignment: guillotiere::Size { width: blockw as i32, height: blockh as i32, ..Default::default() },
                     small_size_threshold: maxwidth as i32 / 16,
-                    large_size_threshold: maxwidth as i32 /  4,
+                    large_size_threshold: maxwidth as i32 /  1,
                 }
             ));
         }
@@ -526,7 +526,7 @@ impl CombineAtlas2DMgr {
             let mut idx = 0;
             if (width < 256 && height < 256) || !(width.is_power_of_two() && height.is_power_of_two()) {
                 let len = self.atlasarr.len();
-                idx = usize::MAX;
+                idx = len;
                 for i in 0..len {
                     idx = len - i - 1;
                     let atlas = self.atlasarr.get_mut(idx).unwrap();
@@ -534,7 +534,7 @@ impl CombineAtlas2DMgr {
                         frame = Some(val);
                         break;
                     } else {
-                        idx = usize::MAX;
+                        idx = len;
                     }
                 }
             } else {
@@ -546,7 +546,7 @@ impl CombineAtlas2DMgr {
                     idx += 1;
                 }
             }
-            if frame.is_none() && idx < self.maxcount {
+            if frame.is_none() && idx < self.maxcount && (width < self.maxsize && height < self.maxsize) {
                 let mut hasher = DefaultHasher::default();
                 self.format.hash(&mut hasher);
                 idx.hash(&mut hasher);
