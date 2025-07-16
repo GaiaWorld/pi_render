@@ -92,14 +92,17 @@ pub struct ImageTextureFrame {
     pub extend: Vec<u8>,
     /// 图块所在图集纹理的唯一键, 图块是单独图片时没有该数据
     pub atlashash: Option<u64>,
+    /// 标识纹理是否完全不透明（无alpha通道或alpha全为1）
+    pub is_opacity: bool,
 }
 impl ImageTextureFrame {
     /// 图块默认在图集中的矩形信息
     pub const DEFAULT_TILLOFF: [f32;4] = [1., 1., 0., 0.];
     /// 新建一个独立图片的图块数据
     pub fn new(tex: ImageTexture) -> Self {
+        let is_opacity = tex.is_opacity;
         let view = tex.texture.create_view(&wgpu::TextureViewDescriptor::default());
-        Self { frame: None, size: tex.size, tex: Share::new(tex), extend: vec![], atlashash: None, view: Share::new(view) }
+        Self { frame: None, size: tex.size, tex: Share::new(tex), extend: vec![], atlashash: None, view: Share::new(view), is_opacity }
     }
     /// 获取图块在图集中的矩形信息
     pub fn tilloff(&self) -> [f32;4] {
@@ -145,6 +148,7 @@ impl ImageTextureFrame {
         let mut temprgb = None;
         let mut temprgb16 = None;
         let mut temprgb32 = None;
+        let mut is_opacity = false;
         let (image_buffer, format) = match &data {
             DynamicImage::ImageLuma8(image_buffer) => {
                 (image_buffer.as_raw().as_slice(), wgpu::TextureFormat::R8Unorm)
@@ -153,6 +157,7 @@ impl ImageTextureFrame {
                 (image_buffer.as_raw().as_slice(), wgpu::TextureFormat::R8Unorm)
             },
             DynamicImage::ImageRgb8(image_buffer) => {
+                is_opacity = true;
                 temprgb = Some(data.to_rgba8());
                 (temprgb.as_ref().unwrap().as_raw().as_slice(), wgpu::TextureFormat::Rgba8Unorm)
             },
@@ -166,6 +171,7 @@ impl ImageTextureFrame {
                 (bytemuck::cast_slice(image_buffer.as_raw()), wgpu::TextureFormat::R16Unorm)
             },
             DynamicImage::ImageRgb16(image_buffer) => {
+                is_opacity = true;
                 temprgb16 = Some(data.to_rgba16());
                 (bytemuck::cast_slice(temprgb16.as_ref().unwrap().as_raw()), wgpu::TextureFormat::Rgba16Unorm)
             },
@@ -173,6 +179,7 @@ impl ImageTextureFrame {
                 (bytemuck::cast_slice(image_buffer.as_raw()), wgpu::TextureFormat::Rgba16Unorm)
             },
             DynamicImage::ImageRgb32F(image_buffer) => {
+                is_opacity = true;
                 temprgb32 = Some(data.to_rgba32f());
                 (bytemuck::cast_slice(temprgb32.as_ref().unwrap().as_raw()), wgpu::TextureFormat::Rgba32Float)
             },
@@ -210,7 +217,7 @@ impl ImageTextureFrame {
         // log::error!("{:?}", (key, width, height, format, dimension, depth_or_array_layers, block_width, block_height, extent_width, extent_height, bytes_per_row));
         let size = if let Some(bytes_per_row) = bytes_per_row { extent_height * bytes_per_row } else { extent_width * extent_height * 4 };
         Some(ImageTexture {
-            width, height, size: size as usize, texture, format, view_dimension: dimension, is_opacity: true
+            width, height, size: size as usize, texture, format, view_dimension: dimension, is_opacity
         })
     }
     /// 创建独立纹理资源 - 从压缩纹理图片
@@ -439,7 +446,7 @@ impl Atlas {
         }
     }
     /// 尝试申请指定宽高的矩形区域; 申请成功则返回纹理图块数据
-    pub fn allocate(&mut self, mut width: u32, mut height: u32) -> Option<ImageTextureFrame> {
+    pub fn allocate(&mut self, mut width: u32, mut height: u32, is_opacity: bool) -> Option<ImageTextureFrame> {
         let mut result = None;
         while let Some((idx, id))  = self.recycle.pop() {
             if let Some(allocator) = self.allocator.get_mut(idx) {
@@ -478,6 +485,7 @@ impl Atlas {
                     extend: vec![],
                     atlashash: self.key_image_texture_2d_array,
                     view: self.view.clone(),
+                    is_opacity
                 });
                 break;
             } else {
@@ -518,7 +526,7 @@ impl CombineAtlas2DMgr {
     /// 尝试合并一个指定宽高的图块,成功则返回分配的图块信息
     pub fn combine(&mut self,
         format: wgpu::TextureFormat,
-        width: u32, height: u32,
+        width: u32, height: u32, is_opacity: bool,
         device: &RenderDevice, queue: &RenderQueue
     ) -> Option<ImageTextureFrame> {
         if self.format == format {
@@ -530,7 +538,7 @@ impl CombineAtlas2DMgr {
                 for i in 0..len {
                     idx = len - i - 1;
                     let atlas = self.atlasarr.get_mut(idx).unwrap();
-                    if let Some(val) = atlas.allocate(width, height) {
+                    if let Some(val) = atlas.allocate(width, height, is_opacity) {
                         frame = Some(val);
                         break;
                     } else {
@@ -539,7 +547,7 @@ impl CombineAtlas2DMgr {
                 }
             } else {
                 for atlas in self.atlasarr.iter_mut() {
-                    if let Some(val) = atlas.allocate(width, height) {
+                    if let Some(val) = atlas.allocate(width, height, is_opacity) {
                         frame = Some(val);
                         break;
                     }
@@ -552,7 +560,7 @@ impl CombineAtlas2DMgr {
                 idx.hash(&mut hasher);
                 let key = hasher.finish();
                 let mut atlas = Atlas::new(key, self.maxsize, self.maxsize, self.maxlayer, self.format, device, queue);
-                frame = atlas.allocate(width, height);
+                frame = atlas.allocate(width, height, is_opacity);
                 self.atlasarr.push(atlas);
             }
             frame
