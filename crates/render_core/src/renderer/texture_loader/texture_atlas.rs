@@ -114,9 +114,14 @@ impl TextureCombineAtlas2DMgr {
             if ktx.textures().count() == 0 || ktx.textures().count() > 1 || ktx.faces() > 1 || ktx.pixel_depth() > 1 {
                 return None;
             }
+
+            let is_opacity = match ktx.gl_base_internal_format() {
+                0x1907 => true,
+                _ => false
+            };
             
             if let Some(atlas) = self.map.get_mut(&key) {
-                if let Some(texture) = atlas.combine(format, ktx.pixel_width(), ktx.pixel_height(), device, queue) {
+                if let Some(texture) = atlas.combine(format, ktx.pixel_width(), ktx.pixel_height(), is_opacity, device, queue) {
                     // log::error!("Combine: {:?}", (&keyimage.url));
                     for data in ktx.textures() {
                         texture.update_texture(queue, data);
@@ -136,7 +141,7 @@ impl TextureCombineAtlas2DMgr {
                 let format = wgpu::TextureFormat::R8Unorm;
                 let key = KeyAtlasDesc { format };
                 if let Some(atlas) = self.map.get_mut(&key) {
-                    if let Some(texture) = atlas.combine(format, image_buffer.width(), image_buffer.height(), device, queue) {
+                    if let Some(texture) = atlas.combine(format, image_buffer.width(), image_buffer.height(), false, device, queue) {
                         texture.update_texture(queue, data);
                         return Some(texture);
                     }
@@ -148,7 +153,7 @@ impl TextureCombineAtlas2DMgr {
                 let format = wgpu::TextureFormat::Rgba8Unorm;
                 let key = KeyAtlasDesc { format };
                 if let Some(atlas) = self.map.get_mut(&key) {
-                    if let Some(texture) = atlas.combine(format, image_buffer.width(), image_buffer.height(), device, queue) {
+                    if let Some(texture) = atlas.combine(format, image_buffer.width(), image_buffer.height(), true, device, queue) {
                         texture.update_texture(queue, data);
                         return Some(texture);
                     }
@@ -159,7 +164,7 @@ impl TextureCombineAtlas2DMgr {
                 let format = wgpu::TextureFormat::Rgba8Unorm;
                 let key = KeyAtlasDesc { format };
                 if let Some(atlas) = self.map.get_mut(&key) {
-                    if let Some(texture) = atlas.combine(format, image_buffer.width(), image_buffer.height(), device, queue) {
+                    if let Some(texture) = atlas.combine(format, image_buffer.width(), image_buffer.height(), false, device, queue) {
                         // log::error!("ImageRgb8 Combine");
                         texture.update_texture(queue, data);
                         return Some(texture);
