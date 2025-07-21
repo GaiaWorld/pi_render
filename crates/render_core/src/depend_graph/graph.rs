@@ -133,8 +133,11 @@ impl<Context: ThreadSync + 'static, DataId: Key + ThreadSync> DependGraph<Contex
                 "white"
             };
 			let id1 = id.data();
-            let enable = n.is_enable;
-            let transfer = n.is_transfer;
+            let enable = if n.is_enable {1}else {0};
+            let transfer = if n.is_transfer{1}else{0};
+            let build = if node.is_build {1} else {0};
+            let run = if node.is_run{1} else {0};
+            let entity = node.data_id;
 
             
 
@@ -147,7 +150,7 @@ impl<Context: ThreadSync + 'static, DataId: Key + ThreadSync> DependGraph<Contex
                 ));
             } else {
                 v.push(format!(
-                    "\t \"{id:?}\" [\"style\"=\"filled\" \"label\"=\"{name}_{id1:?}_enable_{enable:?}_transfer_{transfer:?}\" \"fillcolor\"=\"{color}\"]"
+                    "\t \"{id:?}\" [\"style\"=\"filled\" \"label\"=\"{name}_{id1:?}_e{enable:?}_t{transfer:?}_b{build:?}_r{run:?}_d{entity:?}\" \"fillcolor\"=\"{color}\"]"
                 ));
             }
         }
@@ -789,7 +792,10 @@ impl<Context: ThreadSync + 'static, DataId: Key + ThreadSync> DependGraph<Contex
                     to_data_id.push(data_id);
                 }
             }
-           
+
+            let node = &mut self.nodes[*id];
+            node.from_data_id = from_data_id;
+            node.to_data_id = to_data_id;
             // let node = &mut self.nodes[*id];
             // let mut node_state = node.state.0.as_ref().borrow_mut();
            
