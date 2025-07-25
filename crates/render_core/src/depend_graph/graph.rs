@@ -616,7 +616,7 @@ impl<Context: ThreadSync + 'static, DataId: Key + ThreadSync> DependGraph<Contex
 
 		// 运行所有激活图节点的build方法
 		for node_id in self.build_nodes.iter() {
-			let node = &mut self.nodes[*node_id];
+			let node: &mut ScheduleNode<Context, DataId> = &mut self.nodes[*node_id];
             node.curr_next_build_refs = node.total_next_build_refs as i32;
 			// let graph_node = self.schedule_graph.get(*node_id).unwrap();
 			(*node.build_node)(
@@ -638,12 +638,14 @@ impl<Context: ThreadSync + 'static, DataId: Key + ThreadSync> DependGraph<Contex
 
                 
                 if node.curr_next_build_refs == 0 {
+                    log::debug!("from buildend, from_data_id:{:?}, data_id:{:?}, total_next_build_refs: {:?}", node.data_id, node_id, node.total_next_build_refs);
                     // SAFE: 此处强转可变是安全的，因为单线程执行build
                     node.state.0.borrow_mut().build_end(context, node.data_id);
                 }
             }
             let node = &self.nodes[*node_id];
             if node.curr_next_build_refs == 0 { 
+                log::debug!("self buildend, data_id:{:?}, total_next_build_refs: {:?}", node.data_id, node.total_next_build_refs);
                 node.state.0.borrow_mut().build_end(context, node.data_id);
             }
 		}
@@ -667,7 +669,7 @@ impl<Context: ThreadSync + 'static, DataId: Key + ThreadSync> DependGraph<Contex
         self.update_graph()?;
 
         // 构建 run_ng，返回 构建图
-		if self.is_topo_dirty {
+		if self.is_topo_dirty || self.is_finish_dirty {
             // log::warn!("update_run_ng=================");
 			if let Err(GraphError::ParamFillRepeat(f1, f2, t)) = self.update_run_ng() {
                 log::error!("param fill with repeat, graph: {:}", self.dump_graphviz());
@@ -681,18 +683,29 @@ impl<Context: ThreadSync + 'static, DataId: Key + ThreadSync> DependGraph<Contex
             self.build_nodes.clear();
             // 计算可运行节点
             self.can_run_node.clear();
-            for i in self.schedule_graph.topological.iter() {
-                if self.nodes[*i].is_build {
-                    self.build_nodes.push(i.clone());
-                } else {
-                    let graph_node = &mut self.nodes[*i];
-                    graph_node.total_next_build_refs -= 1;
-                }
-                if self.nodes[*i].is_run {
-                    self.can_run_node.push(i.clone());
+            for id in self.schedule_graph.topological.iter() {
+                let graph_node = match self.schedule_graph.get(*id) {
+                    Some(r) => r,
+                    None => continue,
+                };
+                let node = &mut self.nodes[*id];
+                if node.is_run {
+                    self.can_run_node.push(id.clone());
                 }
 
-                pi_print_any::out_any!(log::debug, "enable_nodes======{:?}", &self.nodes[*i].is_run);
+                node.total_next_build_refs = graph_node.to().len() as i32; // 初始化总数量
+                if self.nodes[*id].is_build {
+                    self.build_nodes.push(id.clone());
+                } else {
+                    // 如果节点不可build， 需要将前直接点的next数量减1
+                    for from in graph_node.from() {
+                        let node = &mut self.nodes[*from];
+                        node.total_next_build_refs -= 1;
+                    }
+                }
+               
+
+                pi_print_any::out_any!(log::debug, "enable_nodes======{:?}", &self.nodes[*id].is_run);
             }
             // log::warn!("enable_nodes======{:?}", (self.is_topo_dirty, self.is_enable_dirty, self.is_finish_dirty));
             // log::warn!("enable_nodes======{:?}", &self.enable_nodes);
@@ -775,7 +788,6 @@ impl<Context: ThreadSync + 'static, DataId: Key + ThreadSync> DependGraph<Contex
                 None => continue,
             };
             let node = &mut self.nodes[*id];
-            node.total_next_build_refs = graph_node.to().len() as i32; // 初始化总数量
             node.from_data_id.clear();
             node.to_data_id.clear();
             let mut from_data_id = std::mem::replace(&mut node.from_data_id, Vec::new());

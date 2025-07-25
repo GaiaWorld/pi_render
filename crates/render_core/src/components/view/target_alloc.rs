@@ -206,9 +206,25 @@ impl GetTargetView for TargetView {
     }
 }
 
-impl<T: GetTargetView + 'static, O: std::ops::Deref<Target=T>> GetTargetView for O {
+impl GetTargetView for ShareTargetView {
     fn get_target_view(&self) -> Option<&TargetView>{
-		self.deref().get_target_view()
+        Some(&*self)
+    }
+}
+
+impl<T: GetTargetView + 'static> GetTargetView for Option<T> {
+    fn get_target_view(&self) -> Option<&TargetView>{
+		match self {
+			Some(r) => r.get_target_view(),
+			None => None,
+		}
+    }
+}
+
+
+impl<'a, T: GetTargetView + 'static> GetTargetView for &'a T {
+    fn get_target_view(&self) -> Option<&TargetView>{
+		(*self).get_target_view()
     }
 }
 
