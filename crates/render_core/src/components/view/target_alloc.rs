@@ -659,6 +659,8 @@ impl AtlasAllocator {
 		} else {
 			height
 		};
+		width = ((width as f64 / 32.0).ceil() * 32.0) as u32;
+		height = ((height as f64 / 32.0).ceil() * 32.0) as u32;
 		// let mut width = info.descript.default_width.max(min_width);
 		// let mut height = info.descript.default_height.max(min_height);
 		let len = info.descript.colors_descriptor.len();
