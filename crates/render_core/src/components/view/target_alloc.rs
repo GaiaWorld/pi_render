@@ -474,9 +474,9 @@ impl AtlasAllocator {
 		}
 
 		let target = if is_alone {
-			Share::new(self.create_target(width, height, width, height, target_type))
+			Share::new(self.create_target(width, height, width, height, target_type, true))
 		} else {
-			Share::new(self.create_target(width, height, Null::null(), Null::null(), target_type))
+			Share::new(self.create_target(width, height, Null::null(), Null::null(), target_type, false))
 		};
 
 		// self.debugList.push(Cmd::Create(self.cur_allocator_index, w , h));
@@ -647,6 +647,7 @@ impl AtlasAllocator {
 		width: u32, 
 		height: u32, 
 		target_type: TargetType,
+		is_alone: bool,
 	)-> Fbo {
 		let info: &AllocatorGroupInfo = unsafe { transmute(&self.all_allocator[target_type.0].info) };
 		let mut width = if width.is_null() {
@@ -659,8 +660,11 @@ impl AtlasAllocator {
 		} else {
 			height
 		};
-		width = ((width as f64 / 32.0).ceil() * 32.0) as u32;
-		height = ((height as f64 / 32.0).ceil() * 32.0) as u32;
+		if !is_alone {
+			width = ((width as f64 / 32.0).ceil() * 32.0) as u32;
+			height = ((height as f64 / 32.0).ceil() * 32.0) as u32;
+		}
+		
 		// let mut width = info.descript.default_width.max(min_width);
 		// let mut height = info.descript.default_height.max(min_height);
 		let len = info.descript.colors_descriptor.len();
