@@ -684,7 +684,7 @@ impl AtlasAllocator {
 				descriptor,
 				TextureAspect::All,
 				info.texture_hash[i],
-				len,
+				if is_alone {2} else {len}, // alone时， 要求严格等于
 			);
 			if len == 1 {
 				width = r.1;
