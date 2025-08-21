@@ -529,23 +529,23 @@ impl CombineAtlas2DMgr {
         width: u32, height: u32, is_opacity: bool,
         device: &RenderDevice, queue: &RenderQueue
     ) -> Option<ImageTextureFrame> {
-        if self.format == format {
+        if self.format == format && width * 2 <= self.maxsize && height * 2 <= self.maxsize {
             let mut frame = None;
             let mut idx = 0;
-            if (width < 256 && height < 256) || !(width.is_power_of_two() && height.is_power_of_two()) {
-                let len = self.atlasarr.len();
-                idx = len;
-                for i in 0..len {
-                    idx = len - i - 1;
-                    let atlas = self.atlasarr.get_mut(idx).unwrap();
-                    if let Some(val) = atlas.allocate(width, height, is_opacity) {
-                        frame = Some(val);
-                        break;
-                    } else {
-                        idx = len;
-                    }
-                }
-            } else {
+            // if (width < 256 && height < 256) || !(width.is_power_of_two() && height.is_power_of_two()) {
+            //     let len = self.atlasarr.len();
+            //     idx = len;
+            //     for i in 0..len {
+            //         idx = len - i - 1;
+            //         let atlas = self.atlasarr.get_mut(idx).unwrap();
+            //         if let Some(val) = atlas.allocate(width, height, is_opacity) {
+            //             frame = Some(val);
+            //             break;
+            //         } else {
+            //             idx = len;
+            //         }
+            //     }
+            // } else {
                 for atlas in self.atlasarr.iter_mut() {
                     if let Some(val) = atlas.allocate(width, height, is_opacity) {
                         frame = Some(val);
@@ -553,7 +553,7 @@ impl CombineAtlas2DMgr {
                     }
                     idx += 1;
                 }
-            }
+            // }
             if frame.is_none() && idx < self.maxcount && (width < self.maxsize && height < self.maxsize) {
                 let mut hasher = DefaultHasher::default();
                 self.format.hash(&mut hasher);

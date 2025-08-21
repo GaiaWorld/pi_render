@@ -14,10 +14,11 @@ use super::{
     vertex_format::TVertexFormatByteSize,
     buffer::{FixedSizeBufferPool, AssetRWBuffer, RWBufferRange},
 };
+use serde::{Deserialize, Serialize};
 
 pub type IDAssetVertexBuffer = u64;
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, Hash, PartialEq, Eq, Default)]
 pub struct KeyVertexBuffer(Atom);
 impl KeyVertexBuffer {
     pub fn as_str(&self) -> &str {

@@ -1,8 +1,9 @@
+use serde::{Deserialize, Serialize};
 use wgpu::util::DeviceExt;
 
 use crate::rhi::{device::RenderDevice, RenderQueue};
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum EDefaultTexture {
     Black,
     White,
