@@ -2,12 +2,13 @@ use std::hash::{Hash, Hasher};
 
 use pi_assets::asset::Handle;
 use pi_hash::DefaultHasher;
+use serde::{Deserialize, Serialize};
 
 use crate::{rhi::{device::RenderDevice, asset::RenderRes, pipeline::RenderPipeline}, asset::ASSET_SIZE_FOR_UNKOWN};
 
 use super::{bind_group::BindGroupLayout, shader::{KeyShader, TKeyShaderSetBlock, Shader}, vertex_buffer::KeyPipelineFromAttributes};
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Default, Deserialize, Serialize)]
 pub struct DepthBiasState {
     /// Constant depth biasing factor, in basic units of the depth format.
     pub constant: i32,
