@@ -1,0 +1,25 @@
+[package]
+name = "pi_render_graph"
+version = "0.1.0"
+authors = ["sun <530739162@qq.com>"]
+edition = "2021"
+description = "Render Graph for PI Engine"
+repository = "https://github.com/GaiaWorld/pi_render"
+license = "MIT OR Apache-2.0"
+keywords = ["pi"]
+
+[features]
+
+[dependencies]
+pi_slotmap = "0.2"
+pi_map = "0.2"
+pi-async-rt = "0.2"
+pi_share = "0.5"
+pi_null = "0.1"
+pi_futures = "0.1"
+pi_hash = "0.1"
+pi_print_any = "0.1"
+log = "0.4"
+thiserror = "1.0"
+
+[dev-dependencies]
