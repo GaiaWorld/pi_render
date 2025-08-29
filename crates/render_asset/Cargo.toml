@@ -1,6 +1,6 @@
 [package]
 name = "pi_render_asset"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["sun <530739162@qq.com>"]
 edition = "2021"
 description = "Render Target Alloc for PI Engine"
@@ -19,3 +19,4 @@ pi_hal = { version = "0.3", registry = "yn" }
 pi_key_alloter = "0.6"
 derive-deref-rs = "0.1"
 wgpu = {version = "0.3", registry = "yn", package="pi_wgpu"}
+log = "0.4"
