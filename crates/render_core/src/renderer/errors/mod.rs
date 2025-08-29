@@ -1,4 +1,4 @@
-use crate::depend_graph::GraphError;
+use pi_render_graph::GraphError;
 
 pub type EError = u32;
 
