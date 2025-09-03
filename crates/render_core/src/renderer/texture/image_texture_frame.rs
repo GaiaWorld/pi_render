@@ -9,13 +9,14 @@ use pi_futures::BoxFuture;
 use pi_hal::{image::DynamicImage, texture::ImageTexture};
 use pi_hash::DefaultHasher;
 use pi_share::Share;
+use serde::{Serialize, Deserialize};
 use wgpu::TextureView;
 
 use crate::{asset::TAssetKeyU64, renderer::{buildin_data::DefaultTexture, texture::ImageTextureView}, rhi::{device::RenderDevice, sampler::SamplerDesc, RenderQueue}};
 
 use super::TextureViewDesc;
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub struct KeyImageTextureFrame {
     /// 路径
     pub url: Atom,

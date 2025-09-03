@@ -42,9 +42,7 @@ impl TAssetKeyU64 for String {
 }
 impl TAssetKeyU64 for Atom {
     fn asset_u64(&self) -> u64 {
-        let mut hasher = DefaultHasher::default();
-        self.hash(&mut hasher);
-        hasher.finish()
+        self.str_hash() as u64
     }
 }
 
