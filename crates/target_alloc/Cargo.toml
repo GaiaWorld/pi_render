@@ -1,0 +1,32 @@
+[package]
+name = "pi_target_alloc"
+version = "0.1.2"
+authors = ["sun <530739162@qq.com>"]
+edition = "2021"
+description = "Render Target Alloc for PI Engine"
+repository = "https://github.com/GaiaWorld/pi_render"
+license = "MIT OR Apache-2.0"
+keywords = ["pi"]
+
+[features]
+default = ["debug_info"]
+debug_info = []
+
+[dependencies]
+pi_null = "0.1"
+pi_assets = "0.15"
+pi_hash = "0.1"
+pi_slotmap = "0.2"
+pi_share = "0.5"
+pi_atom = "0.6"
+pi_key_alloter = "0.6"
+smallvec = "1.8"
+log = "0.4"
+pi_render_asset = {version = "0.1.1", registry = "yn"}
+guillotiere = { version = "0.6" }
+wgpu = {version = "0.3", registry = "yn", package="pi_wgpu"}
+derive-deref-rs = "0.1"
+serde = { version = "1.0", features = ["derive"]}
+lazy_static = "1.4"
+
+[dev-dependencies]

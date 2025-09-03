@@ -9,11 +9,11 @@ license = "MIT OR Apache-2.0"
 keywords = ["pi"]
 
 [features]
-default = ["debug_info"]
+default = ["serde"]
 webgl = []
 location = []
 trace=[]
-debug_info = ["serde"]
+debug_info = ["serde", "pi_target_alloc/debug_info"]
 
 [dependencies]
 # pi_share = {version="0.4", features=["serial", "rc"]}
@@ -33,6 +33,9 @@ pi_map = "0.2"
 pi_null = "0.1"
 pi_ecs_macros = "0.1"
 pi_slotmap = "0.2"
+pi_render_graph = { version = "0.1", path="../render_graph", registry = "yn" }
+pi_render_asset = { version = "0.1", path="../render_asset", registry = "yn" }
+pi_target_alloc= { version = "0.1", path="../target_alloc", registry = "yn" }
 derive_deref = "1.1"
 serde_json          = { features = ["raw_value"], version = "1.0" }
 serde = { workspace = true, features = ["derive"], optional = true }
@@ -84,7 +87,6 @@ backtrace = "0.3"
 
 
 [dev-dependencies]
-bytemuck = { version = "1.4", features = ["derive"] }
 render_derive={path="../render_derive", version = "0.2", registry = "yn"}
 env_logger = "0.9"
 winit = { registry = "yn", version = "0.28"}

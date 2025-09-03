@@ -1,0 +1,22 @@
+[package]
+name = "pi_render_asset"
+version = "0.1.1"
+authors = ["sun <530739162@qq.com>"]
+edition = "2021"
+description = "Render Target Alloc for PI Engine"
+repository = "https://github.com/GaiaWorld/pi_render"
+license = "MIT OR Apache-2.0"
+keywords = ["pi"]
+
+[features]
+
+[dependencies]
+pi_assets = "0.15"
+pi_share = "0.5"
+pi_futures = "0.1"
+pi_atom = "0.6"
+pi_hal = { version = "0.3", registry = "yn" }
+pi_key_alloter = "0.6"
+derive-deref-rs = "0.1"
+wgpu = {version = "0.3", registry = "yn", package="pi_wgpu"}
+log = "0.4"
