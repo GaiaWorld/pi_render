@@ -22,7 +22,7 @@ pi_atom = "0.6"
 pi_key_alloter = "0.6"
 smallvec = "1.8"
 log = "0.4"
-pi_render_asset = {version = "0.1.1", registry = "yn"}
+pi_render_asset = { version = "0.1", path="../render_asset", registry = "yn" }
 guillotiere = { version = "0.6" }
 wgpu = {version = "0.3", registry = "yn", package="pi_wgpu"}
 derive-deref-rs = "0.1"
