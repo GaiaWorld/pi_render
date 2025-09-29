@@ -1,6 +1,6 @@
 [package]
 name = "pi_render_asset"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["sun <530739162@qq.com>"]
 edition = "2021"
 description = "Render Target Alloc for PI Engine"
