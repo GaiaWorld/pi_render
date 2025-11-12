@@ -20,11 +20,11 @@ use crate::rhi::{asset::TextureRes, device::RenderDevice, RenderQueue};
 pub struct FontSheet {
 	font_mgr: FontMgr,
 	texture_version: Share<ShareMutex<usize>>,
-	texture_view: Option<Handle<AssetWithId<TextureRes>>>,
+	texture_view: Option<Handle<TextureRes>>,
 	texture: Option<Share<Texture>>,
 
 	pub sdf_texture_version: Share<ShareMutex<usize>>,
-	pub sdf_texture_view: Option<Handle<AssetWithId<TextureRes>>>,
+	pub sdf_texture_view: Option<Handle<TextureRes>>,
 	pub sdf_texture: Option<Share<Texture>>,
 
 	// pub sdf2_texture_version: Share<ShareMutex<usize>>,
@@ -39,7 +39,7 @@ pub struct FontSheet {
 	queue: RenderQueue,
 	device: RenderDevice,
 
-	texture_asset_mgr: Share<AssetMgr<AssetWithId<TextureRes>>>,
+	texture_asset_mgr: Share<AssetMgr<TextureRes>>,
 	alloter: Share<pi_key_alloter::KeyAlloter>,
 }
 
@@ -56,7 +56,7 @@ unsafe impl Sync for FontSheet {}
 impl FontSheet {
 	pub fn new(
 		device: &RenderDevice,
-		texture_asset_mgr: &Share<AssetMgr<AssetWithId<TextureRes>>>,
+		texture_asset_mgr: &Share<AssetMgr<TextureRes>>,
 		alloter: Share<pi_key_alloter::KeyAlloter>,
 		queue: &RenderQueue,
 		max_texture_dimension_2d: u32,
@@ -174,7 +174,7 @@ impl FontSheet {
 	}
 
 	/// 纹理
-	pub fn texture_view(&self) -> &Option<Handle<AssetWithId<TextureRes>>> {
+	pub fn texture_view(&self) -> &Option<Handle<TextureRes>> {
 		&self.texture_view
 	}
 
@@ -194,7 +194,7 @@ impl FontSheet {
 	}
 
 	/// 纹理
-	pub fn sdf_texture_view(&self) -> &Option<Handle<AssetWithId<TextureRes>>> {
+	pub fn sdf_texture_view(&self) -> &Option<Handle<TextureRes>> {
 		&self.sdf_texture_view
 	}
 
@@ -467,7 +467,7 @@ impl FontSheet {
 		let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 		// let key = calc_hash(&"text texture view");
 		let key = Atom::from("_$text").str_hash() as u64;
-		let texture_view = if let Ok(r) = self.texture_asset_mgr.insert(key, AssetWithId::new(TextureRes::new(size.width as u32, size.height as u32, (size.width * size.height * 4) as usize, texture_view, false, wgpu::TextureFormat::Rgba8Unorm), (size.width * size.height * 4) as usize, self.alloter.clone())) {
+		let texture_view = if let Ok(r) = self.texture_asset_mgr.insert(key, TextureRes::new(size.width as u32, size.height as u32, (size.width * size.height * 4) as usize, texture_view, false, wgpu::TextureFormat::Rgba8Unorm)) {
 			r
 		} else {
 			panic!("insert asset fail");
@@ -495,7 +495,7 @@ impl FontSheet {
 		});
 		let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 		let key = Atom::from("_$text_sdf").str_hash() as u64;
-		let texture_view = if let Ok(r) = self.texture_asset_mgr.insert(key, AssetWithId::new(TextureRes::new(size.width as u32, size.height as u32, (size.width * size.height) as usize, texture_view, false, wgpu::TextureFormat::R8Unorm), (size.width * size.height) as usize, self.alloter.clone())) {
+		let texture_view = if let Ok(r) = self.texture_asset_mgr.insert(key, TextureRes::new(size.width as u32, size.height as u32, (size.width * size.height) as usize, texture_view, false, wgpu::TextureFormat::R8Unorm)) {
 			r
 		} else {
 			panic!("insert asset fail");
