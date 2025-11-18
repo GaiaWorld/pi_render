@@ -286,7 +286,7 @@ impl ImageTextureFrame {
         // log::error!("{:?}", (key, width, height, format, dimension, depth_or_array_layers, block_width, block_height, extent_width, extent_height, bytes_per_row));
         let size = if let Some(bytes_per_row) = bytes_per_row { extent_height * bytes_per_row } else { extent_width * extent_height * 4 };
         ImageTexture {
-            width, height, size: size as usize, texture, format, view_dimension: dimension, is_opacity
+            width: extent_width * block_width, height: extent_height * block_height, size: size as usize, texture, format, view_dimension: dimension, is_opacity
         }
     }
     /// 创建纹理
@@ -468,8 +468,8 @@ impl Atlas {
                 let oy = rect.rectangle.min.y as u16 + deltah as u16;
                 let sx = width  as u16;
                 let sy = height as u16;
-                let w = self.maxwidth  as u16;
-                let h = self.maxheight as u16;
+                let w = ((self.maxwidth + blockw - 1) / blockw * blockw) as u16;
+                let h = ((self.maxheight + blockw - 1) / blockw * blockw) as u16;
                 let blocksize = if let Some(size) = format.block_copy_size(None) {
                     size
                 } else { 1 };
