@@ -47,7 +47,7 @@ pub struct TextureFrame {
     /// 矩形分配获得的ID
     id: AllocId,
     /// 矩形信息(单位-像素) \[有效偏移x, 有效偏移y, 有效宽度, 有效高度, 所属图集宽度, 所属图集高度\]
-    rect: (u16, u16, u16, u16, u16, u16),
+    pub rect: (u16, u16, u16, u16, u16, u16, u16, u16),
     /// 图块所属纹理数组层级
     depth_or_array_layer: usize,
     seq: Share<SegQueue<(usize, AllocId)>>,
@@ -457,6 +457,8 @@ impl Atlas {
         let mut idx = 0;
         let format = self.texture.texture.format();
         let (blockw, blockh) = format.block_dimensions();
+        let w1 = width;
+        let h1 = height;
         width  = (width  + blockw - 1) / blockw * blockw;
         height = (height + blockh - 1) / blockh * blockh;
         let deltaw = if width * 4 < self.maxwidth { blockw } else { 0 };
@@ -479,7 +481,7 @@ impl Atlas {
                         depth_or_array_layer: idx,
                         id: rect.id,
                         seq: self.recycle.clone(),
-                        rect: (ox, oy, sx, sy, w, h),
+                        rect: (ox, oy, sx, sy, w, h, w1 as u16, h1 as u16),
                     }),
                     tex: self.texture.clone(),
                     size: (blocksize * width / blockw * height / blockh) as usize,
