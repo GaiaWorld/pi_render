@@ -236,8 +236,12 @@ impl ImageTextureFrame {
             return None;
         }
 
+        let is_opacity = match ktx.gl_base_internal_format() {
+                0x1907 => true,
+                _ => false
+            };
         for data in ktx.textures() {
-            return Some(ImageTextureFrame::create_data_texture(device, queue, &key, width, height, format, dimension, true, 1, None, Some(data), 0));
+            return Some(ImageTextureFrame::create_data_texture(device, queue, &key, width, height, format, dimension, is_opacity, 1, None, Some(data), 0));
         }
         None
     }

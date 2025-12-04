@@ -112,6 +112,7 @@ impl TextureCombineAtlas2DMgr {
             let _mipmaps = ktx.mipmap_levels();
             
             if ktx.textures().count() == 0 || ktx.textures().count() > 1 || ktx.faces() > 1 || ktx.pixel_depth() > 1 {
+                log::error!("Combine failed1: {:?}", (&_keyimage.url));
                 return None;
             }
 
@@ -130,6 +131,7 @@ impl TextureCombineAtlas2DMgr {
                 }
             }
         }
+         log::error!("Combine failed2: {:?}", (&_keyimage.url));
         return None;
     }
     // 尝试合并普通图片纹理图块
