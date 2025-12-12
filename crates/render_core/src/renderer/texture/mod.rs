@@ -49,10 +49,10 @@ impl TextureViewDesc {
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub struct TextureRect {
-    pub(crate) x: u16,
-    pub(crate) y: u16,
-    pub(crate) w: u16,
-    pub(crate) h: u16,
+    pub x: u16,
+    pub y: u16,
+    pub w: u16,
+    pub h: u16,
 }
 impl Default for TextureRect {
     fn default() -> Self {
