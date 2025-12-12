@@ -158,8 +158,16 @@ impl ETextureViewUsage {
             ETextureViewUsage::ImageFrame(arc) => {
                 arc.texture().tilloff()
             },
-            ETextureViewUsage::SRT(_) => ImageTextureFrame::DEFAULT_TILLOFF,
-            ETextureViewUsage::FBORect(_, _, _, _) => ImageTextureFrame::DEFAULT_TILLOFF,
+            ETextureViewUsage::SRT(v) => {
+                let fbo = v.target();
+                let rect = v.rect();
+                let x = rect.min.x;
+                let y = rect.min.y;
+                let w = rect.max.x - rect.min.x;
+                let h = rect.max.y - rect.min.y;
+                [ w as f32 / fbo.width as f32, 1. * h as f32 / fbo.height as f32, x as f32 / fbo.width as f32, y as f32 / fbo.height as f32]
+            },
+            ETextureViewUsage::FBORect(fbo, _, _, rect) => [rect.w as f32 / fbo.width as f32, rect.h as f32 / fbo.height as f32, rect.x as f32 / fbo.width as f32, rect.y as f32 / fbo.height as f32],
         }
     }
 }
