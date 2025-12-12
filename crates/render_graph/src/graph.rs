@@ -391,6 +391,7 @@ impl<Context: ThreadSync + 'static, DataId: Key + ThreadSync> DependGraph<Contex
             self.node_names.remove(n.name.as_str());
 			self.is_topo_dirty = true;
 			self.finish_nodes.remove(&id);
+            self.need_init_nodes.retain(|&nid| nid != id); // 添加这一行
         }
         
         Ok(id)
