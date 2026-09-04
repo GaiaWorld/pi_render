@@ -154,7 +154,12 @@ impl ETextureViewUsage {
         match self {
             ETextureViewUsage::Tex(_arc) => ImageTextureFrame::DEFAULT_TILLOFF,
             ETextureViewUsage::TexWithId(_arc) => ImageTextureFrame::DEFAULT_TILLOFF,
-            ETextureViewUsage::Image(_arc) => ImageTextureFrame::DEFAULT_TILLOFF,
+            ETextureViewUsage::Image(_arc) => [
+                _arc.texture().image().realwidth as f32 / _arc.texture().image().width as f32,
+                _arc.texture().image().realheight as f32 / _arc.texture().image().height as f32,
+                0.,
+                0.,
+            ],
             ETextureViewUsage::ImageFrame(arc) => {
                 arc.texture().tilloff()
             },
