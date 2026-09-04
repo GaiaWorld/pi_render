@@ -231,7 +231,7 @@ pub async fn create_environment_texture_from_file<G: Garbageer<ImageTextureFrame
 
             let dimension = wgpu::TextureViewDimension::Cube;
             let haltex = pi_hal::texture::ImageTexture {
-                width, height, size: data.len() as usize, texture, format, view_dimension: dimension, is_opacity
+                width, height, size: data.len() as usize, texture, format, view_dimension: dimension, is_opacity, realwidth: width, realheight: height
             };
             let mut texture = ImageTextureFrame::new(haltex);
             texture.extend = info.infodata;

@@ -115,7 +115,12 @@ impl ImageTextureFrame {
                 (frame.rect.1 as f32 / frame.rect.5 as f32), // * (u16::MAX as f32)) as u16,
             ]
         } else {
-            ImageTextureFrame::DEFAULT_TILLOFF
+            [
+                (self.tex.realwidth as f32 / self.tex.width as f32), // * (u16::MAX as f32)) as u16,
+                (self.tex.realheight as f32 / self.tex.height as f32), // * (u16::MAX as f32)) as u16,
+                (0. as f32 / self.tex.width as f32), // * (u16::MAX as f32)) as u16,
+                (0. as f32 / self.tex.height as f32), // * (u16::MAX as f32)) as u16,
+            ]
         }
     }
     /// 获取纹理资源
@@ -218,7 +223,7 @@ impl ImageTextureFrame {
         // log::error!("{:?}", (key, width, height, format, dimension, depth_or_array_layers, block_width, block_height, extent_width, extent_height, bytes_per_row));
         let size = if let Some(bytes_per_row) = bytes_per_row { extent_height * bytes_per_row } else { extent_width * extent_height * 4 };
         Some(ImageTexture {
-            width, height, size: size as usize, texture, format, view_dimension: dimension, is_opacity
+            width, height, size: size as usize, texture, format, view_dimension: dimension, is_opacity, realwidth: width, realheight: height
         })
     }
     /// 创建独立纹理资源 - 从压缩纹理图片
@@ -290,7 +295,7 @@ impl ImageTextureFrame {
         // log::error!("{:?}", (key, width, height, format, dimension, depth_or_array_layers, block_width, block_height, extent_width, extent_height, bytes_per_row));
         let size = if let Some(bytes_per_row) = bytes_per_row { extent_height * bytes_per_row } else { extent_width * extent_height * 4 };
         ImageTexture {
-            width: extent_width * block_width, height: extent_height * block_height, size: size as usize, texture, format, view_dimension: dimension, is_opacity
+            width: extent_width * block_width, height: extent_height * block_height, size: size as usize, texture, format, view_dimension: dimension, is_opacity, realwidth: width, realheight: height
         }
     }
     /// 创建纹理
@@ -353,7 +358,7 @@ impl ImageTextureFrame {
         if let Some(frame) = &self.frame {
             frame.rect.2 as u32
         } else {
-            self.tex.width
+            self.tex.realwidth
         }
     }
     /// 纹理有效内容宽度
@@ -361,7 +366,7 @@ impl ImageTextureFrame {
         if let Some(frame) = &self.frame {
             frame.rect.3 as u32
         } else {
-            self.tex.height
+            self.tex.realheight
         }
     }
     /// 图块矩形信息

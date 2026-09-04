@@ -64,8 +64,6 @@ impl ResImageTexture {
         format: wgpu::TextureFormat, dimension: wgpu::TextureViewDimension, is_opacity: bool, depth_or_array_layers: u32, aspect: Option<wgpu::TextureAspect>,
         data: Option<&[u8]>, dataoffset: u64
     ) -> Self {
-        let texture = ResImageTexture::create_texture(device, key, width, height, format, dimension.compatible_texture_dimension(), depth_or_array_layers);
-
         let (block_width, block_height) = format.block_dimensions();
         let mut extent_width    = width / block_width;
         let mut extent_height   = height / block_height;
@@ -75,6 +73,9 @@ impl ResImageTexture {
         if extent_height * block_height < height {
             extent_height += 1;
         }
+
+        let texture = ResImageTexture::create_texture(device, key, extent_width * block_width, extent_height * block_height, format, dimension.compatible_texture_dimension(), depth_or_array_layers);
+
         let bytes_per_row = if let Some(pre_pixel_size) = format.block_copy_size(aspect) {
             Some(extent_width * pre_pixel_size)
         } else { None };
@@ -102,7 +103,7 @@ impl ResImageTexture {
         // log::error!("{:?}", (key, width, height, format, dimension, depth_or_array_layers, block_width, block_height, extent_width, extent_height, bytes_per_row));
         let size = if let Some(bytes_per_row) = bytes_per_row { extent_height * bytes_per_row } else { extent_width * extent_height * 4 };
         let data: ImageTexture = ImageTexture {
-            width, height, size: size as usize, texture, format, view_dimension: dimension, is_opacity
+            width: extent_width * block_width, height: extent_height * block_height, size: size as usize, texture, format, view_dimension: dimension, is_opacity, realwidth: width, realheight: height
         };
         Self {
             data, extend: vec![]
